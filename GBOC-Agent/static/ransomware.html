@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GBOC Agent 11.7c - Detecção de Ransomware</title>
+    <link rel="stylesheet" href="/static/style.css?v=11.9">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:28px}
+        .stat-card{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:18px;text-align:center}
+        .stat-card .val{font-size:1.8em;font-weight:700}
+        .stat-card .lbl{font-size:.8em;color:var(--text-muted);margin-top:4px}
+
+        .two-col{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+        @media(max-width:900px){.two-col{grid-template-columns:1fr}}
+
+        .panel{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px}
+        .panel-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+        .panel-header h3{margin:0;display:flex;align-items:center;gap:8px;font-size:1em}
+        .panel-body{padding:20px}
+
+        .tbl{width:100%;border-collapse:collapse}
+        .tbl th,.tbl td{padding:11px 14px;text-align:left;border-bottom:1px solid var(--border);font-size:.85em}
+        .tbl th{background:var(--bg-input);color:var(--text-muted);font-weight:600}
+
+        .badge-ok{background:rgba(78,203,136,.15);color:var(--success);padding:2px 10px;border-radius:20px;font-size:.8em}
+        .badge-warn{background:rgba(240,169,64,.15);color:var(--warning);padding:2px 10px;border-radius:20px;font-size:.8em}
+        .badge-crit{background:rgba(240,107,107,.15);color:var(--danger);padding:2px 10px;border-radius:20px;font-size:.8em}
+        .badge-none{background:rgba(79,163,232,.15);color:var(--primary);padding:2px 10px;border-radius:20px;font-size:.8em}
+
+        .threat-banner{padding:20px;border-radius:12px;margin-bottom:24px;display:flex;align-items:center;gap:16px}
+        .threat-banner.none{background:rgba(78,203,136,.08);border:1px solid rgba(78,203,136,.3)}
+        .threat-banner.low{background:rgba(79,163,232,.08);border:1px solid rgba(79,163,232,.3)}
+        .threat-banner.medium{background:rgba(240,169,64,.08);border:1px solid rgba(240,169,64,.3)}
+        .threat-banner.high,.threat-banner.critical{background:rgba(240,107,107,.08);border:1px solid rgba(240,107,107,.3)}
+        .threat-banner .icon{font-size:2.5em;flex-shrink:0}
+
+        .form-group{margin-bottom:14px}
+        .form-group label{display:block;font-size:.85em;color:var(--text-muted);margin-bottom:5px;font-weight:600}
+        .form-group input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:.9em}
+
+        .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;align-items:center;justify-content:center}
+        .modal-overlay.show{display:flex}
+        .modal-box{background:var(--bg-card);border-radius:14px;padding:28px;width:500px;max-width:95vw;border:1px solid var(--border)}
+        .modal-box h3{margin-bottom:20px;display:flex;align-items:center;gap:10px}
+        .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}
+        .empty-msg{text-align:center;color:var(--text-muted);padding:40px 20px}
+
+        /* Filesystem browser */
+        .fs-browser{border:1px solid var(--border);border-radius:8px;max-height:260px;overflow-y:auto;margin-top:8px;background:var(--bg-main)}
+        .fs-path-bar{display:flex;align-items:center;gap:6px;padding:8px 12px;background:var(--bg-input);border-bottom:1px solid var(--border);font-size:.82em;flex-wrap:wrap}
+        .fs-path-bar .crumb{color:var(--primary);cursor:pointer;font-weight:600}
+        .fs-path-bar .crumb:hover{text-decoration:underline}
+        .fs-item{display:flex;align-items:center;gap:10px;padding:8px 14px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.03);font-size:.88em;transition:background .1s}
+        .fs-item:hover{background:rgba(66,153,225,.08)}
+        .fs-item.selected{background:rgba(66,153,225,.15);border-left:3px solid var(--primary)}
+        .fs-item i{color:var(--warning);width:18px;text-align:center}
+        .fs-loading{text-align:center;padding:20px;color:var(--text-muted);font-size:.85em}
+
+        /* Guardian */
+        .guardian-banner{padding:20px 24px;border-radius:12px;margin-bottom:24px;display:flex;align-items:center;gap:16px;position:relative;overflow:hidden}
+        .guardian-banner.active{background:linear-gradient(135deg,rgba(78,203,136,.08),rgba(79,163,232,.08));border:1px solid rgba(78,203,136,.35)}
+        .guardian-banner.stopped{background:rgba(240,107,107,.06);border:1px solid rgba(240,107,107,.3)}
+        .guardian-banner .pulse{position:absolute;top:16px;right:20px;width:12px;height:12px;border-radius:50%;background:var(--success)}
+        .guardian-banner .pulse.on{animation:pulse-glow 2s ease-in-out infinite}
+        .guardian-banner .pulse.off{background:var(--danger)}
+        @keyframes pulse-glow{0%,100%{box-shadow:0 0 4px rgba(78,203,136,.4)}50%{box-shadow:0 0 14px rgba(78,203,136,.8)}}
+        .guardian-controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px}
+        .guardian-controls select,.guardian-controls input[type=number]{padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:.85em;width:80px}
+        .incident-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
+        .incident-row:last-child{border-bottom:none}
+        .incident-status{font-size:.75em;padding:2px 10px;border-radius:20px;font-weight:600}
+        .incident-status.active{background:rgba(240,107,107,.15);color:var(--danger)}
+        .incident-status.resolved{background:rgba(78,203,136,.15);color:var(--success)}
+    </style>
+    <script src="/static/auth_interceptor.js"></script>
+</head>
+<body>
+    <div class="app">
+        <main class="main-content">
+            <header class="header">
+                <div>
+                    <h1 class="page-title"><i class="fas fa-shield-virus" style="color:var(--danger)"></i> Detecção de Ransomware</h1>
+                    <div class="page-subtitle">Análise de entropia, extensões suspeitas, canary files e varredura completa</div>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" onclick="loadAll()"><i class="fas fa-sync-alt"></i> Atualizar</button>
+                    <button class="btn btn-primary" onclick="openScanModal()"><i class="fas fa-search"></i> Nova Varredura</button>
+                    <button class="btn btn-success" onclick="openCanaryModal()"><i class="fas fa-dove"></i> Criar Canary</button>
+                </div>
+            </header>
+
+            <!-- Status Banner -->
+            <div id="threat-banner" class="threat-banner none">
+                <div class="icon"><i class="fas fa-shield-alt" style="color:var(--success)"></i></div>
+                <div>
+                    <div style="font-size:1.2em;font-weight:700" id="threat-title">Carregando...</div>
+                    <div style="font-size:.88em;color:var(--text-muted)" id="threat-sub"></div>
+                </div>
+            </div>
+
+            <!-- Guardian Auto-Response Banner -->
+            <div class="guardian-banner stopped" id="guardian-banner">
+                <div class="pulse off" id="guardian-pulse"></div>
+                <div style="font-size:2em;flex-shrink:0"><i class="fas fa-robot" id="guardian-icon"></i></div>
+                <div style="flex:1">
+                    <div style="font-size:1.1em;font-weight:700" id="guardian-title">Guardian — Proteção Automática</div>
+                    <div style="font-size:.85em;color:var(--text-muted)" id="guardian-sub">Carregando status...</div>
+                    <div class="guardian-controls" id="guardian-controls">
+                        <button class="btn btn-sm btn-success" id="guardian-toggle-btn" onclick="toggleGuardian()"><i class="fas fa-play"></i> Ativar</button>
+                        <span style="font-size:.82em;color:var(--text-muted)">Intervalo:</span>
+                        <input type="number" id="guardian-interval" value="5" min="1" max="60" title="Minutos entre verificações">
+                        <button class="btn btn-sm btn-secondary" onclick="saveGuardianConfig()" title="Salvar intervalo"><i class="fas fa-save"></i></button>
+                        <button class="btn btn-sm btn-secondary" onclick="testGuardian()" title="Testar notificações"><i class="fas fa-bell"></i> Testar</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- KPIs -->
+            <div class="stats-row" id="kpi-row">
+                <div class="stat-card"><div class="val" id="kpi-canaries">0</div><div class="lbl">Canary Files</div></div>
+                <div class="stat-card"><div class="val" id="kpi-compromised" style="color:var(--danger)">0</div><div class="lbl">Comprometidos</div></div>
+                <div class="stat-card"><div class="val" id="kpi-scans">0</div><div class="lbl">Varreduras</div></div>
+                <div class="stat-card"><div class="val" id="kpi-last-threat">—</div><div class="lbl">Último Nível</div></div>
+                <div class="stat-card"><div class="val" id="kpi-incidents" style="color:var(--warning)">0</div><div class="lbl">Incidentes</div></div>
+            </div>
+
+            <div class="two-col">
+                <!-- Canary Files -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3><i class="fas fa-dove" style="color:var(--success)"></i> Canary Files</h3>
+                        <button class="btn btn-sm btn-secondary" onclick="verifyCanaries()"><i class="fas fa-check-double"></i> Verificar Todos</button>
+                    </div>
+                    <div class="panel-body" id="canary-list"><div class="empty-msg">Carregando...</div></div>
+                </div>
+
+                <!-- Scan History -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3><i class="fas fa-history" style="color:var(--primary)"></i> Histórico de Varreduras</h3>
+                    </div>
+                    <div class="panel-body" style="padding:0">
+                        <table class="tbl">
+                            <thead><tr><th>Data</th><th>Tipo</th><th>Alvo</th><th>Ameaça</th><th>Duração</th></tr></thead>
+                            <tbody id="scan-history"><tr><td colspan="5" class="empty-msg">Carregando...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Incident History -->
+            <div class="panel" style="margin-top:4px">
+                <div class="panel-header">
+                    <h3><i class="fas fa-skull-crossbones" style="color:var(--danger)"></i> Incidentes de Ransomware</h3>
+                    <span style="font-size:.78em;color:var(--text-muted)" id="incident-count"></span>
+                </div>
+                <div class="panel-body" id="incident-list"><div class="empty-msg"><i class="fas fa-check-circle" style="font-size:2em;opacity:.3;display:block;margin-bottom:8px"></i>Nenhum incidente registrado — tudo limpo</div></div>
+            </div>
+
+            <!-- Scan Modal -->
+            <div class="modal-overlay" id="scan-modal">
+                <div class="modal-box" style="width:580px">
+                    <h3><i class="fas fa-search" style="color:var(--primary)"></i> Nova Varredura</h3>
+                    <div class="form-group">
+                        <label>Diretório Alvo</label>
+                        <div style="display:flex;gap:6px">
+                            <input type="text" id="scan-path" placeholder="Selecione ou digite o caminho..." style="flex:1">
+                            <button class="btn btn-secondary" onclick="toggleFsBrowser('scan')" title="Procurar pasta"><i class="fas fa-folder-open"></i></button>
+                        </div>
+                        <div class="fs-browser" id="fs-browser-scan" style="display:none">
+                            <div class="fs-path-bar" id="fs-crumbs-scan"></div>
+                            <div id="fs-list-scan"><div class="fs-loading"><i class="fas fa-spinner fa-spin"></i> Carregando...</div></div>
+                        </div>
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn btn-secondary" onclick="closeScanModal()">Cancelar</button>
+                        <button class="btn btn-primary" onclick="startScan()"><i class="fas fa-play"></i> Iniciar Varredura</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Canary Modal -->
+            <div class="modal-overlay" id="canary-modal">
+                <div class="modal-box" style="width:580px">
+                    <h3><i class="fas fa-dove" style="color:var(--success)"></i> Criar Canary File</h3>
+                    <div class="form-group">
+                        <label>Caminho do Arquivo Canary</label>
+                        <div style="display:flex;gap:6px">
+                            <input type="text" id="canary-path" placeholder="Selecione a pasta e adicione o nome do arquivo..." style="flex:1">
+                            <button class="btn btn-secondary" onclick="toggleFsBrowser('canary')" title="Procurar pasta"><i class="fas fa-folder-open"></i></button>
+                        </div>
+                        <div class="fs-browser" id="fs-browser-canary" style="display:none">
+                            <div class="fs-path-bar" id="fs-crumbs-canary"></div>
+                            <div id="fs-list-canary"><div class="fs-loading"><i class="fas fa-spinner fa-spin"></i> Carregando...</div></div>
+                        </div>
+                    </div>
+                    <p style="font-size:.82em;color:var(--text-muted)">Um arquivo sentinela será criado nesse caminho. Se ele for alterado ou deletado, um alerta de ransomware será disparado.</p>
+                    <div class="modal-actions">
+                        <button class="btn btn-secondary" onclick="closeCanaryModal()">Cancelar</button>
+                        <button class="btn btn-success" onclick="createCanary()"><i class="fas fa-plus"></i> Criar</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/sidebar.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded',()=>{new UnifiedSidebar().initialize();loadAll()});
+    const API='/api/ransomware';
+
+    async function loadAll(){
+        await Promise.allSettled([loadStatus(), loadCanaries(), loadHistory(), loadGuardian(), loadIncidents()]);
+    }
+
+    // ─── Guardian Auto-Response ──────────────────────────────────
+
+    async function loadGuardian(){
+        try{
+            const r=await fetch(API+'/guardian/status');const d=await r.json();
+            const running=d.running;
+            const banner=document.getElementById('guardian-banner');
+            const pulse=document.getElementById('guardian-pulse');
+            const icon=document.getElementById('guardian-icon');
+            const title=document.getElementById('guardian-title');
+            const sub=document.getElementById('guardian-sub');
+            const btn=document.getElementById('guardian-toggle-btn');
+            const interval=document.getElementById('guardian-interval');
+
+            banner.className='guardian-banner '+(running?'active':'stopped');
+            pulse.className='pulse '+(running?'on':'off');
+            icon.style.color=running?'var(--success)':'var(--danger)';
+            title.textContent='Guardian — '+(running?'Proteção Ativa ✓':'Proteção Inativa');
+
+            const incidents=d.recent_incidents||[];
+            const lastInc=d.last_incident?gbocFormatDateTime(d.last_incident):null;
+            let subText=running
+                ?`Verificando canaries a cada ${d.check_interval_minutes||5} min`
+                :`Desativado — o sistema NÃO responderá automaticamente a ataques`;
+            if(lastInc) subText+=` · Último incidente: ${lastInc}`;
+            sub.textContent=subText;
+
+            btn.className='btn btn-sm '+(running?'btn-danger':'btn-success');
+            btn.innerHTML=running?'<i class="fas fa-stop"></i> Parar':'<i class="fas fa-play"></i> Ativar';
+            interval.value=d.check_interval_minutes||5;
+        }catch(e){console.error('loadGuardian:',e)}
+    }
+
+    async function toggleGuardian(){
+        try{
+            const btn=document.getElementById('guardian-toggle-btn');
+            const isRunning=btn.textContent.trim().includes('Parar');
+            const r=await fetch(API+'/guardian/'+(isRunning?'stop':'start'),{method:'POST'});
+            const d=await r.json();
+            loadGuardian();
+        }catch(e){alert('Erro: '+e.message)}
+    }
+
+    async function saveGuardianConfig(){
+        const mins=parseInt(document.getElementById('guardian-interval').value)||5;
+        try{
+            const r=await fetch(API+'/guardian/config',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({check_interval_minutes:mins})});
+            if(!r.ok){const d=await r.json();alert(d.detail||'Erro');return}
+            loadGuardian();
+        }catch(e){alert('Erro: '+e.message)}
+    }
+
+    async function testGuardian(){
+        if(!confirm('Enviar notificação de TESTE por todos os canais configurados?'))return;
+        try{
+            const r=await fetch(API+'/guardian/test',{method:'POST'});
+            const d=await r.json();
+            const n=d.notifications||{};
+            alert(`Teste concluído!\nEnviados: ${n.sent||0}\nFalharam: ${n.failed||0}\nCanais: ${(n.channels||[]).join(', ')||'Nenhum configurado'}`);
+        }catch(e){alert('Erro: '+e.message)}
+    }
+
+    async function loadIncidents(){
+        try{
+            const r=await fetch(API+'/guardian/incidents?limit=10');const d=await r.json();
+            const list=d.incidents||[];
+            document.getElementById('kpi-incidents').textContent=list.length;
+            document.getElementById('incident-count').textContent=list.length?list.length+' registro(s)':'';
+            const el=document.getElementById('incident-list');
+            if(!list.length){el.innerHTML='<div class="empty-msg"><i class="fas fa-check-circle" style="font-size:2em;opacity:.3;display:block;margin-bottom:8px"></i>Nenhum incidente registrado — tudo limpo</div>';return}
+            el.innerHTML=list.map(inc=>{
+                const info=inc.threat_info||{};
+                const actions=inc.response_actions||[];
+                const dt=inc.detected_at?gbocFormatDateTime(inc.detected_at):'—';
+                const st=inc.status||'active';
+                const stCls=st==='resolved'?'resolved':'active';
+                const actSummary=actions.map(a=>a.action).filter(Boolean).join(', ');
+                return `<div class="incident-row">
+                    <div><i class="fas fa-${st==='resolved'?'check-circle':'radiation'}" style="font-size:1.5em;color:${st==='resolved'?'var(--success)':'var(--danger)'}"></i></div>
+                    <div style="flex:1">
+                        <div style="font-weight:600;font-size:.9em">Incidente #${inc.id} — ${dt}</div>
+                        <div style="font-size:.78em;color:var(--text-muted)">
+                            Comprometidos: ${info.compromised||0} · Desaparecidos: ${info.missing||0}
+                            ${actSummary?' · Ações: '+actSummary:''}
+                        </div>
+                        ${inc.resolved_at?`<div style="font-size:.75em;color:var(--success)">Resolvido em: ${gbocFormatDateTime(inc.resolved_at)}</div>`:''}
+                    </div>
+                    <span class="incident-status ${stCls}">${st==='resolved'?'RESOLVIDO':'ATIVO'}</span>
+                    ${st!=='resolved'?`<button class="btn btn-sm btn-success" onclick="resolveIncident(${inc.id})" title="Marcar como resolvido"><i class="fas fa-check"></i></button>`:''}
+                </div>`;
+            }).join('');
+        }catch(e){console.error('loadIncidents:',e)}
+    }
+
+    async function resolveIncident(id){
+        if(!confirm('Marcar este incidente como resolvido?'))return;
+        try{await fetch(API+'/guardian/incidents/'+id+'/resolve',{method:'PUT'});loadIncidents();loadGuardian()}catch(e){alert('Erro: '+e.message)}
+    }
+
+    async function loadStatus(){
+        try{
+            const r=await fetch(API+'/status');const d=await r.json();
+            const c=d.canaries||{};const ls=d.last_scan||{};
+            document.getElementById('kpi-canaries').textContent=c.total||0;
+            document.getElementById('kpi-compromised').textContent=c.compromised||0;
+            const tl=ls.threat_level||d.overall_status||'none';
+            document.getElementById('kpi-last-threat').textContent=tl.toUpperCase();
+            const banner=document.getElementById('threat-banner');
+            banner.className='threat-banner '+(d.overall_status==='protected'?'none':tl);
+            const icon=banner.querySelector('.icon i');
+            if(d.overall_status==='protected'){
+                icon.className='fas fa-shield-alt';icon.style.color='var(--success)';
+                document.getElementById('threat-title').textContent='Sistema Protegido';
+                document.getElementById('threat-sub').textContent=`${c.total} canary files ativos · Último scan: ${ls.date?gbocFormatDateTime(ls.date):'Nunca'}`;
+            } else {
+                icon.className='fas fa-exclamation-triangle';icon.style.color='var(--danger)';
+                document.getElementById('threat-title').textContent='⚠ Atenção — Possível Ameaça Detectada';
+                document.getElementById('threat-sub').textContent=`${c.compromised} canary(s) comprometido(s) · Nível: ${tl}`;
+            }
+        }catch(e){console.error('loadStatus:',e)}
+    }
+
+    async function loadCanaries(){
+        try{
+            const r=await fetch(API+'/canary/list');const d=await r.json();
+            const list=d.canaries||[];
+            const el=document.getElementById('canary-list');
+            if(!list.length){el.innerHTML='<div class="empty-msg"><i class="fas fa-dove" style="font-size:2em;opacity:.3;margin-bottom:8px;display:block"></i>Nenhum canary file criado</div>';return}
+            el.innerHTML=list.map(c=>`
+                <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+                    <i class="fas fa-${c.is_compromised?'exclamation-triangle':'check-circle'}" style="color:${c.is_compromised?'var(--danger)':'var(--success)'};font-size:1.2em"></i>
+                    <div style="flex:1;min-width:0">
+                        <div style="font-weight:600;font-size:.88em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${c.file_path}">${c.file_path}</div>
+                        <div style="font-size:.75em;color:var(--text-muted)">Verificado: ${c.last_verified_at?gbocFormatDateTime(c.last_verified_at):'—'}</div>
+                    </div>
+                    <button class="btn btn-sm btn-danger" onclick="deleteCanary(${c.id})" title="Remover"><i class="fas fa-trash"></i></button>
+                </div>
+            `).join('');
+        }catch(e){console.error('loadCanaries:',e)}
+    }
+
+    async function loadHistory(){
+        try{
+            const r=await fetch(API+'/scan/history?limit=15');const d=await r.json();
+            const scans=d.scans||[];
+            document.getElementById('kpi-scans').textContent=scans.length;
+            const tb=document.getElementById('scan-history');
+            if(!scans.length){tb.innerHTML='<tr><td colspan="5" class="empty-msg">Nenhuma varredura</td></tr>';return}
+            tb.innerHTML=scans.map(s=>{
+                const tl=s.threat_level||'none';
+                const cls=tl==='none'?'badge-none':tl==='low'?'badge-none':tl==='medium'?'badge-warn':'badge-crit';
+                return `<tr>
+                    <td style="font-size:.82em;white-space:nowrap">${s.started_at?gbocFormatDateTime(s.started_at):'—'}</td>
+                    <td>${s.scan_type||'full'}</td>
+                    <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${s.target_path||''}">${s.target_path||'—'}</td>
+                    <td><span class="${cls}">${tl.toUpperCase()}</span></td>
+                    <td>${s.duration_seconds||0}s</td>
+                </tr>`;
+            }).join('');
+        }catch(e){console.error('loadHistory:',e)}
+    }
+
+    function openScanModal(){document.getElementById('scan-modal').classList.add('show')}
+    function closeScanModal(){document.getElementById('scan-modal').classList.remove('show');document.getElementById('fs-browser-scan').style.display='none'}
+    function openCanaryModal(){document.getElementById('canary-modal').classList.add('show')}
+    function closeCanaryModal(){document.getElementById('canary-modal').classList.remove('show');document.getElementById('fs-browser-canary').style.display='none'}
+
+    // ─── Filesystem Browser ──────────────────────────────────────
+    const _fsBrowserState={};
+
+    function toggleFsBrowser(target){
+        const el=document.getElementById('fs-browser-'+target);
+        if(el.style.display==='none'){
+            el.style.display='block';
+            browseTo(target, null);
+        } else {
+            el.style.display='none';
+        }
+    }
+
+    async function browseTo(target, path){
+        const listEl=document.getElementById('fs-list-'+target);
+        const crumbEl=document.getElementById('fs-crumbs-'+target);
+        listEl.innerHTML='<div class="fs-loading"><i class="fas fa-spinner fa-spin"></i> Carregando...</div>';
+        try{
+            let url='/api/fs/browse';
+            if(path) url+='?path='+encodeURIComponent(path);
+            const r=await fetch(url);const d=await r.json();
+            const items=d.items||[];
+            _fsBrowserState[target]={path:d.path||path, items};
+
+            // Breadcrumbs
+            const currentPath=d.path||path||'';
+            let crumbHtml='<i class="fas fa-folder" style="color:var(--warning)"></i> ';
+            if(currentPath){
+                const sep=currentPath.includes('\\\\')?'\\\\':currentPath.includes('/')?'/':'\\\\';
+                const parts=currentPath.replace(/\\\\/g,'/').split('/').filter(Boolean);
+                crumbHtml+=`<span class="crumb" onclick="browseTo('${target}',null)">Raiz</span>`;
+                let accum='';
+                parts.forEach((p,i)=>{
+                    accum+=p+(i<parts.length-1?'/':'');
+                    const full=accum;
+                    crumbHtml+=` / <span class="crumb" onclick="browseTo('${target}','${full.replace(/'/g,"\\'")}')">${p}</span>`;
+                });
+            } else {
+                crumbHtml+='<span style="color:var(--text-muted)">Selecione um diretório</span>';
+            }
+            crumbEl.innerHTML=crumbHtml;
+
+            // Items
+            if(!items.length){
+                listEl.innerHTML='<div class="fs-loading" style="color:var(--text-muted)"><i class="fas fa-folder-open" style="opacity:.4"></i> Pasta vazia</div>';
+                return;
+            }
+            // Add parent dir option
+            let html='';
+            if(currentPath){
+                const parent=currentPath.replace(/\\\\/g,'/').replace(/\/[^/]+\/?$/,'');
+                html+=`<div class="fs-item" onclick="browseTo('${target}','${(parent||'').replace(/'/g,"\\'")}')"><i class="fas fa-level-up-alt"></i> <span style="color:var(--text-muted)">..</span></div>`;
+            }
+            html+=items.map(it=>`
+                <div class="fs-item" onclick="fsSelect('${target}','${it.path.replace(/'/g,"\\'")}','${it.type}')">
+                    <i class="fas fa-${it.type==='drive'?'hdd':'folder'}"></i>
+                    <span>${it.name}</span>
+                </div>
+            `).join('');
+            listEl.innerHTML=html;
+        }catch(e){
+            listEl.innerHTML=`<div class="fs-loading" style="color:var(--danger)"><i class="fas fa-exclamation-triangle"></i> Erro: ${e.message}</div>`;
+        }
+    }
+
+    function fsSelect(target, path, type){
+        if(type==='dir'||type==='drive'){
+            // Set the input value to the selected path
+            const inputId=target==='scan'?'scan-path':'canary-path';
+            document.getElementById(inputId).value=path;
+            // Navigate into the folder
+            browseTo(target, path);
+        }
+    }
+
+    async function startScan(){
+        const path=document.getElementById('scan-path').value.trim();
+        if(!path){alert('Informe o diretório alvo');return}
+        closeScanModal();
+        try{
+            const r=await fetch(API+'/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target_path:path})});
+            const d=await r.json();
+            if(!r.ok){alert('Erro: '+(d.detail||'Desconhecido'));return}
+            alert(`Varredura concluída!\nNível de ameaça: ${(d.threat_level||'none').toUpperCase()}\nAchados: ${d.findings?.length||0}`);
+            loadAll();
+        }catch(e){alert('Erro: '+e.message)}
+    }
+
+    async function createCanary(){
+        const path=document.getElementById('canary-path').value.trim();
+        if(!path){alert('Informe o caminho');return}
+        closeCanaryModal();
+        try{
+            const r=await fetch(API+'/canary',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({file_path:path})});
+            if(!r.ok){const d=await r.json();alert('Erro: '+(d.detail||'Desconhecido'));return}
+            loadAll();
+        }catch(e){alert('Erro: '+e.message)}
+    }
+
+    async function deleteCanary(id){
+        if(!confirm('Remover este canary file?'))return;
+        try{await fetch(API+'/canary/'+id,{method:'DELETE'});loadAll()}catch(e){alert('Erro: '+e.message)}
+    }
+
+    async function verifyCanaries(){
+        try{
+            const r=await fetch(API+'/canary/verify');const d=await r.json();
+            alert(`Verificação concluída!\nIntactos: ${d.intact||0}\nComprometidos: ${d.compromised||0}\nFaltando: ${d.missing||0}`);
+            loadAll();
+        }catch(e){alert('Erro: '+e.message)}
+    }
+    </script>
+</body>
+</html>
+

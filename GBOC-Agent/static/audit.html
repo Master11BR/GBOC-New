@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GBOC Agent 11.7c - Audit Trail</title>
+    <link rel="stylesheet" href="/static/style.css?v=11.9">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="/static/auth_interceptor.js"></script>
+    <style>
+        .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:18px}
+        .stat-card{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center}
+        .stat-card .val{font-size:1.5em;font-weight:700}.stat-card .lbl{font-size:.8em;color:var(--text-muted)}
+        .panel{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:16px}
+        .panel-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+        .panel-body{padding:14px 18px}
+        .tbl{width:100%;border-collapse:collapse}.tbl th,.tbl td{padding:9px 10px;border-bottom:1px solid var(--border);font-size:.84em;text-align:left}
+        .tbl th{background:var(--bg-input);color:var(--text-muted)}
+    </style>
+</head>
+<body>
+<div class="app">
+<main class="main-content">
+    <header class="header">
+        <div>
+            <h1 class="page-title"><i class="fas fa-clipboard-list" style="color:var(--primary)"></i> Audit Trail</h1>
+            <div class="page-subtitle">Rastreio de ações administrativas e eventos de segurança</div>
+        </div>
+        <div class="header-actions">
+            <button class="btn btn-secondary" onclick="loadAll()"><i class="fas fa-sync-alt"></i> Atualizar</button>
+            <button class="btn btn-primary" onclick="exportCsv()"><i class="fas fa-download"></i> Export CSV</button>
+        </div>
+    </header>
+
+    <div class="stats-row">
+        <div class="stat-card"><div class="val" id="kpi-total">0</div><div class="lbl">Eventos</div></div>
+        <div class="stat-card"><div class="val" id="kpi-users">0</div><div class="lbl">Usuários únicos</div></div>
+        <div class="stat-card"><div class="val" id="kpi-actions">0</div><div class="lbl">Tipos de ação</div></div>
+        <div class="stat-card"><div class="val" id="kpi-24h">0</div><div class="lbl">Últimas 24h</div></div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header">
+            <h3><i class="fas fa-filter"></i> Filtros</h3>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <select id="f-action" class="form-control" style="min-width:220px"></select>
+                <input id="f-user" class="form-control" style="min-width:200px" placeholder="Filtrar por usuário">
+                <input id="f-ip" class="form-control" style="min-width:170px" placeholder="Filtrar por IP">
+                <button class="btn btn-sm btn-primary" onclick="applyFilters()"><i class="fas fa-search"></i> Aplicar</button>
+                <button class="btn btn-sm btn-secondary" onclick="clearFilters()"><i class="fas fa-eraser"></i> Limpar</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header"><h3><i class="fas fa-clock"></i> Eventos de Auditoria</h3></div>
+        <div class="panel-body" style="padding:0">
+            <table class="tbl">
+                <thead><tr><th>Data</th><th>Ação</th><th>Usuário</th><th>IP</th><th>Detalhes</th></tr></thead>
+                <tbody id="audit-table"><tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:20px">Carregando...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+</main>
+</div>
+<script src="/static/sidebar.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{new UnifiedSidebar().initialize();loadAll()});
+const API='/api/audit';
+let _items=[];
+
+async function loadAll(){ await Promise.allSettled([loadActions(), loadSummary(), loadEvents()]); }
+
+async function loadActions(){
+  const r=await fetch(API+'/actions'); const d=await r.json();
+  const actions=d.actions||[];
+  document.getElementById('f-action').innerHTML='<option value="">Todas as ações</option>'+actions.map(a=>`<option value="${a}">${a}</option>`).join('');
+}
+
+async function loadSummary(){
+  const [r30, r1] = await Promise.all([
+    fetch(API+'/summary?days=30'),
+    fetch(API+'/summary?days=1')
+  ]);
+  const d30 = await r30.json();
+  const d1 = await r1.json();
+
+  const total = (d30.daily_activity||[]).reduce((acc,x)=>acc + Number(x.cnt||0), 0);
+  const users = (d30.users||[]).length;
+  const actions = (d30.actions||[]).length;
+  const last24h = (d1.daily_activity||[]).reduce((acc,x)=>acc + Number(x.cnt||0), 0);
+
+  document.getElementById('kpi-total').textContent = total;
+  document.getElementById('kpi-users').textContent = users;
+  document.getElementById('kpi-actions').textContent = actions;
+  document.getElementById('kpi-24h').textContent = last24h;
+}
+
+async function loadEvents(){
+  const r=await fetch(API+'/?limit=200'); const d=await r.json();
+  _items=d.entries||[];
+  render(_items);
+}
+
+function applyFilters(){
+  const action=document.getElementById('f-action').value;
+  const user=(document.getElementById('f-user').value||'').toLowerCase();
+  const ip=(document.getElementById('f-ip').value||'').toLowerCase();
+  const list=_items.filter(x=>{
+    const xa=(x.action||x.event_type||'');
+    const xu=(x.username||x.user||'').toLowerCase();
+    const xi=(x.ip_address||x.ip||'').toLowerCase();
+    return (!action||xa===action) && (!user||xu.includes(user)) && (!ip||xi.includes(ip));
+  });
+  render(list);
+}
+
+function clearFilters(){
+  document.getElementById('f-action').value='';
+  document.getElementById('f-user').value='';
+  document.getElementById('f-ip').value='';
+  render(_items);
+}
+
+function render(list){
+  const tb=document.getElementById('audit-table');
+  if(!list.length){tb.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:20px">Sem eventos</td></tr>';return}
+  tb.innerHTML=list.map(x=>`<tr>
+    <td>${x.timestamp?gbocFormatDateTime(x.timestamp):'—'}</td>
+    <td><strong>${x.action||'—'}</strong></td>
+    <td>${x.username||'—'}</td>
+    <td>${x.ip_address||'—'}</td>
+    <td style="max-width:420px;white-space:normal;word-break:break-word">${x.detail ? (typeof x.detail==='string'?x.detail:JSON.stringify(x.detail)) : (x.error_message||'—')}</td>
+  </tr>`).join('');
+}
+
+function exportCsv(){ window.open(API+'/export?format=csv','_blank'); }
+</script>
+</body>
+</html>
+

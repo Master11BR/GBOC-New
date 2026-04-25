@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GBOC Agent - Logs do Sistema</title>
+    <link rel="stylesheet" href="/static/style.css?v=11.9">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Todos os estilos usam variáveis do tema — não há hardcode de cor */
+        .log-container { background: var(--bg-card); border-radius: 8px; padding: 20px; border: 1px solid var(--border); }
+        .log-controls { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+        .log-viewer {
+            background: var(--bg-input);
+            color: var(--text);
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            max-height: 600px;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+        }
+        [data-theme="light"] .log-viewer { background: var(--bg-input); color: var(--text); }
+        .log-line { padding: 3px 0; border-bottom: 1px solid var(--border); }
+        .log-line:hover { background: var(--card-hover); }
+        .log-error   { color: var(--danger); }
+        .log-warning { color: var(--warning); }
+        .log-info    { color: var(--primary); }
+        .log-success { color: var(--success); }
+        .log-timestamp { color: var(--text-muted); margin-right: 10px; }
+        .filter-badge { padding: 6px 12px; border-radius: 4px; cursor: pointer; border: 1px solid var(--border); color: var(--text); background: var(--bg-card); transition: all 0.2s; font-size: 0.88em; }
+        .filter-badge:hover { background: var(--card-hover); }
+        .filter-badge.active { background: var(--primary); color: var(--bg-dark); border-color: var(--primary); }
+        .module-select { padding: 6px 12px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: .85em; }
+        .log-divider { border-left: 1px solid var(--border); margin: 0 6px; height: 24px; display: inline-block; vertical-align: middle; }
+    </style>
+    <script src="/static/auth_interceptor.js"></script>
+</head>
+<body>
+    <div class="app">
+        <!-- Sidebar será injetado automaticamente pelo sidebar.js -->
+
+        <main class="main-content">
+            <header class="header">
+                <div>
+                    <h1 class="page-title">Logs do Sistema</h1>
+                    <div class="page-subtitle">Eventos e diagnósticos do GBOC Agent</div>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" onclick="refreshLogs()">
+                        <i class="fas fa-sync-alt"></i> Atualizar
+                    </button>
+                    <button class="btn btn-secondary" onclick="clearLogs()">
+                        <i class="fas fa-trash"></i> Limpar
+                    </button>
+                </div>
+            </header>
+
+            <div class="content">
+                <div class="log-container">
+                    <div class="log-controls">
+                        <span class="filter-badge active" data-level="all" onclick="filterLogs('all')">
+                            <i class="fas fa-list"></i> Todos
+                        </span>
+                        <span class="filter-badge" data-level="error" onclick="filterLogs('error')">
+                            <i class="fas fa-times-circle"></i> Erros
+                        </span>
+                        <span class="filter-badge" data-level="warning" onclick="filterLogs('warning')">
+                            <i class="fas fa-exclamation-triangle"></i> Avisos
+                        </span>
+                        <span class="filter-badge" data-level="info" onclick="filterLogs('info')">
+                            <i class="fas fa-info-circle"></i> Info
+                        </span>
+                        <span class="filter-badge" data-level="success" onclick="filterLogs('success')">
+                            <i class="fas fa-check-circle"></i> Sucesso
+                        </span>
+                        <span class="log-divider"></span>
+                        <select id="moduleFilter" onchange="loadLogs()" class="module-select">
+                            <option value="">Todos os Módulos</option>
+                            <option value="backup">Backup</option>
+                            <option value="repository">Repositório</option>
+                            <option value="scheduler">Agendamento</option>
+                            <option value="api">API</option>
+                            <option value="system">Sistema</option>
+                            <option value="server">Servidor</option>
+                            <option value="diagnostic">Diagnóstico</option>
+                        </select>
+                    </div>
+
+                    <div class="log-viewer" id="logViewer">
+                        <div class="log-line log-info">
+                            <span class="log-timestamp">[Carregando...]</span>
+                            <span>Aguardando dados dos logs...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let currentFilter = 'all';
+        let allLogs = [];
+        let isLoading = false;
+        let refreshTimer = null;
+        let lastTopLogId = null;
+
+        function formatTimestamp(ts) {
+            if (!ts) return '';
+            try {
+                const d = new Date(ts);
+                if (isNaN(d.getTime())) return ts;
+                return d.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit' });
+            } catch(e) { return ts; }
+        }
+
+        async function loadLogs() {
+            if (isLoading) return;
+            isLoading = true;
+            try {
+                let url = '/api/logs/?hours=48&limit=500';
+                const moduleFilter = document.getElementById('moduleFilter');
+                if (moduleFilter && moduleFilter.value) {
+                    url += '&module=' + moduleFilter.value;
+                }
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+
+                const data = await response.json();
+                const newLogs = data.logs || [];
+
+                if (newLogs.length === 0 && allLogs.length > 0) {
+                    // API retornou vazio mas tínhamos logs — manter os anteriores
+                    return;
+                }
+
+                allLogs = newLogs;
+                renderLogs();
+            } catch (error) {
+                console.error('Erro ao carregar logs:', error);
+                // Se já temos logs, manter e mostrar aviso discreto, não sobrescrever
+                if (allLogs.length === 0) {
+                    document.getElementById('logViewer').innerHTML = `
+                        <div class="log-line log-error">
+                            <span class="log-timestamp">[${new Date().toLocaleTimeString('pt-BR')}]</span>
+                            <span>❌ Erro ao carregar logs: ${error.message}</span>
+                        </div>
+                    `;
+                }
+            } finally {
+                isLoading = false;
+                scheduleRefresh();
+            }
+        }
+
+        function scheduleRefresh() {
+            if (refreshTimer) clearTimeout(refreshTimer);
+            refreshTimer = setTimeout(loadLogs, 10000);
+        }
+
+        function renderLogs() {
+            const viewer = document.getElementById('logViewer');
+            if (!viewer) return;
+
+            // Guardar se o usuário estava no topo (para preservar scroll ao atualizar)
+            const wasAtTop = viewer.scrollTop < 50;
+
+            if (allLogs.length === 0) {
+                viewer.innerHTML = '<div class="log-line log-info"><span>Nenhum log disponível</span></div>';
+                return;
+            }
+
+            const filtered = currentFilter === 'all'
+                ? allLogs
+                : allLogs.filter(log => {
+                    const logLevel = (log.level || '').toLowerCase();
+                    return logLevel === currentFilter;
+                });
+
+            if (filtered.length === 0) {
+                viewer.innerHTML = '<div class="log-line log-info"><span>Nenhum log encontrado para o filtro selecionado</span></div>';
+                return;
+            }
+
+            // Logs já vêm do backend em ordem DESC (mais recente primeiro)
+            const html = filtered.map(log => {
+                const levelClass = `log-${(log.level || 'info').toLowerCase()}`;
+                const icon = getLogIcon(log.level);
+                const source = log.source ? `<span class="log-timestamp" style="font-size:.8em">[${escapeHtml(log.source)}]</span> ` : '';
+                const ts = formatTimestamp(log.timestamp);
+                return `<div class="log-line ${levelClass}"><span class="log-timestamp">[${ts}]</span> ${icon} ${source}<span>${escapeHtml(log.message || '')}</span></div>`;
+            }).join('');
+
+            viewer.innerHTML = html;
+
+            // Manter scroll no topo (registros mais recentes) — não rolar para o fundo
+            if (wasAtTop) {
+                viewer.scrollTop = 0;
+            }
+        }
+
+        function filterLogs(level) {
+            currentFilter = level;
+            document.querySelectorAll('.filter-badge').forEach(badge => {
+                badge.classList.remove('active');
+            });
+            const target = document.querySelector(`[data-level="${level}"]`);
+            if (target) target.classList.add('active');
+            renderLogs();
+        }
+
+        function getLogIcon(level) {
+            const levelLower = (level || '').toLowerCase();
+            const icons = {
+                error: '<i class="fas fa-times-circle"></i>',
+                warning: '<i class="fas fa-exclamation-triangle"></i>',
+                info: '<i class="fas fa-info-circle"></i>',
+                success: '<i class="fas fa-check-circle"></i>'
+            };
+            return icons[levelLower] || icons.info;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function refreshLogs() {
+            if (refreshTimer) clearTimeout(refreshTimer);
+            isLoading = false;
+            loadLogs();
+        }
+
+        async function clearLogs() {
+            if (!confirm('Deseja realmente limpar os logs?')) return;
+            try {
+                const response = await fetch('/api/logs/clear', { method: 'POST' });
+                if (response.ok) {
+                    allLogs = [];
+                    renderLogs();
+                    alert('✅ Logs limpos com sucesso!');
+                    loadLogs();
+                }
+            } catch (error) {
+                alert('❌ Erro ao limpar logs: ' + error.message);
+            }
+        }
+
+        // Carregar logs iniciais
+        loadLogs();
+    </script>
+
+    <script src="/static/sidebar.js"></script>
+</body>
+</html>

@@ -1,0 +1,2017 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GBOC Server Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        :root,[data-theme="dark"]{--bg-dark:#0e1525;--bg-card:#182035;--bg-input:#111928;--sidebar-bg:#131c30;--text:#dce8f5;--text-muted:#7ea8cc;--border:#2a3f5f;--card-hover:#1e2d47;--primary:#4fa3e8;--success:#4ecb88;--warning:#f0a940;--danger:#f06b6b;--accent-gradient:linear-gradient(135deg,#4fa3e8,#7b5ea8);--nm-shadow-dark:rgba(0,0,0,.55);--nm-shadow-light:rgba(79,163,232,.06);--nm-inset-dark:rgba(0,0,0,.4);--nm-inset-light:rgba(79,163,232,.04)}
+        [data-theme="light"]{--bg-dark:#eef1f7;--bg-card:#ffffff;--bg-input:#f4f6fb;--sidebar-bg:#ffffff;--text:#0f172a;--text-muted:#475569;--border:#cbd5e1;--card-hover:#e8edf5;--primary:#1d6fbf;--success:#1a7a4a;--warning:#b45309;--danger:#be2525;--accent-gradient:linear-gradient(135deg,#1d6fbf,#6d3fa8);--nm-shadow-dark:rgba(163,177,198,.55);--nm-shadow-light:rgba(255,255,255,.9);--nm-inset-dark:rgba(163,177,198,.45);--nm-inset-light:rgba(255,255,255,.7)}
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:'Segoe UI',Inter,system-ui,sans-serif;background:var(--bg-dark);color:var(--text);min-height:100vh;display:flex;transition:background .3s,color .3s}
+
+        .sidebar{width:240px;background:var(--sidebar-bg);border-right:1px solid var(--border);position:fixed;height:100vh;overflow-y:auto;z-index:100;display:flex;flex-direction:column}
+        .sidebar-header{padding:20px;border-bottom:1px solid var(--border)}
+        .logo{color:var(--text);text-decoration:none;font-size:1.4em;font-weight:700;display:flex;align-items:center;gap:10px}
+        .logo i{color:var(--primary)}
+        .nav{padding:12px;flex:1}
+        .nav-link{display:flex;align-items:center;gap:12px;color:var(--text-muted);text-decoration:none;padding:12px 16px;border-radius:8px;margin-bottom:4px;cursor:pointer;font-weight:500;transition:all .2s;font-size:.95em}
+        .nav-link:hover{background:var(--card-hover);color:var(--text)}
+        .nav-link.active{background:linear-gradient(135deg,rgba(102,126,234,.22),rgba(124,143,242,.18));color:var(--text);box-shadow:4px 4px 10px var(--nm-shadow-dark),-4px -4px 10px var(--nm-shadow-light);border:1px solid rgba(102,126,234,.32)}
+        .nav-link i{width:20px;text-align:center}
+        .sidebar-footer{padding:16px;border-top:1px solid var(--border)}
+        .status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:8px}
+        .status-online{background:var(--success);box-shadow:0 0 8px rgba(72,187,120,.5)}
+        .theme-toggle{background:none;border:1px solid var(--border);color:var(--text-muted);padding:8px 14px;border-radius:6px;cursor:pointer;width:100%;display:flex;align-items:center;gap:8px;font-size:.85em;margin-top:8px;transition:all .2s}
+        .theme-toggle:hover{background:var(--card-hover);color:var(--text)}
+
+        .main-content{flex:1;margin-left:240px;padding:24px}
+        .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px}
+        .page-title{font-size:1.5em;font-weight:700}
+        .page-title i{color:var(--primary);margin-right:8px}
+
+        .tabs{display:flex;gap:6px;margin-bottom:24px;border-bottom:2px solid var(--border);padding-bottom:12px;flex-wrap:wrap}
+        .tab-btn{padding:10px 20px;background:none;border:none;color:var(--text-muted);cursor:pointer;font-weight:600;border-bottom:3px solid transparent;transition:all .2s;display:flex;align-items:center;gap:8px;margin-bottom:-14px;font-size:.95em}
+        .tab-btn:hover{color:var(--text)}
+        .tab-btn.active{color:var(--primary);border-bottom-color:var(--primary)}
+        .tab-section{display:none;animation:fadeIn .3s ease-out}
+        .tab-section.active{display:block}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+        .kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-bottom:24px}
+        .kpi-card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:20px;transition:transform .2s,box-shadow .2s}
+        .kpi-card:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(0,0,0,.15)}
+        .kpi-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+        .kpi-header span{font-size:.82em;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+        .kpi-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.1em}
+        .kpi-icon.blue{background:rgba(66,153,225,.15);color:var(--primary)}
+        .kpi-icon.green{background:rgba(72,187,120,.15);color:var(--success)}
+        .kpi-icon.orange{background:rgba(237,137,54,.15);color:var(--warning)}
+        .kpi-icon.red{background:rgba(245,101,101,.15);color:var(--danger)}
+        .kpi-value{font-size:1.9em;font-weight:700;line-height:1.1}
+        .kpi-sub{font-size:.82em;color:var(--text-muted);margin-top:4px}
+
+        .panel{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px}
+        .panel h3{margin:0 0 16px;font-size:1.05em;display:flex;align-items:center;gap:10px}
+        .chart-panel{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px}
+        .chart-panel canvas{max-height:300px}
+        .charts-row{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px}
+
+        .agent-card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:20px;border-left:4px solid var(--primary);transition:all .2s}
+        .agent-card:hover{box-shadow:0 4px 20px rgba(0,0,0,.2);transform:translateY(-2px)}
+        .agent-card.online{border-left-color:var(--success)}
+        .agent-card.offline{border-left-color:var(--danger)}
+        .agent-name{font-weight:700;font-size:1.1em;margin-bottom:4px}
+        .agent-ip{color:var(--text-muted);font-size:.85em;margin-bottom:12px}
+        .agent-metrics{display:flex;gap:16px;font-size:.85em;color:var(--text-muted)}
+        .agent-metrics span{display:flex;align-items:center;gap:4px}
+
+        .user-card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:20px;border-left:4px solid var(--primary);transition:all .2s}
+        .user-card:hover{box-shadow:0 4px 20px rgba(0,0,0,.2);transform:translateY(-2px)}
+        .user-name{font-weight:700;font-size:1.05em;margin-bottom:4px}
+        .user-meta{color:var(--text-muted);font-size:.85em;margin-bottom:12px}
+        .user-badges{display:flex;gap:8px;flex-wrap:wrap}
+
+        .data-table{width:100%;border-collapse:collapse}
+        .data-table th{text-align:left;padding:12px;font-size:.78em;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)}
+        .data-table td{padding:12px;border-bottom:1px solid var(--border);font-size:.9em}
+        .data-table tr:hover{background:var(--card-hover)}
+        .badge{padding:3px 10px;border-radius:4px;font-size:.75em;font-weight:700;text-transform:uppercase}
+        .badge-success{background:rgba(72,187,120,.15);color:var(--success)}
+        .badge-warning{background:rgba(237,137,54,.15);color:var(--warning)}
+        .badge-error{background:rgba(245,101,101,.15);color:var(--danger)}
+        .badge-info{background:rgba(66,153,225,.15);color:var(--primary)}
+
+        .btn{padding:8px 16px;border:1px solid var(--border);border-radius:18px;cursor:pointer;font-weight:600;font-size:.9em;display:inline-flex;align-items:center;gap:6px;transition:all .2s;background:var(--bg-input);color:var(--text);box-shadow:4px 4px 10px var(--nm-shadow-dark),-4px -4px 10px var(--nm-shadow-light)}
+        .btn:hover{background:var(--card-hover)}
+        .btn:active{box-shadow:inset 3px 3px 8px var(--nm-inset-dark),inset -3px -3px 8px var(--nm-inset-light)}
+        .btn-primary{background:var(--primary);color:#fff;border-color:transparent}
+        .btn-primary:hover{opacity:.9}
+        .btn-success{background:var(--success);color:#fff;border-color:transparent}
+        .btn-success:hover{opacity:.9}
+
+        /* Config tabs - visual unificado com Agent */
+        #settings-tabs .btn{
+            background:var(--bg-input);
+            color:var(--text-muted);
+            border:1px solid var(--border);
+            border-radius:8px;
+            padding:8px 14px;
+            font-size:.85em;
+            font-weight:600;
+        }
+        #settings-tabs .btn:hover{color:var(--text);background:var(--card-hover)}
+        #settings-tabs .btn.active{
+            background:rgba(66,153,225,.15);
+            color:var(--primary);
+            border-color:rgba(66,153,225,.4);
+        }
+
+        @media(max-width:900px){.charts-row{grid-template-columns:1fr}.kpi-grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}}
+        #settings-form input,
+        #settings-form select,
+        #settings-form textarea{
+            border-radius:18px !important;
+            border:1px solid var(--border) !important;
+            background:var(--bg-input) !important;
+            color:var(--text) !important;
+            box-shadow: inset 3px 3px 6px var(--nm-inset-dark), inset -3px -3px 6px var(--nm-inset-light) !important;
+        }
+
+        /* Analytics cards/alerts formatting */
+        .alert-card{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:10px;display:flex;align-items:flex-start;gap:14px;border-left:4px solid var(--warning)}
+        .alert-card.critical{border-left-color:var(--danger);background:rgba(245,101,101,.05)}
+        .alert-card.warning{border-left-color:var(--warning);background:rgba(237,137,54,.05)}
+        .alert-card.info{border-left-color:var(--primary);background:rgba(66,153,225,.05)}
+        .alert-card .alert-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.1em;flex-shrink:0}
+        .alert-card.critical .alert-icon{background:rgba(245,101,101,.15);color:var(--danger)}
+        .alert-card.warning .alert-icon{background:rgba(237,137,54,.15);color:var(--warning)}
+        .alert-card.info .alert-icon{background:rgba(66,153,225,.15);color:var(--primary)}
+        .alert-title{font-weight:700;font-size:.95em;margin-bottom:2px}
+        .alert-msg{font-size:.82em;color:var(--text-muted)}
+        .alert-action{font-size:.8em;color:var(--primary);margin-top:4px;font-weight:600}
+
+        .diag-card{background:var(--bg-input);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:10px;display:flex;gap:14px;align-items:flex-start}
+        .diag-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:.95em}
+        .diag-icon.critical{background:rgba(245,101,101,.15);color:var(--danger)}
+        .diag-icon.high{background:rgba(237,137,54,.15);color:var(--warning)}
+        .diag-icon.medium{background:rgba(66,153,225,.15);color:var(--primary)}
+        .diag-icon.low{background:rgba(72,187,120,.15);color:var(--success)}
+        .diag-severity{display:inline-block;padding:2px 8px;border-radius:4px;font-size:.7em;font-weight:700;text-transform:uppercase;margin-right:6px}
+        .diag-severity.critical{background:rgba(245,101,101,.15);color:var(--danger)}
+        .diag-severity.high{background:rgba(237,137,54,.15);color:var(--warning)}
+        .diag-severity.medium{background:rgba(66,153,225,.15);color:var(--primary)}
+        .diag-severity.low{background:rgba(72,187,120,.15);color:var(--success)}
+        .diag-fix{background:var(--bg-card);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin-top:8px;font-size:.82em;display:flex;align-items:flex-start;gap:8px}
+        .diag-fix i{color:var(--success);margin-top:2px}
+
+        .trend-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;font-size:.78em;font-weight:600}
+        .trend-badge.improving{background:rgba(72,187,120,.15);color:var(--success)}
+        .trend-badge.degrading{background:rgba(245,101,101,.15);color:var(--danger)}
+        .trend-badge.stable{background:rgba(66,153,225,.15);color:var(--primary)}
+    </style>
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <a href="/" class="logo"><i class="fas fa-shield-alt"></i> GBOC Server</a>
+        </div>
+        <nav class="nav">
+            <div class="nav-link active" onclick="switchTab('overview',this)"><i class="fas fa-home"></i> Dashboard</div>
+            <div class="nav-link" onclick="switchTab('agents',this)"><i class="fas fa-server"></i> Agentes</div>
+            <div class="nav-link" onclick="switchTab('backups',this)"><i class="fas fa-hard-drive"></i> Backups</div>
+            <div class="nav-link" onclick="switchTab('analytics',this)"><i class="fas fa-chart-bar"></i> Analytics</div>
+            <div class="nav-link" onclick="switchTab('ransomware',this)"><i class="fas fa-shield-virus"></i> Ransomware</div>
+            <div class="nav-link" onclick="switchTab('compliance',this)"><i class="fas fa-clipboard-check"></i> Compliance</div>
+            <div class="nav-link" onclick="switchTab('alerts',this)"><i class="fas fa-bell"></i> Alertas</div>
+            <div class="nav-link" onclick="switchTab('replication',this)"><i class="fas fa-exchange-alt"></i> Replicação</div>
+            <div class="nav-link" onclick="switchTab('logs',this)"><i class="fas fa-file-alt"></i> Logs</div>
+            <div class="nav-link" onclick="switchTab('users',this)"><i class="fas fa-users-cog"></i> Usuários</div>
+            <div class="nav-link" onclick="switchTab('config',this)"><i class="fas fa-cog"></i> Configurações</div>
+        </nav>
+        <div class="sidebar-footer">
+            <div style="font-size:.82em;color:var(--text-muted);margin-bottom:6px">
+                <span class="status-dot status-online" id="conn-dot"></span>
+                <span id="conn-text">Servidor Online</span>
+            </div>
+            <div style="font-size:.82em;color:var(--text);margin-bottom:8px;display:flex;align-items:center;gap:6px">
+                <i class="fas fa-user-circle" style="color:var(--primary)"></i>
+                <span id="user-display">Admin</span>
+            </div>
+            <button class="theme-toggle" onclick="toggleTheme()">
+                <i class="fas fa-adjust"></i> <span id="theme-label">Tema</span>
+            </button>
+            <button class="theme-toggle" onclick="doLogout()" style="margin-top:4px;color:var(--danger)">
+                <i class="fas fa-sign-out-alt"></i> Sair
+            </button>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <div class="header">
+            <h1 class="page-title"><i class="fas fa-chart-line"></i> GBOC Analytics</h1>
+            <div style="display:flex;gap:8px">
+                <button class="btn btn-success" onclick="pushSync()"><i class="fas fa-upload"></i> Push Sync</button>
+                <button class="btn btn-primary" onclick="loadAll()"><i class="fas fa-sync-alt"></i> Atualizar</button>
+            </div>
+        </div>
+
+        <!-- TAB: OVERVIEW -->
+        <div id="tab-overview" class="tab-section active">
+            <div class="kpi-grid">
+                <div class="kpi-card">
+                    <div class="kpi-header"><span>Agentes</span><div class="kpi-icon blue"><i class="fas fa-server"></i></div></div>
+                    <div class="kpi-value" id="kpi-online">0</div>
+                    <div class="kpi-sub">Online</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-header"><span>Jobs (24h)</span><div class="kpi-icon green"><i class="fas fa-play-circle"></i></div></div>
+                    <div class="kpi-value" id="kpi-jobs">0</div>
+                    <div class="kpi-sub" id="kpi-success-rate">0% sucesso</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-header"><span>Volume (7d)</span><div class="kpi-icon orange"><i class="fas fa-database"></i></div></div>
+                    <div class="kpi-value" id="kpi-volume">0</div>
+                    <div class="kpi-sub">GB</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-header"><span>Alertas</span><div class="kpi-icon red"><i class="fas fa-exclamation-triangle"></i></div></div>
+                    <div class="kpi-value" id="kpi-alerts">0</div>
+                    <div class="kpi-sub">Criticos</div>
+                </div>
+            </div>
+
+            <div class="chart-panel">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                    <h3 style="margin:0"><i class="fas fa-activity" style="color:var(--primary);margin-right:8px"></i> Trafego & Performance</h3>
+                    <div class="period-btns">
+                        <button class="period-btn" onclick="loadChart('24h',this)">24H</button>
+                        <button class="period-btn active" onclick="loadChart('7d',this)">7D</button>
+                        <button class="period-btn" onclick="loadChart('30d',this)">30D</button>
+                        <button class="period-btn" onclick="loadChart('1y',this)">1A</button>
+                    </div>
+                </div>
+                <canvas id="main-chart" style="max-height:300px"></canvas>
+            </div>
+
+            <div class="panel">
+                <h3><i class="fas fa-clock" style="color:var(--primary)"></i> Ultimas Atividades</h3>
+                <table class="data-table">
+                    <thead><tr><th>Status</th><th>Agente</th><th>Origem</th><th>Tamanho</th><th>Data</th></tr></thead>
+                    <tbody id="table-recent"><tr><td colspan="5" style="text-align:center;color:var(--text-muted)">Carregando...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- TAB: AGENTS -->
+        <div id="tab-agents" class="tab-section">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+                <h2 style="font-size:1.3em;margin:0"><i class="fas fa-server" style="color:var(--primary);margin-right:8px"></i> Agentes Conectados</h2>
+                <div style="display:flex;gap:8px;align-items:center">
+                    <span id="agents-summary" style="font-size:.85em;color:var(--text-muted)"></span>
+                    <button class="btn btn-primary" onclick="loadAgentsTab()"><i class="fas fa-sync-alt"></i> Atualizar</button>
+                </div>
+            </div>
+            <!-- Agent Cards Grid -->
+            <div id="agents-grid" class="kpi-grid" style="grid-template-columns:repeat(auto-fill,minmax(340px,1fr));margin-bottom:24px"></div>
+            <!-- Agent Detail Panel (shown when a card is clicked) -->
+            <div id="agent-detail-panel" style="display:none"></div>
+        </div>
+
+        <!-- TAB: BACKUPS -->
+        <div id="tab-backups" class="tab-section">
+            <div class="panel">
+                <h3><i class="fas fa-hard-drive" style="color:var(--primary)"></i> Historico de Backups</h3>
+                <table class="data-table">
+                    <thead><tr><th>Status</th><th>Agente</th><th>Job</th><th>Duracao</th><th>Tamanho</th><th>Data</th></tr></thead>
+                    <tbody id="table-backups"><tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Carregando...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- TAB: ANALYTICS -->
+        <div id="tab-analytics" class="tab-section">
+            <!-- Health Score Banner -->
+            <div id="health-banner" class="panel" style="border-left:4px solid var(--success);margin-bottom:20px;display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+                <div style="text-align:center;min-width:100px">
+                    <div id="health-score" style="font-size:2.8em;font-weight:800;line-height:1">100</div>
+                    <div id="health-label" style="font-size:.82em;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-top:4px">Saudável</div>
+                </div>
+                <div style="flex:1;min-width:200px">
+                    <h3 style="margin:0 0 8px;font-size:1.1em"><i class="fas fa-heartbeat" style="color:var(--danger);margin-right:8px"></i>Score de Saúde do Sistema</h3>
+                    <div style="background:var(--bg-input);border-radius:8px;height:12px;overflow:hidden">
+                        <div id="health-bar" style="height:100%;border-radius:8px;background:var(--success);width:100%;transition:width .5s"></div>
+                    </div>
+                    <div id="health-summary" style="font-size:.82em;color:var(--text-muted);margin-top:6px"></div>
+                </div>
+            </div>
+
+            <!-- Alertas Preemptivos -->
+            <div id="alerts-container" style="margin-bottom:20px"></div>
+
+            <!-- KPIs -->
+            <div class="kpi-grid" style="margin-bottom:20px">
+                <div class="kpi-card">
+                    <div class="kpi-header"><span>Execuções Totais</span><div class="kpi-icon blue"><i class="fas fa-play-circle"></i></div></div>
+                    <div class="kpi-value" id="an-total-exec">0</div>
+                    <div class="kpi-sub" id="an-success-rate">0% sucesso</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-header"><span>Últimas 24h</span><div class="kpi-icon green"><i class="fas fa-clock"></i></div></div>
+                    <div class="kpi-value" id="an-24h">0</div>
+                    <div class="kpi-sub" id="an-24h-rate">0% sucesso</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-header"><span>Falhas (7d)</span><div class="kpi-icon red"><i class="fas fa-times-circle"></i></div></div>
+                    <div class="kpi-value" id="an-fails-7d">0</div>
+                    <div class="kpi-sub" id="an-fail-trend">—</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-header"><span>Duração Média</span><div class="kpi-icon orange"><i class="fas fa-stopwatch"></i></div></div>
+                    <div class="kpi-value" id="an-avg-dur">0s</div>
+                    <div class="kpi-sub" id="an-dur-trend">—</div>
+                </div>
+            </div>
+
+            <!-- Gráficos de Tendência -->
+            <div class="charts-row" style="margin-bottom:20px">
+                <div class="chart-panel">
+                    <h3 style="margin:0 0 16px"><i class="fas fa-chart-area" style="color:var(--primary);margin-right:8px"></i> Timeline de Execuções (14 dias)</h3>
+                    <canvas id="chart-timeline"></canvas>
+                </div>
+                <div class="chart-panel">
+                    <h3 style="margin:0 0 16px"><i class="fas fa-chart-line" style="color:var(--warning);margin-right:8px"></i> Logs por Hora (24h)</h3>
+                    <canvas id="chart-logs"></canvas>
+                </div>
+            </div>
+
+            <!-- Métricas de Sistema + Previsões -->
+            <div class="charts-row" style="margin-bottom:20px">
+                <div class="chart-panel">
+                    <h3 style="margin:0 0 16px"><i class="fas fa-microchip" style="color:var(--success);margin-right:8px"></i> Recursos do Sistema (Histórico)</h3>
+                    <canvas id="chart-system"></canvas>
+                </div>
+                <div class="chart-panel">
+                    <h3 style="margin:0 0 16px"><i class="fas fa-crystal-ball" style="color:var(--primary);margin-right:8px"></i> Previsão de Disco (7 dias)</h3>
+                    <div id="prediction-summary" style="margin-bottom:12px"></div>
+                    <canvas id="chart-prediction"></canvas>
+                </div>
+            </div>
+
+            <!-- Performance por Task + Por Agente -->
+            <div class="charts-row" style="margin-bottom:20px">
+                <div class="panel">
+                    <h3><i class="fas fa-tasks" style="color:var(--primary)"></i> Performance por Job</h3>
+                    <table class="data-table">
+                        <thead><tr><th>Job</th><th>Total</th><th>OK</th><th>Falhas</th><th>Dur. Média</th><th>Taxa</th></tr></thead>
+                        <tbody id="table-by-task"></tbody>
+                    </table>
+                </div>
+                <div class="panel">
+                    <h3><i class="fas fa-server" style="color:var(--primary)"></i> Performance por Agente</h3>
+                    <table class="data-table">
+                        <thead><tr><th>Agente</th><th>Total</th><th>OK</th><th>Falhas</th><th>Volume</th><th>Taxa</th></tr></thead>
+                        <tbody id="table-by-agent"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Diagnóstico Preemptivo -->
+            <div class="panel" style="margin-bottom:20px">
+                <h3><i class="fas fa-stethoscope" style="color:var(--danger)"></i> Diagnóstico Preemptivo — Erros & Correções</h3>
+                <div id="diagnostics-container"></div>
+            </div>
+        </div>
+
+        <!-- TAB: LOGS -->
+        <div id="tab-logs" class="tab-section">
+            <h2 style="font-size:1.3em;margin-bottom:20px"><i class="fas fa-file-alt" style="color:var(--primary);margin-right:8px"></i> Logs dos Agentes</h2>
+            <div class="panel" style="margin-bottom:16px">
+                <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+                    <select id="log-level" onchange="loadLogs()" style="background:var(--bg-input);color:var(--text);border:1px solid var(--border);padding:8px 12px;border-radius:6px;font-size:.9em">
+                        <option value="">Todos os Níveis</option>
+                        <option value="ERROR">ERROR</option>
+                        <option value="WARNING">WARNING</option>
+                        <option value="INFO">INFO</option>
+                        <option value="DEBUG">DEBUG</option>
+                    </select>
+                    <select id="log-agent" onchange="loadLogs()" style="background:var(--bg-input);color:var(--text);border:1px solid var(--border);padding:8px 12px;border-radius:6px;font-size:.9em">
+                        <option value="">Todos os Agentes</option>
+                    </select>
+                    <input type="text" id="log-search" placeholder="Buscar nos logs..." onkeyup="if(event.key==='Enter')loadLogs()" style="background:var(--bg-input);color:var(--text);border:1px solid var(--border);padding:8px 12px;border-radius:6px;font-size:.9em;flex:1;min-width:200px">
+                    <button class="btn btn-primary" onclick="loadLogs()"><i class="fas fa-search"></i> Filtrar</button>
+                </div>
+            </div>
+            <div class="panel">
+                <div id="log-stats" style="display:flex;gap:16px;margin-bottom:16px;font-size:.85em;color:var(--text-muted)"></div>
+                <div id="logs-container" style="max-height:600px;overflow-y:auto">
+                    <table class="data-table">
+                        <thead><tr><th>Nível</th><th>Agente</th><th>Fonte</th><th>Mensagem</th><th>Data</th></tr></thead>
+                        <tbody id="table-logs"><tr><td colspan="5" style="text-align:center;color:var(--text-muted)">Clique em Filtrar para carregar</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: CONFIG -->
+        <div id="tab-config" class="tab-section">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+                <h2 style="font-size:1.3em;margin:0"><i class="fas fa-cog" style="color:var(--primary);margin-right:8px"></i> Configurações do Servidor</h2>
+                <div style="display:flex;gap:8px">
+                    <button class="btn btn-sm" onclick="exportSettings()" title="Exportar"><i class="fas fa-download"></i> Exportar</button>
+                    <button class="btn btn-sm" onclick="document.getElementById('import-file').click()" title="Importar"><i class="fas fa-upload"></i> Importar</button>
+                    <input type="file" id="import-file" accept=".json" style="display:none" onchange="importSettings(this)">
+                    <button class="btn btn-sm" onclick="runCleanup()" title="Limpeza"><i class="fas fa-broom"></i> Manutenção</button>
+                    <button class="btn btn-sm" style="color:var(--danger)" onclick="resetAllSettings()" title="Reset"><i class="fas fa-undo"></i> Reset</button>
+                </div>
+            </div>
+
+            <!-- Server Info Cards -->
+            <div class="kpi-grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr));margin-bottom:24px">
+                <div class="panel" style="padding:16px">
+                    <h3 style="font-size:.9em;margin-bottom:10px"><i class="fas fa-info-circle" style="color:var(--primary)"></i> Servidor</h3>
+                    <div style="font-size:.85em;color:var(--text-muted);line-height:1.9">
+                        <div><strong>Versão:</strong> <span id="cfg-version">—</span></div>
+                        <div><strong>URL:</strong> <span id="cfg-url">—</span></div>
+                        <div><strong>Host:</strong> <span id="cfg-hostname">—</span></div>
+                        <div><strong>Plataforma:</strong> <span id="cfg-platform">—</span></div>
+                        <div><strong>Python:</strong> <span id="cfg-python">—</span></div>
+                    </div>
+                </div>
+                <div class="panel" style="padding:16px">
+                    <h3 style="font-size:.9em;margin-bottom:10px"><i class="fas fa-database" style="color:var(--success)"></i> Banco de Dados</h3>
+                    <div style="font-size:.85em;color:var(--text-muted);line-height:1.9">
+                        <div><strong>Tipo:</strong> <span id="cfg-db-type">—</span></div>
+                        <div><strong>Host:</strong> <span id="cfg-db-host">—</span></div>
+                        <div><strong>Database:</strong> <span id="cfg-db-name">—</span></div>
+                        <div><strong>Tamanho:</strong> <span id="cfg-db-size">—</span></div>
+                    </div>
+                </div>
+                <div class="panel" style="padding:16px">
+                    <h3 style="font-size:.9em;margin-bottom:10px"><i class="fas fa-network-wired" style="color:var(--warning)"></i> Conexões</h3>
+                    <div style="font-size:.85em;color:var(--text-muted);line-height:1.9">
+                        <div><strong>Agentes:</strong> <span id="cfg-agents-online">—</span> online / <span id="cfg-agents-total">—</span> total</div>
+                        <div><strong>WebSocket:</strong> <span id="cfg-ws-count">—</span> ativas</div>
+                        <div><strong>Reports:</strong> <span id="cfg-reports">—</span></div>
+                        <div><strong>Eventos 24h:</strong> <span id="cfg-events24">—</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Tabs -->
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:10px" id="settings-tabs">
+                <button class="btn btn-sm active" onclick="switchSettingsTab('general',this)"><i class="fas fa-sliders-h"></i> Geral</button>
+                <button class="btn btn-sm" onclick="switchSettingsTab('sync',this)"><i class="fas fa-sync-alt"></i> Sincronização</button>
+                <button class="btn btn-sm" onclick="switchSettingsTab('security',this)"><i class="fas fa-shield-alt"></i> Segurança</button>
+                <button class="btn btn-sm" onclick="switchSettingsTab('database',this)"><i class="fas fa-database"></i> Database</button>
+                <button class="btn btn-sm" onclick="switchSettingsTab('retention',this)"><i class="fas fa-clock"></i> Retenção</button>
+                <button class="btn btn-sm" onclick="switchSettingsTab('notifications',this)"><i class="fas fa-bell"></i> Notificações</button>
+                <button class="btn btn-sm" onclick="switchSettingsTab('ui',this)"><i class="fas fa-palette"></i> Interface</button>
+            </div>
+
+            <!-- Settings Form -->
+            <div class="panel" style="padding:20px">
+                <div id="settings-form" style="display:grid;grid-template-columns:1fr;gap:14px;max-width:700px">
+                    <div style="text-align:center;color:var(--text-muted);padding:30px">Carregando configurações...</div>
+                </div>
+                <div style="margin-top:20px;display:flex;gap:10px">
+                    <button class="btn btn-sm" style="background:var(--primary);color:#fff" onclick="saveCurrentTab()"><i class="fas fa-save"></i> Salvar Alterações</button>
+                    <button class="btn btn-sm" onclick="loadConfig()"><i class="fas fa-undo"></i> Descartar</button>
+                    <span id="save-status" style="font-size:.82em;color:var(--success);align-self:center"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: RANSOMWARE (Centralizado) -->
+        <div id="tab-ransomware" class="tab-section">
+            <h2 style="font-size:1.3em;margin-bottom:20px"><i class="fas fa-shield-virus" style="color:var(--danger);margin-right:8px"></i> Detecção de Ransomware — Visão Centralizada</h2>
+            <div class="kpi-grid" style="margin-bottom:20px">
+                <div class="kpi-card">
+                    <div class="kpi-header"><span>Agentes Protegidos</span><div class="kpi-icon green"><i class="fas fa-shield-alt"></i></div></div>
+                    <div class="kpi-value" id="rw-protected">—</div><div class="kpi-sub">com canary files</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-header"><span>Canary Files Total</span><div class="kpi-icon blue"><i class="fas fa-dove"></i></div></div>
+                    <div class="kpi-value" id="rw-canaries">—</div><div class="kpi-sub">ativos</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-header"><span>Comprometidos</span><div class="kpi-icon red"><i class="fas fa-exclamation-triangle"></i></div></div>
+                    <div class="kpi-value" id="rw-compromised">—</div><div class="kpi-sub">canaries alterados</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-header"><span>Varreduras (7d)</span><div class="kpi-icon orange"><i class="fas fa-search"></i></div></div>
+                    <div class="kpi-value" id="rw-scans">—</div><div class="kpi-sub">realizadas</div>
+                </div>
+            </div>
+            <div class="panel">
+                <h3><i class="fas fa-server" style="color:var(--primary)"></i> Status por Agente</h3>
+                <table class="data-table">
+                    <thead><tr><th>Agente</th><th>Status</th><th>Canaries</th><th>Comprometidos</th><th>Último Scan</th><th>Nível</th></tr></thead>
+                    <tbody id="rw-agents-table"><tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Carregando...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- TAB: COMPLIANCE (Centralizado) -->
+        <div id="tab-compliance" class="tab-section">
+            <h2 style="font-size:1.3em;margin-bottom:20px"><i class="fas fa-clipboard-check" style="color:var(--primary);margin-right:8px"></i> Compliance — Visão Centralizada</h2>
+            <div class="kpi-grid" style="margin-bottom:20px">
+                <div class="kpi-card">
+                    <div class="kpi-header"><span>Score Médio</span><div class="kpi-icon green"><i class="fas fa-percentage"></i></div></div>
+                    <div class="kpi-value" id="cp-score">—</div><div class="kpi-sub">de todos agentes</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-header"><span>Políticas</span><div class="kpi-icon blue"><i class="fas fa-file-contract"></i></div></div>
+                    <div class="kpi-value" id="cp-policies">—</div><div class="kpi-sub">configuradas</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-header"><span>Violações</span><div class="kpi-icon red"><i class="fas fa-times-circle"></i></div></div>
+                    <div class="kpi-value" id="cp-violations">—</div><div class="kpi-sub">encontradas</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-header"><span>Última Auditoria</span><div class="kpi-icon orange"><i class="fas fa-gavel"></i></div></div>
+                    <div class="kpi-value" id="cp-last" style="font-size:1em">—</div><div class="kpi-sub">data</div>
+                </div>
+            </div>
+            <div id="cp-agents-grid" class="kpi-grid" style="grid-template-columns:repeat(auto-fill,minmax(340px,1fr));margin-bottom:20px"></div>
+            <div class="panel">
+                <h3><i class="fas fa-server" style="color:var(--primary)"></i> Compliance por Agente</h3>
+                <table class="data-table">
+                    <thead><tr><th>Agente</th><th>Score</th><th>Conformes</th><th>Violações</th><th>Última Auditoria</th></tr></thead>
+                    <tbody id="cp-agents-table"><tr><td colspan="5" style="text-align:center;color:var(--text-muted)">Carregando...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- TAB: ALERTS (Centralizado) -->
+        <div id="tab-alerts" class="tab-section">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+                <h2 style="font-size:1.3em;margin:0"><i class="fas fa-bell" style="color:var(--warning);margin-right:8px"></i> Central de Alertas</h2>
+                <div style="display:flex;gap:8px">
+                    <select id="srv-alert-sev" onchange="loadServerAlerts()" style="background:var(--bg-input);color:var(--text);border:1px solid var(--border);padding:8px 12px;border-radius:6px;font-size:.9em">
+                        <option value="">Todas</option>
+                        <option value="critical">Crítico</option>
+                        <option value="warning">Aviso</option>
+                        <option value="info">Info</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="loadServerAlerts()"><i class="fas fa-sync-alt"></i> Atualizar</button>
+                </div>
+            </div>
+            <div class="kpi-grid" style="margin-bottom:20px">
+                <div class="kpi-card">
+                    <div class="kpi-header"><span>Total Alertas</span><div class="kpi-icon orange"><i class="fas fa-bell"></i></div></div>
+                    <div class="kpi-value" id="sa-total">—</div><div class="kpi-sub">registrados</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-header"><span>Não Lidos</span><div class="kpi-icon blue"><i class="fas fa-eye-slash"></i></div></div>
+                    <div class="kpi-value" id="sa-unread">—</div><div class="kpi-sub">pendentes</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-header"><span>Críticos</span><div class="kpi-icon red"><i class="fas fa-exclamation-circle"></i></div></div>
+                    <div class="kpi-value" id="sa-critical">—</div><div class="kpi-sub">ativos</div>
+                </div>
+            </div>
+            <div id="srv-alerts-grid" class="kpi-grid" style="grid-template-columns:repeat(auto-fill,minmax(340px,1fr));margin-bottom:20px"></div>
+            <div class="panel">
+                <h3><i class="fas fa-list" style="color:var(--primary)"></i> Alertas Recentes (todos os agentes)</h3>
+                <table class="data-table">
+                    <thead><tr><th>Severidade</th><th>Agente</th><th>Título</th><th>Mensagem</th><th>Data</th></tr></thead>
+                    <tbody id="srv-alerts-table"><tr><td colspan="5" style="text-align:center;color:var(--text-muted)">Carregando...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- TAB: REPLICATION (Centralizado) -->
+        <div id="tab-replication" class="tab-section">
+            <h2 style="font-size:1.3em;margin-bottom:20px"><i class="fas fa-exchange-alt" style="color:#805ad5;margin-right:8px"></i> Replicação — Visão Centralizada</h2>
+            <div class="kpi-grid" style="margin-bottom:20px">
+                <div class="kpi-card">
+                    <div class="kpi-header"><span>Regras Ativas</span><div class="kpi-icon blue"><i class="fas fa-copy"></i></div></div>
+                    <div class="kpi-value" id="rp-rules">—</div><div class="kpi-sub">configuradas</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-header"><span>Em Sincronização</span><div class="kpi-icon orange"><i class="fas fa-sync-alt"></i></div></div>
+                    <div class="kpi-value" id="rp-syncing">—</div><div class="kpi-sub">agora</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-header"><span>Volume Total</span><div class="kpi-icon green"><i class="fas fa-database"></i></div></div>
+                    <div class="kpi-value" id="rp-volume">—</div><div class="kpi-sub">replicado</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-header"><span>Erros (24h)</span><div class="kpi-icon red"><i class="fas fa-times-circle"></i></div></div>
+                    <div class="kpi-value" id="rp-errors">—</div><div class="kpi-sub">falhas</div>
+                </div>
+            </div>
+            <div class="panel">
+                <h3><i class="fas fa-server" style="color:var(--primary)"></i> Replicação por Agente</h3>
+                <table class="data-table">
+                    <thead><tr><th>Agente</th><th>Regras</th><th>Em Sync</th><th>Volume</th><th>Último Sync</th><th>Status</th></tr></thead>
+                    <tbody id="rp-agents-table"><tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Carregando...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- TAB: USERS (Segurança & Usuários — layout idêntico ao Agente) -->
+        <div id="tab-users" class="tab-section">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+                <div>
+                    <h2 style="font-size:1.3em;margin:0"><i class="fas fa-user-shield" style="color:var(--primary);margin-right:8px"></i> Segurança &amp; Usuários</h2>
+                    <div style="font-size:.82em;color:var(--text-muted);margin-top:2px">Autenticação, gerenciamento de usuários, senhas e auditoria de acesso</div>
+                </div>
+                <div style="display:flex;gap:8px">
+                    <button class="btn btn-secondary" onclick="loadServerUsers()"><i class="fas fa-sync-alt"></i> Atualizar</button>
+                    <button class="btn btn-primary" onclick="openSrvUserModal()"><i class="fas fa-user-plus"></i> Novo Usuário</button>
+                </div>
+            </div>
+
+            <!-- KPIs -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-bottom:24px">
+                <div class="panel" style="padding:18px;text-align:center;border:1px solid var(--border)">
+                    <div style="font-size:1.8em;font-weight:700" id="srv-kpi-users">0</div>
+                    <div style="font-size:.8em;color:var(--text-muted);margin-top:4px">Usuários</div>
+                </div>
+                <div class="panel" style="padding:18px;text-align:center;border:1px solid var(--border)">
+                    <div style="font-size:1.8em;font-weight:700" id="srv-kpi-admins">0</div>
+                    <div style="font-size:.8em;color:var(--text-muted);margin-top:4px">Administradores</div>
+                </div>
+                <div class="panel" style="padding:18px;text-align:center;border:1px solid var(--border)">
+                    <div style="font-size:1.8em;font-weight:700;color:var(--success)" id="srv-kpi-auth">---</div>
+                    <div style="font-size:.8em;color:var(--text-muted);margin-top:4px">Autenticação</div>
+                </div>
+                <div class="panel" style="padding:18px;text-align:center;border:1px solid var(--border)">
+                    <div style="font-size:1.8em;font-weight:700" id="srv-kpi-sessions">0</div>
+                    <div style="font-size:.8em;color:var(--text-muted);margin-top:4px">Sessões Ativas</div>
+                </div>
+            </div>
+
+            <!-- 3 colunas: Perfil | Usuários | Auditoria -->
+            <div style="display:grid;grid-template-columns:280px 1fr 1fr;gap:20px;align-items:start" id="srv-users-three-col">
+
+                <!-- Perfil + Alterar Senha -->
+                <div class="panel" style="border:2px solid rgba(99,102,241,.2)">
+                    <div style="text-align:center;padding:24px 20px 16px">
+                        <div id="srv-my-avatar" style="width:64px;height:64px;border-radius:14px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;font-size:1.6em;font-weight:800;background:rgba(99,102,241,.12);color:var(--primary);border:2px solid rgba(99,102,241,.3)">?</div>
+                        <div style="font-size:1.05em;font-weight:700" id="srv-my-name">Carregando...</div>
+                        <div style="font-size:.8em;margin:4px 0 8px" id="srv-my-role"></div>
+                        <div style="font-size:.75em;color:var(--text-muted)" id="srv-my-username"></div>
+                    </div>
+                    <div style="padding:0 20px 20px">
+                        <div style="font-size:.88em;font-weight:600;margin-bottom:12px"><i class="fas fa-key" style="color:var(--warning);margin-right:6px"></i> Alterar Senha</div>
+                        <div style="margin-bottom:10px">
+                            <label style="display:block;font-size:.82em;color:var(--text-muted);margin-bottom:4px;font-weight:600">Senha Atual</label>
+                            <input type="password" id="srv-pw-current" style="width:100%;padding:9px 11px;border-radius:7px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:.88em;box-sizing:border-box" placeholder="••••••••">
+                        </div>
+                        <div style="margin-bottom:10px">
+                            <label style="display:block;font-size:.82em;color:var(--text-muted);margin-bottom:4px;font-weight:600">Nova Senha</label>
+                            <input type="password" id="srv-pw-new" style="width:100%;padding:9px 11px;border-radius:7px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:.88em;box-sizing:border-box" placeholder="Mínimo 4 caracteres">
+                        </div>
+                        <div style="margin-bottom:10px">
+                            <label style="display:block;font-size:.82em;color:var(--text-muted);margin-bottom:4px;font-weight:600">Confirmar Nova Senha</label>
+                            <input type="password" id="srv-pw-confirm" style="width:100%;padding:9px 11px;border-radius:7px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:.88em;box-sizing:border-box" placeholder="Repita a nova senha">
+                        </div>
+                        <div id="srv-pw-msg" style="display:none;padding:7px 11px;border-radius:6px;font-size:.83em;margin-bottom:8px"></div>
+                        <button class="btn btn-primary" onclick="srvChangePassword()" style="width:100%">
+                            <i class="fas fa-key"></i> Alterar Senha
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Lista de Usuários -->
+                <div class="panel">
+                    <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+                        <i class="fas fa-users" style="color:var(--primary)"></i>
+                        <span style="font-weight:600;font-size:.95em">Usuários Cadastrados</span>
+                    </div>
+                    <div id="srv-users-list" style="padding:0"><div style="padding:32px;text-align:center;color:var(--text-muted)">Carregando...</div></div>
+                </div>
+
+                <!-- Auditoria -->
+                <div class="panel">
+                    <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+                        <i class="fas fa-clipboard-list" style="color:var(--warning)"></i>
+                        <span style="font-weight:600;font-size:.95em">Auditoria de Acesso</span>
+                    </div>
+                    <div style="overflow-x:auto">
+                        <table style="width:100%;border-collapse:collapse">
+                            <thead><tr>
+                                <th style="padding:10px 12px;text-align:left;font-size:.82em;color:var(--text-muted);background:var(--bg-input);font-weight:600;border-bottom:1px solid var(--border)">Usuário</th>
+                                <th style="padding:10px 12px;text-align:left;font-size:.82em;color:var(--text-muted);background:var(--bg-input);font-weight:600;border-bottom:1px solid var(--border)">Ação</th>
+                                <th style="padding:10px 12px;text-align:left;font-size:.82em;color:var(--text-muted);background:var(--bg-input);font-weight:600;border-bottom:1px solid var(--border)">IP</th>
+                                <th style="padding:10px 12px;text-align:left;font-size:.82em;color:var(--text-muted);background:var(--bg-input);font-weight:600;border-bottom:1px solid var(--border)">Data</th>
+                            </tr></thead>
+                            <tbody id="srv-audit-table"><tr><td colspan="4" style="padding:32px;text-align:center;color:var(--text-muted)">Carregando...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Modal de Usuário -->
+            <div id="srv-user-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;align-items:center;justify-content:center">
+                <div style="background:var(--bg-card);border-radius:14px;padding:28px;width:460px;max-width:95vw;border:1px solid var(--border)">
+                    <h3 style="margin-bottom:20px;display:flex;align-items:center;gap:10px"><i class="fas fa-user-plus" style="color:var(--primary)"></i> Novo Usuário</h3>
+                    <div style="margin-bottom:12px">
+                        <label style="display:block;font-size:.85em;color:var(--text-muted);margin-bottom:5px;font-weight:600">Nome de Exibição</label>
+                        <input type="text" id="srv-usr-display" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:.9em;box-sizing:border-box" placeholder="Nome Completo">
+                    </div>
+                    <div style="margin-bottom:12px">
+                        <label style="display:block;font-size:.85em;color:var(--text-muted);margin-bottom:5px;font-weight:600">Usuário (login)</label>
+                        <input type="text" id="srv-usr-name" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:.9em;box-sizing:border-box" placeholder="admin2">
+                    </div>
+                    <div style="margin-bottom:12px">
+                        <label style="display:block;font-size:.85em;color:var(--text-muted);margin-bottom:5px;font-weight:600">Senha</label>
+                        <input type="password" id="srv-usr-pwd" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:.9em;box-sizing:border-box" placeholder="Mínimo 4 caracteres">
+                    </div>
+                    <div style="margin-bottom:12px">
+                        <label style="display:block;font-size:.85em;color:var(--text-muted);margin-bottom:5px;font-weight:600">Papel</label>
+                        <select id="srv-usr-role" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:.9em;box-sizing:border-box">
+                            <option value="admin">Administrador (acesso total)</option>
+                            <option value="operator">Operador</option>
+                            <option value="viewer">Visualizador (somente leitura)</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
+                        <button class="btn btn-secondary" onclick="closeSrvUserModal()">Cancelar</button>
+                        <button class="btn btn-success" onclick="createSrvUser()"><i class="fas fa-check"></i> Salvar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        const API = '/api/v1';
+        let mainChart = null;
+
+        function fmtDateTime(value){
+            if(!value) return '—';
+            try{
+                let s=String(value);
+                if(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(s)) s += 'Z';
+                const d=new Date(s);
+                if(Number.isNaN(d.getTime())) return String(value);
+                return d.toLocaleString('pt-BR', {
+                    timeZone: 'America/Sao_Paulo',
+                    day:'2-digit', month:'2-digit', year:'numeric',
+                    hour:'2-digit', minute:'2-digit', second:'2-digit'
+                });
+            }catch(e){ return String(value); }
+        }
+
+        function sevMeta(sev){
+            const s = String(sev || 'info').toLowerCase();
+            if(s === 'critical' || s === 'error' || s === 'high') return { color:'var(--danger)', icon:'fa-exclamation-triangle', badge:'badge-error', card:'critical' };
+            if(s === 'warning' || s === 'medium') return { color:'var(--warning)', icon:'fa-exclamation-circle', badge:'badge-warning', card:'warning' };
+            return { color:'var(--primary)', icon:'fa-info-circle', badge:'badge-info', card:'info' };
+        }
+
+        function showTabPlaceholder(tbodyId, colspan, message){
+            const tb = document.getElementById(tbodyId);
+            if(tb) tb.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center;color:var(--text-muted)">${message}</td></tr>`;
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            checkAuth();
+            const saved = localStorage.getItem('gboc_server_theme');
+            if(saved) document.documentElement.setAttribute('data-theme', saved);
+            loadAll();
+            loadChart('7d');
+            setInterval(loadAll, 30000);
+            connectWS();
+        });
+
+        async function checkAuth(){
+            try{
+                const r=await fetch(API+'/auth/status');
+                const d=await r.json();
+                if(!d.authenticated){
+                    window.location.href='/login.html';
+                    return;
+                }
+                // Mostrar nome do usuário na sidebar
+                if(d.user){
+                    const el=document.getElementById('user-display');
+                    if(el) el.textContent=d.user.display_name||d.user.username;
+                }
+            }catch(e){
+                window.location.href='/login.html';
+            }
+        }
+
+        async function doLogout(){
+            try{ await fetch(API+'/auth/logout',{method:'POST'}); }catch(e){}
+            localStorage.removeItem('gboc_server_token');
+            localStorage.removeItem('gboc_server_user');
+            window.location.href='/login.html';
+        }
+
+        function toggleTheme(){
+            const cur = document.documentElement.getAttribute('data-theme');
+            const next = cur === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            localStorage.setItem('gboc_server_theme', next);
+        }
+
+        function switchTab(id, btn){
+            document.querySelectorAll('.tab-section').forEach(s=>s.classList.remove('active'));
+            document.querySelectorAll('.sidebar .nav-link').forEach(l=>l.classList.remove('active'));
+            document.getElementById('tab-'+id).classList.add('active');
+            if(btn) btn.classList.add('active');
+            if(id==='analytics') loadAnalytics();
+            if(id==='agents') loadAgentsTab();
+            if(id==='logs'){ loadLogAgentFilter(); loadLogs(); }
+            if(id==='config') loadConfig();
+            if(id==='ransomware') loadServerRansomware();
+            if(id==='compliance') loadServerCompliance();
+            if(id==='alerts') loadServerAlerts();
+            if(id==='replication') loadServerReplication();
+            if(id==='users') loadServerUsers();
+        }
+
+        let ws=null, _wsReconnectTimer=null, _wsBackoff=2000;
+        function connectWS(){
+            if(_wsReconnectTimer){ clearTimeout(_wsReconnectTimer); _wsReconnectTimer=null; }
+            try{
+                const proto=location.protocol==='https:'?'wss':'ws';
+                ws=new WebSocket(`${proto}://${window.location.host}/ws/dashboard`);
+                ws.onopen=()=>{
+                    _wsBackoff=2000;
+                    document.getElementById('conn-dot').className='status-dot status-online';
+                    document.getElementById('conn-text').textContent='Servidor Online';
+                };
+                ws.onmessage=(e)=>{try{const d=JSON.parse(e.data);if(d.type==='update')loadAll();}catch(ex){}};
+                ws.onclose=(ev)=>{
+                    document.getElementById('conn-dot').className='status-dot';
+                    document.getElementById('conn-dot').style.background='var(--danger)';
+                    document.getElementById('conn-text').textContent='Desconectado';
+                    // Reconectar com backoff exponencial (máx 30s)
+                    _wsBackoff=Math.min(_wsBackoff*1.5,30000);
+                    _wsReconnectTimer=setTimeout(()=>{
+                        // Verificar se ainda está autenticado antes de reconectar
+                        fetch(`${API}/auth/status`).then(r=>r.json()).then(d=>{
+                            if(d.authenticated) connectWS();
+                            else window.location.href='/login.html';
+                        }).catch(()=>connectWS());
+                    }, _wsBackoff);
+                };
+                ws.onerror=()=>{};
+            }catch(e){ _wsReconnectTimer=setTimeout(connectWS, _wsBackoff); }
+        }
+
+        async function loadAll(){
+            try{
+                const [stats, agents, backups] = await Promise.allSettled([
+                    fetch(`${API}/dashboard/stats`).then(r=>r.json()),
+                    fetch(`${API}/agents`).then(r=>r.json()),
+                    fetch(`${API}/backups/recent?limit=30`).then(r=>r.json())
+                ]);
+
+                if(stats.status==='fulfilled'){
+                    const s=stats.value;
+                    document.getElementById('kpi-online').textContent=s.online_agents||0;
+                    document.getElementById('kpi-jobs').textContent=s.backups_24h||0;
+                    document.getElementById('kpi-volume').textContent=s.total_gb_7d||0;
+                    document.getElementById('kpi-alerts').textContent=s.total_alerts||0;
+                    document.getElementById('kpi-success-rate').textContent=(s.success_rate_24h||100)+'% sucesso';
+                }
+
+                if(backups.status==='fulfilled'){
+                    const bks=backups.value||[];
+                    document.getElementById('table-recent').innerHTML=bks.slice(0,5).map(b=>`
+                        <tr><td><span class="badge ${b.status==='success'?'badge-success':'badge-error'}">${(b.status||'').toUpperCase()}</span></td>
+                        <td style="font-weight:600">${b.hostname||'N/A'}</td>
+                        <td style="font-size:.85em;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${b.source_path||''}</td>
+                        <td>${fmtBytes(b.total_bytes)}</td>
+                        <td style="font-size:.82em;color:var(--text-muted)">${b.start_time?fmtDateTime(b.start_time):''}</td></tr>
+                    `).join('')||'<tr><td colspan="5" style="text-align:center;color:var(--text-muted)">Nenhuma atividade</td></tr>';
+
+                    document.getElementById('table-backups').innerHTML=bks.map(b=>`
+                        <tr><td><span class="badge ${b.status==='success'?'badge-success':'badge-error'}">${(b.status||'').toUpperCase()}</span></td>
+                        <td style="font-weight:600">${b.hostname||'N/A'}</td>
+                        <td style="font-size:.85em">${b.source_path||''}</td>
+                        <td>${b.duration_seconds||0}s</td>
+                        <td>${fmtBytes(b.total_bytes||0)}</td>
+                        <td style="font-size:.82em;color:var(--text-muted)">${b.start_time?fmtDateTime(b.start_time):''}</td></tr>
+                    `).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Nenhum backup</td></tr>';
+                }
+
+                if(agents.status==='fulfilled'){
+                    const ags=agents.value||[];
+                    _cachedAgents = ags;
+                    renderAgentCards(ags);
+                }
+            }catch(e){console.error('loadAll:',e)}
+        }
+
+        async function loadChart(range, btn){
+            if(btn){document.querySelectorAll('.period-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active')}
+            try{
+                const r=await fetch(`${API}/analytics/history?range=${range}`);
+                if(!r.ok)return;
+                const d=await r.json();
+                const ctx=document.getElementById('main-chart').getContext('2d');
+                if(mainChart)mainChart.destroy();
+                const grad=ctx.createLinearGradient(0,0,0,300);
+                grad.addColorStop(0,'rgba(66,153,225,.4)');grad.addColorStop(1,'rgba(66,153,225,0)');
+                mainChart=new Chart(ctx,{
+                    type:'line',
+                    data:{labels:d.labels,datasets:[
+                        {label:'Volume (GB)',data:d.volume_gb,borderColor:'#4299e1',backgroundColor:grad,borderWidth:2,pointRadius:0,fill:true,tension:.4,yAxisID:'y'},
+                        {label:'Velocidade (MB/s)',data:d.speed_mbps,borderColor:'#48bb78',borderWidth:2,borderDash:[5,5],pointRadius:0,tension:.4,yAxisID:'y1'},
+                        {label:'Erros',data:d.errors,type:'bar',backgroundColor:'#f56565',yAxisID:'y'}
+                    ]},
+                    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+                        plugins:{legend:{position:'top',labels:{color:'#8892a6'}}},
+                        scales:{x:{grid:{display:false},ticks:{color:'#8892a6'}},y:{position:'left',grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#4299e1'}},y1:{position:'right',grid:{display:false},ticks:{color:'#48bb78'}}}}
+                });
+            }catch(e){console.error('Chart:',e)}
+        }
+
+        let chartTimeline=null,chartLogs=null,chartSystem=null,chartPrediction=null;
+
+        async function loadAnalytics(){
+            try{
+                const r=await fetch(`${API}/analytics/comprehensive`);
+                if(!r.ok){console.error('Analytics API error',r.status);return}
+                const d=await r.json();
+
+                // ── Health Score ──
+                const hs=d.health||{};
+                const scoreEl=document.getElementById('health-score');
+                const barEl=document.getElementById('health-bar');
+                const labelEl=document.getElementById('health-label');
+                const bannerEl=document.getElementById('health-banner');
+                scoreEl.textContent=hs.score||0;
+                barEl.style.width=(hs.score||0)+'%';
+                const hColor=hs.score>=70?'var(--success)':hs.score>=40?'var(--warning)':'var(--danger)';
+                scoreEl.style.color=hColor; barEl.style.background=hColor;
+                bannerEl.style.borderLeftColor=hColor;
+                labelEl.textContent=hs.status==='healthy'?'Saudável':hs.status==='warning'?'Atenção':'Crítico';
+                labelEl.style.color=hColor;
+                const k=d.kpis||{};
+                document.getElementById('health-summary').textContent=
+                    `${k.agents?.online||0}/${k.agents?.total||0} agentes online · ${k.executions?.total||0} execuções · ${k.executions?.success_rate||0}% sucesso geral`;
+
+                // ── Alertas Preemptivos ──
+                const alertsC=document.getElementById('alerts-container');
+                const alerts=d.alerts||[];
+                alertsC.innerHTML=alerts.map(a=>`
+                    <div class="alert-card ${a.type}">
+                        <div class="alert-icon"><i class="fas fa-${a.icon}"></i></div>
+                        <div style="flex:1">
+                            <div class="alert-title">${a.title}</div>
+                            <div class="alert-msg">${a.message}</div>
+                            <div class="alert-action"><i class="fas fa-wrench"></i> ${a.action}</div>
+                        </div>
+                    </div>
+                `).join('')||'';
+
+                // ── KPIs ──
+                document.getElementById('an-total-exec').textContent=k.executions?.total||0;
+                document.getElementById('an-success-rate').textContent=(k.executions?.success_rate||0)+'% sucesso';
+                document.getElementById('an-24h').textContent=k.last_24h?.total||0;
+                document.getElementById('an-24h-rate').textContent=(k.last_24h?.success_rate||0)+'% sucesso';
+                document.getElementById('an-fails-7d').textContent=k.last_7d?.failed||0;
+                document.getElementById('an-avg-dur').textContent=(k.executions?.avg_duration||0)+'s';
+
+                const tr=d.trends||{};
+                document.getElementById('an-fail-trend').innerHTML=trendBadge(tr.failure_rate, `${tr.recent_fail_rate||0}% → antes ${tr.previous_fail_rate||0}%`);
+                document.getElementById('an-dur-trend').innerHTML=trendBadge(tr.duration, `${tr.recent_duration||0}s → antes ${tr.previous_duration||0}s`);
+
+                // ── Chart: Timeline de Execuções ──
+                const tl=d.timeline||{};
+                if(tl.labels?.length){
+                    const ctx=document.getElementById('chart-timeline').getContext('2d');
+                    if(chartTimeline)chartTimeline.destroy();
+                    chartTimeline=new Chart(ctx,{type:'bar',data:{labels:tl.labels,datasets:[
+                        {label:'Sucesso',data:tl.success,backgroundColor:'rgba(72,187,120,.7)',borderRadius:4},
+                        {label:'Falha',data:tl.failed,backgroundColor:'rgba(245,101,101,.7)',borderRadius:4},
+                        {label:'Interrompido',data:tl.interrupted,backgroundColor:'rgba(237,137,54,.5)',borderRadius:4}
+                    ]},options:chartOpts('Execuções',true)});
+                }
+
+                // ── Chart: Logs por Hora ──
+                const lt=d.log_timeline||{};
+                if(lt.labels?.length){
+                    const ctx=document.getElementById('chart-logs').getContext('2d');
+                    if(chartLogs)chartLogs.destroy();
+                    chartLogs=new Chart(ctx,{type:'line',data:{labels:lt.labels,datasets:[
+                        {label:'Erros',data:lt.errors,borderColor:'#f56565',backgroundColor:'rgba(245,101,101,.1)',fill:true,tension:.3,pointRadius:2},
+                        {label:'Avisos',data:lt.warnings,borderColor:'#ed8936',borderDash:[4,4],tension:.3,pointRadius:0},
+                        {label:'Info',data:lt.info,borderColor:'#4299e1',borderDash:[2,2],tension:.3,pointRadius:0}
+                    ]},options:chartOpts('Logs')});
+                }
+
+                // ── Chart: Métricas de Sistema ──
+                const sm=d.system_metrics||{};
+                if(sm.labels?.length){
+                    const ctx=document.getElementById('chart-system').getContext('2d');
+                    if(chartSystem)chartSystem.destroy();
+                    chartSystem=new Chart(ctx,{type:'line',data:{labels:sm.labels,datasets:[
+                        {label:'CPU %',data:sm.cpu,borderColor:'#f56565',borderWidth:2,tension:.3,pointRadius:1,fill:false},
+                        {label:'RAM %',data:sm.ram,borderColor:'#4299e1',borderWidth:2,tension:.3,pointRadius:1,fill:false},
+                        {label:'Disco %',data:sm.disk,borderColor:'#ed8936',borderWidth:2,tension:.3,pointRadius:1,fill:false}
+                    ]},options:{...chartOpts('%'),scales:{...chartOpts('%').scales,y:{...chartOpts('%').scales?.y,min:0,max:100}}}});
+                }
+
+                // ── Chart: Previsão de Disco ──
+                const pred=d.predictions||{};
+                const dp=pred.disk||{};
+                const predDiv=document.getElementById('prediction-summary');
+                if(dp.trend){
+                    const trendIcon=dp.trend==='up'?'arrow-up':dp.trend==='down'?'arrow-down':'equals';
+                    const trendColor=dp.trend==='up'?'var(--danger)':dp.trend==='down'?'var(--success)':'var(--primary)';
+                    let predMsg=`Atual: <strong>${dp.current}%</strong> · Previsão 7d: <strong>${dp.predicted_7d}%</strong> · Crescimento: <strong>${dp.slope_per_day}%/dia</strong>`;
+                    if(dp.days_to_critical!==null) predMsg+=` · <span style="color:var(--danger);font-weight:700">⚠ Atinge 80% em ~${dp.days_to_critical} dias</span>`;
+                    predDiv.innerHTML=`<div style="font-size:.85em;color:var(--text-muted)"><i class="fas fa-${trendIcon}" style="color:${trendColor};margin-right:6px"></i>${predMsg}</div>`;
+
+                    // Gráfico de previsão
+                    if(sm.disk?.length && dp.future_values?.length){
+                        const ctx=document.getElementById('chart-prediction').getContext('2d');
+                        if(chartPrediction)chartPrediction.destroy();
+                        const histLabels=sm.labels.slice(-10);
+                        const histData=sm.disk.slice(-10);
+                        const futLabels=dp.future_values.map((_,i)=>`+${i+1}d`);
+                        const allLabels=[...histLabels,...futLabels];
+                        const realData=[...histData,...new Array(futLabels.length).fill(null)];
+                        const predData=[...new Array(histLabels.length-1).fill(null),histData[histData.length-1],...dp.future_values];
+                        const critLine=new Array(allLabels.length).fill(80);
+                        chartPrediction=new Chart(ctx,{type:'line',data:{labels:allLabels,datasets:[
+                            {label:'Real',data:realData,borderColor:'#ed8936',borderWidth:2,pointRadius:2,tension:.3},
+                            {label:'Previsão',data:predData,borderColor:'#805ad5',borderWidth:2,borderDash:[6,3],pointRadius:1,tension:.3},
+                            {label:'Limite Crítico (80%)',data:critLine,borderColor:'rgba(245,101,101,.4)',borderWidth:1,borderDash:[2,4],pointRadius:0}
+                        ]},options:{...chartOpts('%'),scales:{...chartOpts('%').scales,y:{min:0,max:100,grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#8892a6'}}}}});
+                    }
+                } else {
+                    predDiv.innerHTML='<div style="font-size:.85em;color:var(--text-muted)">Dados insuficientes para previsão</div>';
+                }
+
+                // ── Tabela por Task ──
+                const tasks=d.by_task||[];
+                document.getElementById('table-by-task').innerHTML=tasks.map(t=>{
+                    const rate=t.total>0?Math.round(t.success/t.total*100):0;
+                    return `<tr>
+                        <td style="font-weight:600">${t.task_name}</td>
+                        <td>${t.total}</td>
+                        <td style="color:var(--success)">${t.success}</td>
+                        <td style="color:var(--danger)">${t.failed}</td>
+                        <td>${Math.round(t.avg_duration)}s</td>
+                        <td><div style="display:flex;align-items:center;gap:6px"><div style="background:var(--bg-input);border-radius:4px;height:8px;width:60px;overflow:hidden"><div style="height:100%;border-radius:4px;width:${rate}%;background:${rate>=70?'var(--success)':rate>=40?'var(--warning)':'var(--danger)'}"></div></div><span style="font-size:.82em;font-weight:600">${rate}%</span></div></td>
+                    </tr>`;
+                }).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Sem dados</td></tr>';
+
+                // ── Tabela por Agente ──
+                const agents=d.by_agent||[];
+                document.getElementById('table-by-agent').innerHTML=agents.map(a=>{
+                    const rate=a.total>0?Math.round(a.success/a.total*100):0;
+                    return `<tr>
+                        <td style="font-weight:600">${a.hostname}</td>
+                        <td>${a.total}</td>
+                        <td style="color:var(--success)">${a.success}</td>
+                        <td style="color:var(--danger)">${a.failed}</td>
+                        <td>${fmtBytes(a.total_bytes)}</td>
+                        <td><span style="font-weight:600;color:${rate>=70?'var(--success)':rate>=40?'var(--warning)':'var(--danger)'}">${rate}%</span></td>
+                    </tr>`;
+                }).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Sem dados</td></tr>';
+
+                // ── Diagnóstico Preemptivo ──
+                const diags=d.diagnostics||[];
+                document.getElementById('diagnostics-container').innerHTML=diags.length?diags.map(dg=>`
+                    <div class="diag-card">
+                        <div class="diag-icon ${dg.severity}"><i class="fas fa-${dg.icon||'bug'}"></i></div>
+                        <div style="flex:1">
+                            <div style="margin-bottom:4px">
+                                <span class="diag-severity ${dg.severity}">${dg.severity}</span>
+                                <span class="badge badge-info" style="margin-right:6px">${dg.category}</span>
+                                <span style="font-size:.82em;color:var(--text-muted)">${dg.count}x ocorrências</span>
+                            </div>
+                            <div style="font-weight:600;font-size:.92em;margin-bottom:2px">${dg.issue}</div>
+                            <div style="font-size:.82em;color:var(--text-muted);font-family:monospace;word-break:break-all">${escHtml(dg.pattern)}</div>
+                            <div class="diag-fix"><i class="fas fa-check-circle"></i><div><strong>Correção:</strong> ${dg.fix}</div></div>
+                            ${dg.last_seen?`<div style="font-size:.75em;color:var(--text-muted);margin-top:4px">Último: ${fmtDateTime(dg.last_seen)}</div>`:''}
+                        </div>
+                    </div>
+                `).join(''):'<div style="text-align:center;color:var(--text-muted);padding:20px"><i class="fas fa-check-circle" style="font-size:2em;color:var(--success);margin-bottom:8px;display:block"></i>Nenhum problema detectado</div>';
+
+            }catch(e){console.error('Analytics:',e)}
+        }
+
+        function trendBadge(trend, text){
+            const icon=trend==='improving'?'arrow-down':trend==='degrading'?'arrow-up':'equals';
+            return `<span class="trend-badge ${trend||'stable'}"><i class="fas fa-${icon}"></i> ${text}</span>`;
+        }
+
+        function chartOpts(yLabel, stacked){
+            return {responsive:true,maintainAspectRatio:false,
+                interaction:{mode:'index',intersect:false},
+                plugins:{legend:{position:'top',labels:{color:'#8892a6',usePointStyle:true,pointStyle:'circle',padding:12}}},
+                scales:{x:{grid:{display:false},ticks:{color:'#8892a6',maxRotation:45}},
+                    y:{stacked:!!stacked,grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#8892a6'}}}
+            };
+        }
+
+        function escHtml(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+        async function pushSync(){
+            try{
+                const r=await fetch(`${API}/sync/push`,{method:'POST',headers:{'Content-Type':'application/json'}});
+                const d=await r.json();
+                if(r.ok){alert('Sincronizacao concluida: '+d.message)}else{alert('Erro: '+(d.detail||'Desconhecido'))}
+                loadAll();
+            }catch(e){alert('Erro: '+e.message)}
+        }
+
+        async function loadLogAgentFilter(){
+            try{
+                const r=await fetch(`${API}/agents`);
+                const agents=await r.json();
+                const sel=document.getElementById('log-agent');
+                const current=sel.value;
+                sel.innerHTML='<option value="">Todos os Agentes</option>';
+                (agents||[]).forEach(a=>{
+                    sel.innerHTML+=`<option value="${a.agent_id}">${a.hostname||a.agent_id}</option>`;
+                });
+                if(current)sel.value=current;
+            }catch(e){console.error('loadLogAgentFilter:',e)}
+        }
+
+        async function loadLogs(){
+            try{
+                const level=document.getElementById('log-level').value;
+                const agent=document.getElementById('log-agent').value;
+                const search=document.getElementById('log-search').value;
+                let url=`${API}/logs?limit=200`;
+                if(level)url+=`&level=${level}`;
+                if(agent)url+=`&agent_id=${agent}`;
+                if(search)url+=`&search=${encodeURIComponent(search)}`;
+
+                const [logsRes, statsRes]=await Promise.allSettled([
+                    fetch(url).then(r=>r.json()),
+                    fetch(`${API}/logs/stats`).then(r=>r.json())
+                ]);
+
+                if(statsRes.status==='fulfilled'){
+                    const s=statsRes.value;
+                    document.getElementById('log-stats').innerHTML=`
+                        <span><i class="fas fa-list"></i> Total: <strong>${(s.total||0).toLocaleString()}</strong></span>
+                        <span style="color:var(--danger)"><i class="fas fa-times-circle"></i> Erros: <strong>${(s.errors||0).toLocaleString()}</strong></span>
+                        <span style="color:var(--warning)"><i class="fas fa-exclamation-triangle"></i> Avisos: <strong>${(s.warnings||0).toLocaleString()}</strong></span>
+                        <span style="color:var(--success)"><i class="fas fa-info-circle"></i> Info: <strong>${(s.info||0).toLocaleString()}</strong></span>
+                    `;
+                }
+
+                if(logsRes.status==='fulfilled'){
+                    const data=logsRes.value;
+                    const logs=data.logs||[];
+                    const tbody=document.getElementById('table-logs');
+                    if(logs.length===0){
+                        tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--text-muted)">Nenhum log encontrado</td></tr>';
+                        return;
+                    }
+                    tbody.innerHTML=logs.map(l=>{
+                        const lvl=l.level||'INFO';
+                        const cls=lvl==='ERROR'?'badge-error':lvl==='WARNING'?'badge-warning':'badge-success';
+                        return `<tr>
+                            <td><span class="badge ${cls}">${lvl}</span></td>
+                            <td style="font-weight:600;font-size:.85em">${l.agent_name||'N/A'}</td>
+                            <td style="font-size:.82em;color:var(--text-muted)">${l.source||''}</td>
+                            <td style="font-size:.85em;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(l.message||'').replace(/"/g,'&quot;')}">${l.message||''}</td>
+                            <td style="font-size:.82em;color:var(--text-muted);white-space:nowrap">${l.timestamp?fmtDateTime(l.timestamp):''}</td>
+                        </tr>`;
+                    }).join('');
+                }
+            }catch(e){console.error('loadLogs:',e)}
+        }
+
+        async function loadConfig(){
+            // 1. Server info cards
+            try{
+                const r=await fetch(`${API}/server/info`);const d=await r.json();
+                document.getElementById('cfg-version').textContent=`GBOC Server v${d.version||'?'}`;
+                document.getElementById('cfg-url').textContent=d.url||window.location.origin;
+                document.getElementById('cfg-hostname').textContent=d.hostname||'—';
+                document.getElementById('cfg-platform').textContent=d.platform||'—';
+                document.getElementById('cfg-python').textContent=d.python||'—';
+                const db=d.database||{};
+                document.getElementById('cfg-db-type').textContent=db.type||'PostgreSQL';
+                document.getElementById('cfg-db-host').textContent=`${db.host||'localhost'}:${db.port||5432}`;
+                document.getElementById('cfg-db-name').textContent=db.name||'gboc';
+                document.getElementById('cfg-db-size').textContent=db.size_human||'—';
+                const ag=d.agents||{};
+                document.getElementById('cfg-agents-online').textContent=ag.online||0;
+                document.getElementById('cfg-agents-total').textContent=ag.total||0;
+                document.getElementById('cfg-ws-count').textContent=d.websocket_connections||0;
+                document.getElementById('cfg-reports').textContent=(d.stats||{}).backup_reports||0;
+                document.getElementById('cfg-events24').textContent=(d.stats||{}).events_24h||0;
+            }catch(e){console.error('loadServerInfo:',e)}
+
+            // 2. Settings form
+            try{
+                const r=await fetch(`${API}/server/settings`);const d=await r.json();
+                window._allSettings=d.settings||{};
+                switchSettingsTab(window._currentSettingsTab||'general');
+            }catch(e){console.error('loadSettings:',e)}
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // SETTINGS FORM MANAGEMENT
+        // ═══════════════════════════════════════════════════════════
+
+        window._currentSettingsTab='general';
+        window._allSettings={};
+
+        function switchSettingsTab(cat, btn){
+            window._currentSettingsTab=cat;
+            // Active button
+            document.querySelectorAll('#settings-tabs .btn').forEach(b=>b.classList.remove('active'));
+            if(btn) btn.classList.add('active');
+            else document.querySelectorAll('#settings-tabs .btn').forEach(b=>{if(b.textContent.toLowerCase().includes(cat))b.classList.add('active')});
+            // Render form
+            const settings=window._allSettings[cat]||{};
+            const form=document.getElementById('settings-form');
+            if(!Object.keys(settings).length){
+                form.innerHTML='<div style="text-align:center;color:var(--text-muted);padding:20px">Nenhuma configuração nesta categoria</div>';
+                return;
+            }
+            form.innerHTML=Object.entries(settings).map(([key, cfg])=>{
+                const v=cfg.value;
+                const t=cfg.type||'text';
+                const label=cfg.description||key.replace(/_/g,' ');
+                let input='';
+                if(t==='boolean'){
+                    input=`<label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+                        <input type="checkbox" data-cat="${cat}" data-key="${key}" ${v?'checked':''} style="width:18px;height:18px;accent-color:var(--primary)">
+                        <span style="font-size:.85em">${v?'Ativado':'Desativado'}</span>
+                    </label>`;
+                } else if(t==='number'){
+                    input=`<input type="number" data-cat="${cat}" data-key="${key}" value="${v}" style="padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);width:140px;font-size:.9em">`;
+                } else if(t.startsWith('select:')){
+                    const opts=t.split(':')[1].split(',');
+                    input=`<select data-cat="${cat}" data-key="${key}" style="padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:.9em">
+                        ${opts.map(o=>`<option value="${o}" ${o===String(v)?'selected':''}>${o}</option>`).join('')}
+                    </select>`;
+                } else if(t==='password'){
+                    input=`<input type="password" data-cat="${cat}" data-key="${key}" value="${v||''}" placeholder="••••••" style="padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);width:300px;font-size:.9em">`;
+                } else {
+                    input=`<input type="text" data-cat="${cat}" data-key="${key}" value="${v||''}" style="padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);width:100%;max-width:400px;font-size:.9em">`;
+                }
+                return `<div style="display:flex;justify-content:space-between;align-items:center;gap:16px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.04)">
+                    <div>
+                        <div style="font-size:.9em;font-weight:600">${label}</div>
+                        <div style="font-size:.75em;color:var(--text-muted)">${cat}/${key}</div>
+                    </div>
+                    <div>${input}</div>
+                </div>`;
+            }).join('');
+            document.getElementById('save-status').textContent='';
+        }
+
+        async function saveCurrentTab(){
+            const cat=window._currentSettingsTab;
+            const updates={};
+            document.querySelectorAll(`[data-cat="${cat}"]`).forEach(el=>{
+                const key=el.dataset.key;
+                let val;
+                if(el.type==='checkbox') val=el.checked?'true':'false';
+                else val=el.value;
+                updates[key]=val;
+            });
+            try{
+                const r=await fetch(`${API}/server/settings`,{
+                    method:'PUT',
+                    headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({[cat]:updates})
+                });
+                const d=await r.json();
+                document.getElementById('save-status').textContent=`✓ ${d.updated||0} configurações salvas`;
+                setTimeout(()=>{document.getElementById('save-status').textContent=''},3000);
+                // Refresh settings
+                const r2=await fetch(`${API}/server/settings`);const d2=await r2.json();
+                window._allSettings=d2.settings||{};
+            }catch(e){alert('Erro: '+e.message)}
+        }
+
+        async function exportSettings(){
+            try{
+                const r=await fetch(`${API}/server/settings/export`,{method:'POST'});const d=await r.json();
+                const blob=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});
+                const a=document.createElement('a');
+                a.href=URL.createObjectURL(blob);
+                a.download=`gboc-server-settings-${new Date().toISOString().slice(0,10)}.json`;
+                a.click();
+            }catch(e){alert('Erro: '+e.message)}
+        }
+
+        async function importSettings(input){
+            if(!input.files.length)return;
+            const file=input.files[0];
+            const text=await file.text();
+            try{
+                const data=JSON.parse(text);
+                const r=await fetch(`${API}/server/settings/import`,{
+                    method:'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify(data)
+                });
+                const d=await r.json();
+                alert(`Importadas: ${d.imported||0} configurações`);
+                loadConfig();
+            }catch(e){alert('Erro na importação: '+e.message)}
+            input.value='';
+        }
+
+        async function runCleanup(){
+            if(!confirm('Executar limpeza de dados antigos (métricas, logs, eventos) conforme política de retenção?'))return;
+            try{
+                const r=await fetch(`${API}/server/maintenance/cleanup`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+                const d=await r.json();
+                const del=d.deleted||{};
+                const lines=Object.entries(del).map(([k,v])=>`${k}: ${v}`).join('\n');
+                alert(`Limpeza concluída!\nTotal removidos: ${d.total_deleted||0}\n\n${lines}`);
+            }catch(e){alert('Erro: '+e.message)}
+        }
+
+        async function resetAllSettings(){
+            if(!confirm('⚠️ ATENÇÃO: Isso vai resetar TODAS as configurações para os valores padrão. Continuar?'))return;
+            try{
+                await fetch(`${API}/server/settings/reset`,{method:'POST'});
+                alert('Configurações resetadas para padrão');
+                loadConfig();
+            }catch(e){alert('Erro: '+e.message)}
+        }
+
+        async function testNotification(channel){
+            try{
+                const r=await fetch(`${API}/server/test-notification`,{
+                    method:'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({channel})
+                });
+                const d=await r.json();
+                if(r.ok) alert(`✓ Notificação ${channel} enviada com sucesso!`);
+                else alert('Erro: '+(d.detail||'Desconhecido'));
+            }catch(e){alert('Erro: '+e.message)}
+        }
+
+        function fmtBytes(b){if(!b||b===0)return'0 B';const k=1024,s=['B','KB','MB','GB','TB'],i=Math.floor(Math.log(b)/Math.log(k));return parseFloat((b/Math.pow(k,i)).toFixed(2))+' '+s[i]}
+
+        // ═══════════════════════════════════════════════════════════
+        // AGENTS TAB — Full Implementation
+        // ═══════════════════════════════════════════════════════════
+
+        let _cachedAgents = [];
+        let _agentDetailChart = null;
+
+        function renderAgentCards(ags){
+            const onlineCount = ags.filter(a=>a.current_status==='online').length;
+            const summaryEl = document.getElementById('agents-summary');
+            if(summaryEl) summaryEl.innerHTML = `<span class="badge badge-success">${onlineCount} online</span> <span class="badge badge-info">${ags.length} total</span>`;
+
+            document.getElementById('agents-grid').innerHTML = ags.map(a=>{
+                const isOnline = a.current_status==='online';
+                const statusColor = isOnline ? 'var(--success)' : 'var(--danger)';
+                const statusText = isOnline ? 'Online' : 'Offline';
+                const version = a.agent_version || '—';
+                const os = a.os_info || 'N/A';
+                const cpu = parseFloat(a.cpu_usage||0).toFixed(1);
+                const ram = parseFloat(a.ram_usage||0).toFixed(1);
+                const disk = parseFloat(a.disk_usage||0).toFixed(1);
+                const jobs = a.jobs_count || 0;
+                const lastSeen = a.last_heartbeat ? timeAgo(new Date(a.last_heartbeat)) : 'Nunca';
+                const ip = a.ip_address || '—';
+
+                // Progress bar color helper
+                const barColor = (v) => v >= 90 ? 'var(--danger)' : v >= 70 ? 'var(--warning)' : 'var(--success)';
+
+                return `
+                <div class="agent-card ${a.current_status||'offline'}" onclick="loadAgentDetail('${a.agent_id}')" style="cursor:pointer;position:relative">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+                        <div>
+                            <div class="agent-name" style="display:flex;align-items:center;gap:8px">
+                                <span style="width:10px;height:10px;border-radius:50%;background:${statusColor};display:inline-block;box-shadow:0 0 8px ${statusColor}50;flex-shrink:0"></span>
+                                ${a.hostname||'Agent'}
+                            </div>
+                            <div style="font-size:.8em;color:var(--text-muted);margin-top:2px">${ip}</div>
+                        </div>
+                        <div style="text-align:right">
+                            <span class="badge ${isOnline?'badge-success':'badge-error'}" style="font-size:.7em">${statusText}</span>
+                            <div style="font-size:.75em;color:var(--text-muted);margin-top:4px">v${version}</div>
+                        </div>
+                    </div>
+
+                    <div style="display:flex;gap:6px;margin-bottom:12px;font-size:.75em;flex-wrap:wrap">
+                        <span style="background:var(--bg-input);padding:2px 8px;border-radius:4px;color:var(--text-muted)"><i class="fas fa-desktop" style="margin-right:4px"></i>${os.length>30 ? os.substring(0,30)+'…' : os}</span>
+                        <span style="background:var(--bg-input);padding:2px 8px;border-radius:4px;color:var(--text-muted)"><i class="fas fa-tasks" style="margin-right:4px"></i>${jobs} jobs</span>
+                    </div>
+
+                    <div style="display:flex;flex-direction:column;gap:10px">
+                        <div>
+                            <div style="display:flex;justify-content:space-between;font-size:.8em;margin-bottom:3px">
+                                <span style="color:var(--text-muted)"><i class="fas fa-microchip" style="width:16px;color:#f56565"></i> CPU</span>
+                                <span style="font-weight:600">${cpu}%</span>
+                            </div>
+                            <div style="background:var(--bg-input);border-radius:4px;height:6px;overflow:hidden">
+                                <div style="height:100%;width:${cpu}%;background:${barColor(cpu)};border-radius:4px;transition:width .5s"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div style="display:flex;justify-content:space-between;font-size:.8em;margin-bottom:3px">
+                                <span style="color:var(--text-muted)"><i class="fas fa-memory" style="width:16px;color:#4299e1"></i> RAM</span>
+                                <span style="font-weight:600">${ram}%</span>
+                            </div>
+                            <div style="background:var(--bg-input);border-radius:4px;height:6px;overflow:hidden">
+                                <div style="height:100%;width:${ram}%;background:${barColor(ram)};border-radius:4px;transition:width .5s"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div style="display:flex;justify-content:space-between;font-size:.8em;margin-bottom:3px">
+                                <span style="color:var(--text-muted)"><i class="fas fa-hdd" style="width:16px;color:#ed8936"></i> Disco</span>
+                                <span style="font-weight:600">${disk}%</span>
+                            </div>
+                            <div style="background:var(--bg-input);border-radius:4px;height:6px;overflow:hidden">
+                                <div style="height:100%;width:${disk}%;background:${barColor(disk)};border-radius:4px;transition:width .5s"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:.78em;color:var(--text-muted)">
+                        <span><i class="fas fa-clock" style="margin-right:4px"></i> ${lastSeen}</span>
+                        <span style="color:var(--primary);font-weight:600"><i class="fas fa-arrow-right"></i> Detalhes</span>
+                    </div>
+                </div>`;
+            }).join('') || '<div style="color:var(--text-muted);text-align:center;padding:40px"><i class="fas fa-server" style="font-size:3em;opacity:.3;margin-bottom:12px;display:block"></i>Nenhum agente registrado</div>';
+        }
+
+        function timeAgo(date){
+            const seconds = Math.floor((new Date()-date)/1000);
+            if(seconds<60) return `${seconds}s atrás`;
+            const minutes = Math.floor(seconds/60);
+            if(minutes<60) return `${minutes}m atrás`;
+            const hours = Math.floor(minutes/60);
+            if(hours<24) return `${hours}h atrás`;
+            const days = Math.floor(hours/24);
+            return `${days}d atrás`;
+        }
+
+        function fmtDuration(s){
+            if(!s||s<=0)return '0s';
+            if(s<60)return Math.round(s)+'s';
+            if(s<3600)return Math.floor(s/60)+'m '+Math.round(s%60)+'s';
+            return Math.floor(s/3600)+'h '+Math.floor((s%3600)/60)+'m';
+        }
+
+        function fmtUptime(seconds){
+            if(!seconds||seconds<=0)return '—';
+            const d=Math.floor(seconds/86400);
+            const h=Math.floor((seconds%86400)/3600);
+            const m=Math.floor((seconds%3600)/60);
+            if(d>0)return `${d}d ${h}h`;
+            if(h>0)return `${h}h ${m}m`;
+            return `${m}m`;
+        }
+
+        async function loadAgentsTab(){
+            try{
+                const r=await fetch(`${API}/agents`);
+                const ags=await r.json();
+                _cachedAgents=ags||[];
+                renderAgentCards(_cachedAgents);
+            }catch(e){console.error('loadAgentsTab:',e)}
+        }
+
+        async function loadAgentDetail(agentId){
+            const panel = document.getElementById('agent-detail-panel');
+            panel.style.display='block';
+            panel.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-muted)"><i class="fas fa-spinner fa-spin" style="font-size:2em;margin-bottom:8px;display:block"></i>Carregando dados do agente...</div>';
+            panel.scrollIntoView({behavior:'smooth',block:'start'});
+
+            try{
+                const r=await fetch(`${API}/agents/${encodeURIComponent(agentId)}/details`);
+                if(!r.ok) {
+                    const errData = await r.json().catch(()=>({}));
+                    throw new Error(errData.detail || `HTTP ${r.status}`);
+                }
+                const d=await r.json();
+                const a = d.agent||{};
+                const tasks = d.tasks||[];
+                const repos = d.repositories||[];
+                const backups = d.recent_backups||[];
+                const execs = d.recent_executions||[];
+                const perf = d.performance_30d||{};
+                const mh = d.metrics_history||{};
+                const isOnline = a.current_status==='online';
+                const statusColor = isOnline?'var(--success)':'var(--danger)';
+
+                // Available tools badges
+                const tools = (a.available_tools||[]);
+                const toolsBadges = tools.length ? tools.map(t=>`<span style="background:rgba(66,153,225,.12);color:var(--primary);padding:2px 8px;border-radius:4px;font-size:.78em;font-weight:600">${t}</span>`).join(' ') : '<span style="color:var(--text-muted);font-size:.85em">Nenhuma ferramenta detectada</span>';
+
+                panel.innerHTML = `
+                <div class="panel" style="border-left:4px solid ${statusColor}">
+                    <!-- Header -->
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+                        <div style="display:flex;align-items:center;gap:16px">
+                            <div style="width:56px;height:56px;border-radius:14px;background:${isOnline?'rgba(72,187,120,.12)':'rgba(245,101,101,.12)'};display:flex;align-items:center;justify-content:center;font-size:1.6em;color:${statusColor};flex-shrink:0">
+                                <i class="fas fa-server"></i>
+                            </div>
+                            <div>
+                                <h3 style="margin:0;font-size:1.3em;display:flex;align-items:center;gap:10px">
+                                    ${a.hostname||'Agent'}
+                                    <span class="badge ${isOnline?'badge-success':'badge-error'}">${isOnline?'Online':'Offline'}</span>
+                                </h3>
+                                <div style="font-size:.88em;color:var(--text-muted);margin-top:2px">
+                                    <span style="margin-right:16px"><i class="fas fa-network-wired" style="margin-right:4px"></i>${a.ip_address||'—'}</span>
+                                    <span style="margin-right:16px"><i class="fas fa-tag" style="margin-right:4px"></i>v${a.agent_version||'—'}</span>
+                                    <span style="margin-right:16px"><i class="fas fa-desktop" style="margin-right:4px"></i>${a.os_info||'—'}</span>
+                                    <span><i class="fas fa-fingerprint" style="margin-right:4px"></i>${a.agent_id||'—'}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <button class="btn btn-primary" onclick="document.getElementById('agent-detail-panel').style.display='none'" style="flex-shrink:0">
+                            <i class="fas fa-times"></i> Fechar
+                        </button>
+                    </div>
+
+                    <!-- KPIs Row -->
+                    <div class="kpi-grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr));margin-bottom:20px">
+                        <div class="kpi-card" style="padding:14px">
+                            <div class="kpi-header"><span>Backups (30d)</span><div class="kpi-icon green"><i class="fas fa-check-circle"></i></div></div>
+                            <div class="kpi-value" style="font-size:1.5em">${perf.total_backups||0}</div>
+                            <div class="kpi-sub">${perf.success_rate||0}% sucesso</div>
+                        </div>
+                        <div class="kpi-card" style="padding:14px">
+                            <div class="kpi-header"><span>Falhas</span><div class="kpi-icon red"><i class="fas fa-times-circle"></i></div></div>
+                            <div class="kpi-value" style="font-size:1.5em;color:${perf.failure_count>0?'var(--danger)':'var(--text)'}">${perf.failure_count||0}</div>
+                            <div class="kpi-sub">nos últimos 30 dias</div>
+                        </div>
+                        <div class="kpi-card" style="padding:14px">
+                            <div class="kpi-header"><span>Volume</span><div class="kpi-icon orange"><i class="fas fa-database"></i></div></div>
+                            <div class="kpi-value" style="font-size:1.5em">${fmtBytes(perf.total_bytes||0)}</div>
+                            <div class="kpi-sub">processados (30d)</div>
+                        </div>
+                        <div class="kpi-card" style="padding:14px">
+                            <div class="kpi-header"><span>Dur. Média</span><div class="kpi-icon blue"><i class="fas fa-stopwatch"></i></div></div>
+                            <div class="kpi-value" style="font-size:1.5em">${fmtDuration(perf.avg_duration||0)}</div>
+                            <div class="kpi-sub">por backup</div>
+                        </div>
+                        <div class="kpi-card" style="padding:14px">
+                            <div class="kpi-header"><span>Uptime</span><div class="kpi-icon blue"><i class="fas fa-clock"></i></div></div>
+                            <div class="kpi-value" style="font-size:1.5em">${fmtUptime(a.uptime_seconds)}</div>
+                            <div class="kpi-sub">desde registro</div>
+                        </div>
+                        <div class="kpi-card" style="padding:14px">
+                            <div class="kpi-header"><span>Jobs Ativos</span><div class="kpi-icon blue"><i class="fas fa-tasks"></i></div></div>
+                            <div class="kpi-value" style="font-size:1.5em">${a.jobs_count||0}</div>
+                            <div class="kpi-sub">${tasks.length} tarefas</div>
+                        </div>
+                    </div>
+
+                    <!-- Metrics Chart + Tools -->
+                    <div class="charts-row" style="margin-bottom:20px">
+                        <div class="chart-panel" style="margin-bottom:0">
+                            <h3 style="margin:0 0 12px;font-size:.95em"><i class="fas fa-chart-area" style="color:var(--primary);margin-right:8px"></i>Métricas do Sistema (24h)</h3>
+                            <canvas id="agent-detail-chart" style="max-height:220px"></canvas>
+                        </div>
+                        <div>
+                            <!-- Current Resources -->
+                            <div class="panel" style="margin-bottom:12px">
+                                <h3 style="margin:0 0 12px;font-size:.95em"><i class="fas fa-tachometer-alt" style="color:var(--primary)"></i> Recursos Atuais</h3>
+                                ${buildResourceBar('CPU', a.cpu_usage, '#f56565')}
+                                ${buildResourceBar('RAM', a.ram_usage, '#4299e1')}
+                                ${buildResourceBar('Disco', a.disk_usage, '#ed8936')}
+                            </div>
+                            <!-- Tools -->
+                            <div class="panel" style="margin-bottom:0">
+                                <h3 style="margin:0 0 10px;font-size:.95em"><i class="fas fa-tools" style="color:var(--warning)"></i> Ferramentas Disponíveis</h3>
+                                <div style="display:flex;flex-wrap:wrap;gap:6px">${toolsBadges}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Repositories -->
+                    ${repos.length ? `
+                    <div class="panel" style="margin-bottom:20px">
+                        <h3 style="margin:0 0 12px;font-size:.95em"><i class="fas fa-archive" style="color:var(--success)"></i> Repositórios (${repos.length})</h3>
+                        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">
+                            ${repos.map(r=>`
+                                <div style="background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:12px">
+                                    <div style="font-weight:600;font-size:.9em;margin-bottom:4px">${r.name||'Repo'}</div>
+                                    <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:.78em;color:var(--text-muted)">
+                                        <span><i class="fas fa-cog" style="margin-right:3px"></i>${r.engine||'—'}</span>
+                                        <span><i class="fas fa-folder" style="margin-right:3px"></i>${r.type||'local'}</span>
+                                        <span class="badge ${r.status==='active'?'badge-success':'badge-warning'}" style="font-size:.95em">${r.status||'—'}</span>
+                                        <span><i class="fas fa-copy" style="margin-right:3px"></i>${r.total_backups||0} backups</span>
+                                    </div>
+                                    ${r.last_backup ? `<div style="font-size:.75em;color:var(--text-muted);margin-top:4px">Último: ${fmtDateTime(r.last_backup)}</div>` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>` : ''}
+
+                    <!-- Tasks -->
+                    ${tasks.length ? `
+                    <div class="panel" style="margin-bottom:20px">
+                        <h3 style="margin:0 0 12px;font-size:.95em"><i class="fas fa-tasks" style="color:var(--primary)"></i> Tarefas (${tasks.length})</h3>
+                        <table class="data-table">
+                            <thead><tr><th>Nome</th><th>Status</th><th>Última Atualização</th></tr></thead>
+                            <tbody>
+                                ${tasks.map(t=>`
+                                    <tr>
+                                        <td style="font-weight:600">${t.name||'Task #'+t.task_id}</td>
+                                        <td><span class="badge ${t.status==='enabled'||t.status==='active'?'badge-success':t.status==='running'?'badge-info':'badge-warning'}">${t.status||'—'}</span></td>
+                                        <td style="font-size:.85em;color:var(--text-muted)">${t.updated_at?fmtDateTime(t.updated_at):'—'}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>` : ''}
+
+                    <!-- Recent Backups -->
+                    ${backups.length ? `
+                    <div class="panel" style="margin-bottom:20px">
+                        <h3 style="margin:0 0 12px;font-size:.95em"><i class="fas fa-history" style="color:var(--primary)"></i> Backups Recentes (${backups.length})</h3>
+                        <table class="data-table">
+                            <thead><tr><th>Status</th><th>Origem</th><th>Tipo</th><th>Duração</th><th>Tamanho</th><th>Data</th></tr></thead>
+                            <tbody>
+                                ${backups.map(b=>`
+                                    <tr>
+                                        <td><span class="badge ${b.status==='success'?'badge-success':'badge-error'}">${(b.status||'').toUpperCase()}</span></td>
+                                        <td style="font-size:.85em;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${b.source_path||''}">${b.source_path||'—'}</td>
+                                        <td style="font-size:.85em">${b.backup_type||'—'}</td>
+                                        <td>${fmtDuration(b.duration_seconds||0)}</td>
+                                        <td>${fmtBytes(b.total_bytes||0)}</td>
+                                        <td style="font-size:.82em;color:var(--text-muted);white-space:nowrap">${b.start_time?fmtDateTime(b.start_time):''}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>` : ''}
+
+                    <!-- Recent Executions -->
+                    ${execs.length ? `
+                    <div class="panel">
+                        <h3 style="margin:0 0 12px;font-size:.95em"><i class="fas fa-play-circle" style="color:var(--success)"></i> Últimas Execuções (${execs.length})</h3>
+                        <table class="data-table">
+                            <thead><tr><th>Status</th><th>Task ID</th><th>Duração</th><th>Arquivos</th><th>Bytes</th><th>Data</th><th>Erro</th></tr></thead>
+                            <tbody>
+                                ${execs.map(e=>`
+                                    <tr>
+                                        <td><span class="badge ${e.status==='success'?'badge-success':'badge-error'}">${(e.status||'').toUpperCase()}</span></td>
+                                        <td style="font-weight:600">#${e.task_id}</td>
+                                        <td>${fmtDuration(e.duration_seconds||0)}</td>
+                                        <td>${(e.files_processed||0).toLocaleString()}</td>
+                                        <td>${fmtBytes(e.bytes_processed||0)}</td>
+                                        <td style="font-size:.82em;color:var(--text-muted);white-space:nowrap">${e.started_at?fmtDateTime(e.started_at):'—'}</td>
+                                        <td style="font-size:.82em;color:var(--danger);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(e.error_message||'').replace(/"/g,'&quot;')}">${e.error_message||'—'}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>` : ''}
+
+                </div>`;
+
+                // Render metrics chart
+                if(mh.labels && mh.labels.length > 0){
+                    const ctx = document.getElementById('agent-detail-chart').getContext('2d');
+                    if(_agentDetailChart) _agentDetailChart.destroy();
+                    _agentDetailChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: mh.labels,
+                            datasets: [
+                                {label:'CPU %', data:mh.cpu, borderColor:'#f56565', borderWidth:2, tension:.3, pointRadius:1, fill:false},
+                                {label:'RAM %', data:mh.ram, borderColor:'#4299e1', borderWidth:2, tension:.3, pointRadius:1, fill:false},
+                                {label:'Disco %', data:mh.disk, borderColor:'#ed8936', borderWidth:2, tension:.3, pointRadius:1, fill:false}
+                            ]
+                        },
+                        options: {
+                            responsive:true, maintainAspectRatio:false,
+                            interaction:{mode:'index',intersect:false},
+                            plugins:{legend:{position:'top',labels:{color:'#8892a6',usePointStyle:true,pointStyle:'circle',padding:12}}},
+                            scales:{
+                                x:{grid:{display:false},ticks:{color:'#8892a6',maxRotation:45,maxTicksLimit:20}},
+                                y:{min:0,max:100,grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#8892a6',callback:v=>v+'%'}}
+                            }
+                        }
+                    });
+                }
+
+            }catch(e){
+                console.error('loadAgentDetail:', e);
+                panel.innerHTML='<div class="panel" style="text-align:center;color:var(--danger);padding:30px"><i class="fas fa-exclamation-triangle" style="font-size:2em;margin-bottom:8px;display:block"></i>Erro ao carregar dados do agente<div style="font-size:.85em;color:var(--text-muted);margin-top:8px">'+e.message+'</div></div>';
+            }
+        }
+
+        function buildResourceBar(label, value, color){
+            const v = parseFloat(value||0).toFixed(1);
+            const barColor = v >= 90 ? 'var(--danger)' : v >= 70 ? 'var(--warning)' : color;
+            return `
+            <div style="margin-bottom:10px">
+                <div style="display:flex;justify-content:space-between;font-size:.85em;margin-bottom:4px">
+                    <span style="color:var(--text-muted)">${label}</span>
+                    <span style="font-weight:700;color:${barColor}">${v}%</span>
+                </div>
+                <div style="background:var(--bg-input);border-radius:6px;height:10px;overflow:hidden">
+                    <div style="height:100%;width:${v}%;background:${barColor};border-radius:6px;transition:width .5s"></div>
+                </div>
+            </div>`;
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // SERVER TABS: Ransomware, Compliance, Alerts, Replication, Users
+        // These aggregate data from ALL agents via server API endpoints
+        // ═══════════════════════════════════════════════════════════
+
+        async function loadServerRansomware(){
+            try{
+                const r=await fetch(`${API}/server/ransomware/overview`);
+                if(!r.ok){showTabPlaceholder('rw-agents-table',6,'Endpoint não disponível');return}
+                const d=await r.json();
+                document.getElementById('rw-protected').textContent=d.protected_agents||0;
+                document.getElementById('rw-canaries').textContent=d.total_canaries||0;
+                document.getElementById('rw-compromised').textContent=d.total_compromised||0;
+                document.getElementById('rw-scans').textContent=d.scans_7d||0;
+                const agents=d.agents||[];
+                const tb=document.getElementById('rw-agents-table');
+                if(!agents.length){tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Nenhum agente com dados de ransomware</td></tr>';return}
+                tb.innerHTML=agents.map(a=>{
+                    const tl=String(a.threat_level||'none').toLowerCase();
+                    const sev = tl==='critical' ? 'critical' : (tl==='high' ? 'high' : (tl==='medium' ? 'medium' : 'info'));
+                    const m=sevMeta(sev);
+                    return `<tr>
+                        <td style="font-weight:600">${a.hostname||'—'}</td>
+                        <td><span class="badge ${a.is_protected?'badge-success':'badge-error'}">${a.is_protected?'PROTEGIDO':'EXPOSTO'}</span></td>
+                        <td>${a.canaries||0}</td>
+                        <td style="color:${a.compromised>0?'var(--danger)':'inherit'}">${a.compromised||0}</td>
+                        <td style="font-size:.82em;color:var(--text-muted)">${a.last_scan?fmtDateTime(a.last_scan):'Nunca'}</td>
+                        <td><span class="badge ${m.badge}">${tl.toUpperCase()}</span></td>
+                    </tr>`;
+                }).join('');
+            }catch(e){showTabPlaceholder('rw-agents-table',6,'Erro ao carregar: '+e.message)}
+        }
+
+        async function loadServerCompliance(){
+            try{
+                const r=await fetch(`${API}/server/compliance/overview`);
+                if(!r.ok){showTabPlaceholder('cp-agents-table',5,'Endpoint não disponível');return}
+                const d=await r.json();
+                document.getElementById('cp-score').textContent=(d.avg_score||0)+'%';
+                document.getElementById('cp-policies').textContent=d.total_policies||0;
+                document.getElementById('cp-violations').textContent=d.total_violations||0;
+                document.getElementById('cp-last').textContent=d.last_audit?fmtDateTime(d.last_audit):'—';
+                const agents=d.agents||[];
+                const tb=document.getElementById('cp-agents-table');
+                const grid=document.getElementById('cp-agents-grid');
+                if(!agents.length){
+                    if(grid) grid.innerHTML='';
+                    tb.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--text-muted)">Nenhum dado de compliance</td></tr>';
+                    return;
+                }
+
+                if(grid){
+                    grid.innerHTML=agents.map(a=>{
+                        const sc=a.score||0;
+                        const sev = sc<50?'critical':(sc<80?'warning':'info');
+                        const m=sevMeta(sev);
+                        return `<div class="agent-card ${m.card}">
+                            <div class="agent-name"><i class="fas ${m.icon}" style="margin-right:8px;color:${m.color}"></i>${a.hostname||'—'}</div>
+                            <div class="agent-ip">Última auditoria: ${a.last_audit?fmtDateTime(a.last_audit):'—'}</div>
+                            <div class="agent-metrics" style="justify-content:space-between">
+                                <span><i class="fas fa-percentage" style="color:${m.color}"></i> <strong style="color:${m.color}">${sc}%</strong></span>
+                                <span><i class="fas fa-check" style="color:var(--success)"></i> ${a.passing||0}</span>
+                                <span><i class="fas fa-times" style="color:var(--danger)"></i> ${a.failing||0}</span>
+                            </div>
+                        </div>`;
+                    }).join('');
+                }
+
+                tb.innerHTML=agents.map(a=>{
+                    const sc=a.score||0;
+                    const sev = sc<50?'critical':(sc<80?'warning':'info');
+                    const m=sevMeta(sev);
+                    return `<tr>
+                        <td style="font-weight:600">${a.hostname||'—'}</td>
+                        <td><strong style="color:${m.color}">${sc}%</strong></td>
+                        <td style="color:var(--success)">${a.passing||0}</td>
+                        <td style="color:var(--danger)">${a.failing||0}</td>
+                        <td style="font-size:.82em;color:var(--text-muted)">${a.last_audit?fmtDateTime(a.last_audit):'—'}</td>
+                    </tr>`;
+                }).join('');
+            }catch(e){showTabPlaceholder('cp-agents-table',5,'Erro ao carregar: '+e.message)}
+        }
+
+        async function loadServerAlerts(){
+            const sev=document.getElementById('srv-alert-sev')?.value||'';
+            try{
+                let url=`${API}/server/alerts/overview`;
+                if(sev)url+=`?severity=${sev}`;
+                const r=await fetch(url);
+                if(!r.ok){showTabPlaceholder('srv-alerts-table',5,'Endpoint não disponível');return}
+                const d=await r.json();
+                document.getElementById('sa-total').textContent=d.total||0;
+                document.getElementById('sa-unread').textContent=d.unread||0;
+                document.getElementById('sa-critical').textContent=d.critical||0;
+                const alerts=d.alerts||[];
+                const tb=document.getElementById('srv-alerts-table');
+                const grid=document.getElementById('srv-alerts-grid');
+                if(!alerts.length){
+                    if(grid) grid.innerHTML='';
+                    tb.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--text-muted)">Nenhum alerta</td></tr>';
+                    return;
+                }
+
+                if(grid){
+                    grid.innerHTML=alerts.slice(0,12).map(a=>{
+                        const m=sevMeta(a.severity||'info');
+                        return `<div class="agent-card ${m.card}">
+                            <div class="agent-name"><i class="fas ${m.icon}" style="margin-right:8px;color:${m.color}"></i>${a.title||'—'}</div>
+                            <div class="agent-ip">${a.hostname||a.agent_name||'—'} · ${a.created_at?fmtDateTime(a.created_at):'—'}</div>
+                            <div style="font-size:.85em;color:var(--text-muted);max-height:40px;overflow:hidden;text-overflow:ellipsis">${a.message||''}</div>
+                            <div style="margin-top:10px"><span class="badge ${m.badge}">${(a.severity||'info').toUpperCase()}</span></div>
+                        </div>`;
+                    }).join('');
+                }
+
+                tb.innerHTML=alerts.map(a=>{
+                    const m=sevMeta(a.severity||'info');
+                    return `<tr>
+                        <td><span class="badge ${m.badge}">${(a.severity||'info').toUpperCase()}</span></td>
+                        <td style="font-weight:600">${a.hostname||a.agent_name||'—'}</td>
+                        <td style="font-weight:600">${a.title||'—'}</td>
+                        <td style="font-size:.85em;color:var(--text-muted);max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(a.message||'').replace(/"/g,'&quot;')}">${a.message||''}</td>
+                        <td style="font-size:.82em;color:var(--text-muted);white-space:nowrap">${a.created_at?fmtDateTime(a.created_at):'—'}</td>
+                    </tr>`;
+                }).join('');
+            }catch(e){showTabPlaceholder('srv-alerts-table',5,'Erro ao carregar: '+e.message)}
+        }
+
+        async function loadServerReplication(){
+            try{
+                const r = await fetch(`${API}/server/replication/overview`);
+                if(!r.ok){showTabPlaceholder('rp-agents-table',6,'Endpoint não disponível');return}
+                const d = await r.json();
+
+                document.getElementById('rp-rules').textContent = d.total_rules ?? 0;
+                document.getElementById('rp-syncing').textContent = d.syncing ?? 0;
+                document.getElementById('rp-volume').textContent = fmtBytes(d.total_bytes ?? 0);
+                document.getElementById('rp-errors').textContent = d.errors_24h ?? 0;
+
+                const tb = document.getElementById('rp-agents-table');
+                const agents = d.agents || [];
+                if(!agents.length){
+                    tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Sem dados de replicação</td></tr>';
+                    return;
+                }
+
+                tb.innerHTML = agents.map(a=>{
+                    const status = String(a.status || 'ok').toLowerCase();
+                    const badge = status === 'ok' ? 'badge-success' : (status === 'syncing' ? 'badge-info' : 'badge-error');
+                    return `<tr>
+                        <td style="font-weight:600">${a.hostname || '—'}</td>
+                        <td>${a.rules ?? 0}</td>
+                        <td>${a.syncing ?? 0}</td>
+                        <td>${fmtBytes(a.volume ?? 0)}</td>
+                        <td style="font-size:.82em;color:var(--text-muted)">${a.last_sync ? fmtDateTime(a.last_sync) : '—'}</td>
+                        <td><span class="badge ${badge}">${status.toUpperCase()}</span></td>
+                    </tr>`;
+                }).join('');
+            }catch(e){
+                showTabPlaceholder('rp-agents-table',6,'Erro ao carregar: '+e.message);
+            }
+        }
+
+        // ── Segurança & Usuários ─────────────────────────────────────
+        async function loadServerUsers(){
+            await Promise.allSettled([_srvLoadProfile(), _srvLoadUsers(), _srvLoadAudit()]);
+        }
+
+        async function _srvLoadProfile(){
+            try{
+                const r=await fetch(`${API}/auth/status`); const d=await r.json();
+                const u=d.user||{};
+                const initials=(u.display_name||u.username||'?')[0].toUpperCase();
+                document.getElementById('srv-my-avatar').textContent=initials;
+                document.getElementById('srv-my-name').textContent=u.display_name||u.username||'Usuário';
+                document.getElementById('srv-my-username').textContent=u.username?'@'+u.username:'';
+                const role=u.role||'admin';
+                const roleLabels={admin:'Administrador',operator:'Operador',viewer:'Visualizador'};
+                const cls=role==='admin'?'badge-error':role==='operator'?'badge-info':'badge-success';
+                document.getElementById('srv-my-role').innerHTML=`<span class="badge ${cls}">${roleLabels[role]||role}</span>`;
+                document.getElementById('srv-kpi-auth').textContent=d.auth_enabled?'Ativada':'Desativada';
+                document.getElementById('srv-kpi-auth').style.color=d.auth_enabled?'var(--success)':'var(--warning)';
+            }catch(e){ console.error('_srvLoadProfile',e); }
+        }
+
+        async function _srvLoadUsers(){
+            try{
+                const r=await fetch(`${API}/auth/users`); const d=await r.json();
+                const users=d.users||[];
+                document.getElementById('srv-kpi-users').textContent=users.length;
+                document.getElementById('srv-kpi-admins').textContent=users.filter(u=>u.role==='admin').length;
+                document.getElementById('srv-kpi-sessions').textContent=d.active_sessions||0;
+                const el=document.getElementById('srv-users-list');
+                if(!users.length){
+                    el.innerHTML='<div style="padding:32px;text-align:center;color:var(--text-muted)"><i class="fas fa-users" style="font-size:2em;opacity:.3;display:block;margin-bottom:8px"></i>Nenhum usuário cadastrado.</div>';
+                    return;
+                }
+                el.innerHTML=users.map(u=>{
+                    const role=u.role||'viewer';
+                    const initial=(u.display_name||u.username||'?')[0].toUpperCase();
+                    const cls=role==='admin'?'badge-error':role==='operator'?'badge-info':'badge-success';
+                    const avatarBg=role==='admin'?'rgba(245,101,101,.15)':role==='operator'?'rgba(66,153,225,.15)':'rgba(72,187,120,.15)';
+                    const avatarColor=role==='admin'?'var(--danger)':role==='operator'?'var(--primary)':'var(--success)';
+                    return `<div style="display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid var(--border);transition:background .15s" onmouseover="this.style.background='var(--card-hover)'" onmouseout="this.style.background=''">
+                        <div style="width:40px;height:40px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:1em;font-weight:700;flex-shrink:0;background:${avatarBg};color:${avatarColor}">${initial}</div>
+                        <div style="flex:1;min-width:0">
+                            <div style="font-weight:600;font-size:.9em">${u.display_name||u.username}</div>
+                            <div style="font-size:.76em;color:var(--text-muted)">@${u.username} &middot; <span class="badge ${cls}" style="font-size:.85em">${role.toUpperCase()}</span></div>
+                            <div style="font-size:.73em;color:var(--text-muted);margin-top:1px">Último login: ${u.last_login?fmtDateTime(u.last_login):'Nunca'}</div>
+                        </div>
+                        <div style="display:flex;gap:4px;flex-shrink:0">
+                            <button class="btn btn-sm btn-secondary" onclick="resetSrvPassword(${u.id})" title="Resetar Senha"><i class="fas fa-key"></i></button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteSrvUser(${u.id},'${String(u.username||'').replace(/'/g,"\\'")}')"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </div>`;
+                }).join('');
+            }catch(e){ console.error('_srvLoadUsers',e); }
+        }
+
+        async function _srvLoadAudit(){
+            try{
+                const r=await fetch(`${API}/auth/users/audit?limit=30`); const d=await r.json();
+                const logs=d.entries||[];
+                const tb=document.getElementById('srv-audit-table');
+                if(!logs.length){ tb.innerHTML='<tr><td colspan="4" style="padding:24px;text-align:center;color:var(--text-muted)">Nenhum registro ainda</td></tr>'; return; }
+                tb.innerHTML=logs.map(l=>{
+                    const action=l.action||'---';
+                    const isFail=action.includes('fail')||action.includes('error');
+                    const isLogin=action.includes('login');
+                    const cls=isFail?'badge-error':isLogin?'badge-success':'badge-info';
+                    return `<tr>
+                        <td style="padding:9px 12px;font-weight:600;font-size:.83em;border-bottom:1px solid var(--border)">${l.username||'---'}</td>
+                        <td style="padding:9px 12px;border-bottom:1px solid var(--border)"><span class="badge ${cls}" style="font-size:.8em">${action}</span></td>
+                        <td style="padding:9px 12px;font-size:.8em;color:var(--text-muted);border-bottom:1px solid var(--border)">${l.ip_address||'---'}</td>
+                        <td style="padding:9px 12px;font-size:.8em;color:var(--text-muted);border-bottom:1px solid var(--border)">${l.timestamp?fmtDateTime(l.timestamp):'---'}</td>
+                    </tr>`;
+                }).join('');
+            }catch(e){ console.error('_srvLoadAudit',e); }
+        }
+
+        function openSrvUserModal(){ const m=document.getElementById('srv-user-modal'); if(m) m.style.display='flex'; }
+        function closeSrvUserModal(){
+            const m=document.getElementById('srv-user-modal'); if(m) m.style.display='none';
+            ['srv-usr-name','srv-usr-display','srv-usr-pwd'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+        }
+
+        async function createSrvUser(){
+            const username=(document.getElementById('srv-usr-name')?.value||'').trim();
+            const display_name=(document.getElementById('srv-usr-display')?.value||'').trim();
+            const password=(document.getElementById('srv-usr-pwd')?.value||'').trim();
+            const role=document.getElementById('srv-usr-role')?.value||'admin';
+            if(!username||!password){ alert('Preencha usuário e senha.'); return; }
+            if(password.length<4){ alert('Senha mínima de 4 caracteres.'); return; }
+            try{
+                const r=await fetch(`${API}/auth/users`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,display_name:display_name||username,password,role})});
+                const d=await r.json().catch(()=>({}));
+                if(!r.ok) throw new Error(d.detail||d.message||'Falha ao criar usuário');
+                closeSrvUserModal();
+                await loadServerUsers();
+            }catch(e){ alert('Erro: '+e.message); }
+        }
+
+        async function deleteSrvUser(userId, username){
+            if(!confirm(`Excluir usuário ${username}?`)) return;
+            try{
+                const r=await fetch(`${API}/auth/users/${userId}`,{method:'DELETE'});
+                const d=await r.json().catch(()=>({}));
+                if(!r.ok) throw new Error(d.detail||d.message||'Falha ao excluir');
+                await loadServerUsers();
+            }catch(e){ alert('Erro: '+e.message); }
+        }
+
+        async function resetSrvPassword(userId){
+            const pw=prompt('Nova senha (mínimo 4 caracteres):');
+            if(!pw) return;
+            if(pw.length<4){ alert('Senha mínima de 4 caracteres.'); return; }
+            try{
+                const r=await fetch(`${API}/auth/users/${userId}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
+                const d=await r.json().catch(()=>({}));
+                if(!r.ok) throw new Error(d.detail||d.message||'Falha');
+                alert('Senha alterada com sucesso!');
+                await loadServerUsers();
+            }catch(e){ alert('Erro: '+e.message); }
+        }
+
+        async function srvChangePassword(){
+            const cur=document.getElementById('srv-pw-current').value;
+            const nw=document.getElementById('srv-pw-new').value;
+            const cf=document.getElementById('srv-pw-confirm').value;
+            if(!cur||!nw){ _srvPwMsg('Preencha todos os campos','err'); return; }
+            if(nw.length<4){ _srvPwMsg('Mínimo 4 caracteres','err'); return; }
+            if(nw!==cf){ _srvPwMsg('As senhas não coincidem','err'); return; }
+            try{
+                const r=await fetch(`${API}/auth/change-password`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({current_password:cur,new_password:nw})});
+                const d=await r.json().catch(()=>({}));
+                if(!r.ok){ _srvPwMsg(d.detail||'Erro ao alterar senha','err'); return; }
+                _srvPwMsg('Senha alterada com sucesso!','ok');
+                ['srv-pw-current','srv-pw-new','srv-pw-confirm'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+            }catch(e){ _srvPwMsg('Erro: '+e.message,'err'); }
+        }
+
+        function _srvPwMsg(text, type){
+            const el=document.getElementById('srv-pw-msg');
+            if(!el) return;
+            el.style.display='block';
+            el.style.background=type==='ok'?'rgba(72,187,120,.12)':'rgba(245,101,101,.12)';
+            el.style.color=type==='ok'?'var(--success)':'var(--danger)';
+            el.style.border=type==='ok'?'1px solid rgba(72,187,120,.3)':'1px solid rgba(245,101,101,.3)';
+            el.textContent=text;
+            if(type==='ok') setTimeout(()=>{ el.style.display='none'; }, 3000);
+        }
+    </script>
+</body>
+</html>

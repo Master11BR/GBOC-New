@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GBOC Agent 11.7c - Compliance</title>
+    <link rel="stylesheet" href="/static/style.css?v=11.9">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:28px}
+        .stat-card{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:18px;text-align:center}
+        .stat-card .val{font-size:1.8em;font-weight:700}
+        .stat-card .lbl{font-size:.8em;color:var(--text-muted);margin-top:4px}
+
+        .two-col{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:20px}
+        @media(max-width:900px){.two-col{grid-template-columns:1fr}}
+
+        .panel{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px}
+        .panel-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+        .panel-header h3{margin:0;display:flex;align-items:center;gap:8px;font-size:1em}
+        .panel-body{padding:20px}
+
+        .tbl{width:100%;border-collapse:collapse}
+        .tbl th,.tbl td{padding:11px 14px;text-align:left;border-bottom:1px solid var(--border);font-size:.85em}
+        .tbl th{background:var(--bg-input);color:var(--text-muted);font-weight:600}
+
+        .badge-ok{background:rgba(78,203,136,.15);color:var(--success);padding:2px 10px;border-radius:20px;font-size:.8em}
+        .badge-warn{background:rgba(240,169,64,.15);color:var(--warning);padding:2px 10px;border-radius:20px;font-size:.8em}
+        .badge-crit{background:rgba(240,107,107,.15);color:var(--danger);padding:2px 10px;border-radius:20px;font-size:.8em}
+
+        .compliance-score{text-align:center;padding:30px}
+        .compliance-score .score{font-size:4em;font-weight:800;line-height:1}
+        .compliance-score .label{font-size:1em;margin-top:8px}
+
+        .rule-item{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
+        .rule-item:last-child{border:none}
+        .rule-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+        .rule-icon.pass{background:rgba(72,187,120,.15);color:var(--success)}
+        .rule-icon.fail{background:rgba(245,101,101,.15);color:var(--danger)}
+        .rule-icon.warn{background:rgba(237,137,54,.15);color:var(--warning)}
+
+        .form-group{margin-bottom:14px}
+        .form-group label{display:block;font-size:.85em;color:var(--text-muted);margin-bottom:5px;font-weight:600}
+        .form-group input,.form-group select,.form-group textarea{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:.9em}
+
+        .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;align-items:center;justify-content:center}
+        .modal-overlay.show{display:flex}
+        .modal-box{background:var(--bg-card);border-radius:14px;padding:28px;width:560px;max-width:95vw;border:1px solid var(--border);max-height:85vh;overflow-y:auto}
+        .modal-box h3{margin-bottom:20px;display:flex;align-items:center;gap:10px}
+        .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}
+        .empty-msg{text-align:center;color:var(--text-muted);padding:40px 20px}
+    </style>
+    <script src="/static/auth_interceptor.js"></script>
+</head>
+<body>
+    <div class="app">
+        <main class="main-content">
+            <header class="header">
+                <div>
+                    <h1 class="page-title"><i class="fas fa-clipboard-check" style="color:var(--primary)"></i> Compliance & Políticas</h1>
+                    <div class="page-subtitle">Verificação de conformidade, regras de retenção e auditoria</div>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" onclick="loadAll()"><i class="fas fa-sync-alt"></i> Atualizar</button>
+                    <button class="btn btn-primary" onclick="runAudit()"><i class="fas fa-gavel"></i> Auditar Agora</button>
+                    <button class="btn btn-success" onclick="openPolicyModal()"><i class="fas fa-plus"></i> Nova Política</button>
+                </div>
+            </header>
+
+            <!-- Score & KPIs -->
+            <div class="two-col" style="margin-bottom:0">
+                <div class="panel" style="margin-bottom:20px">
+                    <div class="compliance-score">
+                        <div class="score" id="comp-score" style="color:var(--success)">—</div>
+                        <div class="label" id="comp-label" style="color:var(--text-muted)">Score de Compliance</div>
+                        <div style="background:var(--bg-input);border-radius:8px;height:12px;overflow:hidden;margin-top:16px;max-width:300px;margin-left:auto;margin-right:auto">
+                            <div id="comp-bar" style="height:100%;border-radius:8px;background:var(--success);width:0%;transition:width .5s"></div>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <div class="stats-row" style="grid-template-columns:1fr 1fr">
+                        <div class="stat-card"><div class="val" id="kpi-policies">0</div><div class="lbl">Políticas Ativas</div></div>
+                        <div class="stat-card"><div class="val" id="kpi-pass" style="color:var(--success)">0</div><div class="lbl">Conformes</div></div>
+                        <div class="stat-card"><div class="val" id="kpi-fail" style="color:var(--danger)">0</div><div class="lbl">Violações</div></div>
+                        <div class="stat-card"><div class="val" id="kpi-audits">0</div><div class="lbl">Auditorias</div></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rules Check -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h3><i class="fas fa-tasks" style="color:var(--primary)"></i> Regras de Compliance</h3>
+                </div>
+                <div class="panel-body" id="rules-list"><div class="empty-msg">Carregando...</div></div>
+            </div>
+
+            <div class="two-col">
+                <!-- Policies -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3><i class="fas fa-file-contract" style="color:var(--warning)"></i> Políticas Cadastradas</h3>
+                    </div>
+                    <div class="panel-body" style="padding:0">
+                        <table class="tbl">
+                            <thead><tr><th>Nome</th><th>Tipo</th><th>Status</th><th>Ações</th></tr></thead>
+                            <tbody id="policies-table"><tr><td colspan="4" class="empty-msg">Carregando...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Audit History -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3><i class="fas fa-history" style="color:var(--success)"></i> Histórico de Auditorias</h3>
+                    </div>
+                    <div class="panel-body" style="padding:0">
+                        <table class="tbl">
+                            <thead><tr><th>Data</th><th>Score</th><th>Conformes</th><th>Violações</th></tr></thead>
+                            <tbody id="audit-history"><tr><td colspan="4" class="empty-msg">Carregando...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Policy Modal -->
+            <div class="modal-overlay" id="policy-modal">
+                <div class="modal-box">
+                    <h3><i class="fas fa-file-contract" style="color:var(--primary)"></i> Nova Política</h3>
+                    <div class="form-group">
+                        <label>Nome da Política</label>
+                        <input type="text" id="pol-name" placeholder="Ex: Retenção mínima 30 dias">
+                    </div>
+                    <div class="form-group">
+                        <label>Tipo</label>
+                        <select id="pol-type">
+                            <option value="retention">Retenção</option>
+                            <option value="encryption">Criptografia</option>
+                            <option value="frequency">Frequência de Backup</option>
+                            <option value="immutability">Imutabilidade</option>
+                            <option value="offsite">Offsite/3-2-1</option>
+                            <option value="custom">Personalizada</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Descrição / Critérios</label>
+                        <textarea id="pol-desc" rows="3" placeholder="Descreva os critérios desta política..." style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:.9em;resize:vertical"></textarea>
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn btn-secondary" onclick="closePolicyModal()">Cancelar</button>
+                        <button class="btn btn-success" onclick="createPolicy()"><i class="fas fa-check"></i> Criar</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/sidebar.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded',()=>{new UnifiedSidebar().initialize();loadAll()});
+    const API='/api/compliance';
+
+    async function loadAll(){
+        await Promise.allSettled([loadScore(), loadRules(), loadPolicies(), loadAuditHistory()]);
+    }
+
+    async function loadScore(){
+        try{
+            const r=await fetch(API+'/score');const d=await r.json();
+            const sc=d.score||0;
+            document.getElementById('comp-score').textContent=sc+'%';
+            document.getElementById('comp-bar').style.width=sc+'%';
+            const color=sc>=80?'var(--success)':sc>=50?'var(--warning)':'var(--danger)';
+            document.getElementById('comp-score').style.color=color;
+            document.getElementById('comp-bar').style.background=color;
+            document.getElementById('comp-label').textContent=sc>=80?'Excelente':sc>=50?'Atenção Necessária':'Crítico';
+            document.getElementById('kpi-policies').textContent=d.total_policies||0;
+            document.getElementById('kpi-pass').textContent=d.passing||0;
+            document.getElementById('kpi-fail').textContent=d.failing||0;
+            document.getElementById('kpi-audits').textContent=d.total_audits||0;
+        }catch(e){console.error('loadScore:',e)}
+    }
+
+    async function loadRules(){
+        try{
+            const r=await fetch(API+'/rules');const d=await r.json();
+            const rules=d.rules||[];
+            const el=document.getElementById('rules-list');
+            if(!rules.length){el.innerHTML='<div class="empty-msg">Nenhuma regra configurada. Crie políticas para gerar regras.</div>';return}
+            const order={fail:0,warn:1,pass:2};
+            rules.sort((a,b)=>(order[a.status]??9)-(order[b.status]??9));
+            el.innerHTML=rules.map(r=>`
+                <div class="rule-item">
+                    <div class="rule-icon ${r.status}">${r.status==='pass'?'<i class="fas fa-check"></i>':r.status==='fail'?'<i class="fas fa-times"></i>':'<i class="fas fa-exclamation"></i>'}</div>
+                    <div style="flex:1">
+                        <div style="font-weight:600;font-size:.92em">${r.name}</div>
+                        <div style="font-size:.82em;color:var(--text-muted)">${r.description||''}</div>
+                        ${r.fix?`<div style="font-size:.78em;color:var(--primary);margin-top:4px"><i class="fas fa-wrench"></i> ${r.fix}</div>`:''}
+                    </div>
+                    <span class="${r.status==='pass'?'badge-ok':r.status==='fail'?'badge-crit':'badge-warn'}">${r.status.toUpperCase()}</span>
+                </div>
+            `).join('');
+        }catch(e){console.error('loadRules:',e)}
+    }
+
+    async function loadPolicies(){
+        try{
+            const r=await fetch(API+'/policies');const d=await r.json();
+            const pols=d.policies||[];
+            const tb=document.getElementById('policies-table');
+            if(!pols.length){tb.innerHTML='<tr><td colspan="4" class="empty-msg">Nenhuma política</td></tr>';return}
+            tb.innerHTML=pols.map(p=>`<tr>
+                <td style="font-weight:600">${p.name}</td>
+                <td style="font-size:.85em">${p.type||'—'}</td>
+                <td><span class="${p.enabled?'badge-ok':'badge-warn'}">${p.enabled?'ATIVA':'INATIVA'}</span></td>
+                <td><button class="btn btn-sm btn-danger" onclick="deletePolicy(${p.id})"><i class="fas fa-trash"></i></button></td>
+            </tr>`).join('');
+        }catch(e){console.error('loadPolicies:',e)}
+    }
+
+    async function loadAuditHistory(){
+        try{
+            const r=await fetch(API+'/audit/history?limit=10');const d=await r.json();
+            const audits=d.audits||[];
+            const tb=document.getElementById('audit-history');
+            if(!audits.length){tb.innerHTML='<tr><td colspan="4" class="empty-msg">Nenhuma auditoria</td></tr>';return}
+            tb.innerHTML=audits.map(a=>`<tr>
+                <td style="font-size:.82em;white-space:nowrap">${a.timestamp?gbocFormatDateTime(a.timestamp):'—'}</td>
+                <td><strong style="color:${a.score>=80?'var(--success)':a.score>=50?'var(--warning)':'var(--danger)'}">${a.score}%</strong></td>
+                <td style="color:var(--success)">${a.passing||0}</td>
+                <td style="color:var(--danger)">${a.failing||0}</td>
+            </tr>`).join('');
+        }catch(e){console.error('loadAuditHistory:',e)}
+    }
+
+    function openPolicyModal(){document.getElementById('policy-modal').classList.add('show')}
+    function closePolicyModal(){document.getElementById('policy-modal').classList.remove('show')}
+
+    async function createPolicy(){
+        const name=document.getElementById('pol-name').value.trim();
+        const type=document.getElementById('pol-type').value;
+        const desc=document.getElementById('pol-desc').value.trim();
+        if(!name){alert('Informe o nome da política');return}
+        closePolicyModal();
+        try{
+            const r=await fetch(API+'/policies',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,type,description:desc})});
+            if(!r.ok){const d=await r.json();alert('Erro: '+(d.detail||'Desconhecido'));return}
+            loadAll();
+        }catch(e){alert('Erro: '+e.message)}
+    }
+
+    async function deletePolicy(id){
+        if(!confirm('Excluir esta política?'))return;
+        try{await fetch(API+'/policies/'+id,{method:'DELETE'});loadAll()}catch(e){alert('Erro: '+e.message)}
+    }
+
+    async function runAudit(){
+        try{
+            const r=await fetch(API+'/audit',{method:'POST'});const d=await r.json();
+            alert(`Auditoria concluída!\nScore: ${d.score}%\nConformes: ${d.passing}\nViolações: ${d.failing}`);
+            loadAll();
+        }catch(e){alert('Erro: '+e.message)}
+    }
+    </script>
+</body>
+</html>
+

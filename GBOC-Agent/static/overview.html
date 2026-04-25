@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GBOC - API Overview</title>
+    <link rel="stylesheet" href="/static/style.css?v=11.9">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        
+        .stat-card { background: var(--bg-card); padding: 20px; border-radius: 10px; border-left: 5px solid var(--primary); color: var(--text); transition: transform 0.2s; min-height: 140px; }
+        .stat-card:hover { transform: translateY(-2px); background: var(--card-hover); }
+
+        .stat-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .stat-header h3 { margin: 0; font-size: 0.9em; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+        .stat-icon { font-size: 1.5em; opacity: 0.8; }
+
+        .stat-value { font-size: 2.2em; font-weight: bold; margin-bottom: 5px; }
+        .stat-detail { font-size: 0.9em; color: var(--text-muted); display: flex; align-items: center; gap: 5px; }
+
+        .section-title { color: var(--text); margin: 30px 0 15px 0; font-size: 1.3em; border-bottom: 1px solid var(--border); padding-bottom: 10px; display: flex; align-items: center; gap: 10px; }
+
+        /* Estilo da Lista de Discos */
+        .disk-list { width: 100%; margin-top: 10px; }
+        .disk-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; font-size: 0.9em; }
+        .disk-name { font-weight: bold; color: var(--primary); }
+        .disk-bar-bg { width: 100%; height: 6px; background: var(--bg-input); border-radius: 3px; margin-bottom: 10px; }
+        .disk-bar-fill { height: 100%; border-radius: 3px; transition: width 0.5s; }
+
+        .badge { padding: 4px 10px; border-radius: 12px; font-size: 0.8em; font-weight: bold; }
+        .badge-success { background: rgba(78,203,136,.2); color: var(--success); border: 1px solid var(--success); }
+        .badge-warning { background: rgba(240,169,64,.2); color: var(--warning); border: 1px solid var(--warning); }
+        .badge-danger { background: rgba(240,107,107,.2); color: var(--danger); border: 1px solid var(--danger); }
+    </style>
+    <script src="/static/auth_interceptor.js"></script>
+</head>
+<body>
+    <div class="app">
+        <!-- Sidebar será injetado automaticamente pelo sidebar.js -->
+
+        <main class="main-content">
+            <header class="header">
+                <h1 class="page-title">📊 Visão Geral da API</h1>
+                <a href="/" class="btn btn-secondary">Voltar ao Dashboard</a>
+            </header>
+
+            <div class="section-title"><i class="fas fa-microchip"></i> Métricas do Sistema</div>
+            <div class="overview-grid">
+                <div class="stat-card" style="border-left-color: var(--warning);">
+                    <div class="stat-header"><h3>Processador</h3><i class="fas fa-bolt stat-icon" style="color: var(--warning);"></i></div>
+                    <div class="stat-value" id="cpu-val">0%</div>
+                    <div class="stat-detail" id="cpu-detail">Monitorando...</div>
+                </div>
+                <div class="stat-card" style="border-left-color: var(--primary);">
+                    <div class="stat-header"><h3>Memória RAM</h3><i class="fas fa-memory stat-icon" style="color: var(--primary);"></i></div>
+                    <div class="stat-value" id="mem-val">0%</div>
+                    <div class="stat-detail" id="mem-detail">Calculando...</div>
+                </div>
+                <div class="stat-card" style="border-left-color: var(--warning);">
+                    <div class="stat-header"><h3>Armazenamento</h3><i class="fas fa-hdd stat-icon" style="color: var(--warning);"></i></div>
+                    <div id="disk-container" class="disk-list">
+                        <div class="stat-value" id="disk-val-single">0%</div>
+                        <div class="stat-detail" id="disk-detail-single">Calculando...</div>
+                    </div>
+                </div>
+                <div class="stat-card" style="border-left-color: var(--success);">
+                    <div class="stat-header"><h3>Saúde Global</h3><i class="fas fa-heartbeat stat-icon" style="color: var(--success);"></i></div>
+                    <div class="stat-value" id="health-val">100</div>
+                    <div class="stat-detail" id="health-detail"><span class="badge badge-success">Excelente</span></div>
+                </div>
+            </div>
+
+            <div class="section-title"><i class="fas fa-network-wired"></i> Informações de Rede</div>
+            <div class="overview-grid">
+                <div class="stat-card" style="border-left-color: var(--accent);">
+                    <div class="stat-header"><h3>IP Local</h3><i class="fas fa-globe"></i></div>
+                    <div class="stat-value" id="ip-val" style="font-size:1.5em">...</div>
+                </div>
+                <div class="stat-card" style="border-left-color: var(--accent);">
+                    <div class="stat-header"><h3>Hostname</h3><i class="fas fa-laptop"></i></div>
+                    <div class="stat-value" id="host-val" style="font-size:1.5em">...</div>
+                </div>
+                <div class="stat-card" style="border-left-color: var(--accent);">
+                    <div class="stat-header"><h3>Porta</h3><i class="fas fa-door-open"></i></div>
+                    <div class="stat-value" style="font-size:1.5em">9200</div>
+                </div>
+                <div class="stat-card" style="border-left-color: var(--accent);">
+                    <div class="stat-header"><h3>Status Servidor</h3><i class="fas fa-server"></i></div>
+                    <div class="stat-value" id="status-srv" style="font-size:1.2em">...</div>
+                </div>
+            </div>
+
+            <div class="section-title"><i class="fas fa-archive"></i> Informações de Backup</div>
+            <div class="overview-grid">
+                <div class="stat-card">
+                    <div class="stat-header"><h3>Repositórios</h3></div>
+                    <div class="stat-value" id="repo-count">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-header"><h3>Tarefas Ativas</h3></div>
+                    <div class="stat-value" id="task-count">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-header"><h3>Engines Detectados</h3></div>
+                    <div class="stat-value" id="engine-count">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-header"><h3>Dados Backup</h3></div>
+                    <div class="stat-value" id="total-backups">0 GB</div>
+                </div>
+            </div>
+
+            <div class="section-title"><i class="fas fa-info-circle"></i> Informações do Sistema</div>
+            <div class="overview-grid">
+                <div class="stat-card" style="border-left-color: var(--text-muted);">
+                    <div class="stat-header"><h3>Sistema Operacional</h3></div>
+                    <div class="stat-value" id="os-val" style="font-size:1.1em">...</div>
+                </div>
+                <div class="stat-card" style="border-left-color: var(--text-muted);">
+                    <div class="stat-header"><h3>Versão</h3></div>
+                    <div class="stat-value" id="ver" style="font-size:1.1em">...</div>
+                </div>
+                <div class="stat-card" style="border-left-color: var(--text-muted);">
+                    <div class="stat-header"><h3>Uptime</h3></div>
+                    <div class="stat-value" id="uptime-val" style="font-size:1.1em">...</div>
+                </div>
+                <div class="stat-card" style="border-left-color: var(--text-muted);">
+                    <div class="stat-header"><h3>Versão GBOC</h3></div>
+                    <div class="stat-value" style="font-size:1.1em">11.7c</div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        function formatGB(bytes) {
+            if (!bytes) return "0 GB";
+            return (bytes / (1024 ** 3)).toFixed(1) + " GB";
+        }
+
+        function formatUptime(seconds) {
+            const d = Math.floor(seconds / (3600*24));
+            const h = Math.floor(seconds % (3600*24) / 3600);
+            const m = Math.floor(seconds % 3600 / 60);
+            return `${d}d ${h}h ${m}m`;
+        }
+
+        async function loadData() {
+            try {
+                const res = await fetch('/api/overview/');
+                const data = await res.json();
+
+                // 1. SISTEMA
+                if(data.system_metrics) {
+                    const sys = data.system_metrics;
+                    document.getElementById('cpu-val').innerText = sys.cpu.usage_percent + "%";
+                    document.getElementById('mem-val').innerText = sys.memory.percent + "%";
+                    const memUsed = formatGB(sys.memory.used);
+                    const memTotal = formatGB(sys.memory.total);
+                    document.getElementById('mem-detail').innerHTML = `<i class="fas fa-calculator"></i> ${memUsed} / ${memTotal}`;
+
+                    // Lógica Híbrida de Disco
+                    const diskContainer = document.getElementById('disk-container');
+                    
+                    if (sys.disks && sys.disks.length > 0) {
+                        // Novo Formato (Multi-disco)
+                        diskContainer.innerHTML = '';
+                        sys.disks.forEach(d => {
+                            const color = d.percent > 90 ? '#f56565' : '#ed8936';
+                            diskContainer.innerHTML += `
+                                <div class="disk-item">
+                                    <span>${d.device}</span>
+                                    <span>${formatGB(d.free)} Livres</span>
+                                </div>
+                                <div class="disk-bar-bg"><div class="disk-bar-fill" style="width:${d.percent}%; background:${color};"></div></div>
+                            `;
+                        });
+                    } else if (sys.disk) {
+                        // Formato Antigo (Fallback)
+                        const freeGB = sys.disk.total_free_gb || 0;
+                        document.getElementById('disk-container').innerHTML = `
+                            <div class="stat-value">${sys.disk.total_usage_percent}%</div>
+                            <div class="stat-detail"><i class="fas fa-hdd"></i> ${freeGB} GB Livres</div>
+                        `;
+                    }
+                }
+
+                // HEALTH
+                document.getElementById('health-val').innerText = data.health_score || 100;
+
+                // 2. REDE
+                if(data.network_info) {
+                    document.getElementById('ip-val').innerText = data.network_info.local_ip;
+                    document.getElementById('host-val').innerText = data.network_info.hostname;
+                    const statusEl = document.getElementById('status-srv');
+                    if(data.server_sync && (data.server_sync.connected || data.server_sync.status === 'Online')) {
+                        statusEl.innerHTML = '<span class="badge badge-success">Online</span>';
+                    } else {
+                        statusEl.innerHTML = '<span class="badge badge-warning">Verificando...</span>';
+                    }
+                }
+
+                // 3. BACKUP
+                const summary = data.backup_summary || data.overview_summary || {};
+                document.getElementById('repo-count').innerText = summary.total_repositories || summary.repositories || 0;
+                document.getElementById('task-count').innerText = summary.active_tasks || summary.tasks || 0;
+                
+                // Engines
+                if(data.engines_status) {
+                    const installed = data.engines_status.installed || 0;
+                    const listLen = data.engines_status.list ? data.engines_status.list.length : 0;
+                    // Se listLen for menor que installed (bug de array), usa um fixo ou o maior
+                    const total = Math.max(installed, listLen, 5); 
+                    document.getElementById('engine-count').innerText = `${installed}/${total}`;
+                }
+
+                // 4. SISTEMA DETALHADO
+                if(data.system_info) {
+                    document.getElementById('os-val').innerText = data.system_info.platform || 'Windows';
+                    document.getElementById('ver').innerText = data.system_info.version || '-';
+                    document.getElementById('uptime-val').innerText = formatUptime(data.system_info.uptime_seconds || 0);
+                }
+
+            } catch (e) {
+                console.error("Erro carregamento:", e);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', loadData);
+        setInterval(loadData, 5000);
+    </script>
+
+    <script src="/static/sidebar.js"></script>
+</body>
+</html>

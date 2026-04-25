@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GBOC Agent - Changelog</title>
+    <link rel="stylesheet" href="/static/style.css?v=11.9">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .changelog-container { max-width: 900px; }
+
+        .changelog-content {
+            background: var(--bg-card, #151d2e);
+            border: 1px solid var(--border, rgba(255,255,255,.08));
+            border-radius: 12px;
+            padding: 32px 36px;
+            line-height: 1.7;
+            font-size: 0.95em;
+        }
+
+        .changelog-content h1 {
+            font-size: 1.6em;
+            font-weight: 700;
+            margin: 0 0 8px;
+            color: var(--text, #e2e8f0);
+        }
+
+        .changelog-content h2 {
+            font-size: 1.3em;
+            font-weight: 700;
+            margin: 32px 0 16px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--primary, #6366f1);
+            color: var(--primary, #6366f1);
+        }
+
+        .changelog-content h3 {
+            font-size: 1.05em;
+            font-weight: 600;
+            margin: 24px 0 10px;
+            color: var(--text, #e2e8f0);
+        }
+
+        .changelog-content p {
+            margin: 8px 0;
+            color: var(--text-secondary, #94a3b8);
+        }
+
+        .changelog-content blockquote {
+            margin: 0 0 20px;
+            padding: 12px 18px;
+            border-left: 4px solid var(--primary, #6366f1);
+            background: rgba(99, 102, 241, 0.06);
+            border-radius: 0 8px 8px 0;
+            color: var(--text-secondary, #94a3b8);
+            font-style: italic;
+        }
+
+        .changelog-content ul, .changelog-content ol {
+            margin: 8px 0;
+            padding-left: 24px;
+        }
+
+        .changelog-content li {
+            margin: 4px 0;
+            color: var(--text-secondary, #94a3b8);
+        }
+
+        .changelog-content li strong {
+            color: var(--text, #e2e8f0);
+        }
+
+        .changelog-content code {
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--primary, #6366f1);
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-size: 0.88em;
+            font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+        }
+
+        .changelog-content pre {
+            background: var(--bg-input, #0f172a);
+            border: 1px solid var(--border, rgba(255,255,255,.08));
+            border-radius: 8px;
+            padding: 16px 20px;
+            overflow-x: auto;
+            margin: 12px 0;
+        }
+
+        .changelog-content pre code {
+            background: none;
+            padding: 0;
+            color: var(--text-secondary, #94a3b8);
+            font-size: 0.85em;
+            line-height: 1.6;
+        }
+
+        .changelog-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0;
+            font-size: 0.9em;
+        }
+
+        .changelog-content th {
+            text-align: left;
+            padding: 10px 14px;
+            background: var(--bg-input, #0f172a);
+            color: var(--text, #e2e8f0);
+            font-weight: 600;
+            font-size: 0.82em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid var(--border, rgba(255,255,255,.08));
+        }
+
+        .changelog-content td {
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border, rgba(255,255,255,.08));
+            color: var(--text-secondary, #94a3b8);
+        }
+
+        .changelog-content tr:hover td {
+            background: rgba(255,255,255,0.02);
+        }
+
+        .changelog-content hr {
+            border: none;
+            border-top: 1px solid var(--border, rgba(255,255,255,.08));
+            margin: 24px 0;
+        }
+
+        .changelog-toolbar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+
+        .changelog-toolbar .btn {
+            padding: 8px 16px;
+            border: 1px solid var(--border, rgba(255,255,255,.08));
+            border-radius: 8px;
+            background: var(--bg-card, #151d2e);
+            color: var(--text-secondary, #94a3b8);
+            cursor: pointer;
+            font-size: 0.85em;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .changelog-toolbar .btn:hover {
+            background: var(--bg-input, #0f172a);
+            color: var(--text, #e2e8f0);
+        }
+
+        .changelog-toolbar .btn-primary {
+            background: var(--primary, #6366f1);
+            color: var(--bg-dark);
+            border-color: transparent;
+        }
+
+        .changelog-toolbar .btn-primary:hover {
+            opacity: 0.9;
+        }
+
+        .changelog-meta {
+            font-size: 0.8em;
+            color: var(--text-secondary, #94a3b8);
+            margin-left: auto;
+        }
+
+        .changelog-loading {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary, #94a3b8);
+        }
+
+        .changelog-loading i {
+            font-size: 2em;
+            margin-bottom: 12px;
+            color: var(--primary, #6366f1);
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .changelog-error {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--danger, #f56565);
+        }
+
+        /* TOC navigation */
+        .changelog-toc {
+            background: var(--bg-card, #151d2e);
+            border: 1px solid var(--border, rgba(255,255,255,.08));
+            border-radius: 12px;
+            padding: 20px 24px;
+            margin-bottom: 20px;
+        }
+
+        .changelog-toc h4 {
+            margin: 0 0 12px;
+            font-size: 0.85em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary, #94a3b8);
+        }
+
+        .changelog-toc a {
+            display: block;
+            padding: 6px 0;
+            color: var(--primary, #6366f1);
+            text-decoration: none;
+            font-size: 0.9em;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .changelog-toc a:hover {
+            color: var(--text, #e2e8f0);
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <main class="main-content">
+            <div class="header">
+                <h1 class="page-title"><i class="fas fa-clipboard-list"></i> Changelog</h1>
+            </div>
+
+            <div class="changelog-container">
+                <div class="changelog-toolbar">
+                    <button class="btn btn-primary" onclick="loadChangelog()">
+                        <i class="fas fa-sync-alt"></i> Atualizar
+                    </button>
+                    <button class="btn" onclick="toggleToc()">
+                        <i class="fas fa-list"></i> Índice
+                    </button>
+                    <button class="btn" onclick="downloadMd()">
+                        <i class="fas fa-download"></i> Baixar MD
+                    </button>
+                    <span class="changelog-meta" id="changelog-meta"></span>
+                </div>
+
+                <div id="changelog-toc" class="changelog-toc" style="display:none;">
+                    <h4><i class="fas fa-list"></i> Índice de Versões</h4>
+                    <div id="toc-links"></div>
+                </div>
+
+                <div id="changelog-output" class="changelog-content">
+                    <div class="changelog-loading">
+                        <i class="fas fa-spinner"></i>
+                        <p>Carregando changelog...</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/sidebar.js"></script>
+    <script>
+    let rawMarkdown = '';
+
+    async function loadChangelog() {
+        const output = document.getElementById('changelog-output');
+        output.innerHTML = '<div class="changelog-loading"><i class="fas fa-spinner"></i><p>Carregando changelog...</p></div>';
+
+        try {
+            const res = await fetch('/api/system/changelog');
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+
+            if (data.status !== 'success' || !data.content) {
+                throw new Error(data.message || 'Conteúdo não encontrado');
+            }
+
+            rawMarkdown = data.content;
+            const html = renderMarkdown(rawMarkdown);
+            output.innerHTML = html;
+
+            // Build TOC
+            buildToc(output);
+
+            // Meta info
+            const meta = document.getElementById('changelog-meta');
+            if (data.last_modified) {
+                const d = new Date(data.last_modified);
+                meta.textContent = `Atualizado: ${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'})}`;
+            }
+
+        } catch (err) {
+            output.innerHTML = `<div class="changelog-error"><i class="fas fa-exclamation-triangle" style="font-size:2em;margin-bottom:12px;"></i><p>Erro ao carregar changelog: ${err.message}</p></div>`;
+        }
+    }
+
+    function renderMarkdown(md) {
+        let html = md;
+
+        // Code blocks (``` ... ```)
+        html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (m, lang, code) => {
+            return `<pre><code>${escapeHtml(code.trim())}</code></pre>`;
+        });
+
+        // Tables
+        html = html.replace(/^(\|.+\|)\n(\|[\s:-]+\|)\n((?:\|.+\|\n?)+)/gm, (m, header, sep, body) => {
+            const ths = header.split('|').filter(c => c.trim()).map(c => `<th>${c.trim()}</th>`).join('');
+            const rows = body.trim().split('\n').map(row => {
+                const tds = row.split('|').filter(c => c.trim()).map(c => `<td>${c.trim()}</td>`).join('');
+                return `<tr>${tds}</tr>`;
+            }).join('');
+            return `<table><thead><tr>${ths}</tr></thead><tbody>${rows}</tbody></table>`;
+        });
+
+        // Headings
+        html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+        html = html.replace(/^## (.+)$/gm, '<h2 id="' + 'sec-$1'.replace(/[^a-zA-Z0-9]/g, '-') + '">$1</h2>');
+        html = html.replace(/^## (.+)$/gm, (m, t) => `<h2 id="sec-${t.replace(/[^a-zA-Z0-9]+/g, '-').toLowerCase()}">${t}</h2>`);
+        html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
+        // Blockquotes
+        html = html.replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
+
+        // Bold + Italic
+        html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+        html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+        // Inline code
+        html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+        // Unordered lists
+        html = html.replace(/^(\s*)[-*] (.+)$/gm, (m, indent, text) => {
+            const level = Math.floor(indent.length / 2);
+            return `<li data-level="${level}">${text}</li>`;
+        });
+        // Wrap consecutive li elements in ul
+        html = html.replace(/((?:<li[^>]*>.*<\/li>\n?)+)/g, '<ul>$1</ul>');
+
+        // Horizontal rules
+        html = html.replace(/^---+$/gm, '<hr>');
+
+        // Paragraphs (lines that aren't already HTML)
+        html = html.replace(/^(?!<[a-z/])([\w✅🔧🐛📊🏗️🔐📈🩺🔔🩹📧📋🗄️🗃️🔄🎨].+)$/gm, '<p>$1</p>');
+
+        return html;
+    }
+
+    function escapeHtml(s) {
+        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function buildToc(container) {
+        const headings = container.querySelectorAll('h2');
+        const tocLinks = document.getElementById('toc-links');
+        tocLinks.innerHTML = '';
+        headings.forEach((h, i) => {
+            const id = 'section-' + i;
+            h.id = id;
+            const a = document.createElement('a');
+            a.href = '#' + id;
+            a.textContent = h.textContent;
+            tocLinks.appendChild(a);
+        });
+    }
+
+    function toggleToc() {
+        const toc = document.getElementById('changelog-toc');
+        toc.style.display = toc.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function downloadMd() {
+        if (!rawMarkdown) return;
+        const blob = new Blob([rawMarkdown], { type: 'text/markdown' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'CHANGELOG.md';
+        a.click();
+        URL.revokeObjectURL(a.href);
+    }
+
+    // Init
+    document.addEventListener('DOMContentLoaded', loadChangelog);
+    </script>
+</body>
+</html>

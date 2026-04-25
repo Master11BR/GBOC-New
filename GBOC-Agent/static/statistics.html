@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estatísticas - GBOC Agent</title>
+    <link rel="stylesheet" href="/static/style.css?v=11.9">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="/static/auth_interceptor.js"></script>
+</head>
+<body>
+    <!-- Sidebar será injetado automaticamente pelo sidebar.js -->
+    <div class="app">
+        <!-- Header -->
+        <header class="header">
+            <h1 class="page-title"><i class="fas fa-chart-line"></i> Estatísticas do Sistema</h1>
+        </header>
+
+        <div class="stats-container">
+
+        <!-- Controles -->
+        <div class="controls-panel">
+            <div class="control-group">
+                <label>Período:</label>
+                <select id="periodSelect">
+                    <option value="day">Hoje</option>
+                    <option value="week">Últimos 7 dias</option>
+                    <option value="month" selected>Últimos 30 dias</option>
+                    <option value="year">Último ano</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <button id="btn-refresh-stats" class="btn-primary">
+                    <i class="fas fa-sync-alt"></i> Atualizar
+                </button>
+            </div>
+        </div>
+
+        <!-- Resumo Geral -->
+        <div class="stats-summary">
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fas fa-play-circle"></i></div>
+                <div class="stat-content">
+                    <div class="stat-value" id="totalExecutions">-</div>
+                    <div class="stat-label">Execuções Totais</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon success"><i class="fas fa-check-circle"></i></div>
+                <div class="stat-content">
+                    <div class="stat-value" id="successRate">-</div>
+                    <div class="stat-label">Taxa de Sucesso</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon info"><i class="fas fa-database"></i></div>
+                <div class="stat-content">
+                    <div class="stat-value" id="totalData">-</div>
+                    <div class="stat-label">Dados Copiados</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon warning"><i class="fas fa-tachometer-alt"></i></div>
+                <div class="stat-content">
+                    <div class="stat-value" id="avgSpeed">-</div>
+                    <div class="stat-label">Velocidade Média</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gráficos -->
+        <div class="charts-grid">
+            <!-- Evolução de Execuções -->
+            <div class="chart-container">
+                <h3><i class="fas fa-chart-line"></i> Evolução de Execuções</h3>
+                <canvas id="executionsChart"></canvas>
+            </div>
+
+            <!-- Throughput (Dados e Velocidade) -->
+            <div class="chart-container">
+                <h3><i class="fas fa-tachometer-alt"></i> Throughput (Dados e Velocidade)</h3>
+                <canvas id="throughputChart"></canvas>
+            </div>
+
+            <!-- Comparação de Engines -->
+            <div class="chart-container">
+                <h3><i class="fas fa-cogs"></i> Comparação de Engines</h3>
+                <canvas id="enginesChart"></canvas>
+            </div>
+
+            <!-- Tendência de Erros -->
+            <div class="chart-container">
+                <h3><i class="fas fa-exclamation-triangle"></i> Tendência de Erros</h3>
+                <canvas id="errorsChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Tabela de Comparação de Engines -->
+        <div class="table-container">
+            <h3><i class="fas fa-table"></i> Comparação Detalhada de Engines</h3>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Engine</th>
+                        <th>Execuções</th>
+                        <th>Taxa de Sucesso</th>
+                        <th>Dados Totais (GB)</th>
+                        <th>Velocidade Média (MB/s)</th>
+                        <th>Erros</th>
+                    </tr>
+                </thead>
+                <tbody id="enginesTableBody">
+                    <tr><td colspan="6">Carregando...</td></tr>
+                </tbody>
+            </table>
+        </div>
+        </div>
+    </div>
+
+    <script>
+        let charts = {};
+
+        // Cache para dados de estatísticas
+        const statsCache = {
+            data: null,
+            timestamp: 0,
+            ttl: 2 * 60 * 1000  // 2 minutos
+        };
+
+        // Função para verificar se o cache é válido
+        function isCacheValid() {
+            return statsCache.data && (Date.now() - statsCache.timestamp) < statsCache.ttl;
+        }
+
+        window.loadStatistics = async function() {
+            const period = document.getElementById('periodSelect').value;
+
+            try {
+                // Mostrar indicadores de carregamento
+                document.querySelectorAll('.stat-value').forEach(el => el.textContent = '...');
+
+                // Carregar resumo
+                const summaryRes = await fetch(`/api/statistics/summary?period=${period}`);
+                if (!summaryRes.ok) {
+                    throw new Error(`Erro HTTP: ${summaryRes.status}`);
+                }
+                const summary = await summaryRes.json();
+
+                if (summary.status !== 'success') {
+                    throw new Error(summary.message || 'Erro ao carregar estatísticas');
+                }
+
+                updateSummary(summary);
+
+                // Carregar dados diários
+                const days = period === 'day' ? 1 : period === 'week' ? 7 : period === 'month' ? 30 : 365;
+                const dailyRes = await fetch(`/api/statistics/daily?days=${days}`);
+                const daily = await dailyRes.json();
+                updateExecutionsChart(daily);
+
+                // Carregar throughput
+                const throughputRes = await fetch(`/api/statistics/throughput?days=${days}`);
+                const throughput = await throughputRes.json();
+                updateThroughputChart(throughput);
+
+                // Carregar comparação de engines
+                const enginesRes = await fetch(`/api/statistics/engines/comparison?period=${period}`);
+                const engines = await enginesRes.json();
+                updateEnginesChart(engines);
+                updateEnginesTable(engines);
+
+                // Carregar tendência de erros
+                const errorsRes = await fetch(`/api/statistics/errors/trend?days=${days}`);
+                const errors = await errorsRes.json();
+                updateErrorsChart(errors);
+
+            } catch (error) {
+                console.error('Erro ao carregar estatísticas:', error);
+                document.querySelectorAll('.stat-value').forEach(el => el.textContent = 'Erro');
+            }
+        }
+
+        function updateSummary(summary) {
+            // Validar dados antes de usar
+            if (!summary || typeof summary !== 'object') {
+                console.error('Dados inválidos recebidos para o resumo:', summary);
+                return;
+            }
+
+            const totalExecutions = document.getElementById('totalExecutions');
+            const successRate = document.getElementById('successRate');
+            const totalData = document.getElementById('totalData');
+            const avgSpeed = document.getElementById('avgSpeed');
+
+            if (totalExecutions) totalExecutions.textContent = summary.total_executions || 0;
+            if (successRate) successRate.textContent = (summary.success_rate || 0).toFixed(1) + '%';
+            if (totalData) totalData.textContent = (summary.total_bytes_gb || 0).toFixed(2) + ' GB';
+            if (avgSpeed) avgSpeed.textContent = (summary.avg_speed_mbps || 0).toFixed(2) + ' MB/s';
+        }
+
+        function updateExecutionsChart(data) {
+            const ctx = document.getElementById('executionsChart').getContext('2d');
+
+            if (charts.executions) {
+                charts.executions.destroy();
+            }
+
+            charts.executions = new Chart(ctx, {
+                type: 'line',
+                data: data.chart_data,
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'top' },
+                        title: { display: false }
+                    },
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+
+        function updateThroughputChart(data) {
+            const ctx = document.getElementById('throughputChart').getContext('2d');
+
+            if (charts.throughput) {
+                charts.throughput.destroy();
+            }
+
+            charts.throughput = new Chart(ctx, {
+                type: 'line',
+                data: data.chart_data,
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'top' }
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            position: 'left',
+                            title: { display: true, text: 'Dados (GB)' }
+                        },
+                        y1: {
+                            type: 'linear',
+                            position: 'right',
+                            title: { display: true, text: 'Velocidade (MB/s)' },
+                            grid: { drawOnChartArea: false }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateEnginesChart(data) {
+            const ctx = document.getElementById('enginesChart').getContext('2d');
+
+            if (charts.engines) {
+                charts.engines.destroy();
+            }
+
+            charts.engines = new Chart(ctx, {
+                type: 'bar',
+                data: data.chart_data,
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'top' }
+                    },
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+
+        function updateErrorsChart(data) {
+            const ctx = document.getElementById('errorsChart').getContext('2d');
+
+            if (charts.errors) {
+                charts.errors.destroy();
+            }
+
+            charts.errors = new Chart(ctx, {
+                type: 'line',
+                data: data.chart_data,
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'top' }
+                    },
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+
+        function updateEnginesTable(data) {
+            const tbody = document.getElementById('enginesTableBody');
+            const engines = data.engines || [];
+
+            if (engines.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6">Nenhum dado disponível</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = engines.map(engine => `
+                <tr>
+
+                    <td><strong>${engine.engine}</strong></td>
+                    <td>${engine.total_executions || 0}</td>
+                    <td>${(engine.success_rate || 0).toFixed(1)}%</td>
+                    <td>${(engine.total_bytes_gb || 0).toFixed(2)}</td>
+                    <td>${(engine.avg_speed_mbps || 0).toFixed(2)}</td>
+                    <td>${engine.total_errors || 0}</td>
+                </tr>
+            `).join('');
+        }
+
+        // Inicializar listeners quando DOM está pronto
+        document.addEventListener('DOMContentLoaded', function() {
+            // Listener para mudar período
+            const periodSelect = document.getElementById('periodSelect');
+            if (periodSelect) {
+                periodSelect.addEventListener('change', () => {
+                    // Limpar cache ao mudar período
+                    statsCache.data = null;
+                    window.loadStatistics();
+                });
+            }
+
+            // Listener para botão de atualizar
+            const refreshBtn = document.getElementById('btn-refresh-stats');
+            if (refreshBtn) {
+                refreshBtn.addEventListener('click', () => {
+                    // Limpar cache ao forçar atualização
+                    statsCache.data = null;
+                    window.loadStatistics();
+                });
+            }
+
+            // Carregar dados iniciais
+            window.loadStatistics();
+
+            // Atualizar a cada 5 minutos, mas verificar cache primeiro
+            setInterval(() => {
+                if (!isCacheValid()) {
+                    window.loadStatistics();
+                }
+            }, 5 * 60 * 1000);
+        });
+    </script>
+
+    <script src="/static/sidebar.js"></script>
+</body>
+</html>

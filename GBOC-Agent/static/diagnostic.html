@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnóstico - GBOC Agent 11.7c</title>
+    <link rel="stylesheet" href="/static/style.css?v=11.9">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="/static/auth_interceptor.js"></script>
+    <style>
+        /* Tabs agora usam .gboc-tabs/.gboc-tab do style.css */
+        .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px;margin-bottom:24px;}
+        .kpi-box{background:var(--bg-card);border-radius:12px;padding:20px;display:flex;align-items:center;gap:16px;border:1px solid var(--border);transition:.25s;}
+        .kpi-box:hover{transform:translateY(-2px);border-color:var(--primary);}
+        .kpi-icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.3em;}
+        .kpi-icon.blue{background:rgba(66,153,225,.15);color:var(--primary);}
+        .kpi-icon.green{background:rgba(72,187,120,.15);color:var(--success);}
+        .kpi-icon.orange{background:rgba(237,137,54,.15);color:var(--warning);}
+        .kpi-icon.red{background:rgba(245,101,101,.15);color:var(--danger);}
+        .kpi-icon.purple{background:rgba(128,90,213,.15);color:var(--accent);}
+        .kpi-icon.cyan{background:rgba(56,178,172,.15);color:var(--info);}
+        .kpi-info{flex:1;}.kpi-value{font-size:1.6em;font-weight:700;line-height:1.1;}.kpi-label{font-size:.82em;color:var(--text-muted);margin-top:2px;}
+        .health-wrap{background:var(--bg-card);border-radius:14px;padding:28px;margin-bottom:24px;border:1px solid var(--border);}
+        .health-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+        .health-score{font-size:2.8em;font-weight:800;}
+        .health-bar{height:12px;background:var(--bg-input);border-radius:6px;overflow:hidden;}
+        .health-fill{height:100%;border-radius:6px;transition:width .6s;}
+        .sla-banner{background:var(--bg-card);border-radius:14px;padding:28px;margin-bottom:24px;border:1px solid var(--border);display:flex;align-items:center;gap:28px;}
+        .sla-ring{position:relative;width:110px;height:110px;flex-shrink:0;}
+        .sla-ring canvas{width:110px!important;height:110px!important;}
+        .sla-ring-label{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:1.5em;font-weight:800;}
+        .sla-details{flex:1;}
+        .card-panel{background:var(--bg-card);border-radius:12px;padding:22px;margin-bottom:20px;border:1px solid var(--border);}
+        .card-panel h3{margin:0 0 16px;font-size:1.05em;display:flex;align-items:center;gap:8px;}
+        .card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;}
+        .chart-box{background:var(--bg-card);border-radius:12px;padding:20px;border:1px solid var(--border);margin-bottom:20px;overflow:hidden;}
+        .chart-box h3{margin:0 0 14px;font-size:1em;color:var(--text-muted);}
+        .chart-box canvas{display:block;max-width:100%!important;width:100%!important;}
+        .chart-fixed-sm{position:relative;height:140px;max-height:140px;}
+        .chart-fixed-sm canvas{width:100%!important;height:100%!important;max-height:100%!important;}
+        #chartErrCategories,#chartErrPareto{height:100%!important;max-height:100%!important;}
+        #chartDailyExec,#chartThroughput,#chartEngines,#chartErrorsTrend{height:250px!important;max-height:250px!important;}
+        .risk-card{background:var(--bg-card);border-radius:12px;padding:20px;border-left:4px solid var(--danger);margin-bottom:14px;}
+        .risk-card.warn{border-left-color:var(--warning);}.risk-card.ok{border-left-color:var(--success);}
+        .risk-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+        .risk-head h4{margin:0;font-size:1em;}
+        .risk-factors{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
+        .risk-factor{padding:4px 10px;border-radius:6px;font-size:.78em;font-weight:600;}
+        .risk-factor.critical{background:rgba(245,101,101,.15);color:var(--danger);}
+        .risk-factor.high{background:rgba(237,137,54,.15);color:var(--warning);}
+        .risk-factor.medium{background:rgba(66,153,225,.15);color:var(--primary);}
+        .risk-last-err{font-size:.82em;color:var(--text-muted);background:var(--bg-input);padding:8px 12px;border-radius:6px;font-family:Consolas,monospace;white-space:pre-wrap;max-height:80px;overflow:auto;}
+        .err-cat-card{background:var(--bg-card);border-radius:12px;padding:18px;border:1px solid var(--border);}
+        .err-cat-head{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+        .err-cat-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1em;}
+        .err-cat-bar{height:6px;background:var(--bg-input);border-radius:3px;overflow:hidden;margin-top:8px;}
+        .err-cat-fill{height:100%;border-radius:3px;}
+        .err-detail-row{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px;}
+        .err-detail-row:last-child{border-bottom:none;}
+        .err-msg{flex:1;font-size:.85em;font-family:Consolas,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:500px;}
+        .err-count{font-weight:700;font-size:1.1em;min-width:30px;text-align:center;}
+        .integ-card{background:var(--bg-card);border-radius:12px;padding:20px;border:1px solid var(--border);display:flex;flex-direction:column;gap:12px;}
+        .integ-head{display:flex;justify-content:space-between;align-items:center;}
+        .integ-head h4{margin:0;font-size:.95em;}
+        .integ-btn{padding:8px 16px;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-size:.82em;display:flex;align-items:center;gap:6px;transition:.2s;}
+        .integ-btn.run{background:rgba(66,153,225,.15);color:var(--primary);}
+        .integ-btn.run:hover{background:rgba(66,153,225,.3);}
+        .integ-btn:disabled{opacity:.5;cursor:not-allowed;}
+        .export-btn{padding:8px 14px;border:1px solid var(--border);background:var(--bg-card);color:var(--text);border-radius:8px;cursor:pointer;font-size:.82em;font-weight:600;display:inline-flex;align-items:center;gap:6px;transition:.2s;}
+        .export-btn:hover{border-color:var(--primary);color:var(--primary);}
+        .alert-item{padding:14px 18px;border-radius:10px;margin-bottom:10px;display:flex;align-items:center;gap:12px;font-size:.9em;}
+        .alert-item.critical{background:rgba(245,101,101,.1);border:1px solid rgba(245,101,101,.25);color:var(--danger);}
+        .alert-item.warning{background:rgba(237,137,54,.1);border:1px solid rgba(237,137,54,.25);color:var(--warning);}
+        .alert-item.info{background:rgba(66,153,225,.1);border:1px solid rgba(66,153,225,.25);color:var(--primary);}
+        .alert-item i{font-size:1.1em;flex-shrink:0;}
+        .sys-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;}
+        .sys-card{background:var(--bg-card);border-radius:12px;padding:20px;border:1px solid var(--border);}
+        .sys-card h4{margin:0 0 12px;font-size:.9em;color:var(--text-muted);}
+        .sys-row{display:flex;justify-content:space-between;padding:6px 0;font-size:.88em;}
+        .sys-row+.sys-row{border-top:1px solid var(--border);}
+        .compliance-tbl{width:100%;border-collapse:collapse;}
+        .compliance-tbl th,.compliance-tbl td{padding:12px 14px;text-align:left;border-bottom:1px solid var(--border);font-size:.88em;}
+        .compliance-tbl th{color:var(--text-muted);font-weight:700;text-transform:uppercase;font-size:.75em;}
+        .compliance-tbl tr:hover{background:rgba(255,255,255,.02);}
+        .badge-compliant{padding:4px 10px;border-radius:12px;font-size:.78em;font-weight:600;background:rgba(72,187,120,.15);color:var(--success);}
+        .badge-at_risk{padding:4px 10px;border-radius:12px;font-size:.78em;font-weight:600;background:rgba(237,137,54,.15);color:var(--warning);}
+        .badge-non_compliant{padding:4px 10px;border-radius:12px;font-size:.78em;font-weight:600;background:rgba(245,101,101,.15);color:var(--danger);}
+        .rec-item{padding:14px 18px;border-radius:10px;margin-bottom:10px;display:flex;align-items:flex-start;gap:12px;background:rgba(66,153,225,.06);border:1px solid rgba(66,153,225,.15);}
+        .rec-item i{color:var(--primary);margin-top:2px;}
+        .rec-priority{font-size:.72em;padding:2px 8px;border-radius:8px;font-weight:600;margin-left:8px;}
+        .rec-priority.high{background:rgba(245,101,101,.15);color:var(--danger);}
+        .rec-priority.medium{background:rgba(237,137,54,.15);color:var(--warning);}
+        .rec-priority.low{background:rgba(72,187,120,.15);color:var(--success);}
+        .forecast-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;}
+        .forecast-item{background:var(--bg-input);padding:16px;border-radius:10px;text-align:center;}
+        .forecast-item .days{font-size:.82em;color:var(--text-muted);margin-bottom:4px;}
+        .forecast-item .value{font-size:1.4em;font-weight:700;}
+        .two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
+        @media(max-width:768px){.kpi-grid{grid-template-columns:1fr 1fr;}.sla-banner{flex-direction:column;text-align:center;}.card-grid,.two-col{grid-template-columns:1fr;}}
+    </style>
+</head><body>
+<div class="app">
+    <main class="main-content">
+        <header class="header">
+            <div>
+                <h1 class="page-title"><i class="fas fa-stethoscope"></i> Diagnóstico</h1>
+                <div class="page-subtitle">Saúde, SLA, Erros, Riscos e Integridade</div>
+            </div>
+            <div class="header-actions">
+                <button class="export-btn" onclick="exportReport('csv')"><i class="fas fa-file-csv"></i> CSV</button>
+                <button class="export-btn" onclick="exportReport('json')"><i class="fas fa-file-code"></i> JSON</button>
+                <button class="btn btn-secondary" onclick="loadAll()"><i class="fas fa-sync-alt"></i> Atualizar</button>
+            </div>
+        </header>
+        <div class="content">
+            <div class="gboc-tabs">
+                <button class="gboc-tab active" onclick="openTab('health')"><i class="fas fa-heartbeat"></i> Saúde</button>
+                <button class="gboc-tab" onclick="openTab('stats')"><i class="fas fa-chart-bar"></i> Estatísticas</button>
+                <button class="gboc-tab" onclick="openTab('sla')"><i class="fas fa-clipboard-check"></i> SLA <span class="gboc-tab-badge" id="slaBadge" style="display:none">0</span></button>
+                <button class="gboc-tab" onclick="openTab('errors')"><i class="fas fa-bug"></i> Erros <span class="gboc-tab-badge" id="errorsBadge" style="display:none">0</span></button>
+                <button class="gboc-tab" onclick="openTab('risk')"><i class="fas fa-exclamation-triangle"></i> Risco <span class="gboc-tab-badge" id="riskBadge" style="display:none">0</span></button>
+                <button class="gboc-tab" onclick="openTab('integrity')"><i class="fas fa-shield-alt"></i> Integridade</button>
+                <button class="gboc-tab" onclick="openTab('system')"><i class="fas fa-server"></i> Sistema</button>
+                <button class="gboc-tab" onclick="openTab('alerts')"><i class="fas fa-bell"></i> Alertas <span class="gboc-tab-badge" id="alertsBadge" style="display:none">0</span></button>
+            </div>
+
+            <!-- TAB: SAUDE -->
+            <div class="gboc-tab-pane active" id="pane-health">
+                <div class="health-wrap">
+                    <div class="health-top">
+                        <div><div class="kpi-label">Health Score</div><div class="health-score" id="healthScore">--</div></div>
+                        <div id="healthLabel" class="badge badge-info">Carregando...</div>
+                    </div>
+                    <div class="health-bar"><div class="health-fill" id="healthFill" style="width:0;background:var(--success);"></div></div>
+                </div>
+                <div class="kpi-grid">
+                    <div class="kpi-box"><div class="kpi-icon green"><i class="fas fa-check-circle"></i></div><div class="kpi-info"><div class="kpi-value" id="hSuccessRate">--</div><div class="kpi-label">Taxa de Sucesso</div></div></div>
+                    <div class="kpi-box"><div class="kpi-icon blue"><i class="fas fa-shield-alt"></i></div><div class="kpi-info"><div class="kpi-value" id="hReliability">--</div><div class="kpi-label">Confiabilidade</div></div></div>
+                    <div class="kpi-box"><div class="kpi-icon orange"><i class="fas fa-clock"></i></div><div class="kpi-info"><div class="kpi-value" id="hMtbf">--</div><div class="kpi-label">MTBF (horas)</div></div></div>
+                    <div class="kpi-box"><div class="kpi-icon red"><i class="fas fa-times-circle"></i></div><div class="kpi-info"><div class="kpi-value" id="hFailures">--</div><div class="kpi-label">Falhas (30d)</div></div></div>
+                </div>
+                <!-- Alertas Preemptivos -->
+                <div class="card-panel">
+                    <h3><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i> Alertas Preemptivos</h3>
+                    <div id="healthAlertsList"><div class="loading"><i class="fas fa-spinner fa-spin"></i> Carregando...</div></div>
+                </div>
+
+                <!-- Erros Recentes (7 dias) -->
+                <div class="card-panel">
+                    <h3><i class="fas fa-bug" style="color:var(--warning)"></i> Erros Recentes (7 dias)</h3>
+                    <div id="healthRecentErrors"><div class="loading"><i class="fas fa-spinner fa-spin"></i> Carregando...</div></div>
+                </div>
+
+                <div class="card-panel">
+                    <h3><i class="fas fa-lightbulb" style="color:var(--warning)"></i> Recomendações</h3>
+                    <div id="recommendationsList"><div class="loading"><i class="fas fa-spinner fa-spin"></i> Carregando...</div></div>
+                </div>
+                <div class="card-panel">
+                    <h3><i class="fas fa-hdd" style="color:var(--primary)"></i> Previsão de Armazenamento</h3>
+                    <div class="forecast-grid" id="forecastGrid">
+                        <div class="forecast-item"><div class="days">30 dias</div><div class="value" id="fc30">--</div></div>
+                        <div class="forecast-item"><div class="days">60 dias</div><div class="value" id="fc60">--</div></div>
+                        <div class="forecast-item"><div class="days">90 dias</div><div class="value" id="fc90">--</div></div>
+                        <div class="forecast-item"><div class="days">Disco Cheio</div><div class="value" id="fcFull">--</div></div>
+                    </div>
+                </div>
+            </div>
+            <!-- TAB: ESTATISTICAS -->
+            <div class="gboc-tab-pane" id="pane-stats">
+                <div class="kpi-grid">
+                    <div class="kpi-box"><div class="kpi-icon blue"><i class="fas fa-play-circle"></i></div><div class="kpi-info"><div class="kpi-value" id="stTotal">--</div><div class="kpi-label">Execuções (30d)</div></div></div>
+                    <div class="kpi-box"><div class="kpi-icon green"><i class="fas fa-check-double"></i></div><div class="kpi-info"><div class="kpi-value" id="stSuccess">--</div><div class="kpi-label">Sucesso (30d)</div></div></div>
+                    <div class="kpi-box"><div class="kpi-icon orange"><i class="fas fa-tachometer-alt"></i></div><div class="kpi-info"><div class="kpi-value" id="stSpeed">--</div><div class="kpi-label">Velocidade Média</div></div></div>
+                    <div class="kpi-box"><div class="kpi-icon purple"><i class="fas fa-database"></i></div><div class="kpi-info"><div class="kpi-value" id="stData">--</div><div class="kpi-label">Dados Processados</div></div></div>
+                    <div class="kpi-box"><div class="kpi-icon cyan"><i class="fas fa-stopwatch"></i></div><div class="kpi-info"><div class="kpi-value" id="stAvgDuration">--</div><div class="kpi-label">Duração Média</div></div></div>
+                    <div class="kpi-box"><div class="kpi-icon red"><i class="fas fa-calendar-day"></i></div><div class="kpi-info"><div class="kpi-value" id="stDailyAvg">--</div><div class="kpi-label">Média Diária</div></div></div>
+                </div>
+                <div class="two-col">
+                    <div class="card-panel">
+                        <h3><i class="fas fa-sort-amount-down" style="color:var(--warning)"></i> Top Tarefas Mais Lentas</h3>
+                        <div id="topSlowestTasks"><div class="loading">Carregando...</div></div>
+                    </div>
+                    <div class="card-panel">
+                        <h3><i class="fas fa-times-circle" style="color:var(--danger)"></i> Top Tarefas Mais Falhas</h3>
+                        <div id="topFailedTasks"><div class="loading">Carregando...</div></div>
+                    </div>
+                </div>
+                <div class="card-panel">
+                    <h3><i class="fas fa-table" style="color:var(--primary)"></i> Comparação por Engine</h3>
+                    <div style="overflow-x:auto;">
+                        <table class="compliance-tbl" id="engineTable">
+                            <thead><tr><th>Engine</th><th>Execuções</th><th>Sucesso</th><th>Taxa</th><th>Vel. Média</th><th>Dados</th><th>Falhas</th></tr></thead>
+                            <tbody id="engineTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Gráficos de Estatísticas -->
+                <div class="two-col">
+                    <div class="chart-box">
+                        <h3><i class="fas fa-chart-line" style="color:var(--primary)"></i> Evolução de Execuções</h3>
+                        <canvas id="chartDailyExec" height="250"></canvas>
+                    </div>
+                    <div class="chart-box">
+                        <h3><i class="fas fa-tachometer-alt" style="color:var(--success)"></i> Throughput (Dados e Velocidade)</h3>
+                        <canvas id="chartThroughput" height="250"></canvas>
+                    </div>
+                </div>
+                <div class="two-col">
+                    <div class="chart-box">
+                        <h3><i class="fas fa-cogs" style="color:var(--warning)"></i> Comparação de Engines</h3>
+                        <canvas id="chartEngines" height="250"></canvas>
+                    </div>
+                    <div class="chart-box">
+                        <h3><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i> Tendência de Erros</h3>
+                        <canvas id="chartErrorsTrend" height="250"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: SLA -->
+            <div class="gboc-tab-pane" id="pane-sla">
+                <div class="sla-banner">
+                    <div class="sla-ring">
+                        <canvas id="slaRingChart"></canvas>
+                        <div class="sla-ring-label" id="slaRingPct">--%</div>
+                    </div>
+                    <div class="sla-details">
+                        <h2 style="margin:0 0 6px;">SLA Compliance</h2>
+                        <p style="color:var(--text-muted);margin:0 0 14px;font-size:.9em;">Percentual de tarefas dentro do RPO esperado</p>
+                        <div class="kpi-grid" style="margin-bottom:0;">
+                            <div class="kpi-box"><div class="kpi-icon green"><i class="fas fa-check"></i></div><div class="kpi-info"><div class="kpi-value" id="slaCompliant">0</div><div class="kpi-label">Conforme</div></div></div>
+                            <div class="kpi-box"><div class="kpi-icon orange"><i class="fas fa-exclamation"></i></div><div class="kpi-info"><div class="kpi-value" id="slaAtRisk">0</div><div class="kpi-label">Em Risco</div></div></div>
+                            <div class="kpi-box"><div class="kpi-icon red"><i class="fas fa-times"></i></div><div class="kpi-info"><div class="kpi-value" id="slaNonCompliant">0</div><div class="kpi-label">Não Conforme</div></div></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-panel">
+                    <h3><i class="fas fa-list-alt" style="color:var(--primary)"></i> Detalhamento por Tarefa</h3>
+                    <div style="overflow-x:auto;">
+                        <table class="compliance-tbl">
+                            <thead><tr><th>Tarefa</th><th>Engine</th><th>Taxa 30d</th><th>RPO Real</th><th>RPO Esperado</th><th>Último Sucesso</th><th>Status</th></tr></thead>
+                            <tbody id="slaTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <!-- TAB: ERROS -->
+            <div class="gboc-tab-pane" id="pane-errors">
+                <div class="kpi-grid">
+                    <div class="kpi-box"><div class="kpi-icon red"><i class="fas fa-bug"></i></div><div class="kpi-info"><div class="kpi-value" id="errTotal">0</div><div class="kpi-label">Total de Erros</div></div></div>
+                    <div class="kpi-box"><div class="kpi-icon orange"><i class="fas fa-layer-group"></i></div><div class="kpi-info"><div class="kpi-value" id="errCategories">0</div><div class="kpi-label">Categorias</div></div></div>
+                    <div class="kpi-box"><div class="kpi-icon purple"><i class="fas fa-redo"></i></div><div class="kpi-info"><div class="kpi-value" id="errTopCount">0</div><div class="kpi-label">Erro Mais Frequente</div></div></div>
+                    <div class="kpi-box"><div class="kpi-icon blue"><i class="fas fa-clock"></i></div><div class="kpi-info"><div class="kpi-value" id="errLastTime">--</div><div class="kpi-label">Último Erro</div></div></div>
+                </div>
+                <div class="two-col">
+                    <div class="chart-box">
+                        <h3><i class="fas fa-chart-pie"></i> Distribuição por Categoria</h3>
+                        <div class="chart-fixed-sm"><canvas id="chartErrCategories"></canvas></div>
+                    </div>
+                    <div class="chart-box">
+                        <h3><i class="fas fa-chart-bar"></i> Erros Mais Frequentes (Pareto)</h3>
+                        <div class="chart-fixed-sm"><canvas id="chartErrPareto"></canvas></div>
+                    </div>
+                </div>
+                <div class="card-panel">
+                    <h3><i class="fas fa-tags" style="color:var(--warning)"></i> Categorias de Erros</h3>
+                    <div class="card-grid" id="errCatCards"></div>
+                </div>
+                <div class="card-panel">
+                    <h3><i class="fas fa-list" style="color:var(--danger)"></i> Todos os Erros (agrupados)</h3>
+                    <div id="errDetailList"></div>
+                </div>
+            </div>
+
+            <!-- TAB: RISCO -->
+            <div class="gboc-tab-pane" id="pane-risk">
+                <div class="kpi-grid">
+                    <div class="kpi-box"><div class="kpi-icon red"><i class="fas fa-exclamation-triangle"></i></div><div class="kpi-info"><div class="kpi-value" id="riskTotal">0</div><div class="kpi-label">Tarefas em Risco</div></div></div>
+                    <div class="kpi-box"><div class="kpi-icon orange"><i class="fas fa-fire"></i></div><div class="kpi-info"><div class="kpi-value" id="riskCritical">0</div><div class="kpi-label">Risco Crítico</div></div></div>
+                    <div class="kpi-box"><div class="kpi-icon blue"><i class="fas fa-tasks"></i></div><div class="kpi-info"><div class="kpi-value" id="riskHealthy">0</div><div class="kpi-label">Saudáveis</div></div></div>
+                </div>
+                <div id="riskCardsList"><div class="loading"><i class="fas fa-spinner fa-spin"></i> Carregando...</div></div>
+            </div>
+
+            <!-- TAB: INTEGRIDADE -->
+            <div class="gboc-tab-pane" id="pane-integrity">
+                <div class="kpi-grid">
+                    <div class="kpi-box"><div class="kpi-icon green"><i class="fas fa-shield-alt"></i></div><div class="kpi-info"><div class="kpi-value" id="integTotal">0</div><div class="kpi-label">Repositórios</div></div></div>
+                    <div class="kpi-box"><div class="kpi-icon blue"><i class="fas fa-history"></i></div><div class="kpi-info"><div class="kpi-value" id="integChecks">0</div><div class="kpi-label">Verificações Feitas</div></div></div>
+                    <div class="kpi-box"><div class="kpi-icon orange"><i class="fas fa-clock"></i></div><div class="kpi-info"><div class="kpi-value" id="integLast">--</div><div class="kpi-label">Última Verificação</div></div></div>
+                </div>
+                <div class="card-panel">
+                    <h3><i class="fas fa-server" style="color:var(--primary)"></i> Repositórios</h3>
+                    <div class="card-grid" id="integrityRepoList"></div>
+                </div>
+                <div class="card-panel">
+                    <h3><i class="fas fa-history" style="color:var(--text-muted)"></i> Histórico de Verificações</h3>
+                    <div style="overflow-x:auto;">
+                        <table class="compliance-tbl">
+                            <thead><tr><th>Repositório</th><th>Engine</th><th>Status</th><th>Início</th><th>Fim</th><th>Resultado</th></tr></thead>
+                            <tbody id="integrityHistoryBody"><tr><td colspan="6" class="empty">Nenhuma verificação realizada</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <!-- TAB: SISTEMA -->
+            <div class="gboc-tab-pane" id="pane-system">
+                <div class="kpi-grid">
+                    <div class="kpi-box"><div class="kpi-icon blue"><i class="fas fa-microchip"></i></div><div class="kpi-info"><div class="kpi-value" id="sysCpu">--%</div><div class="kpi-label">CPU</div></div></div>
+                    <div class="kpi-box"><div class="kpi-icon green"><i class="fas fa-memory"></i></div><div class="kpi-info"><div class="kpi-value" id="sysMem">--%</div><div class="kpi-label">Memória</div></div></div>
+                    <div class="kpi-box"><div class="kpi-icon orange"><i class="fas fa-hdd"></i></div><div class="kpi-info"><div class="kpi-value" id="sysDisk">--%</div><div class="kpi-label">Disco</div></div></div>
+                    <div class="kpi-box"><div class="kpi-icon purple"><i class="fas fa-clock"></i></div><div class="kpi-info"><div class="kpi-value" id="sysUptime">--</div><div class="kpi-label">Uptime</div></div></div>
+                </div>
+                <div class="sys-grid">
+                    <div class="sys-card">
+                        <h4><i class="fas fa-info-circle"></i> Informações do Sistema</h4>
+                        <div class="sys-row"><span>Plataforma</span><strong id="siPlatform">--</strong></div>
+                        <div class="sys-row"><span>Versão OS</span><strong id="siVersion">--</strong></div>
+                        <div class="sys-row"><span>Hostname</span><strong id="siHostname">--</strong></div>
+                        <div class="sys-row"><span>Processador</span><strong id="siProcessor">--</strong></div>
+                        <div class="sys-row"><span>Python</span><strong id="siPython">--</strong></div>
+                        <div class="sys-row"><span>GBOC</span><strong id="siGboc">--</strong></div>
+                    </div>
+                    <div class="sys-card">
+                        <h4><i class="fas fa-chart-area"></i> Recursos</h4>
+                        <div class="sys-row"><span>CPUs</span><strong id="siCpuCount">--</strong></div>
+                        <div class="sys-row"><span>RAM Total</span><strong id="siRamTotal">--</strong></div>
+                        <div class="sys-row"><span>RAM Usada</span><strong id="siRamUsed">--</strong></div>
+                        <div class="sys-row"><span>Disco Total</span><strong id="siDiskTotal">--</strong></div>
+                        <div class="sys-row"><span>Disco Usado</span><strong id="siDiskUsed">--</strong></div>
+                        <div class="sys-row"><span>Disco Livre</span><strong id="siDiskFree">--</strong></div>
+                    </div>
+                    <div class="sys-card">
+                        <h4><i class="fas fa-network-wired"></i> Rede & Backup</h4>
+                        <div class="sys-row"><span>IP Local</span><strong id="siIp">--</strong></div>
+                        <div class="sys-row"><span>Status Sync</span><strong id="siSync">--</strong></div>
+                        <div class="sys-row"><span>Engines</span><strong id="siEngines">--</strong></div>
+                        <div class="sys-row"><span>Repositórios</span><strong id="siRepos">--</strong></div>
+                        <div class="sys-row"><span>Tarefas</span><strong id="siTasks">--</strong></div>
+                    </div>
+                    <div class="sys-card">
+                        <h4><i class="fas fa-database"></i> Schema do Banco</h4>
+                        <div class="sys-row"><span>Health</span><strong id="schemaHealth">--</strong></div>
+                        <div class="sys-row"><span>Status</span><strong id="schemaStatus">--</strong></div>
+                        <div style="margin-top:12px;">
+                            <a href="/schema-check.html" class="btn btn-sm btn-primary" style="width:100%;"><i class="fas fa-stethoscope"></i> Diagnóstico Completo</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: ALERTAS -->
+            <div class="gboc-tab-pane" id="pane-alerts">
+                <div class="kpi-grid">
+                    <div class="kpi-box"><div class="kpi-icon red"><i class="fas fa-bell"></i></div><div class="kpi-info"><div class="kpi-value" id="alertTotal">0</div><div class="kpi-label">Alertas Ativos</div></div></div>
+                    <div class="kpi-box"><div class="kpi-icon orange"><i class="fas fa-exclamation-circle"></i></div><div class="kpi-info"><div class="kpi-value" id="alertWarnings">0</div><div class="kpi-label">Avisos</div></div></div>
+                    <div class="kpi-box"><div class="kpi-icon blue"><i class="fas fa-info-circle"></i></div><div class="kpi-info"><div class="kpi-value" id="alertRiskLevel">--</div><div class="kpi-label">Nível de Risco</div></div></div>
+                </div>
+                <div class="card-panel">
+                    <h3><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i> Alertas Críticos</h3>
+                    <div id="alertCriticalList"><div class="empty">Nenhum alerta crítico</div></div>
+                </div>
+                <div class="card-panel">
+                    <h3><i class="fas fa-exclamation-circle" style="color:var(--warning)"></i> Avisos</h3>
+                    <div id="alertWarningList"><div class="empty">Nenhum aviso</div></div>
+                </div>
+            </div>
+
+        </div><!-- /content -->
+    </main>
+</div><!-- /app -->
+<script src="/static/sidebar.js"></script><script>
+/* ===== HELPERS ===== */
+function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+function fmtGB(v){return v!=null?(+v).toFixed(2)+' GB':'--';}
+function fmtUptime(sec){if(!sec)return'--';const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60);return h>24?Math.floor(h/24)+'d '+h%24+'h':h+'h '+m+'m';}
+function fmtDuration(min){if(!min&&min!==0)return'--';if(min<1)return Math.round(min*60)+'s';if(min<60)return min.toFixed(1)+'min';return(min/60).toFixed(1)+'h';}
+function fmtDate(d){if(!d)return'Nunca';try{const dt=new Date(d);return dt.toLocaleDateString('pt-BR')+' '+dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});}catch(e){return d;}}
+function timeAgo(d){if(!d)return'Nunca';const now=new Date(),then=new Date(d),diff=Math.floor((now-then)/1000);if(diff<60)return diff+'s atrás';if(diff<3600)return Math.floor(diff/60)+'min atrás';if(diff<86400)return Math.floor(diff/3600)+'h atrás';return Math.floor(diff/86400)+'d atrás';}
+function catLabel(c){const m={network:'Rede',timeout:'Timeout',permission:'Permissão',not_found:'Não Encontrado',disk_space:'Espaço em Disco',auth:'Autenticação',corruption:'Corrupção',other:'Outros'};return m[c]||c;}
+function catIcon(c){const m={network:'fa-wifi',timeout:'fa-hourglass-half',permission:'fa-lock',not_found:'fa-search',disk_space:'fa-hdd',auth:'fa-key',corruption:'fa-exclamation-triangle',other:'fa-question-circle'};return m[c]||'fa-question-circle';}
+function catColor(c){const m={network:'#4299e1',timeout:'#ed8936',permission:'#f56565',not_found:'#805ad5',disk_space:'#38b2ac',auth:'#ecc94b',corruption:'#f56565',other:'#a0aec0'};return m[c]||'#a0aec0';}
+
+let slaRingChartObj=null, errCatChartObj=null, errParetoChartObj=null;
+
+/* ===== TABS ===== */
+function openTab(name){
+    document.querySelectorAll('.gboc-tab-pane').forEach(p=>p.classList.remove('active'));
+    document.querySelectorAll('.gboc-tab').forEach(t=>t.classList.remove('active'));
+    const pane=document.getElementById('pane-'+name);
+    if(pane)pane.classList.add('active');
+    if (window.event && window.event.currentTarget) {
+        window.event.currentTarget.classList.add('active');
+    }
+
+    // Recarrega gráficos quando aba fica visível para evitar dimensões incorretas
+    if(name==='errors') setTimeout(loadErrors, 50);
+    if(name==='stats') setTimeout(loadStatsCharts, 50);
+}
+
+/* ===== API FETCH ===== */
+async function api(url){
+    const r=await fetch(url);
+    if(r.status===401){window.location.href='/login.html';return null;}
+    return r.json();
+}
+
+/* ===== HEALTH TAB ===== */
+async function loadHealth(){
+    try{
+        const [comp,hs,rec,fc]=await Promise.all([
+            api('/api/advanced-stats/comprehensive'),
+            api('/api/advanced-stats/health-score'),
+            api('/api/preemptive/recommendations'),
+            api('/api/preemptive/storage-forecast')
+        ]);
+        if(!comp||!hs)return;
+        const d=comp.data;
+        const score=hs.health_score||0;
+        document.getElementById('healthScore').textContent=score.toFixed(0);
+        document.getElementById('healthFill').style.width=score+'%';
+        document.getElementById('healthFill').style.background=score>=70?'var(--success)':score>=40?'var(--warning)':'var(--danger)';
+        const lbl=document.getElementById('healthLabel');
+        if(score>=80){lbl.className='badge badge-success';lbl.textContent='Excelente';}
+        else if(score>=60){lbl.className='badge badge-info';lbl.textContent='Bom';}
+        else if(score>=40){lbl.className='badge badge-warning';lbl.textContent='Atenção';}
+        else{lbl.className='badge badge-danger';lbl.textContent='Crítico';}
+
+        document.getElementById('hSuccessRate').textContent=(d.backup_stats.success_rate||0).toFixed(1)+'%';
+        document.getElementById('hReliability').textContent=(d.reliability_stats.reliability_score||0).toFixed(1)+'%';
+        document.getElementById('hMtbf').textContent=(d.reliability_stats.mtbf_hours||0).toFixed(1);
+        document.getElementById('hFailures').textContent=d.reliability_stats.total_failures||0;
+
+        // Recommendations
+        const rl=document.getElementById('recommendationsList');
+        if(rec&&rec.recommendations&&rec.recommendations.length){
+            rl.innerHTML=rec.recommendations.map(r=>`<div class="rec-item"><i class="fas fa-lightbulb"></i><span>${esc(r.message)}<span class="rec-priority ${r.priority||'medium'}">${(r.priority||'medium').toUpperCase()}</span></span></div>`).join('');
+        }else{rl.innerHTML='<div class="empty">Nenhuma recomendação no momento</div>';}
+
+        // Forecast
+        if(d.predictions){
+            document.getElementById('fc30').textContent=fmtGB(d.predictions.storage_30d_gb);
+            document.getElementById('fc60').textContent=fmtGB(d.predictions.storage_60d_gb);
+            document.getElementById('fc90').textContent=fmtGB(d.predictions.storage_90d_gb);
+        }
+        if(fc&&fc.storage){
+            document.getElementById('fcFull').textContent=fc.storage.days_until_full?fc.storage.days_until_full+' dias':'Seguro';
+        }
+    }catch(e){console.error('Health error:',e);}
+}
+
+/* ===== STATS TAB ===== */
+async function loadStats(){
+    try{
+        const comp=await api('/api/advanced-stats/comprehensive');
+        if(!comp)return;
+        const d=comp.data;
+        document.getElementById('stTotal').textContent=d.backup_stats.total_backups||0;
+        document.getElementById('stSuccess').textContent=d.backup_stats.successful||0;
+        document.getElementById('stSpeed').textContent=(d.performance_stats.avg_speed_mbps||0).toFixed(1)+' MB/s';
+        document.getElementById('stData').textContent=fmtGB(d.storage_stats.total_backup_size_gb);
+        document.getElementById('stAvgDuration').textContent=fmtDuration(d.performance_stats.avg_duration_minutes);
+        document.getElementById('stDailyAvg').textContent=(d.backup_stats.avg_daily_backups||0).toFixed(1);
+
+        loadTopTasks();
+        loadEngineTable();
+    }catch(e){console.error('Stats error:',e);}
+}
+
+async function loadTopTasks(){
+    try{
+        const data=await api('/api/statistics/?period=month');
+        if(!data||!data.statistics)return;
+        const s=data.statistics;
+        // For top slowest/failed, we use the tasks from overview
+        const tasks=await api('/api/tasks/');
+        if(!tasks)return;
+        const execData=await api('/api/advanced-stats/comprehensive');
+        if(!execData)return;
+
+        // Build simple top tasks from available data
+        const slowEl=document.getElementById('topSlowestTasks');
+        const failEl=document.getElementById('topFailedTasks');
+
+        // Use SLA data which has per-task info
+        const sla=await api('/api/preemptive/sla-compliance');
+        if(sla&&sla.tasks){
+            const sorted=[...sla.tasks].sort((a,b)=>(b.total_executions_30d||0)-(a.total_executions_30d||0));
+            const failed=[...sla.tasks].sort((a,b)=>(a.success_rate_30d||0)-(b.success_rate_30d||0));
+
+            slowEl.innerHTML=sorted.map(t=>`<div class="err-detail-row"><span class="err-msg">${esc(t.name)} <span class="badge badge-info">${t.engine}</span></span><span>${t.total_executions_30d} exec</span></div>`).join('')||'<div class="empty">Sem dados</div>';
+            failEl.innerHTML=failed.map(t=>{
+                const failCount=t.total_executions_30d-t.successful_30d;
+                return`<div class="err-detail-row"><span class="err-msg">${esc(t.name)} <span class="badge badge-info">${t.engine}</span></span><span style="color:var(--danger)">${failCount} falhas</span></div>`;
+            }).join('')||'<div class="empty">Sem dados</div>';
+        }
+    }catch(e){console.error('TopTasks error:',e);}
+}
+
+async function loadEngineTable(){
+    try{
+        const sla=await api('/api/preemptive/sla-compliance');
+        if(!sla||!sla.tasks)return;
+        const byEngine={};
+        sla.tasks.forEach(t=>{
+            if(!byEngine[t.engine])byEngine[t.engine]={total:0,success:0,failed:0};
+            byEngine[t.engine].total+=t.total_executions_30d||0;
+            byEngine[t.engine].success+=t.successful_30d||0;
+            byEngine[t.engine].failed+=(t.total_executions_30d||0)-(t.successful_30d||0);
+        });
+        const body=document.getElementById('engineTableBody');
+        body.innerHTML=Object.entries(byEngine).map(([eng,v])=>{
+            const rate=v.total?((v.success/v.total)*100).toFixed(1):0;
+            return`<tr><td><strong>${esc(eng)}</strong></td><td>${v.total}</td><td>${v.success}</td><td><span class="${rate>=80?'badge-compliant':rate>=50?'badge-at_risk':'badge-non_compliant'}" style="padding:3px 8px;border-radius:8px;font-size:.82em">${rate}%</span></td><td>--</td><td>--</td><td style="color:var(--danger)">${v.failed}</td></tr>`;
+        }).join('');
+    }catch(e){console.error('EngineTable error:',e);}
+}
+/* ===== SLA TAB ===== */
+async function loadSla(){
+    try{
+        const data=await api('/api/preemptive/sla-compliance');
+        if(!data)return;
+        const s=data.summary;
+        document.getElementById('slaCompliant').textContent=s.compliant||0;
+        document.getElementById('slaAtRisk').textContent=s.at_risk||0;
+        document.getElementById('slaNonCompliant').textContent=s.non_compliant||0;
+        document.getElementById('slaRingPct').textContent=(s.compliance_pct||0).toFixed(0)+'%';
+
+        // Badge
+        const badge=document.getElementById('slaBadge');
+        if(s.non_compliant>0){badge.style.display='inline';badge.textContent=s.non_compliant;badge.className='tab-badge';}
+        else if(s.at_risk>0){badge.style.display='inline';badge.textContent=s.at_risk;badge.className='tab-badge warn';}
+        else{badge.style.display='none';}
+
+        // Ring chart
+        if(slaRingChartObj)slaRingChartObj.destroy();
+        const ctx=document.getElementById('slaRingChart').getContext('2d');
+        slaRingChartObj=new Chart(ctx,{type:'doughnut',data:{datasets:[{data:[s.compliance_pct||0,100-(s.compliance_pct||0)],backgroundColor:[(s.compliance_pct||0)>=70?'#48bb78':(s.compliance_pct||0)>=40?'#ed8936':'#f56565','rgba(255,255,255,0.05)'],borderWidth:0}]},options:{cutout:'78%',responsive:false,plugins:{legend:{display:false},tooltip:{enabled:false}}}});
+
+        // Table
+        const tbody=document.getElementById('slaTableBody');
+        tbody.innerHTML=(data.tasks||[]).map(t=>{
+            const cls='badge-'+t.compliance;
+            const lbl=t.compliance==='compliant'?'Conforme':t.compliance==='at_risk'?'Em Risco':'Não Conforme';
+            return`<tr>
+                <td><strong>${esc(t.name)}</strong></td>
+                <td><span class="badge badge-info">${esc(t.engine)}</span></td>
+                <td>${(t.success_rate_30d||0).toFixed(1)}%</td>
+                <td>${t.rpo_hours!=null?t.rpo_hours+'h':'N/A'}</td>
+                <td>${t.expected_rpo_hours||24}h</td>
+                <td>${fmtDate(t.last_success)}</td>
+                <td><span class="${cls}" style="padding:4px 10px;border-radius:12px;font-size:.78em;font-weight:600">${lbl}</span></td>
+            </tr>`;
+        }).join('');
+    }catch(e){console.error('SLA error:',e);}
+}
+/* ===== ERRORS TAB ===== */
+async function loadErrors(){
+    try{
+        const data=await api('/api/preemptive/error-classification');
+        if(!data)return;
+        const errs=data.errors||[];
+        const cats=data.categories||{};
+        const total=data.total_errors||0;
+
+        document.getElementById('errTotal').textContent=total;
+        document.getElementById('errCategories').textContent=Object.keys(cats).length;
+        if(errs.length>0){
+            document.getElementById('errTopCount').textContent=errs[0].count+'x';
+            document.getElementById('errLastTime').textContent=timeAgo(errs[0].last_occurrence);
+        }
+
+        // Badge
+        const badge=document.getElementById('errorsBadge');
+        if(total>0){badge.style.display='inline';badge.textContent=total;}else{badge.style.display='none';}
+
+        // Category doughnut chart
+        if(errCatChartObj)errCatChartObj.destroy();
+        const catLabels=Object.keys(cats).map(c=>catLabel(c));
+        const catValues=Object.values(cats);
+        const catColors=Object.keys(cats).map(c=>catColor(c));
+        const ctx1=document.getElementById('chartErrCategories').getContext('2d');
+        errCatChartObj=new Chart(ctx1,{type:'doughnut',data:{labels:catLabels,datasets:[{data:catValues,backgroundColor:catColors,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:8},plugins:{legend:{position:'bottom',labels:{color:'#a0aec0',padding:12,font:{size:11}}}}}});
+
+        // Pareto bar chart
+        if(errParetoChartObj)errParetoChartObj.destroy();
+        const topErrs=errs.slice(0,7);
+        const paretoLabels=topErrs.map(e=>{const m=e.message.trim().substring(0,40);return m+(e.message.trim().length>40?'...':'');});
+        const paretoValues=topErrs.map(e=>e.count);
+        const ctx2=document.getElementById('chartErrPareto').getContext('2d');
+        errParetoChartObj=new Chart(ctx2,{type:'bar',data:{labels:paretoLabels,datasets:[{data:paretoValues,backgroundColor:'rgba(245,101,101,0.6)',borderColor:'#f56565',borderWidth:1}]},options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#a0aec0'}},y:{grid:{display:false},ticks:{color:'#a0aec0',font:{size:10}}}}}});
+
+        // Category cards
+        const catCards=document.getElementById('errCatCards');
+        catCards.innerHTML=Object.entries(cats).map(([cat,count])=>{
+            const pct=total>0?((count/total)*100).toFixed(0):0;
+            const color=catColor(cat);
+            return`<div class="err-cat-card">
+                <div class="err-cat-head">
+                    <div class="err-cat-icon" style="background:${color}22;color:${color}"><i class="fas ${catIcon(cat)}"></i></div>
+                    <div><strong>${catLabel(cat)}</strong><div style="font-size:.82em;color:var(--text-muted)">${count} erros (${pct}%)</div></div>
+                </div>
+                <div class="err-cat-bar"><div class="err-cat-fill" style="width:${pct}%;background:${color}"></div></div>
+            </div>`;
+        }).join('');
+
+        // Error detail list
+        const detailList=document.getElementById('errDetailList');
+        detailList.innerHTML=errs.map(e=>{
+            const color=catColor(e.category);
+            return`<div class="err-detail-row">
+                <div style="display:flex;align-items:center;gap:8px;min-width:80px">
+                    <span class="err-count" style="color:${color}">${e.count}x</span>
+                    <span class="badge" style="background:${color}22;color:${color};font-size:.72em">${catLabel(e.category)}</span>
+                </div>
+                <span class="err-msg" title="${esc(e.message.trim())}">${esc(e.message.trim().substring(0,100))}</span>
+                <span style="font-size:.78em;color:var(--text-muted);white-space:nowrap">${esc(e.task_name)} · ${esc(e.engine)}</span>
+            </div>`;
+        }).join('')||'<div class="empty">Nenhum erro encontrado</div>';
+
+    }catch(e){console.error('Errors error:',e);}
+}
+/* ===== RISK TAB ===== */
+async function loadRisk(){
+    try{
+        const data=await api('/api/preemptive/tasks-at-risk');
+        if(!data)return;
+        const tasks=data.tasks_at_risk||[];
+        const totalTasks=4; // from overview
+        const totalRisk=data.total||0;
+
+        document.getElementById('riskTotal').textContent=totalRisk;
+        document.getElementById('riskCritical').textContent=tasks.filter(t=>t.risk_level==='critical').length;
+        document.getElementById('riskHealthy').textContent=Math.max(0,totalTasks-totalRisk);
+
+        // Badge
+        const badge=document.getElementById('riskBadge');
+        if(totalRisk>0){badge.style.display='inline';badge.textContent=totalRisk;}else{badge.style.display='none';}
+
+        const list=document.getElementById('riskCardsList');
+        if(tasks.length===0){
+            list.innerHTML='<div class="card-panel" style="text-align:center;padding:40px"><i class="fas fa-check-circle" style="font-size:2em;color:var(--success);margin-bottom:12px;display:block"></i><strong>Nenhuma tarefa em risco!</strong><p style="color:var(--text-muted);margin-top:6px">Todas as tarefas estão operando normalmente.</p></div>';
+            return;
+        }
+
+        list.innerHTML=tasks.map(t=>{
+            const cls=t.risk_level==='critical'?'':t.risk_level==='high'?'warn':'ok';
+            return`<div class="risk-card ${cls}">
+                <div class="risk-head">
+                    <h4><i class="fas fa-exclamation-triangle" style="color:var(--danger);margin-right:8px"></i>${esc(t.name)}</h4>
+                    <span class="badge badge-${t.risk_level==='critical'?'danger':'warning'}">${t.risk_level.toUpperCase()}</span>
+                </div>
+                <div class="risk-factors">
+                    ${(t.risk_factors||[]).map(f=>`<span class="risk-factor ${f.severity}">${esc(f.detail)}</span>`).join('')}
+                </div>
+                <div style="font-size:.82em;color:var(--text-muted);margin-bottom:6px">Engine: <strong>${esc(t.engine)}</strong> · Último sucesso: <strong>${fmtDate(t.last_success)}</strong></div>
+                ${t.last_error?`<div class="risk-last-err">${esc(t.last_error)}</div>`:''}
+            </div>`;
+        }).join('');
+    }catch(e){console.error('Risk error:',e);}
+}
+/* ===== INTEGRITY TAB ===== */
+async function loadIntegrity(){
+    try{
+        const [repos,hist]=await Promise.all([
+            api('/api/repositories/'),
+            api('/api/integrity/history')
+        ]);
+        if(!repos)return;
+
+        document.getElementById('integTotal').textContent=repos.length||0;
+        const history=hist?hist.history||[]:[];
+        document.getElementById('integChecks').textContent=history.length;
+        if(history.length>0){
+            document.getElementById('integLast').textContent=timeAgo(history[0].started_at);
+        }
+
+        // Repo cards
+        const repoList=document.getElementById('integrityRepoList');
+        repoList.innerHTML=repos.map(r=>{
+            const lastCheck=history.find(h=>h.repository_id===r.id);
+            const statusBadge=lastCheck?(lastCheck.status==='success'?'<span class="badge-compliant" style="padding:3px 8px;border-radius:8px;font-size:.78em">OK</span>':'<span class="badge-non_compliant" style="padding:3px 8px;border-radius:8px;font-size:.78em">Falhou</span>'):'<span style="color:var(--text-muted);font-size:.82em">Não verificado</span>';
+            return`<div class="integ-card">
+                <div class="integ-head">
+                    <h4><i class="fas fa-database" style="color:var(--primary);margin-right:6px"></i>${esc(r.name)}</h4>
+                    ${statusBadge}
+                </div>
+                <div style="font-size:.82em;color:var(--text-muted)">Engine: <strong>${esc(r.engine)}</strong> · Tipo: <strong>${esc(r.type)}</strong></div>
+                <div style="font-size:.82em;color:var(--text-muted)">Última: ${lastCheck?fmtDate(lastCheck.started_at):'Nunca'}</div>
+                <button class="integ-btn run" onclick="runIntegrityCheck(${r.id},this)"><i class="fas fa-play"></i> Verificar Agora</button>
+            </div>`;
+        }).join('');
+
+        // History table
+        if(history.length>0){
+            const tbody=document.getElementById('integrityHistoryBody');
+            tbody.innerHTML=history.map(h=>`<tr>
+                <td>${h.repository_id}</td>
+                <td>${esc(h.engine)}</td>
+                <td><span class="${h.status==='success'?'badge-compliant':'badge-non_compliant'}" style="padding:3px 8px;border-radius:8px;font-size:.78em">${h.status}</span></td>
+                <td>${fmtDate(h.started_at)}</td>
+                <td>${fmtDate(h.finished_at)}</td>
+                <td style="font-size:.82em">${esc(h.result_summary||'--')}</td>
+            </tr>`).join('');
+        }
+    }catch(e){console.error('Integrity error:',e);}
+}
+
+async function runIntegrityCheck(repoId,btn){
+    btn.disabled=true;
+    btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Verificando...';
+    try{
+        const r=await fetch('/api/integrity/check/'+repoId,{method:'POST'});
+        const data=await r.json();
+        if(data.status==='success'){
+            btn.innerHTML='<i class="fas fa-check"></i> Concluído';
+            btn.style.color='var(--success)';
+            setTimeout(()=>loadIntegrity(),2000);
+        }else{
+            btn.innerHTML='<i class="fas fa-times"></i> Falhou';
+            btn.style.color='var(--danger)';
+        }
+    }catch(e){
+        btn.innerHTML='<i class="fas fa-times"></i> Erro';
+        btn.style.color='var(--danger)';
+    }
+    setTimeout(()=>{btn.disabled=false;btn.innerHTML='<i class="fas fa-play"></i> Verificar Agora';btn.style.color='';},4000);
+}
+/* ===== SYSTEM TAB ===== */
+async function loadSystem(){
+    try{
+        const [sys,ov,schema]=await Promise.all([
+            api('/api/system/info'),
+            api('/api/overview/'),
+            api('/api/system/schema-check')
+        ]);
+        if(!sys)return;
+        const s=sys.system||{};
+        const r=sys.resources||{};
+
+        document.getElementById('sysCpu').textContent=(r.cpu_percent||0).toFixed(1)+'%';
+        document.getElementById('sysMem').textContent=(r.memory_percent||0).toFixed(1)+'%';
+        document.getElementById('sysDisk').textContent=(r.disk_percent||0).toFixed(1)+'%';
+
+        if(ov&&ov.system_info){
+            document.getElementById('sysUptime').textContent=fmtUptime(ov.system_info.uptime_seconds);
+        }
+
+        document.getElementById('siPlatform').textContent=s.platform+' '+s.release;
+        document.getElementById('siVersion').textContent=s.version||'--';
+        document.getElementById('siHostname').textContent=s.hostname||'--';
+        document.getElementById('siProcessor').textContent=(s.processor||'--').substring(0,30);
+        document.getElementById('siPython').textContent=s.python_version||'--';
+        document.getElementById('siGboc').textContent=sys.gboc_version||'11.7c';
+
+        document.getElementById('siCpuCount').textContent=r.cpu_count||'--';
+        document.getElementById('siRamTotal').textContent=(r.memory_total_gb||0).toFixed(1)+' GB';
+        document.getElementById('siRamUsed').textContent=(r.memory_used_gb||0).toFixed(1)+' GB';
+        document.getElementById('siDiskTotal').textContent=(r.disk_total_gb||0).toFixed(1)+' GB';
+        document.getElementById('siDiskUsed').textContent=(r.disk_used_gb||0).toFixed(1)+' GB';
+        document.getElementById('siDiskFree').textContent=((r.disk_total_gb||0)-(r.disk_used_gb||0)).toFixed(1)+' GB';
+
+        if(ov){
+            document.getElementById('siIp').textContent=ov.network_info?ov.network_info.local_ip:'--';
+            document.getElementById('siSync').textContent=ov.network_info?ov.network_info.sync_status:'--';
+            document.getElementById('siEngines').textContent=ov.engines_status?ov.engines_status.list.join(', '):'--';
+            document.getElementById('siRepos').textContent=ov.overview_summary?ov.overview_summary.repositories:'--';
+            document.getElementById('siTasks').textContent=ov.overview_summary?ov.overview_summary.tasks:'--';
+        }
+
+        // Schema check
+        if(schema){
+            const health=schema.schema_health||0;
+            document.getElementById('schemaHealth').textContent=health+'%';
+            document.getElementById('schemaStatus').innerHTML=health===100?'<span style="color:var(--success)">✓ Completo</span>':'<span style="color:var(--warning)">⚠ Incompleto</span>';
+        }
+    }catch(e){console.error('System error:',e);}
+}
+
+/* ===== ALERTS TAB ===== */
+async function loadAlerts(){
+    try{
+        const data=await api('/api/preemptive/alerts');
+        if(!data)return;
+        const alerts=data.alerts||[];
+        const warnings=data.warnings||[];
+
+        document.getElementById('alertTotal').textContent=alerts.length;
+        document.getElementById('alertWarnings').textContent=warnings.length;
+        document.getElementById('alertRiskLevel').textContent=(data.risk_level||'low').toUpperCase();
+
+        // Badge
+        const badge=document.getElementById('alertsBadge');
+        const total=alerts.length+warnings.length;
+        if(total>0){badge.style.display='inline';badge.textContent=total;}else{badge.style.display='none';}
+
+        // Critical alerts
+        const critList=document.getElementById('alertCriticalList');
+        if(alerts.length>0){
+            critList.innerHTML=alerts.map(a=>`<div class="alert-item critical"><i class="fas fa-exclamation-triangle"></i><span>${esc(a.message)}</span></div>`).join('');
+        }else{critList.innerHTML='<div class="empty"><i class="fas fa-check-circle" style="color:var(--success)"></i> Nenhum alerta crítico</div>';}
+
+        // Warnings
+        const warnList=document.getElementById('alertWarningList');
+        if(warnings.length>0){
+            warnList.innerHTML=warnings.map(w=>`<div class="alert-item warning"><i class="fas fa-exclamation-circle"></i><span>${esc(w.message)}</span></div>`).join('');
+        }else{warnList.innerHTML='<div class="empty"><i class="fas fa-check-circle" style="color:var(--success)"></i> Nenhum aviso</div>';}
+    }catch(e){console.error('Alerts error:',e);}
+}
+
+/* ===== HEALTH TAB - PREEMPTIVE ALERTS & RECENT ERRORS ===== */
+async function loadHealthAlerts(){
+    try{
+        const data=await api('/api/preemptive/alerts');
+        if(!data)return;
+        const all=[...(data.alerts||[]).map(a=>({...a,cls:'critical'})),...(data.warnings||[]).map(w=>({...w,cls:'warning'}))];
+        const el=document.getElementById('healthAlertsList');
+        if(all.length>0){
+            el.innerHTML=all.map(a=>`<div class="alert-item ${a.cls}"><i class="fas ${a.cls==='critical'?'fa-exclamation-triangle':'fa-exclamation-circle'}"></i><span>${esc(a.message)}</span></div>`).join('');
+        }else{
+            el.innerHTML='<div class="empty" style="padding:16px"><i class="fas fa-check-circle" style="color:var(--success);margin-right:8px"></i> Nenhum alerta ativo — sistema saudável</div>';
+        }
+    }catch(e){console.error('HealthAlerts error:',e);}
+}
+
+async function loadHealthRecentErrors(){
+    try{
+        const data=await api('/api/preemptive/error-classification');
+        if(!data)return;
+        const errs=data.errors||[];
+        const el=document.getElementById('healthRecentErrors');
+        if(errs.length>0){
+            el.innerHTML=errs.slice(0,5).map(e=>{
+                const color=catColor(e.category);
+                return`<div class="err-detail-row">
+                    <div style="display:flex;align-items:center;gap:8px;min-width:60px">
+                        <span class="err-count" style="color:${color}">${e.count}x</span>
+                    </div>
+                    <span class="err-msg" title="${esc(e.message.trim())}">${esc(e.message.trim().substring(0,80))}</span>
+                    <span style="font-size:.78em;color:var(--text-muted);white-space:nowrap">${esc(e.task_name)} · ${timeAgo(e.last_occurrence)}</span>
+                </div>`;
+            }).join('');
+        }else{
+            el.innerHTML='<div class="empty" style="padding:16px"><i class="fas fa-check-circle" style="color:var(--success);margin-right:8px"></i> Nenhum erro recente</div>';
+        }
+    }catch(e){console.error('HealthRecentErrors error:',e);}
+}
+
+/* ===== STATS TAB - CHARTS ===== */
+let chartDailyObj=null, chartThroughObj=null, chartEngObj=null, chartErrTrendObj=null;
+
+async function loadStatsCharts(){
+    try{
+        // 1. Daily executions chart
+        const daily=await api('/api/statistics/daily?days=30');
+        if(daily&&daily.chart_data){
+            if(chartDailyObj)chartDailyObj.destroy();
+            const ctx=document.getElementById('chartDailyExec').getContext('2d');
+            const cd=daily.chart_data;
+            cd.datasets.forEach(ds=>{ds.fill=true;ds.tension=0.3;ds.pointRadius=2;});
+            chartDailyObj=new Chart(ctx,{type:'line',data:cd,options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#a0aec0',font:{size:11}}}},scales:{x:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#a0aec0',font:{size:10}}},y:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#a0aec0'}}}}});
+        }
+
+        // 2. Throughput chart
+        const tp=await api('/api/statistics/throughput?days=30');
+        if(tp&&tp.chart_data){
+            if(chartThroughObj)chartThroughObj.destroy();
+            const ctx=document.getElementById('chartThroughput').getContext('2d');
+            const cd=tp.chart_data;
+            cd.datasets.forEach(ds=>{ds.fill=true;ds.tension=0.3;ds.pointRadius=2;});
+            chartThroughObj=new Chart(ctx,{type:'line',data:cd,options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#a0aec0',font:{size:11}}}},scales:{x:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#a0aec0',font:{size:10}}},y:{position:'left',grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#a0aec0'}},y1:{position:'right',grid:{display:false},ticks:{color:'#a0aec0'}}}}});
+        }
+
+        // 3. Engines comparison chart
+        const eng=await api('/api/statistics/engines/comparison?period=month');
+        if(eng&&eng.chart_data){
+            if(chartEngObj)chartEngObj.destroy();
+            const ctx=document.getElementById('chartEngines').getContext('2d');
+            chartEngObj=new Chart(ctx,{type:'bar',data:eng.chart_data,options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#a0aec0',font:{size:11}}}},scales:{x:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#a0aec0'}},y:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#a0aec0'}}}}});
+        }
+
+        // 4. Errors trend chart
+        const et=await api('/api/statistics/errors/trend?days=30');
+        if(et&&et.chart_data){
+            if(chartErrTrendObj)chartErrTrendObj.destroy();
+            const ctx=document.getElementById('chartErrorsTrend').getContext('2d');
+            const cd=et.chart_data;
+            cd.datasets.forEach(ds=>{ds.fill=true;ds.tension=0.3;ds.pointRadius=2;});
+            chartErrTrendObj=new Chart(ctx,{type:'line',data:cd,options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#a0aec0',font:{size:11}}}},scales:{x:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#a0aec0',font:{size:10}}},y:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#a0aec0'}}}}});
+        }
+    }catch(e){console.error('StatsCharts error:',e);}
+}
+
+/* ===== EXPORT ===== */
+async function exportReport(format){
+    try{
+        const url='/api/export/backup-report/'+format;
+        const r=await fetch(url);
+        if(r.status===401){window.location.href='/login.html';return;}
+        if(!r.ok){alert('Erro ao exportar: '+r.status);return;}
+        const blob=await r.blob();
+        const a=document.createElement('a');
+        a.href=URL.createObjectURL(blob);
+        a.download='gboc-report.'+format;
+        a.click();
+        URL.revokeObjectURL(a.href);
+    }catch(e){
+        console.error('Export error:',e);
+        alert('Erro ao exportar relatório');
+    }
+}
+
+/* ===== INIT ===== */
+document.addEventListener('DOMContentLoaded',function(){
+    document.querySelectorAll('.nav-link').forEach(l=>{
+        if(l.getAttribute('href')==='/diagnostic.html')l.classList.add('active');
+    });
+    loadAll();
+});
+
+/* ===== LOAD ALL (updated) ===== */
+async function loadAll(){
+    loadHealth();
+    loadHealthAlerts();
+    loadHealthRecentErrors();
+    loadStats();
+    loadStatsCharts();
+    loadSla();
+    loadErrors();
+    loadRisk();
+    loadIntegrity();
+    loadSystem();
+    loadAlerts();
+}
+</script>
+</body>
+</html>
+

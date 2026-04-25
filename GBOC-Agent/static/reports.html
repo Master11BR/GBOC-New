@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GBOC Agent 11.7c - Relatórios</title>
+    <link rel="stylesheet" href="/static/style.css?v=11.9">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .reports-grid { display: grid; grid-template-columns: 340px 1fr; gap: 24px; }
+        @media(max-width:900px){ .reports-grid{grid-template-columns:1fr;} }
+
+        .report-builder { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
+        .report-builder h3 { margin-bottom: 18px; display:flex; align-items:center; gap:10px; }
+
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display:block; font-size:0.85em; color:var(--text-muted); margin-bottom:6px; font-weight:600; }
+        .form-group select,
+        .form-group input { width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--border); background:var(--bg-input); color:var(--text); font-size:0.9em; }
+
+        .type-cards { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+        .type-card { background:var(--bg-input); border:2px solid var(--border); border-radius:10px; padding:14px; cursor:pointer; transition:all .2s; text-align:center; }
+        .type-card:hover { border-color:var(--primary); }
+        .type-card.active { border-color:var(--primary); background:rgba(66,153,225,.12); }
+        .type-card i { font-size:1.6em; margin-bottom:6px; display:block; }
+        .type-card span { font-size:.82em; color:var(--text-muted); }
+
+        .btn-generate { width:100%; padding:13px; font-size:1em; margin-top:8px; }
+
+        .preview-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; overflow:hidden; display:flex; flex-direction:column; }
+        .preview-header { padding:16px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+        .preview-header h3 { margin:0; display:flex; align-items:center; gap:8px; }
+        .preview-actions { display:flex; gap:8px; }
+        .preview-body { flex:1; padding:0; min-height:500px; position:relative; }
+        .preview-body iframe { width:100%; height:100%; border:none; min-height:500px; background:var(--bg-card); border-radius:0 0 12px 12px; }
+        .preview-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; min-height:500px; color:var(--text-muted); }
+        .preview-empty i { font-size:4em; margin-bottom:16px; opacity:.3; }
+
+        /* Schedule section */
+        .schedule-section { margin-top:30px; }
+        .schedule-table { width:100%; border-collapse:collapse; }
+        .schedule-table th, .schedule-table td { padding:12px 14px; text-align:left; border-bottom:1px solid var(--border); font-size:.88em; }
+        .schedule-table th { background:var(--bg-input); color:var(--text-muted); font-weight:600; }
+        .badge-active { background:rgba(78,203,136,.15); color:var(--success); padding:3px 10px; border-radius:20px; font-size:.8em; }
+        .badge-disabled { background:rgba(160,174,192,.12); color:var(--text-muted); padding:3px 10px; border-radius:20px; font-size:.8em; }
+
+        /* History */
+        .history-section { margin-top:30px; }
+        .history-item { display:flex; align-items:center; gap:14px; padding:12px 16px; background:var(--bg-card); border:1px solid var(--border); border-radius:10px; margin-bottom:8px; }
+        .history-item .icon { font-size:1.5em; }
+        .history-item .meta { flex:1; }
+        .history-item .meta strong { display:block; font-size:.9em; }
+        .history-item .meta span { font-size:.8em; color:var(--text-muted); }
+
+        .loading-overlay { position:absolute; inset:0; background:rgba(26,26,46,.85); display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:10; border-radius:0 0 12px 12px; }
+        .loading-overlay .spinner { width:48px; height:48px; border:4px solid var(--border); border-top-color:var(--primary); border-radius:50%; animation:spin .8s linear infinite; margin-bottom:16px; }
+        @keyframes spin { to{transform:rotate(360deg)} }
+
+        /* Modal */
+        .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:1000; align-items:center; justify-content:center; }
+        .modal-overlay.show { display:flex; }
+        .modal-box { background:var(--bg-card); border-radius:14px; padding:28px; width:500px; max-width:95vw; max-height:85vh; overflow-y:auto; border:1px solid var(--border); }
+        .modal-box h3 { margin-bottom:20px; display:flex; align-items:center; gap:10px; }
+        .modal-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:20px; }
+    </style>
+    <script src="/static/auth_interceptor.js"></script>
+</head>
+<body>
+    <div class="app">
+        <main class="main-content">
+            <header class="header">
+                <div>
+                    <h1 class="page-title"><i class="fas fa-file-alt" style="color:var(--primary)"></i> Relatórios</h1>
+                    <div class="page-subtitle">Geração, agendamento e histórico de relatórios</div>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" onclick="loadSchedules()"><i class="fas fa-sync-alt"></i> Atualizar</button>
+                    <button class="btn btn-primary" onclick="openScheduleModal()"><i class="fas fa-clock"></i> Agendar</button>
+                </div>
+            </header>
+
+            <div class="content">
+                <div class="reports-grid">
+                    <!-- Builder Panel -->
+                    <div class="report-builder">
+                        <h3><i class="fas fa-tools" style="color:var(--primary)"></i> Gerador de Relatórios</h3>
+
+                        <div class="form-group">
+                            <label>Tipo de Relatório</label>
+                            <div class="type-cards" id="typeCards"></div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Período (dias)</label>
+                            <select id="periodDays">
+                                <option value="7">Últimos 7 dias</option>
+                                <option value="14">Últimos 14 dias</option>
+                                <option value="30" selected>Últimos 30 dias</option>
+                                <option value="60">Últimos 60 dias</option>
+                                <option value="90">Últimos 90 dias</option>
+                                <option value="180">Últimos 6 meses</option>
+                                <option value="365">Último ano</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Formato de Saída</label>
+                            <select id="formatSelect">
+                                <option value="html">HTML (visualização / impressão PDF)</option>
+                                <option value="json">JSON (integração)</option>
+                                <option value="csv">CSV (planilha)</option>
+                            </select>
+                        </div>
+
+                        <button class="btn btn-primary btn-generate" onclick="generateReport()" id="btnGenerate">
+                            <i class="fas fa-play"></i> Gerar Relatório
+                        </button>
+
+                        <div style="margin-top:16px; display:flex; gap:8px;">
+                            <button class="btn btn-secondary" style="flex:1" onclick="downloadReport()" id="btnDownload" disabled>
+                                <i class="fas fa-download"></i> Baixar
+                            </button>
+                            <button class="btn btn-secondary" style="flex:1" onclick="printReport()" id="btnPrint" disabled>
+                                <i class="fas fa-print"></i> Imprimir
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Preview Panel -->
+                    <div class="preview-panel">
+                        <div class="preview-header">
+                            <h3><i class="fas fa-eye" style="color:var(--primary)"></i> Pré-visualização</h3>
+                            <div class="preview-actions">
+                                <button class="btn btn-secondary" onclick="toggleFullscreen()" title="Tela cheia" style="padding:8px 12px;"><i class="fas fa-expand"></i></button>
+                            </div>
+                        </div>
+                        <div class="preview-body" id="previewBody">
+                            <div class="preview-empty" id="previewEmpty">
+                                <i class="fas fa-file-chart-line"></i>
+                                <p style="font-size:1.1em;margin-bottom:6px;">Nenhum relatório gerado</p>
+                                <span style="font-size:.85em;">Selecione um tipo e clique em "Gerar Relatório"</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Schedules Section -->
+                <div class="schedule-section">
+                    <div class="section-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                        <h2><i class="fas fa-clock" style="color:var(--warning)"></i> Agendamentos</h2>
+                    </div>
+                    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+                        <table class="schedule-table">
+                            <thead><tr><th>Nome</th><th>Tipo</th><th>Formato</th><th>Cron</th><th>E-mail</th><th>Status</th><th>Ações</th></tr></thead>
+                            <tbody id="scheduleTableBody">
+                                <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:30px;">Nenhum agendamento</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- History Section -->
+                <div class="history-section">
+                    <div class="section-header" style="margin-bottom:16px;">
+                        <h2><i class="fas fa-history" style="color:var(--success)"></i> Histórico Recente</h2>
+                    </div>
+                    <div id="historyContainer">
+                        <div style="text-align:center;color:var(--text-muted);padding:30px;">Nenhum relatório gerado ainda</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Schedule Modal -->
+    <div class="modal-overlay" id="scheduleModal">
+        <div class="modal-box">
+            <h3><i class="fas fa-clock" style="color:var(--primary)"></i> <span id="scheduleModalTitle">Novo Agendamento</span></h3>
+            <input type="hidden" id="scheduleEditId" value="">
+            <div class="form-group">
+                <label>Nome</label>
+                <input type="text" id="schedName" placeholder="Ex: Relatório Semanal Executivo">
+            </div>
+            <div class="form-group">
+                <label>Tipo de Relatório</label>
+                <select id="schedType"></select>
+            </div>
+            <div class="form-group">
+                <label>Formato</label>
+                <select id="schedFormat">
+                    <option value="html">HTML</option>
+                    <option value="json">JSON</option>
+                    <option value="csv">CSV</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Período (dias)</label>
+                <input type="number" id="schedPeriod" value="30" min="1" max="365">
+            </div>
+            <div class="form-group">
+                <label>Expressão Cron</label>
+                <input type="text" id="schedCron" placeholder="0 8 * * 1" title="Minuto Hora Dia Mês DiaSemana">
+                <span style="font-size:.75em;color:var(--text-muted);">Ex: 0 8 * * 1 = toda segunda 08:00</span>
+            </div>
+            <div class="form-group">
+                <label>Enviar para (e-mail, separado por vírgula)</label>
+                <input type="text" id="schedEmail" placeholder="admin@empresa.com">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeScheduleModal()">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveSchedule()" id="btnSaveSched"><i class="fas fa-save"></i> Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/sidebar.js"></script>
+    <script>
+    // ── State ─────────────────────────────────────────────────
+    let selectedType = 'executive';
+    let lastReportBlob = null;
+    let lastReportFormat = 'html';
+    const TYPE_ICONS = { executive:'fa-chart-pie', sla:'fa-shield-alt', capacity:'fa-database', errors:'fa-exclamation-triangle' };
+    const TYPE_COLORS = { executive:'#4299e1', sla:'#48bb78', capacity:'#ed8936', errors:'#f56565' };
+
+    // ── Init ──────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', async () => {
+        try { await new UnifiedSidebar().initialize(); } catch(_) {}
+        await loadReportTypes();
+        await loadSchedules();
+        await loadHistory();
+    });
+
+    async function loadReportTypes() {
+        try {
+            const res = await fetch('/api/reports/types');
+            const data = await res.json();
+            const container = document.getElementById('typeCards');
+            const schedSelect = document.getElementById('schedType');
+            container.innerHTML = '';
+            schedSelect.innerHTML = '';
+            (data.types || []).forEach((t) => {
+                const icon = TYPE_ICONS[t.id] || 'fa-file';
+                const color = TYPE_COLORS[t.id] || '#4299e1';
+                const active = t.id === selectedType ? 'active' : '';
+                container.innerHTML += `<div class="type-card ${active}" data-type="${t.id}" onclick="selectType('${t.id}')"><i class="fas ${icon}" style="color:${color}"></i><strong>${t.label}</strong><span>${t.description}</span></div>`;
+                schedSelect.innerHTML += `<option value="${t.id}">${t.label}</option>`;
+            });
+        } catch(e) { console.error('Erro tipos:', e); }
+    }
+
+    function selectType(type) {
+        selectedType = type;
+        document.querySelectorAll('.type-card').forEach(c => c.classList.toggle('active', c.dataset.type === type));
+    }
+
+    // ── Generate ──────────────────────────────────────────────
+    async function generateReport() {
+        const days = document.getElementById('periodDays').value;
+        const format = document.getElementById('formatSelect').value;
+        const btn = document.getElementById('btnGenerate');
+        const body = document.getElementById('previewBody');
+
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gerando...';
+
+        const empty = document.getElementById('previewEmpty');
+        if(empty) empty.style.display = 'none';
+        body.querySelectorAll('.loading-overlay, iframe, pre').forEach(e => e.remove());
+        const loader = document.createElement('div');
+        loader.className = 'loading-overlay';
+        loader.innerHTML = '<div class="spinner"></div><span style="color:var(--text-muted)">Gerando relatório...</span>';
+        body.appendChild(loader);
+
+        try {
+            const res = await fetch(`/api/reports/generate/${selectedType}?days=${days}&format=${format}`);
+            if(!res.ok) throw new Error(`HTTP ${res.status}`);
+
+            lastReportFormat = format;
+            body.querySelectorAll('.loading-overlay').forEach(e => e.remove());
+
+            if(format === 'html') {
+                const html = await res.text();
+                lastReportBlob = new Blob([html], {type:'text/html'});
+                const iframe = document.createElement('iframe');
+                iframe.style.cssText = 'width:100%;height:100%;border:none;min-height:500px;border-radius:0 0 12px 12px;';
+                body.appendChild(iframe);
+                iframe.contentDocument.open();
+                iframe.contentDocument.write(html);
+                iframe.contentDocument.close();
+            } else if(format === 'json') {
+                const text = await res.text();
+                lastReportBlob = new Blob([text], {type:'application/json'});
+                const pre = document.createElement('pre');
+                pre.style.cssText = 'padding:20px;overflow:auto;max-height:600px;font-size:.82em;background:var(--bg-input);color:var(--text);margin:0;border-radius:0 0 12px 12px;';
+                pre.textContent = text;
+                body.appendChild(pre);
+            } else {
+                const text = await res.text();
+                lastReportBlob = new Blob([text], {type:'text/csv'});
+                const pre = document.createElement('pre');
+                pre.style.cssText = 'padding:20px;overflow:auto;max-height:600px;font-size:.82em;background:var(--bg-input);color:var(--text);margin:0;border-radius:0 0 12px 12px;';
+                pre.textContent = text;
+                body.appendChild(pre);
+            }
+
+            document.getElementById('btnDownload').disabled = false;
+            document.getElementById('btnPrint').disabled = (format !== 'html');
+            await loadHistory();
+        } catch(err) {
+            body.querySelectorAll('.loading-overlay').forEach(e => e.remove());
+            body.innerHTML = `<div class="preview-empty"><i class="fas fa-triangle-exclamation" style="color:var(--danger)"></i><p>Erro ao gerar relatório: ${err.message}</p></div>`;
+            console.error(err);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-play"></i> Gerar Relatório';
+        }
+    }
+
+    function downloadReport(){
+        if(!lastReportBlob) return;
+        const ext = lastReportFormat === 'html' ? 'html' : (lastReportFormat === 'json' ? 'json' : 'csv');
+        const url = URL.createObjectURL(lastReportBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `gboc_${selectedType}_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.${ext}`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    }
+
+    function printReport(){
+        const iframe = document.querySelector('#previewBody iframe');
+        if(iframe && iframe.contentWindow) iframe.contentWindow.print();
+    }
+
+    function toggleFullscreen(){
+        const panel = document.querySelector('.preview-panel');
+        if(!panel) return;
+        if(!document.fullscreenElement) panel.requestFullscreen?.();
+        else document.exitFullscreen?.();
+    }
+
+    // ── Schedules ─────────────────────────────────────────────
+    async function loadSchedules(){
+        try{
+            const res = await fetch('/api/reports/schedules');
+            const data = await res.json();
+            const rows = data.schedules || [];
+            const tb = document.getElementById('scheduleTableBody');
+            if(!rows.length){
+                tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:30px;">Nenhum agendamento</td></tr>';
+                return;
+            }
+            tb.innerHTML = rows.map(s=>`<tr>
+                <td>${s.name||'—'}</td>
+                <td>${s.report_type||'—'}</td>
+                <td>${(s.format||'html').toUpperCase()}</td>
+                <td>${s.cron_expression||'—'}</td>
+                <td>${s.email_to||'—'}</td>
+                <td>${s.enabled?'<span class="badge-active">Ativo</span>':'<span class="badge-disabled">Desativado</span>'}</td>
+                <td>
+                  <button class="btn btn-sm btn-secondary" onclick="editSchedule(${s.id})"><i class="fas fa-edit"></i></button>
+                  <button class="btn btn-sm btn-danger" onclick="deleteSchedule(${s.id})"><i class="fas fa-trash"></i></button>
+                </td>
+            </tr>`).join('');
+        }catch(e){console.error('Erro schedules:',e)}
+    }
+
+    async function loadHistory(){
+        try{
+            const res = await fetch('/api/reports/history?limit=20');
+            const data = await res.json();
+            const items = data.history || [];
+            const wrap = document.getElementById('historyContainer');
+            if(!items.length){
+                wrap.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:30px;">Nenhum relatório gerado ainda</div>';
+                return;
+            }
+            wrap.innerHTML = items.map(h=>`<div class="history-item">
+                <div class="icon"><i class="fas ${h.status==='success'?'fa-circle-check':'fa-circle-xmark'}" style="color:${h.status==='success'?'#48bb78':'#f56565'}"></i></div>
+                <div class="meta">
+                    <strong>${h.report_type||'report'} · ${(h.format||'html').toUpperCase()}</strong>
+                    <span>${h.generated_at?gbocFormatDateTime(h.generated_at):'—'} · ${h.file_size||0} bytes</span>
+                </div>
+            </div>`).join('');
+        }catch(e){console.error('Erro history:',e)}
+    }
+
+    function openScheduleModal(){
+        document.getElementById('scheduleEditId').value='';
+        document.getElementById('scheduleModalTitle').textContent='Novo Agendamento';
+        document.getElementById('scheduleModal').classList.add('show');
+    }
+    function closeScheduleModal(){ document.getElementById('scheduleModal').classList.remove('show'); }
+
+    async function editSchedule(id){
+        const res = await fetch('/api/reports/schedules');
+        const data = await res.json();
+        const s = (data.schedules||[]).find(x=>x.id===id);
+        if(!s) return;
+        document.getElementById('scheduleEditId').value = s.id;
+        document.getElementById('scheduleModalTitle').textContent='Editar Agendamento';
+        document.getElementById('schedName').value = s.name||'';
+        document.getElementById('schedType').value = s.report_type||'executive';
+        document.getElementById('schedFormat').value = s.format||'html';
+        document.getElementById('schedPeriod').value = s.period_days||30;
+        document.getElementById('schedCron').value = s.cron_expression||'';
+        document.getElementById('schedEmail').value = s.email_to||'';
+        document.getElementById('scheduleModal').classList.add('show');
+    }
+
+    async function saveSchedule(){
+        const id = document.getElementById('scheduleEditId').value;
+        const payload = {
+            name: document.getElementById('schedName').value.trim(),
+            report_type: document.getElementById('schedType').value,
+            format: document.getElementById('schedFormat').value,
+            period_days: parseInt(document.getElementById('schedPeriod').value||'30',10),
+            cron_expression: document.getElementById('schedCron').value.trim(),
+            email_to: document.getElementById('schedEmail').value.trim(),
+            enabled: true
+        };
+        if(!payload.name || !payload.cron_expression){ alert('Preencha nome e cron'); return; }
+
+        const url = id ? `/api/reports/schedules/${id}` : '/api/reports/schedules';
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+        if(!res.ok){ const e = await res.json().catch(()=>({})); alert(e.detail||'Erro ao salvar agendamento'); return; }
+        closeScheduleModal();
+        await loadSchedules();
+    }
+
+    async function deleteSchedule(id){
+        if(!confirm('Remover este agendamento?')) return;
+        const res = await fetch(`/api/reports/schedules/${id}`, {method:'DELETE'});
+        if(!res.ok){ const e = await res.json().catch(()=>({})); alert(e.detail||'Erro ao remover'); return; }
+        await loadSchedules();
+    }
+    </script>
+</body>
+</html>
+

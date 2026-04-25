@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnóstico de Autenticação - GBOC Agent</title>
+    <link rel="stylesheet" href="/static/style.css?v=11.9">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .diag-panel { background: var(--bg-card); padding: 20px; border-radius: 10px; margin: 20px; border: 1px solid var(--border); }
+        .diag-item { padding: 12px; margin: 8px 0; background: var(--bg-input); border-radius: 6px; display: flex; justify-content: space-between; align-items: center; }
+        .diag-status { padding: 4px 12px; border-radius: 12px; font-size: 0.85em; font-weight: 600; }
+        .status-ok { background: rgba(78,203,136,.2); color: var(--success); }
+        .status-error { background: rgba(240,107,107,.2); color: var(--danger); }
+        .status-warning { background: rgba(240,169,64,.2); color: var(--warning); }
+        .btn-test { margin-top: 12px; width: 100%; padding: 12px; }
+        pre { background: var(--bg-input); padding: 12px; border-radius: 6px; overflow-x: auto; max-height: 300px; }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <main class="main-content">
+            <header class="header">
+                <div>
+                    <h1 class="page-title">🔍 Diagnóstico de Autenticação</h1>
+                    <p style="color:var(--text-muted); margin:4px 0 0 0;">Verificação completa do sistema de login/logout</p>
+                </div>
+                <div>
+                    <a href="/" class="btn btn-secondary"><i class="fas fa-home"></i> Dashboard</a>
+                </div>
+            </header>
+
+            <div class="content">
+                <div class="diag-panel">
+                    <h3><i class="fas fa-file-code"></i> 1. Arquivos JavaScript</h3>
+                    <div class="diag-item">
+                        <span>gboc-global.js carregado?</span>
+                        <span class="diag-status" id="status-global">Verificando...</span>
+                    </div>
+                    <div class="diag-item">
+                        <span>auth_interceptor.js carregado?</span>
+                        <span class="diag-status" id="status-interceptor">Verificando...</span>
+                    </div>
+                    <div class="diag-item">
+                        <span>Função handleLogout disponível?</span>
+                        <span class="diag-status" id="status-logout-fn">Verificando...</span>
+                    </div>
+                </div>
+
+                <div class="diag-panel">
+                    <h3><i class="fas fa-cookie-bite"></i> 2. localStorage</h3>
+                    <div class="diag-item">
+                        <span>Token armazenado?</span>
+                        <span class="diag-status" id="status-token">Verificando...</span>
+                    </div>
+                    <div class="diag-item">
+                        <span>Usuário armazenado?</span>
+                        <span class="diag-status" id="status-user">Verificando...</span>
+                    </div>
+                    <div id="storage-details"></div>
+                </div>
+
+                <div class="diag-panel">
+                    <h3><i class="fas fa-server"></i> 3. API de Autenticação</h3>
+                    <div class="diag-item">
+                        <span>Endpoint /api/auth/status</span>
+                        <span class="diag-status" id="status-api-status">Verificando...</span>
+                    </div>
+                    <div class="diag-item">
+                        <span>Autenticação habilitada?</span>
+                        <span class="diag-status" id="status-auth-enabled">Verificando...</span>
+                    </div>
+                    <div class="diag-item">
+                        <span>Usuário autenticado?</span>
+                        <span class="diag-status" id="status-authenticated">Verificando...</span>
+                    </div>
+                    <div id="api-details"></div>
+                </div>
+
+                <div class="diag-panel">
+                    <h3><i class="fas fa-vial"></i> 4. Testes Práticos</h3>
+                    <button class="btn btn-test btn-primary" onclick="testLogout()">
+                        <i class="fas fa-sign-out-alt"></i> Testar Função de Logout
+                    </button>
+                    <button class="btn btn-test btn-warning" onclick="clearStorage()">
+                        <i class="fas fa-trash"></i> Limpar localStorage (simular logout)
+                    </button>
+                    <button class="btn btn-test btn-secondary" onclick="runDiagnostics()">
+                        <i class="fas fa-sync-alt"></i> Re-executar Diagnóstico
+                    </button>
+                </div>
+
+                <div class="diag-panel">
+                    <h3><i class="fas fa-terminal"></i> 5. Console de Logs</h3>
+                    <pre id="console-logs">Aguardando logs...</pre>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/auth_interceptor.js?v=11.7c"></script>
+    <script src="/static/gboc-global.js?v=11.7c"></script>
+    <script>
+    let logs = [];
+
+    function log(msg) {
+        const timestamp = new Date().toLocaleTimeString();
+        logs.push(`[${timestamp}] ${msg}`);
+        document.getElementById('console-logs').textContent = logs.join('\n');
+    }
+
+    function setStatus(id, status, text) {
+        const el = document.getElementById(id);
+        el.className = `diag-status status-${status}`;
+        el.textContent = text;
+    }
+
+    async function runDiagnostics() {
+        log('🔍 Iniciando diagnóstico...');
+        logs = [];
+
+        // 1. Verificar arquivos JavaScript
+        log('1️⃣ Verificando arquivos JavaScript...');
+        
+        if (typeof handleLogout === 'function') {
+            setStatus('status-logout-fn', 'ok', '✅ Disponível');
+            log('✅ Função handleLogout encontrada');
+        } else {
+            setStatus('status-logout-fn', 'error', '❌ Não encontrada');
+            log('❌ Função handleLogout NÃO encontrada - gboc-global.js não carregado!');
+        }
+
+        // Verificar se window.fetch foi interceptado
+        if (window.fetch.toString().includes('originalFetch')) {
+            setStatus('status-interceptor', 'ok', '✅ Ativo');
+            log('✅ auth_interceptor.js está ativo');
+        } else {
+            setStatus('status-interceptor', 'warning', '⚠️ Pode não estar ativo');
+            log('⚠️ auth_interceptor pode não estar ativo');
+        }
+
+        setStatus('status-global', 'ok', '✅ Carregado');
+        log('✅ gboc-global.js carregado');
+
+        // 2. Verificar localStorage
+        log('2️⃣ Verificando localStorage...');
+        const token = localStorage.getItem('gboc_token');
+        const userStr = localStorage.getItem('gboc_user');
+
+        if (token) {
+            setStatus('status-token', 'ok', '✅ Presente');
+            log(`✅ Token presente: ${token.substring(0, 20)}...`);
+        } else {
+            setStatus('status-token', 'warning', '⚠️ Ausente');
+            log('⚠️ Token não encontrado - usuário não está logado');
+        }
+
+        if (userStr) {
+            setStatus('status-user', 'ok', '✅ Presente');
+            try {
+                const user = JSON.parse(userStr);
+                log(`✅ Usuário: ${user.username} (${user.display_name || 'sem nome'})`);
+                document.getElementById('storage-details').innerHTML = `
+                    <div style="margin-top:12px; padding:12px; background:var(--bg-input); border-radius:6px;">
+                        <strong>Dados do Usuário:</strong>
+                        <pre>${JSON.stringify(user, null, 2)}</pre>
+                    </div>
+                `;
+            } catch (e) {
+                log('❌ Erro ao parsear dados do usuário');
+            }
+        } else {
+            setStatus('status-user', 'warning', '⚠️ Ausente');
+            log('⚠️ Dados do usuário não encontrados');
+        }
+
+        // 3. Verificar API
+        log('3️⃣ Verificando API de autenticação...');
+        try {
+            const res = await fetch('/api/auth/status');
+            const data = await res.json();
+            
+            setStatus('status-api-status', 'ok', `✅ ${res.status}`);
+            log(`✅ API respondeu: ${res.status}`);
+
+            if (data.auth_enabled) {
+                setStatus('status-auth-enabled', 'ok', '✅ Sim');
+                log('✅ Autenticação está habilitada');
+            } else {
+                setStatus('status-auth-enabled', 'warning', '⚠️ Não');
+                log('⚠️ Autenticação NÃO está habilitada (modo setup)');
+            }
+
+            if (data.authenticated) {
+                setStatus('status-authenticated', 'ok', '✅ Sim');
+                log(`✅ Usuário autenticado: ${data.username || 'desconhecido'}`);
+            } else {
+                setStatus('status-authenticated', 'warning', '⚠️ Não');
+                log('⚠️ Usuário NÃO autenticado');
+            }
+
+            document.getElementById('api-details').innerHTML = `
+                <div style="margin-top:12px; padding:12px; background:var(--bg-input); border-radius:6px;">
+                    <strong>Resposta da API:</strong>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                </div>
+            `;
+        } catch (e) {
+            setStatus('status-api-status', 'error', '❌ Erro');
+            log(`❌ Erro ao chamar API: ${e.message}`);
+        }
+
+        log('✅ Diagnóstico concluído!');
+    }
+
+    function testLogout() {
+        log('🧪 Testando função de logout...');
+        if (typeof handleLogout === 'function') {
+            log('✅ Chamando handleLogout()...');
+            handleLogout();
+        } else {
+            alert('❌ Função handleLogout não está disponível!\n\nVerifique se gboc-global.js foi carregado corretamente.');
+            log('❌ Não foi possível chamar handleLogout - função não existe');
+        }
+    }
+
+    function clearStorage() {
+        log('🗑️ Limpando localStorage...');
+        localStorage.removeItem('gboc_token');
+        localStorage.removeItem('gboc_user');
+        log('✅ localStorage limpo');
+        alert('localStorage limpo! Re-executando diagnóstico...');
+        runDiagnostics();
+    }
+
+    // Executar diagnóstico ao carregar
+    document.addEventListener('DOMContentLoaded', runDiagnostics);
+    </script>
+<script src="/static/sidebar.js"></script>
+</body>
+</html>
+

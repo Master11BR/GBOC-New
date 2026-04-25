@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configurações - GBOC Agent</title>
+    <link rel="stylesheet" href="/static/style.css?v=11.9">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="/static/auth_interceptor.js"></script>
+</head>
+<body>
+    <div class="app">
+        <!-- Sidebar injetada pelo sidebar.js -->
+        
+        <main class="main-content">
+            <header class="header">
+                <div>
+                    <h1 class="page-title"><i class="fas fa-cog"></i> Configurações</h1>
+                    <p class="page-subtitle">Gerencie as preferências e parâmetros do sistema</p>
+                </div>
+            </header>
+
+            <div class="gboc-tabs">
+                <button class="gboc-tab active" data-tab="general">
+                    <i class="fas fa-sliders-h"></i> Geral
+                </button>
+                <button class="gboc-tab" data-tab="backup">
+                    <i class="fas fa-database"></i> Backup
+                </button>
+                <button class="gboc-tab" data-tab="engines">
+                    <i class="fas fa-cogs"></i> Motores
+                </button>
+                <button class="gboc-tab" data-tab="server">
+                    <i class="fas fa-cloud"></i> Servidor Central
+                </button>
+                <button class="gboc-tab" data-tab="notifications">
+                    <i class="fas fa-bell"></i> Notificações
+                </button>
+                <button class="gboc-tab" data-tab="security">
+                    <i class="fas fa-user-shield"></i> Segurança
+                </button>
+                <button class="gboc-tab" data-tab="system">
+                    <i class="fas fa-server"></i> Sistema
+                </button>
+            </div>
+
+            <div class="settings-content">
+                <!-- ABA: GERAL -->
+                <div id="general" class="gboc-tab-pane active">
+                    <div class="settings-grid">
+                        <div class="settings-card">
+                            <h2><i class="fas fa-desktop"></i> Interface e Idioma</h2>
+                            
+                            <div class="setting-item">
+                                <label for="setting-lang">Idioma do Sistema</label>
+                                <div class="setting-description">Escolha o idioma preferencial para a interface.</div>
+                                <select id="setting-lang" class="form-control">
+                                    <option value="pt-BR" selected>Português (Brasil)</option>
+                                    <option value="en-US">English (USA)</option>
+                                    <option value="es-ES">Español (España)</option>
+                                </select>
+                            </div>
+
+                            <div class="setting-item">
+                                <label for="setting-theme">Tema Visual</label>
+                                <div class="setting-description">Alterne entre os modos claro e escuro.</div>
+                                <select id="setting-theme" class="form-control">
+                                    <option value="dark" selected>Escuro (Padrão)</option>
+                                    <option value="light">Claro</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="settings-card">
+                            <h2><i class="fas fa-sync"></i> Atualização Automática</h2>
+                            
+                            <div class="setting-item">
+                                <label for="setting-refresh-interval">Frequência de Atualização (segundos)</label>
+                                <div class="setting-description">Define quão rápido o dashboard e listas são atualizados.</div>
+                                <input type="number" id="setting-refresh-interval" class="form-control" value="30" min="5" max="300">
+                            </div>
+
+                            <div class="setting-row">
+                                <label for="setting-notifications">
+                                    <i class="fas fa-bell"></i> Notificações Desktop
+                                </label>
+                                <input type="checkbox" id="setting-notifications" checked>
+                            </div>
+                            
+                            <div class="setting-row">
+                                <label for="setting-log-details">
+                                    <i class="fas fa-file-alt"></i> Logs Detalhados (Debug)
+                                </label>
+                                <input type="checkbox" id="setting-log-details">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="settings-actions">
+                        <button id="btn-save-general" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Salvar Alterações
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ABA: BACKUP -->
+                <div id="backup" class="gboc-tab-pane">
+                    <div class="settings-grid">
+                        <div class="settings-card">
+                            <h2><i class="fas fa-running"></i> Execução de Tarefas</h2>
+                            
+                            <div class="setting-item">
+                                <label for="setting-backup-threads">Tarefas Simultâneas (Threads)</label>
+                                <div class="setting-description">Máximo de execuções paralelas recomendadas.</div>
+                                <input type="number" id="setting-backup-threads" class="form-control" value="1" min="1" max="8">
+                            </div>
+
+                            <div class="setting-item">
+                                <label for="setting-backup-retry">Tentativas em caso de Falha</label>
+                                <div class="setting-description">Número de vezes que o sistema tentará reiniciar uma tarefa falha.</div>
+                                <input type="number" id="setting-backup-retry" class="form-control" value="3" min="0" max="10">
+                            </div>
+                        </div>
+
+                        <div class="settings-card">
+                            <h2><i class="fas fa-clock"></i> Limites de Tempo</h2>
+                            
+                            <div class="setting-item">
+                                <label for="setting-backup-timeout">Tempo Máximo de Execução (minutos)</label>
+                                <div class="setting-description">Aborta a tarefa se exceder este limite (0 = sem limite).</div>
+                                <input type="number" id="setting-backup-timeout" class="form-control" value="0" min="0" max="1440">
+                            </div>
+
+                            <div class="setting-row">
+                                <label for="setting-skip-error-files">
+                                    <i class="fas fa-forward"></i> Ignorar arquivos com erro de leitura
+                                </label>
+                                <input type="checkbox" id="setting-skip-error-files" checked>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="settings-actions">
+                        <button id="btn-save-backup" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Salvar Configurações de Backup
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ABA: ENGINES -->
+                <div id="engines" class="gboc-tab-pane">
+                    <div class="settings-grid">
+                        <div class="settings-card">
+                            <h2><i class="fas fa-tools"></i> Restic</h2>
+                            <div class="setting-item">
+                                <label>Cache Directory</label>
+                                <input type="text" id="engine-restic-cache" class="form-control" placeholder="Caminho padrão do sistema">
+                            </div>
+                            <div class="setting-row">
+                                <label>Auto-Cleanup (Prune)</label>
+                                <input type="checkbox" id="engine-restic-prune" checked>
+                            </div>
+                        </div>
+                        
+                        <div class="settings-card">
+                            <h2><i class="fas fa-archive"></i> Kopia</h2>
+                            <div class="setting-item">
+                                <label>Maintenance Interval (hours)</label>
+                                <input type="number" id="engine-kopia-maintenance" class="form-control" value="24">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="settings-actions">
+                        <button id="btn-save-engines" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Salvar Motores
+                        </button>
+                        <button id="btn-rescan-engines" class="btn btn-secondary">
+                            <i class="fas fa-search"></i> Rescan de Motores
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ABA: SERVER -->
+                <div id="server" class="gboc-tab-pane">
+                    <div class="settings-card" style="max-width: 600px; margin: 0 auto;">
+                        <h2><i class="fas fa-cloud-upload-alt"></i> Conexão com Servidor Central</h2>
+                        
+                        <div class="setting-item">
+                            <label>URL do Servidor Central</label>
+                            <input type="text" id="server-url" class="form-control" placeholder="http://meu-servidor-gboc.com">
+                        </div>
+                        
+                        <div class="setting-item">
+                            <label>Chave de API (Token)</label>
+                            <input type="password" id="server-key" class="form-control" placeholder="gboc_at_xxxxxxxxxxxx">
+                        </div>
+
+                        <div class="setting-item">
+                            <label>Intervalo de Heartbeat (minutos)</label>
+                            <input type="number" id="heartbeat-interval" class="form-control" value="2" min="1" max="60">
+                        </div>
+                        
+                        <div class="settings-actions" style="background: transparent; border: none; padding: 0;">
+                            <button id="btn-test-connection" class="btn btn-secondary">
+                                <i class="fas fa-plug"></i> Testar Conexão
+                            </button>
+                            <button id="btn-save-server" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Vincular Agente
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ABA: NOTIFICAÇÕES -->
+                <div id="notifications" class="gboc-tab-pane">
+                    <div class="settings-grid">
+                        <div class="settings-card">
+                            <h2><i class="fas fa-bell"></i> Configurações Gerais</h2>
+                            
+                            <div class="setting-row">
+                                <label for="notify-enabled">
+                                    <i class="fas fa-toggle-on"></i> Habilitar Notificações
+                                </label>
+                                <input type="checkbox" id="notify-enabled">
+                            </div>
+                            
+                            <div class="setting-row">
+                                <label for="notify-success">
+                                    <i class="fas fa-check-circle"></i> Notificar Sucessos
+                                </label>
+                                <input type="checkbox" id="notify-success">
+                            </div>
+                            
+                            <div class="setting-row">
+                                <label for="notify-failure">
+                                    <i class="fas fa-exclamation-triangle"></i> Notificar Falhas
+                                </label>
+                                <input type="checkbox" id="notify-failure" checked>
+                            </div>
+                            
+                            <div class="setting-row">
+                                <label for="notify-warning">
+                                    <i class="fas fa-exclamation-circle"></i> Notificar Avisos
+                                </label>
+                                <input type="checkbox" id="notify-warning" checked>
+                            </div>
+                        </div>
+
+                        <div class="settings-card">
+                            <h2><i class="fas fa-globe"></i> Webhook</h2>
+                            
+                            <div class="setting-row">
+                                <label for="webhook-enabled">
+                                    <i class="fas fa-link"></i> Habilitar Webhook
+                                </label>
+                                <input type="checkbox" id="webhook-enabled">
+                            </div>
+                            
+                            <div class="setting-item">
+                                <label for="webhook-url">URL do Webhook</label>
+                                <input type="url" id="webhook-url" class="form-control" placeholder="https://seu-webhook.com/notify">
+                            </div>
+                        </div>
+
+                        <div class="settings-card">
+                            <h2><i class="fas fa-envelope"></i> Email SMTP</h2>
+                            
+                            <div class="setting-row">
+                                <label for="email-enabled">
+                                    <i class="fas fa-envelope-open"></i> Habilitar Email
+                                </label>
+                                <input type="checkbox" id="email-enabled">
+                            </div>
+                            
+                            <div class="setting-item">
+                                <label for="email-to">Destinatários (separados por vírgula)</label>
+                                <input type="text" id="email-to" class="form-control" placeholder="admin@empresa.com, suporte@empresa.com">
+                            </div>
+                            
+                            <div class="setting-item">
+                                <label>Eventos para Notificar por Email</label>
+                                <div class="checkbox-group">
+                                    <label>
+                                        <input type="checkbox" id="email-backup-start" checked>
+                                        <span>Início de backup</span>
+                                    </label>
+                                    <label>
+                                        <input type="checkbox" id="email-backup-success" checked>
+                                        <span>Backup concluído com sucesso</span>
+                                    </label>
+                                    <label>
+                                        <input type="checkbox" id="email-backup-failure" checked>
+                                        <span>Falha no backup</span>
+                                    </label>
+                                    <label>
+                                        <input type="checkbox" id="email-restore-start">
+                                        <span>Início de restauração</span>
+                                    </label>
+                                    <label>
+                                        <input type="checkbox" id="email-restore-success">
+                                        <span>Restauração concluída</span>
+                                    </label>
+                                    <label>
+                                        <input type="checkbox" id="email-restore-failure" checked>
+                                        <span>Falha na restauração</span>
+                                    </label>
+                                    <label>
+                                        <input type="checkbox" id="email-system-error" checked>
+                                        <span>Erros do sistema</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="settings-actions">
+                        <button id="btn-test-notifications" class="btn btn-secondary">
+                            <i class="fas fa-paper-plane"></i> Testar Notificações
+                        </button>
+                        <button id="btn-save-notifications" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Salvar Configurações
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ABA: SEGURANÇA & USUÁRIOS -->
+                <div id="security" class="gboc-tab-pane">
+                    <div class="settings-grid">
+                        <div class="settings-card" style="border: 2px solid var(--primary); background: rgba(99,102,241,.05);">
+                            <h2><i class="fas fa-user-shield" style="color:var(--primary)"></i> Segurança &amp; Acesso</h2>
+                            <p class="setting-description">Gerencie a autenticação do painel web.</p>
+
+                            <div id="auth-user-info" style="margin-bottom:16px;">
+                                <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg-main);border-radius:8px;border:1px solid var(--border);">
+                                    <i class="fas fa-user-circle" style="font-size:1.5rem;color:var(--primary);"></i>
+                                    <div>
+                                        <div style="font-weight:600;color:var(--text);" id="auth-display-name">Carregando...</div>
+                                        <div style="font-size:0.8em;color:var(--text-secondary);" id="auth-username-info"></div>
+                                        <div style="font-size:0.75em;color:var(--text-secondary);margin-top:2px;" id="auth-last-login"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="setting-item">
+                                <label><i class="fas fa-rocket"></i> Tela de inicialização</label>
+                                <div class="setting-description">Oculta a splash do dashboard após o primeiro carregamento nesta sessão.</div>
+                                <button id="btn-reset-splash-session" class="btn btn-secondary">
+                                    <i class="fas fa-redo"></i> Reexibir tela de inicialização na próxima abertura do Dashboard
+                                </button>
+                            </div>
+
+                            <h3 style="font-size:0.95em;margin:16px 0 12px;color:var(--text);"><i class="fas fa-key" style="color:var(--warning);margin-right:6px;"></i>Alterar Senha</h3>
+                            <div class="setting-item">
+                                <label for="auth-current-pw">Senha Atual</label>
+                                <input type="password" id="auth-current-pw" class="form-control" placeholder="Digite a senha atual">
+                            </div>
+                            <div class="setting-item">
+                                <label for="auth-new-pw">Nova Senha</label>
+                                <input type="password" id="auth-new-pw" class="form-control" placeholder="Mínimo 6 caracteres">
+                            </div>
+                            <div class="setting-item">
+                                <label for="auth-confirm-pw">Confirmar Nova Senha</label>
+                                <input type="password" id="auth-confirm-pw" class="form-control" placeholder="Repita a nova senha">
+                            </div>
+                            <div id="auth-pw-msg" style="display:none;padding:8px 12px;border-radius:6px;font-size:0.85em;margin-top:8px;"></div>
+
+                            <div class="settings-actions" style="background:transparent;border:none;padding:8px 0 0 0;">
+                                <button id="btn-change-password" class="btn btn-primary" onclick="changePassword()">
+                                    <i class="fas fa-key"></i> Alterar Senha
+                                </button>
+                                <button class="btn btn-secondary" onclick="gbocLogout()" style="margin-left:8px;">
+                                    <i class="fas fa-sign-out-alt"></i> Sair (Logout)
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="settings-card" style="border: 2px solid rgba(99,102,241,.3);">
+                            <h2><i class="fas fa-users" style="color:var(--primary)"></i> Gerenciamento de Usuários</h2>
+                            <p class="setting-description">Cadastre, edite e remova usuários com acesso ao painel.</p>
+
+                            <div style="margin-bottom:16px;">
+                                <button class="btn btn-primary" onclick="openUserModal()" style="padding:8px 16px;">
+                                    <i class="fas fa-user-plus"></i> Novo Usuário
+                                </button>
+                            </div>
+
+                            <div id="users-list" style="margin-top:12px;">
+                                <div style="color:var(--text-secondary);font-size:0.85em;">Carregando...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal Criar/Editar Usuário (global, fora das abas) -->
+                <div id="user-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center;">
+                    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:28px;max-width:440px;width:90%;box-shadow:0 12px 40px rgba(0,0,0,.4);">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                            <h3 id="user-modal-title" style="margin:0;color:var(--text);font-size:1.1em;"><i class="fas fa-user-plus"></i> Novo Usuário</h3>
+                            <button onclick="closeUserModal()" style="background:none;border:none;color:var(--text-secondary);font-size:1.3em;cursor:pointer;">&times;</button>
+                        </div>
+                        <input type="hidden" id="user-edit-id">
+                        <div style="margin-bottom:14px;">
+                            <label style="display:block;color:var(--text-secondary);font-size:0.85em;margin-bottom:4px;">Nome de Usuário</label>
+                            <input type="text" id="user-username" class="form-control" placeholder="ex: joao.silva" style="width:100%;box-sizing:border-box;">
+                        </div>
+                        <div style="margin-bottom:14px;">
+                            <label style="display:block;color:var(--text-secondary);font-size:0.85em;margin-bottom:4px;">Nome de Exibição</label>
+                            <input type="text" id="user-display-name" class="form-control" placeholder="ex: João Silva" style="width:100%;box-sizing:border-box;">
+                        </div>
+                        <div style="margin-bottom:14px;">
+                            <label style="display:block;color:var(--text-secondary);font-size:0.85em;margin-bottom:4px;">Perfil</label>
+                            <select id="user-role" class="form-control" style="width:100%;box-sizing:border-box;">
+                                <option value="admin">Administrador</option>
+                                <option value="operator">Operador</option>
+                                <option value="viewer">Visualizador</option>
+                            </select>
+                        </div>
+                        <div style="margin-bottom:14px;">
+                            <label style="display:block;color:var(--text-secondary);font-size:0.85em;margin-bottom:4px;" id="user-pw-label">Senha</label>
+                            <input type="password" id="user-password" class="form-control" placeholder="Mínimo 6 caracteres" style="width:100%;box-sizing:border-box;">
+                        </div>
+                        <div id="user-active-group" style="margin-bottom:14px;display:none;">
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                                <input type="checkbox" id="user-is-active" checked style="width:18px;height:18px;accent-color:var(--primary);">
+                                <span style="color:var(--text);font-size:0.9em;">Conta ativa</span>
+                            </label>
+                        </div>
+                        <div id="user-modal-msg" style="display:none;padding:8px 12px;border-radius:6px;font-size:0.85em;margin-bottom:12px;"></div>
+                        <div style="display:flex;justify-content:flex-end;gap:8px;">
+                            <button class="btn btn-secondary" onclick="closeUserModal()">Cancelar</button>
+                            <button class="btn btn-primary" onclick="saveUser()"><i class="fas fa-save"></i> Salvar</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ABA: SISTEMA -->
+                <div id="system" class="gboc-tab-pane">
+                    <div class="settings-grid">
+                        <div class="settings-card" style="border: 2px solid var(--danger); background: rgba(245,101,101,.05);">
+                            <h2><i class="fas fa-trash-alt" style="color:var(--danger)"></i> Reset de Instalação</h2>
+                            <p class="setting-description" style="color:var(--danger)">
+                                <strong>⚠️ AÇÃO IRREVERSÍVEL:</strong> Remove todos os repositórios, tarefas, execuções e reseta configurações para valores padrão. O sistema voltará ao estado de instalação limpa.
+                            </p>
+
+                            <div class="settings-actions" style="background: transparent; border: none; padding: 0;">
+                                <button id="btn-reset-install" class="btn btn-danger" style="background:var(--danger);color:var(--bg-dark);padding:10px 24px;font-weight:700;">
+                                    <i class="fas fa-trash-alt"></i> Reset Install
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="settings-card">
+                            <h2><i class="fas fa-undo"></i> Reset de Status de Backup</h2>
+                            <p class="setting-description">Use esta opção para resetar backups que ficam presos no status "running" quando o agente é fechado inesperadamente.</p>
+                            
+                            <div class="setting-item">
+                                <label>Status Atual dos Backups</label>
+                                <div id="backup-status-list" class="status-list">
+                                    <div class="status-item loading">
+                                        <i class="fas fa-spinner fa-spin"></i> Carregando status dos backups...
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="settings-actions" style="background: transparent; border: none; padding: 0;">
+                                <button id="btn-refresh-status" class="btn btn-secondary">
+                                    <i class="fas fa-sync"></i> Atualizar Status
+                                </button>
+                                <button id="btn-reset-stuck-backups" class="btn btn-warning">
+                                    <i class="fas fa-undo"></i> Resetar Backups Presos
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="settings-card">
+                            <h2><i class="fas fa-envelope"></i> Configuração SMTP</h2>
+                            <p class="setting-description">Configure o servidor SMTP para envio de notificações por email.</p>
+                            
+                            <div class="setting-item">
+                                <label for="smtp-server">Servidor SMTP</label>
+                                <input type="text" id="smtp-server" class="form-control" placeholder="smtp.gmail.com">
+                            </div>
+                            
+                            <div class="setting-item">
+                                <label for="smtp-port">Porta SMTP</label>
+                                <input type="number" id="smtp-port" class="form-control" value="587" min="1" max="65535">
+                            </div>
+                            
+                            <div class="setting-item">
+                                <label for="smtp-username">Usuário (Email)</label>
+                                <input type="email" id="smtp-username" class="form-control" placeholder="seu-email@gmail.com">
+                            </div>
+                            
+                            <div class="setting-item">
+                                <label for="smtp-password">Senha</label>
+                                <input type="password" id="smtp-password" class="form-control" placeholder="Sua senha ou app password">
+                            </div>
+                            
+                            <div class="setting-row">
+                                <label for="smtp-tls">
+                                    <i class="fas fa-lock"></i> Usar TLS
+                                </label>
+                                <input type="checkbox" id="smtp-tls" checked>
+                            </div>
+                            
+                            <div class="setting-item">
+                                <label for="smtp-from-email">Email Remetente</label>
+                                <input type="email" id="smtp-from-email" class="form-control" placeholder="noreply@gboc.com">
+                            </div>
+                            
+                            <div class="setting-item">
+                                <label for="smtp-from-name">Nome do Remetente</label>
+                                <input type="text" id="smtp-from-name" class="form-control" placeholder="GBOC Backup System">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="settings-actions">
+                        <button id="btn-test-smtp" class="btn btn-secondary">
+                            <i class="fas fa-paper-plane"></i> Testar SMTP
+                        </button>
+                        <button id="btn-save-smtp" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Salvar Configuração SMTP
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/sidebar.js"></script>
+    <script>
+        // Lógica de abas (usa componente unificado .gboc-tab / .gboc-tab-pane)
+        document.querySelectorAll('.gboc-tab').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.gboc-tab').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.gboc-tab-pane').forEach(c => c.classList.remove('active'));
+
+                btn.classList.add('active');
+                const tabId = btn.getAttribute('data-tab');
+                document.getElementById(tabId).classList.add('active');
+
+                // Auto-load data when switching tabs
+                if (tabId === 'system') {
+                    loadBackupStatus();
+                }
+                if (tabId === 'security') {
+                    loadAuthInfo();
+                    loadUsers();
+                }
+            });
+        });
+
+        // Carregar configurações iniciais (mock/api)
+        async function loadSettings() {
+            try {
+                const response = await fetch('/api/settings/');
+                const data = await response.json();
+                if (data.status === 'success' && data.settings) {
+                    Object.keys(data.settings).forEach(key => {
+                        const val = data.settings[key];
+                        // Procurar por ID literal ou com prefixo setting-
+                        let el = document.getElementById(`setting-${key}`) || document.getElementById(key);
+                        if (el) {
+                            if (el.type === 'checkbox') el.checked = (val === true || val === 'true' || val === 1);
+                            else el.value = val;
+                        }
+                    });
+                }
+            } catch (e) {
+                console.error("Erro ao carregar configurações", e);
+            }
+        }
+
+        async function saveSettings(category) {
+            // Coletar campos da aba ativa
+            const content = document.getElementById(category);
+            const inputs = content.querySelectorAll('input, select');
+            const settings = {};
+            
+            inputs.forEach(input => {
+                const key = input.id.replace('setting-', '');
+                settings[key] = input.type === 'checkbox' ? input.checked : input.value;
+            });
+
+            try {
+                const response = await fetch('/api/settings/bulk', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ settings })
+                });
+                const result = await response.json();
+                if (result.status === 'success') {
+                    alert('Configurações salvas com sucesso!');
+                } else {
+                    alert('Erro ao salvar: ' + result.message);
+                }
+            } catch (e) {
+                alert('Erro na requisição: ' + e.message);
+            }
+        }
+
+        document.getElementById('btn-save-general').addEventListener('click', () => saveSettings('general'));
+        document.getElementById('btn-save-backup').addEventListener('click', () => saveSettings('backup'));
+        document.getElementById('btn-save-engines').addEventListener('click', () => saveSettings('engines'));
+        document.getElementById('btn-reset-splash-session').addEventListener('click', () => {
+            sessionStorage.removeItem('gboc_startup_splash_done');
+            alert('A tela de inicialização será exibida novamente na próxima abertura do Dashboard nesta sessão.');
+        });
+        document.getElementById('btn-rescan-engines').addEventListener('click', async () => {
+            const btn = document.getElementById('btn-rescan-engines');
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Reescaneando...';
+
+            try {
+                const response = await fetch('/api/engines/rescan', { method: 'POST' });
+                const result = await response.json();
+                if (response.ok && result.status === 'success') {
+                    const detected = (result.engines || []).filter(e => e.detected).length;
+                    alert(`Rescan concluído. Motores detectados: ${detected}/${(result.engines || []).length}`);
+                } else {
+                    alert('Erro no rescan: ' + (result.detail || result.message || 'Erro desconhecido'));
+                }
+            } catch (e) {
+                alert('Erro na requisição de rescan: ' + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+        });
+        
+        document.getElementById('btn-save-server').addEventListener('click', async () => {
+            const url = document.getElementById('server-url').value;
+            const key = document.getElementById('server-key').value;
+            
+            try {
+                const response = await fetch('/api/server/configure', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ server_url: url, api_key: key })
+                });
+                const result = await response.json();
+                alert(result.message || 'Configurado com sucesso');
+            } catch (e) {
+                alert('Erro ao configurar servidor: ' + e.message);
+            }
+        });
+
+        // Funções da aba Notificações
+        async function saveNotifications() {
+            const notifications = {
+                enabled: document.getElementById('notify-enabled').checked,
+                notify_success: document.getElementById('notify-success').checked,
+                notify_failure: document.getElementById('notify-failure').checked,
+                notify_warning: document.getElementById('notify-warning').checked,
+                webhook_enabled: document.getElementById('webhook-enabled').checked,
+                webhook_url: document.getElementById('webhook-url').value,
+                email_enabled: document.getElementById('email-enabled').checked,
+                email_to: document.getElementById('email-to').value,
+                email_backup_start: document.getElementById('email-backup-start').checked,
+                email_backup_success: document.getElementById('email-backup-success').checked,
+                email_backup_failure: document.getElementById('email-backup-failure').checked,
+                email_restore_start: document.getElementById('email-restore-start').checked,
+                email_restore_success: document.getElementById('email-restore-success').checked,
+                email_restore_failure: document.getElementById('email-restore-failure').checked,
+                email_system_error: document.getElementById('email-system-error').checked
+            };
+            
+            try {
+                const response = await fetch('/api/settings/bulk', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ settings: notifications, category: 'notifications' })
+                });
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    alert('Configurações de notificações salvas com sucesso!');
+                } else {
+                    alert('Erro ao salvar: ' + (result.message || 'Erro desconhecido'));
+                }
+            } catch (e) {
+                alert('Erro na requisição: ' + e.message);
+            }
+        }
+
+        async function testNotifications() {
+            try {
+                const response = await fetch('/api/alerts/test-notifications', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    alert('Notificações de teste enviadas! Verifique seus webhooks e emails.');
+                } else {
+                    alert('Erro ao testar notificações: ' + (result.message || 'Erro desconhecido'));
+                }
+            } catch (e) {
+                alert('Erro na requisição: ' + e.message);
+            }
+        }
+
+        // Funções da aba Sistema
+        async function loadBackupStatus() {
+            const statusList = document.getElementById('backup-status-list');
+            statusList.innerHTML = '<div class="status-item loading"><i class="fas fa-spinner fa-spin"></i> Carregando status dos backups...</div>';
+
+            try {
+                const response = await fetch('/api/tasks/status');
+                if (!response.ok) {
+                    statusList.innerHTML = '<div class="status-item info"><i class="fas fa-info-circle"></i> Sem dados de execuções recentes.</div>';
+                    return;
+                }
+                const data = await response.json();
+
+                if (data.status === 'success' && data.tasks) {
+                    statusList.innerHTML = '';
+
+                    if (data.tasks.length === 0) {
+                        statusList.innerHTML = '<div class="status-item info"><i class="fas fa-info-circle"></i> Nenhuma execução nas últimas 24 horas.</div>';
+                        return;
+                    }
+
+                    data.tasks.forEach(task => {
+                        const statusClass = task.status === 'running' ? 'warning' : task.status === 'failed' ? 'error' : 'success';
+                        const statusIcon = task.status === 'running' ? 'fa-play-circle' : task.status === 'failed' ? 'fa-times-circle' : 'fa-check-circle';
+
+                        const statusItem = document.createElement('div');
+                        statusItem.className = `status-item ${statusClass}`;
+                        statusItem.innerHTML = `
+                            <i class="fas ${statusIcon}"></i>
+                            <strong>${task.name || 'Backup'}</strong> - Status: ${task.status}
+                            ${task.started_at ? '<small>Iniciado: ' + gbocFormatDateTime(task.started_at) + '</small>' : ''}
+                            ${task.error_message ? '<small style="color:var(--danger)">Erro: ' + task.error_message + '</small>' : ''}
+                        `;
+                        statusList.appendChild(statusItem);
+                    });
+                } else {
+                    statusList.innerHTML = '<div class="status-item error"><i class="fas fa-exclamation-triangle"></i> Erro ao carregar status dos backups.</div>';
+                }
+            } catch (e) {
+                statusList.innerHTML = '<div class="status-item error"><i class="fas fa-exclamation-triangle"></i> Erro na requisição: ' + e.message + '</div>';
+            }
+        }
+
+        async function resetStuckBackups() {
+            if (!confirm('Tem certeza que deseja resetar todos os backups presos no status "running"? Esta ação não pode ser desfeita.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/tasks/reset-stuck', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    alert(`Backups resetados com sucesso! ${result.reset_count || 0} tarefas foram afetadas.`);
+                    loadBackupStatus(); // Recarregar status
+                } else {
+                    alert('Erro ao resetar backups: ' + (result.message || 'Erro desconhecido'));
+                }
+            } catch (e) {
+                alert('Erro na requisição: ' + e.message);
+            }
+        }
+
+        async function saveSmtpConfig() {
+            const smtpConfig = {
+                server: document.getElementById('smtp-server').value,
+                port: parseInt(document.getElementById('smtp-port').value),
+                username: document.getElementById('smtp-username').value,
+                password: document.getElementById('smtp-password').value,
+                use_tls: document.getElementById('smtp-tls').checked,
+                from_email: document.getElementById('smtp-from-email').value,
+                from_name: document.getElementById('smtp-from-name').value
+            };
+            
+            // Validação básica
+            if (!smtpConfig.server || !smtpConfig.username || !smtpConfig.password) {
+                alert('Por favor, preencha todos os campos obrigatórios: servidor, usuário e senha.');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/smtp/configure', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(smtpConfig)
+                });
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    alert('Configuração SMTP salva com sucesso!');
+                } else {
+                    alert('Erro ao salvar configuração SMTP: ' + (result.message || 'Erro desconhecido'));
+                }
+            } catch (e) {
+                alert('Erro na requisição: ' + e.message);
+            }
+        }
+
+        async function testSmtpConfig() {
+            const testEmail = prompt('Digite um email para testar o envio:');
+            if (!testEmail) return;
+            
+            try {
+                const response = await fetch('/api/smtp/test', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ test_email: testEmail })
+                });
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    alert('Email de teste enviado com sucesso! Verifique sua caixa de entrada.');
+                } else {
+                    alert('Erro ao enviar email de teste: ' + (result.message || 'Erro desconhecido'));
+                }
+            } catch (e) {
+                alert('Erro na requisição: ' + e.message);
+            }
+        }
+
+        // Event listeners para a aba Sistema
+        document.getElementById('btn-refresh-status').addEventListener('click', loadBackupStatus);
+        document.getElementById('btn-reset-stuck-backups').addEventListener('click', resetStuckBackups);
+        document.getElementById('btn-save-smtp').addEventListener('click', saveSmtpConfig);
+        document.getElementById('btn-test-smtp').addEventListener('click', testSmtpConfig);
+        document.getElementById('btn-reset-install').addEventListener('click', resetInstall);
+
+        async function resetInstall() {
+            const step1 = confirm('⚠️ ATENÇÃO: Isso vai APAGAR todos os repositórios, tarefas, execuções e resetar configurações.\n\nDeseja continuar?');
+            if (!step1) return;
+            const step2 = prompt('Para confirmar, digite "RESET" em maiúsculas:');
+            if (step2 !== 'RESET') { alert('Operação cancelada.'); return; }
+
+            try {
+                const response = await fetch('/api/settings/reset-install', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    const d = result.deleted || {};
+                    alert(`✅ Reset concluído!\n\n• ${d.executions || 0} execuções removidas\n• ${d.tasks || 0} tarefas removidas\n• ${d.repositories || 0} repositórios removidos\n• ${d.settings_reset || 0} configurações resetadas`);
+                    window.location.reload();
+                } else {
+                    alert('Erro ao resetar: ' + (result.detail || result.message || 'Erro desconhecido'));
+                }
+            } catch (e) {
+                alert('Erro na requisição: ' + e.message);
+            }
+        }
+
+        // Event listeners para a aba Notificações
+        document.getElementById('btn-save-notifications').addEventListener('click', saveNotifications);
+        document.getElementById('btn-test-notifications').addEventListener('click', testNotifications);
+
+        // === Auth / Change Password ===
+        async function loadAuthInfo() {
+            try {
+                // Primeiro, tenta via localStorage para resposta rápida
+                const localUser = JSON.parse(localStorage.getItem('gboc_user') || 'null');
+                if (localUser) {
+                    document.getElementById('auth-display-name').textContent = localUser.display_name || localUser.username;
+                    document.getElementById('auth-username-info').textContent = 'Usuário: ' + localUser.username + ' | Perfil: ' + (localUser.role || 'admin');
+                }
+
+                // Depois, confirma com a API
+                const res = await fetch('/api/auth/status');
+                const data = await res.json();
+                if (data.authenticated && data.user) {
+                    const roleLabels = {admin:'Administrador', operator:'Operador', viewer:'Visualizador'};
+                    document.getElementById('auth-display-name').textContent = data.user.display_name || data.user.username;
+                    document.getElementById('auth-username-info').textContent = 'Usuário: ' + data.user.username + ' | Perfil: ' + (roleLabels[data.user.role] || data.user.role || 'admin');
+                    const lastLoginEl = document.getElementById('auth-last-login');
+                    if (lastLoginEl && data.user.last_login) {
+                        lastLoginEl.textContent = 'Último login: ' + gbocFormatDateTime(data.user.last_login);
+                    }
+                } else if (!data.auth_enabled) {
+                    document.getElementById('auth-display-name').textContent = 'Autenticação desativada';
+                    document.getElementById('auth-username-info').textContent = 'Nenhum usuário cadastrado';
+                } else {
+                    document.getElementById('auth-display-name').textContent = 'Não autenticado';
+                    document.getElementById('auth-username-info').textContent = '';
+                }
+            } catch(e) {
+                document.getElementById('auth-display-name').textContent = 'Erro ao carregar';
+            }
+        }
+
+        async function loadUsers() {
+            try {
+                const res = await fetch('/api/auth/users');
+                const data = await res.json();
+                const container = document.getElementById('users-list');
+                if (!container) return;
+
+                if (data.status !== 'success' || !data.users || data.users.length === 0) {
+                    container.innerHTML = '<div style="color:var(--text-secondary);font-size:0.85em;">Nenhum usuário cadastrado.</div>';
+                    return;
+                }
+
+                // Buscar usuário logado para impedir auto-exclusão
+                let currentUsername = '';
+                try {
+                    const localUser = JSON.parse(localStorage.getItem('gboc_user') || 'null');
+                    if (localUser) currentUsername = localUser.username;
+                } catch(e) {}
+
+                let html = '';
+                data.users.forEach(u => {
+                    const lastLogin = u.last_login ? gbocFormatDateTime(u.last_login) : 'Nunca';
+                    const created = u.created_at ? gbocFormatDateTime(u.created_at) : '--';
+                    const statusColor = u.is_active ? 'var(--success)' : 'var(--danger)';
+                    const statusText = u.is_active ? 'Ativo' : 'Inativo';
+                    const isSelf = u.username === currentUsername;
+                    const roleLabel = u.role === 'admin' ? 'Administrador' : u.role === 'operator' ? 'Operador' : u.role === 'viewer' ? 'Visualizador' : u.role;
+
+                    html += `
+                    <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg-main);border-radius:8px;border:1px solid var(--border);margin-bottom:8px;">
+                        <div style="width:42px;height:42px;border-radius:50%;background:${u.is_active ? 'rgba(99,102,241,.15)' : 'rgba(245,101,101,.15)'};display:flex;align-items:center;justify-content:center;color:${u.is_active ? 'var(--primary)' : 'var(--danger)'};font-weight:700;font-size:1.2em;flex-shrink:0;">
+                            ${(u.display_name || u.username || '?')[0].toUpperCase()}
+                        </div>
+                        <div style="flex:1;min-width:0;">
+                            <div style="font-weight:600;color:var(--text);display:flex;align-items:center;gap:6px;">
+                                ${u.display_name || u.username}
+                                ${isSelf ? '<span style="font-size:0.7em;background:var(--primary);color:var(--bg-dark);padding:1px 6px;border-radius:4px;">você</span>' : ''}
+                            </div>
+                            <div style="font-size:0.78em;color:var(--text-secondary);">
+                                @${u.username} &bull; ${roleLabel} &bull; <span style="color:${statusColor}">${statusText}</span>
+                            </div>
+                            <div style="font-size:0.72em;color:var(--text-secondary);margin-top:2px;">
+                                Último login: ${lastLogin} &bull; Criado: ${created}
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:6px;flex-shrink:0;">
+                            <button onclick="editUser(${u.id}, '${u.username.replace(/'/g,"\\'")}', '${(u.display_name||'').replace(/'/g,"\\'")}', '${u.role||'admin'}', ${u.is_active})"
+                                style="padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--primary);cursor:pointer;font-size:0.8em;" title="Editar">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            ${!isSelf ? `<button onclick="deleteUser(${u.id}, '${u.username.replace(/'/g,"\\'")}')"
+                                style="padding:6px 10px;border-radius:6px;border:1px solid rgba(240,107,107,.3);background:rgba(240,107,107,.1);color:var(--danger);cursor:pointer;font-size:0.8em;" title="Excluir">
+                                <i class="fas fa-trash"></i>
+                            </button>` : ''}
+                        </div>
+                    </div>`;
+                });
+
+                container.innerHTML = html;
+            } catch(e) {
+                const container = document.getElementById('users-list');
+                if (container) container.innerHTML = '<div style="color:var(--danger);font-size:0.85em;">Erro ao carregar usuários.</div>';
+            }
+        }
+
+        function openUserModal(isEdit = false) {
+            document.getElementById('user-edit-id').value = '';
+            document.getElementById('user-username').value = '';
+            document.getElementById('user-display-name').value = '';
+            document.getElementById('user-role').value = 'admin';
+            document.getElementById('user-password').value = '';
+            document.getElementById('user-is-active').checked = true;
+            document.getElementById('user-modal-msg').style.display = 'none';
+
+            if (!isEdit) {
+                document.getElementById('user-modal-title').innerHTML = '<i class="fas fa-user-plus"></i> Novo Usuário';
+                document.getElementById('user-username').disabled = false;
+                document.getElementById('user-pw-label').textContent = 'Senha';
+                document.getElementById('user-password').placeholder = 'Mínimo 6 caracteres';
+                document.getElementById('user-password').required = true;
+                document.getElementById('user-active-group').style.display = 'none';
+            }
+
+            const modal = document.getElementById('user-modal');
+            modal.style.display = 'flex';
+        }
+
+        function closeUserModal() {
+            document.getElementById('user-modal').style.display = 'none';
+        }
+
+        function editUser(id, username, displayName, role, isActive) {
+            openUserModal(true);
+            document.getElementById('user-edit-id').value = id;
+            document.getElementById('user-username').value = username;
+            document.getElementById('user-username').disabled = true;
+            document.getElementById('user-display-name').value = displayName;
+            document.getElementById('user-role').value = role || 'admin';
+            document.getElementById('user-is-active').checked = isActive;
+            document.getElementById('user-modal-title').innerHTML = '<i class="fas fa-user-edit"></i> Editar Usuário';
+            document.getElementById('user-pw-label').textContent = 'Nova Senha (deixe em branco para manter)';
+            document.getElementById('user-password').placeholder = 'Deixe vazio para não alterar';
+            document.getElementById('user-password').required = false;
+            document.getElementById('user-active-group').style.display = 'block';
+        }
+
+        async function saveUser() {
+            const editId = document.getElementById('user-edit-id').value;
+            const isEdit = editId && editId !== '';
+            const msgEl = document.getElementById('user-modal-msg');
+
+            function showUserMsg(text, isError) {
+                msgEl.style.display = 'block';
+                msgEl.textContent = text;
+                msgEl.style.background = isError ? 'rgba(245,101,101,.1)' : 'rgba(72,187,120,.1)';
+                msgEl.style.color = isError ? '#f56565' : '#48bb78';
+                msgEl.style.border = '1px solid ' + (isError ? 'rgba(245,101,101,.3)' : 'rgba(72,187,120,.3)');
+            }
+
+            const username = document.getElementById('user-username').value.trim();
+            const displayName = document.getElementById('user-display-name').value.trim();
+            const role = document.getElementById('user-role').value;
+            const password = document.getElementById('user-password').value;
+
+            if (!isEdit) {
+                if (!username) { showUserMsg('Nome de usuário é obrigatório.', true); return; }
+                if (!password || password.length < 6) { showUserMsg('Senha deve ter no mínimo 6 caracteres.', true); return; }
+            }
+
+            try {
+                let res;
+                if (isEdit) {
+                    const payload = {
+                        display_name: displayName || undefined,
+                        role: role,
+                        is_active: document.getElementById('user-is-active').checked
+                    };
+                    if (password && password.length > 0) {
+                        if (password.length < 6) { showUserMsg('Nova senha deve ter no mínimo 6 caracteres.', true); return; }
+                        payload.new_password = password;
+                    }
+                    res = await fetch('/api/auth/users/' + editId, {
+                        method: 'PUT',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(payload)
+                    });
+                } else {
+                    res = await fetch('/api/auth/users', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ username, password, display_name: displayName || username, role })
+                    });
+                }
+
+                const data = await res.json();
+                if (res.ok && (data.status === 'success' || data.id)) {
+                    showUserMsg(isEdit ? '✅ Usuário atualizado!' : '✅ Usuário criado!', false);
+                    setTimeout(() => { closeUserModal(); loadUsers(); }, 800);
+                } else {
+                    showUserMsg(data.detail || data.message || 'Erro ao salvar.', true);
+                }
+            } catch(e) {
+                showUserMsg('Erro de conexão: ' + e.message, true);
+            }
+        }
+
+        async function deleteUser(id, username) {
+            if (!confirm('Tem certeza que deseja excluir o usuário "' + username + '"?\n\nEsta ação é irreversível.')) return;
+            try {
+                const res = await fetch('/api/auth/users/' + id, { method: 'DELETE' });
+                const data = await res.json();
+                if (res.ok && data.status === 'success') {
+                    loadUsers();
+                } else {
+                    alert(data.detail || data.message || 'Erro ao excluir usuário.');
+                }
+            } catch(e) {
+                alert('Erro de conexão: ' + e.message);
+            }
+        }
+
+        async function changePassword() {
+            const currentPw = document.getElementById('auth-current-pw').value;
+            const newPw = document.getElementById('auth-new-pw').value;
+            const confirmPw = document.getElementById('auth-confirm-pw').value;
+            const msgEl = document.getElementById('auth-pw-msg');
+
+            function showMsg(text, isError) {
+                msgEl.style.display = 'block';
+                msgEl.textContent = text;
+                msgEl.style.background = isError ? 'rgba(245,101,101,.1)' : 'rgba(72,187,120,.1)';
+                msgEl.style.color = isError ? '#f56565' : '#48bb78';
+                msgEl.style.border = '1px solid ' + (isError ? 'rgba(245,101,101,.3)' : 'rgba(72,187,120,.3)');
+            }
+
+            if (!currentPw || !newPw) { showMsg('Preencha todos os campos.', true); return; }
+            if (newPw.length < 6) { showMsg('Nova senha deve ter no mínimo 6 caracteres.', true); return; }
+            if (newPw !== confirmPw) { showMsg('As senhas não coincidem.', true); return; }
+
+            try {
+                const res = await fetch('/api/auth/change-password', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ current_password: currentPw, new_password: newPw })
+                });
+                const data = await res.json();
+                if (res.ok && data.status === 'success') {
+                    showMsg('✅ Senha alterada com sucesso!', false);
+                    document.getElementById('auth-current-pw').value = '';
+                    document.getElementById('auth-new-pw').value = '';
+                    document.getElementById('auth-confirm-pw').value = '';
+                } else {
+                    showMsg(data.detail || data.message || 'Erro ao alterar senha.', true);
+                }
+            } catch(e) {
+                showMsg('Erro de conexão.', true);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSettings();
+            loadAuthInfo();
+            loadUsers();
+        });
+    </script>
+</body>
+</html>

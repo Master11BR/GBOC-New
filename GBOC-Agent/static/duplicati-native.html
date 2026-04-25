@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GBOC Agent - Duplicati Nativo</title>
+    <link rel="stylesheet" href="/static/style.css?v=11.9">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="/static/auth_interceptor.js"></script>
+    <style>
+        .dup-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+        @media(max-width:900px){ .dup-grid{grid-template-columns:1fr;} }
+        .dup-status-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);}
+        .dup-status-row:last-child{border-bottom:none;}
+        .dup-status-label{color:var(--text-muted);font-size:.85em;min-width:140px;}
+        .dup-status-value{color:var(--text);font-weight:600;font-size:.9em;word-break:break-all;}
+        .dup-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:.8em;font-weight:600;}
+        .dup-badge.ok  {background:rgba(78,203,136,.15);color:var(--success);}
+        .dup-badge.warn{background:rgba(240,169,64,.15); color:var(--warning);}
+        .dup-badge.crit{background:rgba(240,107,107,.15);color:var(--danger);}
+        .dup-badge.info{background:rgba(79,163,232,.15); color:var(--primary);}
+        [data-theme="light"] .dup-badge.ok  {background:#d1fae5;color:#065f46;}
+        [data-theme="light"] .dup-badge.warn{background:#fef3c7;color:#92400e;}
+        [data-theme="light"] .dup-badge.crit{background:#fee2e2;color:#991b1b;}
+        [data-theme="light"] .dup-badge.info{background:#dbeafe;color:#1e40af;}
+        .backup-card{background:var(--bg-input);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:12px;}
+        .backup-card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+        .backup-card-name{font-weight:700;color:var(--text);font-size:.95em;}
+        .backup-card-meta{font-size:.82em;color:var(--text-muted);margin-top:4px;display:flex;flex-wrap:wrap;gap:10px;}
+        .conn-form{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+        @media(max-width:700px){.conn-form{grid-template-columns:1fr;}}
+        .conn-form label{display:flex;flex-direction:column;gap:4px;font-size:.85em;color:var(--text-muted);font-weight:600;}
+        .conn-form input{background:var(--bg-input);border:1px solid var(--border);border-radius:6px;padding:9px 11px;color:var(--text);font-size:.9em;}
+        .conn-form input:focus{outline:none;border-color:var(--primary);}
+        .conn-form .full{grid-column:1/-1;}
+        .feedback-block{border-radius:8px;padding:12px 14px;font-size:.88em;line-height:1.5;margin-top:14px;display:none;}
+        .feedback-block.ok  {background:rgba(78,203,136,.1); border:1px solid var(--success);color:var(--success);}
+        .feedback-block.err {background:rgba(240,107,107,.1);border:1px solid var(--danger); color:var(--danger);}
+        .feedback-block.info{background:rgba(79,163,232,.1); border:1px solid var(--primary);color:var(--text);}
+        .feedback-block.warn{background:rgba(240,169,64,.1); border:1px solid var(--warning);color:var(--warning);}
+        [data-theme="light"] .feedback-block.ok  {background:#f0fdf4;}
+        [data-theme="light"] .feedback-block.err {background:#fef2f2;}
+        [data-theme="light"] .feedback-block.info{background:#eff6ff;}
+        [data-theme="light"] .feedback-block.warn{background:#fffbeb;}
+        .section-spinner{text-align:center;padding:30px;color:var(--text-muted);}
+        .empty-backups{text-align:center;padding:40px 20px;color:var(--text-muted);}
+        .empty-backups i{font-size:2.5em;margin-bottom:12px;opacity:.5;display:block;}
+    </style>
+</head>
+<body>
+<div class="app">
+    <div id="sidebar"></div>
+    <main class="main-content">
+        <header class="header">
+            <div>
+                <h1 class="page-title"><i class="fas fa-plug" style="color:var(--accent);margin-right:8px;"></i>Duplicati Nativo</h1>
+                <div class="page-subtitle">Integração com instancia local do Duplicati (modulo de leitura e diagnostico)</div>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-secondary" onclick="loadAll()">
+                    <i class="fas fa-sync-alt"></i> Atualizar
+                </button>
+            </div>
+        </header>
+
+        <div class="content">
+            <div class="dup-grid" style="margin-bottom:20px;">
+
+                <!-- Configuracao -->
+                <div class="status-card">
+                    <div class="status-header" style="margin-bottom:16px;">
+                        <h3 style="font-size:1em;color:var(--text);margin:0;">
+                            <i class="fas fa-plug" style="color:var(--primary);margin-right:8px;"></i>Configuracao de Conexao
+                        </h3>
+                    </div>
+                    <div class="conn-form">
+                        <label class="full">URL Base
+                            <input id="baseUrl" type="url" placeholder="http://localhost:8200">
+                        </label>
+                        <label>Usuario
+                            <input id="username" placeholder="Opcional">
+                        </label>
+                        <label>Senha
+                            <input id="password" type="password" placeholder="Opcional">
+                        </label>
+                        <label>Timeout (s)
+                            <input id="timeout" type="number" min="2" max="60" value="8">
+                        </label>
+                        <label style="flex-direction:row;align-items:center;gap:8px;padding-top:20px;">
+                            <input id="verifyTls" type="checkbox"> Validar TLS
+                        </label>
+                    </div>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;">
+                        <button class="btn btn-primary" onclick="saveConfig()">
+                            <i class="fas fa-save"></i> Salvar
+                        </button>
+                        <button class="btn btn-secondary" onclick="probe()">
+                            <i class="fas fa-heartbeat"></i> Testar Conexao
+                        </button>
+                        <button class="btn btn-secondary" onclick="discover()">
+                            <i class="fas fa-search"></i> Descobrir Endpoints
+                        </button>
+                    </div>
+                    <div id="connFeedback" class="feedback-block"></div>
+                </div>
+
+                <!-- Status -->
+                <div class="status-card">
+                    <div class="status-header" style="margin-bottom:16px;">
+                        <h3 style="font-size:1em;color:var(--text);margin:0;">
+                            <i class="fas fa-info-circle" style="color:var(--primary);margin-right:8px;"></i>Status da Instancia
+                        </h3>
+                        <span id="statusBadge" class="dup-badge info">
+                            <i class="fas fa-circle-notch fa-spin"></i> Verificando...
+                        </span>
+                    </div>
+                    <div id="statusRows">
+                        <div class="section-spinner"><i class="fas fa-circle-notch fa-spin"></i> Carregando...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Backups -->
+            <div class="status-card">
+                <div class="status-header" style="margin-bottom:16px;">
+                    <h3 style="font-size:1em;color:var(--text);margin:0;">
+                        <i class="fas fa-database" style="color:var(--primary);margin-right:8px;"></i>Backups Configurados no Duplicati
+                    </h3>
+                    <button class="btn btn-small btn-secondary" onclick="loadBackups()">
+                        <i class="fas fa-list"></i> Listar
+                    </button>
+                </div>
+                <div id="backupsContainer">
+                    <div class="section-spinner"><i class="fas fa-circle-notch fa-spin"></i> Carregando...</div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script src="/static/sidebar.js"></script>
+<script>
+function showFeedback(id, msg, type) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = msg;
+    el.className = 'feedback-block ' + (type || 'info');
+    el.style.display = 'block';
+}
+function hideFeedback(id) {
+    var el = document.getElementById(id);
+    if (el) { el.style.display = 'none'; el.innerHTML = ''; }
+}
+async function apiCall(path, options) {
+    var res = await fetch(path, Object.assign({ headers: { 'Content-Type': 'application/json' } }, options || {}));
+    var data = await res.json().catch(function(){ return {}; });
+    if (!res.ok) throw new Error(data.detail || data.message || JSON.stringify(data));
+    return data;
+}
+async function loadConfig() {
+    try {
+        var cfg = await apiCall('/api/duplicati-native/config');
+        document.getElementById('baseUrl').value = cfg.base_url || '';
+        document.getElementById('username').value = cfg.username || '';
+        document.getElementById('timeout').value = cfg.timeout_seconds || 8;
+        document.getElementById('verifyTls').checked = !!cfg.verify_tls;
+    } catch(e) {}
+}
+async function saveConfig() {
+    hideFeedback('connFeedback');
+    var btn = document.querySelector('[onclick="saveConfig()"]');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...'; }
+    try {
+        var payload = {
+            base_url: document.getElementById('baseUrl').value.trim(),
+            username: document.getElementById('username').value.trim(),
+            password: document.getElementById('password').value,
+            timeout_seconds: Number(document.getElementById('timeout').value || 8),
+            verify_tls: document.getElementById('verifyTls').checked
+        };
+        if (!payload.base_url) { showFeedback('connFeedback', 'URL Base obrigatoria', 'err'); return; }
+        await apiCall('/api/duplicati-native/config', { method: 'POST', body: JSON.stringify(payload) });
+        showFeedback('connFeedback', '<i class="fas fa-check-circle"></i> Configuracao salva', 'ok');
+        await probe();
+    } catch(e) {
+        showFeedback('connFeedback', '<i class="fas fa-times-circle"></i> Erro: ' + e.message, 'err');
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Salvar'; }
+    }
+}
+function renderStatusRows(data) {
+    var rows = document.getElementById('statusRows');
+    var badge = document.getElementById('statusBadge');
+    if (!rows) return;
+    if (!data || data.error) {
+        if (badge) { badge.className = 'dup-badge crit'; badge.innerHTML = '<i class="fas fa-times-circle"></i> Offline'; }
+        rows.innerHTML = '<div class="dup-status-row"><span class="dup-status-label">Situacao</span><span class="dup-status-value" style="color:var(--danger);"><i class="fas fa-exclamation-triangle"></i> Instancia nao acessivel</span></div>'
+            + '<div class="dup-status-row"><span class="dup-status-label">Detalhe</span><span class="dup-status-value" style="font-size:.82em;color:var(--text-muted);">' + ((data && data.error) || 'Verifique se o Duplicati esta em execucao e a URL esta correta.') + '</span></div>';
+        return;
+    }
+    var online = data.online !== false;
+    if (badge) {
+        badge.className = 'dup-badge ' + (online ? 'ok' : 'crit');
+        badge.innerHTML = online ? '<i class="fas fa-check-circle"></i> Online' : '<i class="fas fa-times-circle"></i> Offline';
+    }
+    var fields = [
+        ['Versao', data.server_version || data.version || '&mdash;'],
+        ['API Version', data.api_version || '&mdash;'],
+        ['OS', data.os || '&mdash;'],
+        ['URL', data.base_url || document.getElementById('baseUrl').value || '&mdash;'],
+        ['Autenticado', data.authenticated != null ? (data.authenticated ? 'Sim' : 'Nao') : '&mdash;']
+    ];
+    rows.innerHTML = fields.map(function(f) {
+        return '<div class="dup-status-row"><span class="dup-status-label">' + f[0] + '</span><span class="dup-status-value">' + f[1] + '</span></div>';
+    }).join('');
+}
+async function probe() {
+    var rows = document.getElementById('statusRows');
+    if (rows) rows.innerHTML = '<div class="section-spinner"><i class="fas fa-circle-notch fa-spin"></i> Verificando...</div>';
+    var badge = document.getElementById('statusBadge');
+    if (badge) { badge.className = 'dup-badge info'; badge.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Verificando...'; }
+    try {
+        var data = await apiCall('/api/duplicati-native/status');
+        renderStatusRows(data);
+    } catch(e) {
+        renderStatusRows({ error: e.message });
+    }
+}
+async function discover() {
+    showFeedback('connFeedback', '<i class="fas fa-search"></i> Descobrindo endpoints...', 'info');
+    try {
+        var data = await apiCall('/api/duplicati-native/discover');
+        var found = data.endpoints || data.discovered || [];
+        if (found.length) {
+            showFeedback('connFeedback', '<i class="fas fa-check-circle"></i> Endpoints: ' + found.join(', '), 'ok');
+            if (found[0] && !document.getElementById('baseUrl').value) document.getElementById('baseUrl').value = found[0];
+        } else {
+            showFeedback('connFeedback', '<i class="fas fa-exclamation-circle"></i> Nenhum endpoint encontrado', 'warn');
+        }
+    } catch(e) {
+        showFeedback('connFeedback', '<i class="fas fa-times-circle"></i> ' + e.message, 'err');
+    }
+}
+function fmtBytes(b) {
+    if (!b) return '&mdash;';
+    b = Number(b);
+    if (b > 1e9) return (b/1e9).toFixed(1) + ' GB';
+    if (b > 1e6) return (b/1e6).toFixed(1) + ' MB';
+    if (b > 1e3) return (b/1e3).toFixed(0) + ' KB';
+    return b + ' B';
+}
+function fmtDate(dt) {
+    if (!dt) return '&mdash;';
+    try { return new Date(dt).toLocaleString('pt-BR'); } catch(e) { return dt; }
+}
+function stClass(st) {
+    if (!st) return 'info';
+    var s = String(st).toLowerCase();
+    if (s.includes('success') || s.includes('complet') || s === 'ok') return 'ok';
+    if (s.includes('error') || s.includes('fail') || s.includes('cancel')) return 'crit';
+    if (s.includes('run') || s.includes('active')) return 'info';
+    return 'warn';
+}
+async function loadBackups() {
+    var cont = document.getElementById('backupsContainer');
+    if (cont) cont.innerHTML = '<div class="section-spinner"><i class="fas fa-circle-notch fa-spin"></i> Carregando...</div>';
+    try {
+        var data = await apiCall('/api/duplicati-native/backups');
+        var list = Array.isArray(data) ? data : (data.backups || data.data || []);
+        if (!list.length) {
+            cont.innerHTML = '<div class="empty-backups"><i class="fas fa-database"></i><p>Nenhum backup configurado no Duplicati</p><p style="font-size:.85em;">Verifique se a instancia esta conectada e acessivel.</p></div>';
+            return;
+        }
+        cont.innerHTML = list.map(function(b) {
+            var name    = (b.Backup && b.Backup.Name) || b.name || b.ID || '(sem nome)';
+            var bId     = (b.Backup && b.Backup.ID)   || b.id   || '&mdash;';
+            var desc    = (b.Backup && b.Backup.Description) || b.description || '';
+            var meta    = (b.Backup && b.Backup.Metadata) || {};
+            var lastRun = fmtDate(meta.LastBackupDate || b.last_run);
+            var size    = fmtBytes(meta.SourceFilesSize || b.source_size);
+            var lastSt  = meta.LastBackupResult || b.last_status || '&mdash;';
+            var cls     = stClass(lastSt);
+            var srcs    = ((b.Backup && b.Backup.Sources) || b.sources || []).slice(0,3).join(', ') || '&mdash;';
+            return '<div class="backup-card">'
+                + '<div class="backup-card-header">'
+                + '<span class="backup-card-name"><i class="fas fa-shield-alt" style="color:var(--primary);margin-right:6px;"></i>' + name + '</span>'
+                + '<span class="dup-badge ' + cls + '">' + lastSt + '</span>'
+                + '</div>'
+                + (desc ? '<div style="font-size:.82em;color:var(--text-muted);margin-bottom:6px;">' + desc + '</div>' : '')
+                + '<div class="backup-card-meta">'
+                + '<span><i class="fas fa-hashtag" style="opacity:.6"></i> ID: ' + bId + '</span>'
+                + '<span><i class="fas fa-clock" style="opacity:.6"></i> Ultimo: ' + lastRun + '</span>'
+                + '<span><i class="fas fa-hdd" style="opacity:.6"></i> ' + size + '</span>'
+                + '<span><i class="fas fa-folder" style="opacity:.6"></i> ' + srcs + '</span>'
+                + '</div></div>';
+        }).join('');
+    } catch(e) {
+        if (cont) cont.innerHTML = '<div class="empty-backups"><i class="fas fa-exclamation-triangle" style="color:var(--danger);"></i><p style="color:var(--danger);">Erro ao carregar backups</p><p style="font-size:.85em;color:var(--text-muted);">' + e.message + '</p></div>';
+    }
+}
+async function loadAll() {
+    await loadConfig();
+    await probe();
+    await loadBackups();
+}
+loadAll();
+</script>
+</body>
+</html>

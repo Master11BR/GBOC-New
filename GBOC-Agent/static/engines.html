@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GBOC - Diagnóstico de Motores</title>
+    <link rel="stylesheet" href="/static/style.css?v=11.9">
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    <script src="/static/auth_interceptor.js"></script>
+</head>
+<body>
+    <div id="sidebar-container"></div>
+
+    <div id="main-content">
+        <div class="container">
+            <h1>🔧 Diagnóstico de Motores de Backup</h1>
+
+            <div class="engines-dashboard">
+                <div class="dashboard-header">
+                    <h2>Status dos Motores</h2>
+                    <div class="actions">
+                        <button id="btn-refresh" class="btn btn-primary">
+                            🔄 Atualizar
+                        </button>
+                        <button id="btn-validate-all" class="btn btn-secondary">
+                            ✅ Validar Todos
+                        </button>
+                    </div>
+                </div>
+
+                <div id="system-health" class="system-health">
+                    <div class="health-indicator">
+                        <span id="health-icon">⏳</span>
+                        <span id="health-text">Carregando...</span>
+                    </div>
+                </div>
+
+                <div id="engines-grid" class="engines-grid">
+                    <!-- Motores serão carregados dinamicamente -->
+                </div>
+
+                <div class="engine-details">
+                    <h3>📋 Relatório Detalhado</h3>
+                    <pre id="validation-report">Carregando relatório...</pre>
+                </div>
+            </div>
+
+            <!-- Modal para teste de conexão -->
+            <div id="connection-modal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>🔗 Teste de Conexão de Repositório</h3>
+                        <span class="modal-close">&times;</span>
+                    </div>
+                    <div class="modal-body">
+                        <form id="connection-test-form">
+                            <div class="form-group">
+                                <label for="test-engine">Motor:</label>
+                                <select id="test-engine" required>
+                                    <option value="restic">Restic</option>
+                                    <option value="kopia">Kopia</option>
+                                    <option value="duplicati">Duplicati</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="test-type">Tipo:</label>
+                                <select id="test-type" required>
+                                    <option value="local">Local</option>
+                                    <option value="b2">Backblaze B2</option>
+                                    <option value="s3">Amazon S3</option>
+                                    <option value="azure">Azure</option>
+                                </select>
+                            </div>
+                            <div id="cloud-fields" style="display: none;">
+                                <div class="form-group">
+                                    <label for="test-bucket">Bucket/Contêiner:</label>
+                                    <input type="text" id="test-bucket" placeholder="nome-do-bucket">
+                                </div>
+                                <div class="form-group">
+                                    <label for="test-access-key">Access Key:</label>
+                                    <input type="text" id="test-access-key" placeholder="chave de acesso">
+                                </div>
+                                <div class="form-group">
+                                    <label for="test-secret-key">Secret Key:</label>
+                                    <input type="password" id="test-secret-key" placeholder="chave secreta">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="test-password">Senha:</label>
+                                <input type="password" id="test-password" placeholder="senha do repositório">
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button id="btn-test-connection" class="btn btn-primary">🔗 Testar Conexão</button>
+                        <button id="btn-close-modal" class="btn btn-secondary">Fechar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast notifications -->
+    <div id="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="/static/sidebar.js"></script>
+    <script src="/static/toast_notifications.js"></script>
+
+    <script>
+        class EnginesManager {
+            constructor() {
+                this.engines = [];
+                this.systemHealth = null;
+                this.init();
+            }
+
+            init() {
+                this.bindEvents();
+                this.loadEngines();
+            }
+
+            bindEvents() {
+                // Botões principais
+                document.getElementById('btn-refresh').addEventListener('click', () => this.loadEngines());
+                document.getElementById('btn-validate-all').addEventListener('click', () => this.validateAllEngines());
+
+                // Modal de teste de conexão
+                document.getElementById('test-type').addEventListener('change', (e) => {
+                    const cloudFields = document.getElementById('cloud-fields');
+                    cloudFields.style.display = e.target.value !== 'local' ? 'block' : 'none';
+                });
+
+                // Modal controls
+                document.querySelector('.modal-close').addEventListener('click', () => this.closeModal());
+                document.getElementById('btn-close-modal').addEventListener('click', () => this.closeModal());
+                document.getElementById('btn-test-connection').addEventListener('click', () => this.testConnection());
+
+                // Click outside modal
+                document.getElementById('connection-modal').addEventListener('click', (e) => {
+                    if (e.target.id === 'connection-modal') this.closeModal();
+                });
+            }
+
+            async loadEngines() {
+                try {
+                    this.showLoading();
+
+                    const response = await fetch('/api/engines/validate');
+                    const data = await response.json();
+
+                    if (data.status === 'success') {
+                        this.engines = data.engines;
+                        this.systemHealth = data;
+                        this.renderEngines();
+                        this.updateSystemHealth();
+                        this.loadDetailedReport();
+                    } else {
+                        this.showError('Erro ao carregar motores: ' + data.message);
+                    }
+                } catch (error) {
+                    this.showError('Erro de rede: ' + error.message);
+                } finally {
+                    this.hideLoading();
+                }
+            }
+
+            async validateAllEngines() {
+                try {
+                    this.showLoading('Validando motores...');
+
+                    const response = await fetch('/api/engines/validate');
+                    const data = await response.json();
+
+                    if (data.status === 'success') {
+                        this.engines = data.engines;
+                        this.systemHealth = data;
+                        this.renderEngines();
+                        this.updateSystemHealth();
+                        this.loadDetailedReport();
+                        this.showSuccess('Validação concluída!');
+                    } else {
+                        this.showError('Erro na validação: ' + data.message);
+                    }
+                } catch (error) {
+                    this.showError('Erro de rede: ' + error.message);
+                } finally {
+                    this.hideLoading();
+                }
+            }
+
+            async loadDetailedReport() {
+                try {
+                    const response = await fetch('/api/engines/report');
+                    const data = await response.json();
+
+                    if (data.status === 'success') {
+                        document.getElementById('validation-report').textContent = data.report;
+                    }
+                } catch (error) {
+                    document.getElementById('validation-report').textContent = 'Erro ao carregar relatório: ' + error.message;
+                }
+            }
+
+            renderEngines() {
+                const grid = document.getElementById('engines-grid');
+                grid.innerHTML = '';
+
+                this.engines.forEach(engine => {
+                    const engineCard = this.createEngineCard(engine);
+                    grid.appendChild(engineCard);
+                });
+            }
+
+            createEngineCard(engine) {
+                const card = document.createElement('div');
+                card.className = `engine-card ${engine.healthy ? 'healthy' : 'unhealthy'}`;
+
+                const statusIcon = engine.healthy ? '✅' : '❌';
+                const statusText = engine.healthy ? 'OK' : 'Problema';
+
+                card.innerHTML = `
+                    <div class="engine-header">
+                        <h3>${engine.display_name}</h3>
+                        <span class="engine-status">${statusIcon} ${statusText}</span>
+                    </div>
+                    <div class="engine-info">
+                        <p><strong>Instalado:</strong> ${engine.installed ? 'Sim' : 'Não'}</p>
+                        <p><strong>Funcional:</strong> ${engine.available ? 'Sim' : 'Não'}</p>
+                        ${engine.version ? `<p><strong>Versão:</strong> ${engine.version}</p>` : ''}
+                        ${engine.path ? `<p><strong>Caminho:</strong> <code>${engine.path}</code></p>` : ''}
+                        ${engine.source ? `<p><strong>Origem:</strong> ${engine.source}</p>` : ''}
+                        ${engine.error ? `<p class="error"><strong>Erro:</strong> ${engine.error}</p>` : ''}
+                    </div>
+                    <div class="engine-actions">
+                        <button class="btn btn-sm" onclick="enginesManager.validateEngine('${engine.name}')">
+                            🔍 Validar
+                        </button>
+                        <button class="btn btn-sm btn-secondary" onclick="enginesManager.showConnectionModal('${engine.name}')">
+                            🔗 Testar Conexão
+                        </button>
+                    </div>
+                `;
+
+                return card;
+            }
+
+            updateSystemHealth() {
+                const healthIndicator = document.getElementById('system-health');
+                const healthIcon = document.getElementById('health-icon');
+                const healthText = document.getElementById('health-text');
+
+                if (!this.systemHealth) {
+                    healthIcon.textContent = '⏳';
+                    healthText.textContent = 'Carregando...';
+                    return;
+                }
+
+                const isHealthy = this.systemHealth.system_healthy;
+                const healthyCount = this.systemHealth.healthy_engines;
+                const totalCount = this.systemHealth.total_engines;
+
+                healthIcon.textContent = isHealthy ? '✅' : '❌';
+                healthText.textContent = `${healthyCount}/${totalCount} motores funcionais`;
+
+                healthIndicator.className = `system-health ${isHealthy ? 'healthy' : 'unhealthy'}`;
+            }
+
+            async validateEngine(engineName) {
+                try {
+                    this.showLoading(`Validando ${engineName}...`);
+
+                    const response = await fetch(`/api/engines/validate/${engineName}`);
+                    const data = await response.json();
+
+                    if (data.status === 'success') {
+                        // Atualizar apenas este motor na lista
+                        const index = this.engines.findIndex(e => e.name === engineName);
+                        if (index !== -1) {
+                            this.engines[index] = data.validation;
+                        }
+
+                        this.renderEngines();
+                        this.updateSystemHealth();
+                        this.showSuccess(`${engineName} validado com sucesso!`);
+                    } else {
+                        this.showError(`Erro ao validar ${engineName}: ${data.message}`);
+                    }
+                } catch (error) {
+                    this.showError(`Erro de rede: ${error.message}`);
+                } finally {
+                    this.hideLoading();
+                }
+            }
+
+            showConnectionModal(engineName) {
+                // Pre-selecionar o motor
+                document.getElementById('test-engine').value = engineName;
+
+                // Mostrar modal
+                document.getElementById('connection-modal').style.display = 'block';
+            }
+
+            closeModal() {
+                document.getElementById('connection-modal').style.display = 'none';
+                document.getElementById('connection-test-form').reset();
+                document.getElementById('cloud-fields').style.display = 'none';
+            }
+
+            async testConnection() {
+                const form = document.getElementById('connection-test-form');
+                const formData = new FormData(form);
+
+                const testData = {
+                    engine: formData.get('test-engine'),
+                    type: formData.get('test-type'),
+                    bucket: formData.get('test-bucket') || undefined,
+                    access_key: formData.get('test-access-key') || undefined,
+                    secret_key: formData.get('test-secret-key') || undefined,
+                    motor_password: formData.get('test-password') || undefined
+                };
+
+                // Validar campos obrigatórios
+                if (!testData.engine || !testData.type) {
+                    this.showError('Preencha todos os campos obrigatórios');
+                    return;
+                }
+
+                if (testData.type !== 'local' && !testData.bucket) {
+                    this.showError('Bucket é obrigatório para repositórios na nuvem');
+                    return;
+                }
+
+                try {
+                    this.showLoading('Testando conexão...');
+
+                    const response = await fetch('/api/engines/test-connection', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(testData)
+                    });
+
+                    const data = await response.json();
+
+                    if (data.status === 'success') {
+                        const result = data.connection_test;
+                        if (result.successful) {
+                            this.showSuccess(`✅ Conexão ${result.engine} estabelecida com sucesso!`);
+                        } else {
+                            this.showError(`❌ Falha na conexão ${result.engine}: ${result.error}`);
+                        }
+                    } else {
+                        this.showError(`Erro no teste: ${data.message}`);
+                    }
+
+                } catch (error) {
+                    this.showError(`Erro de rede: ${error.message}`);
+                } finally {
+                    this.hideLoading();
+                }
+            }
+
+            showLoading(message = 'Carregando...') {
+                // Implementar loading indicator se necessário
+                console.log(message);
+            }
+
+            hideLoading() {
+                // Implementar hide loading se necessário
+            }
+
+            showSuccess(message) {
+                if (window.showToast) {
+                    window.showToast(message, 'success');
+                } else {
+                    alert(message);
+                }
+            }
+
+            showError(message) {
+                if (window.showToast) {
+                    window.showToast(message, 'error');
+                } else {
+                    alert('Erro: ' + message);
+                }
+            }
+        }
+
+        // Inicializar quando DOM estiver pronto
+        document.addEventListener('DOMContentLoaded', () => {
+            window.enginesManager = new EnginesManager();
+        });
+    </script>
+
+    <style>
+        .engines-dashboard {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .system-health {
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            text-align: center;
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+
+        .system-health.healthy {
+            background-color: rgba(78,203,136,.15);
+            border: 2px solid var(--success);
+            color: var(--success);
+        }
+
+        .system-health.unhealthy {
+            background-color: rgba(240,107,107,.12);
+            border: 2px solid var(--danger);
+            color: var(--danger);
+        }
+
+        .health-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .engines-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .engine-card {
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            transition: all 0.3s ease;
+            background: var(--bg-card);
+        }
+
+        .engine-card.healthy {
+            border-color: var(--success);
+            background-color: rgba(78,203,136,.08);
+        }
+
+        .engine-card.unhealthy {
+            border-color: var(--danger);
+            background-color: rgba(240,107,107,.08);
+        }
+
+        .engine-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        .engine-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .engine-header h3 {
+            margin: 0;
+            color: var(--text);
+        }
+
+        .engine-status {
+            font-weight: bold;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        .engine-info p {
+            margin: 5px 0;
+            font-size: 0.9em;
+        }
+
+        .engine-info code {
+            background-color: rgba(0,0,0,0.1);
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-size: 0.8em;
+        }
+
+        .engine-info .error {
+            color: var(--danger);
+            font-weight: bold;
+        }
+
+        .engine-actions {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 0.8em;
+        }
+
+        .engine-details {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .engine-details h3 {
+            margin-top: 0;
+            color: var(--text);
+        }
+
+        .engine-details pre {
+            background-color: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        .modal-content {
+            background-color: var(--bg-card);
+            margin: 5% auto;
+            padding: 0;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            color: var(--text);
+        }
+
+        .modal-close {
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--text-muted);
+        }
+
+        .modal-close:hover {
+            color: var(--text);
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: var(--text-muted);
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 14px;
+            background: var(--bg-input);
+            color: var(--text);
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(79,163,232,0.25);
+        }
+
+        .modal-footer {
+            padding: 20px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        /* Responsividade */
+        @media (max-width: 768px) {
+            .engines-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .dashboard-header {
+                flex-direction: column;
+                gap: 15px;
+                align-items: stretch;
+            }
+
+            .actions {
+                justify-content: center;
+            }
+        }
+    </style>
+</body>
+</html>
