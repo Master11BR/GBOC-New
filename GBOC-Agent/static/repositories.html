@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GBOC Agent - Repositórios</title>
+    <link rel="stylesheet" href="/static/style.css?v=11.9">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+        .empty-icon { font-size: 3em; margin-bottom: 15px; opacity: 0.5; }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); }
+        .modal-content {
+            background: var(--bg-card);
+            margin: 3vh auto; padding: 30px; border-radius: 10px;
+            width: 90%; max-width: 540px; max-height: 94vh; overflow-y: auto;
+            color: var(--text);
+            border: 1px solid var(--border);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+        }
+        [data-theme="light"] .modal-content { box-shadow: 0 10px 40px rgba(0,0,0,0.18); }
+        .modal-close { float: right; font-size: 1.5em; cursor: pointer; color: var(--text-muted); background: none; border: none; }
+        .modal-close:hover { color: var(--text); }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 500; color: var(--text-muted); }
+        .form-group input, .form-group select {
+            width: 100%; padding: 10px 12px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-size: 14px;
+        }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79,163,232,0.15); }
+        [data-theme="light"] .form-group input:focus,
+        [data-theme="light"] .form-group select:focus { box-shadow: 0 0 0 3px rgba(29,111,191,0.15); }
+        .form-group input::placeholder { color: var(--text-muted); opacity: 0.7; }
+        .error { color: var(--danger); font-size: 0.9em; margin-top: 5px; }
+        .success { color: var(--success); }
+        #formError { display: none; color: var(--danger); background: rgba(240,107,107,0.1); border: 1px solid var(--danger); border-radius: 6px; padding: 8px 12px; margin-top: 10px; font-size: 0.9em; }
+        [data-theme="light"] #formError { background: #fef2f2; }
+        .modal h2 { color: var(--text); margin-bottom: 20px; font-size: 1.3em; }
+        .modal .btn-group { display: flex; gap: 10px; margin-top: 20px; }
+        .modal .btn-group .btn { flex: 1; justify-content: center; }
+        select option { background: var(--bg-card); color: var(--text); }
+    </style>
+    <script src="/static/auth_interceptor.js"></script>
+</head>
+<body>
+    <div class="app">
+        <div id="sidebar"></div>
+        <main class="main-content">
+            <header class="header">
+                <div>
+                    <h1 class="page-title">Repositórios</h1>
+                    <div class="page-subtitle">Gerencie todos os seus repositórios de backup</div>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-primary" onclick="openCreateModal()">
+                        <i class="fas fa-plus"></i> Novo Repositório
+                    </button>
+                    <button class="btn btn-secondary" onclick="loadRepositories()">
+                        <i class="fas fa-sync-alt"></i> Atualizar
+                    </button>
+                </div>
+            </header>
+
+            <div class="content">
+                <!-- Legenda de cores -->
+                <div class="gboc-legend">
+                    <span style="font-weight:600; margin-right:6px;">Motor:</span>
+                    <span class="gboc-legend-item"><span class="gboc-legend-swatch" style="background:#4299e1"></span>Restic</span>
+                    <span class="gboc-legend-item"><span class="gboc-legend-swatch" style="background:#9f7aea"></span>Kopia</span>
+                    <span class="gboc-legend-item"><span class="gboc-legend-swatch" style="background:#ed8936"></span>Duplicati</span>
+                    <span class="gboc-legend-item"><span class="gboc-legend-swatch" style="background:#48bb78"></span>GBOC Native</span>
+                    <span style="font-weight:600; margin-left:12px; margin-right:6px;">Nuvem:</span>
+                    <span class="gboc-legend-item"><span class="gboc-legend-swatch" style="background:#38b2ac"></span>Wasabi</span>
+                    <span class="gboc-legend-item"><span class="gboc-legend-swatch" style="background:#ed8936"></span>S3</span>
+                    <span class="gboc-legend-item"><span class="gboc-legend-swatch" style="background:#f56565"></span>B2</span>
+                    <span class="gboc-legend-item"><span class="gboc-legend-swatch" style="background:#4299e1"></span>Azure</span>
+                    <span class="gboc-legend-item"><span class="gboc-legend-swatch" style="background:#ecc94b"></span>GCS</span>
+                    <span class="gboc-legend-item"><span class="gboc-legend-swatch" style="background:#9f7aea"></span>SFTP</span>
+                </div>
+
+                <div id="reposContainer" class="gboc-box-grid">
+                    <div class="empty-state">
+                        <div class="empty-icon"><i class="fas fa-inbox"></i></div>
+                        <p>Nenhum repositório configurado</p>
+                        <p style="font-size: 0.9em; margin-top: 10px;">Clique em "Novo Repositório" para começar</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal Criar Repositório -->
+    <div id="createModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeCreateModal()">&times;</span>
+            <h2 id="repoModalTitle">Criar Novo Repositório</h2>
+            
+            <form id="repoForm">
+                <div class="form-group">
+                    <label>Nome do Repositório</label>
+                    <input type="text" id="repoName" required placeholder="Ex: backup-produçao">
+                </div>
+
+                <div class="form-group">
+                    <label>Motor de Backup</label>
+                    <select id="repoEngine" required onchange="updateTypeOptions()">
+                        <option value="">Selecione um motor</option>
+                        <option value="restic">Restic (Local ou Cloud)</option>
+                        <option value="kopia">Kopia (Local ou Cloud)</option>
+                        <option value="duplicati">Duplicati (Local ou Cloud)</option>
+                        <option value="gboc_native">GBOC Native (Local ou Cloud)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Tipo de Repositório</label>
+                    <select id="repoType" required onchange="updatePathPlaceholder()">
+                        <option value="">Selecione o tipo</option>
+                        <option value="local">Local (Filesystem)</option>
+                        <option value="s3">Amazon S3</option>
+                        <option value="azure">Azure Blob Storage</option>
+                        <option value="gcs">Google Cloud Storage</option>
+                        <option value="b2">Backblaze B2</option>
+                        <option value="wasabi">Wasabi</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label id="pathLabel">Caminho Local</label>
+                    <input type="text" id="repoPath" required placeholder="/var/backups/repo">
+                </div>
+
+                <div class="form-group">
+                    <label>Senha de Criptografia do Repositório</label>
+                    <input type="password" id="repoPassword" required placeholder="Senha usada para criptografar os backups">
+                    <small style="color:var(--text-muted);display:block;margin-top:4px;">Usada pelo motor (Restic/Kopia/Duplicati) para criptografar o repositório — local ou cloud.</small>
+                </div>
+
+                <div id="cloudFields" style="display: none;">
+                    <div class="form-group">
+                        <label>Chave de Acesso</label>
+                        <input type="text" id="accessKey" placeholder="Access Key / ID">
+                    </div>
+                    <div class="form-group">
+                        <label>Chave Secreta</label>
+                        <input type="password" id="secretKey" placeholder="Secret Key">
+                    </div>
+                    <div class="form-group">
+                        <label>Bucket / Contêiner</label>
+                        <input type="text" id="bucket" placeholder="Nome do bucket">
+                    </div>
+                    <div class="form-group">
+                        <label>Região (opcional)</label>
+                        <input type="text" id="region" list="regionOptions" placeholder="Ex: us-east-1">
+                        <datalist id="regionOptions"></datalist>
+                    </div>
+                    <div class="form-group">
+                        <label>Endpoint (opcional)</label>
+                        <input type="text" id="endpoint" list="endpointOptions" placeholder="Ex: s3.us-east-1.amazonaws.com">
+                        <datalist id="endpointOptions"></datalist>
+                    </div>
+                    <div class="form-group">
+                        <label>Prefix (opcional - isolamento no bucket)</label>
+                        <input type="text" id="prefix" placeholder="Ex: kopia/ ou backups/">
+                    </div>
+                </div>
+
+                <div id="formError" class="error" style="display: none;"></div>
+                <div id="testDetails" class="error" style="display:none; white-space:pre-wrap; margin-top:8px;"></div>
+
+                <div style="display:flex;align-items:center;gap:8px;margin-top:14px;padding:10px;background:var(--bg-input);border-radius:8px;border:1px solid var(--border)">
+                    <input type="checkbox" id="autoInitialize" checked style="width:18px;height:18px;cursor:pointer">
+                    <label for="autoInitialize" style="cursor:pointer;font-size:.88em;color:var(--text)">
+                        <i class="fas fa-rocket" style="color:var(--success);margin-right:4px"></i>
+                        Auto-inicializar repositório após criar
+                    </label>
+                </div>
+
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button type="button" class="btn btn-secondary" onclick="testCurrentFormConnection()" style="flex: 1;">
+                        <i class="fas fa-plug"></i> Testar no Modal
+                    </button>
+                    <button type="submit" id="repoSubmitButton" class="btn btn-primary" style="flex: 1;">Criar Repositório</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeCreateModal()" style="flex: 1;">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/static/sidebar.js"></script>
+    <script>
+        let currentEditingRepoId = null;
+
+        const CLOUD_PRESETS = {
+            s3: {
+                regions: [
+                    'us-east-1', 'us-east-2', 'us-west-1', 'us-west-2',
+                    'sa-east-1', 'eu-west-1', 'eu-west-2', 'eu-west-3',
+                    'eu-central-1', 'eu-north-1', 'ap-south-1', 'ap-southeast-1',
+                    'ap-southeast-2', 'ap-northeast-1'
+                ],
+                endpoints: [
+                    's3.amazonaws.com',
+                    's3.us-east-2.amazonaws.com',
+                    's3.us-west-1.amazonaws.com',
+                    's3.us-west-2.amazonaws.com',
+                    's3.sa-east-1.amazonaws.com',
+                    's3.eu-west-1.amazonaws.com',
+                    's3.eu-central-1.amazonaws.com',
+                    's3.ap-southeast-1.amazonaws.com'
+                ]
+            },
+            wasabi: {
+                regions: [
+                    'us-east-1',      // Ashburn, VA
+                    'us-east-2',      // Manassas, VA
+                    'us-central-1',   // Plano, TX
+                    'us-west-1',      // Hillsboro, OR
+                    'ca-central-1',   // Toronto, CA
+                    'eu-central-1',   // Amsterdam, NL
+                    'eu-central-2',   // Frankfurt, DE
+                    'eu-west-1',      // London, UK
+                    'eu-west-2',      // Paris, FR
+                    'ap-northeast-1', // Tokyo, JP
+                    'ap-northeast-2', // Osaka, JP
+                    'ap-southeast-1', // Singapore
+                    'ap-southeast-2'  // Sydney, AU
+                ],
+                endpoints: [
+                    's3.us-east-1.wasabisys.com',
+                    's3.us-east-2.wasabisys.com',
+                    's3.us-central-1.wasabisys.com',
+                    's3.us-west-1.wasabisys.com',
+                    's3.ca-central-1.wasabisys.com',
+                    's3.eu-central-1.wasabisys.com',
+                    's3.eu-central-2.wasabisys.com',
+                    's3.eu-west-1.wasabisys.com',
+                    's3.eu-west-2.wasabisys.com',
+                    's3.ap-northeast-1.wasabisys.com',
+                    's3.ap-northeast-2.wasabisys.com',
+                    's3.ap-southeast-1.wasabisys.com',
+                    's3.ap-southeast-2.wasabisys.com'
+                ]
+            }
+        };
+
+        function fillDatalist(id, values) {
+            const list = document.getElementById(id);
+            if (!list) return;
+            list.innerHTML = (values || []).map(v => `<option value="${v}"></option>`).join('');
+        }
+
+        function syncEndpointFromRegion(force = false) {
+            const typeEl = document.getElementById('repoType');
+            const regionEl = document.getElementById('region');
+            const endpointEl = document.getElementById('endpoint');
+            if (!typeEl || !regionEl || !endpointEl) return;
+
+            const type = typeEl.value;
+            const region = (regionEl.value || '').trim();
+            const currentEndpoint = (endpointEl.value || '').trim();
+
+            if (type === 's3' && region && (force || !currentEndpoint)) {
+                endpointEl.value = region === 'us-east-1'
+                    ? 's3.amazonaws.com'
+                    : `s3.${region}.amazonaws.com`;
+            }
+
+            if (type === 'wasabi' && region && (force || !currentEndpoint)) {
+                endpointEl.value = `s3.${region}.wasabisys.com`;
+            }
+        }
+
+        function updateCloudOptions(forceEndpoint = false) {
+            const typeEl = document.getElementById('repoType');
+            const regionEl = document.getElementById('region');
+            const endpointEl = document.getElementById('endpoint');
+            if (!typeEl || !regionEl || !endpointEl) return;
+
+            const type = typeEl.value;
+            const preset = CLOUD_PRESETS[type];
+
+            fillDatalist('regionOptions', preset ? preset.regions : []);
+            fillDatalist('endpointOptions', preset ? preset.endpoints : []);
+
+            if (type === 's3') {
+                regionEl.placeholder = 'Ex: us-east-1';
+                endpointEl.placeholder = 'Ex: s3.us-east-1.amazonaws.com';
+            } else if (type === 'wasabi') {
+                regionEl.placeholder = 'Ex: us-east-1';
+                endpointEl.placeholder = 'Ex: s3.us-east-1.wasabisys.com';
+            } else {
+                regionEl.placeholder = 'Ex: us-east-1';
+                endpointEl.placeholder = 'Endpoint customizado';
+            }
+
+            syncEndpointFromRegion(forceEndpoint);
+        }
+
+        // Carregar repositórios ao iniciar
+        document.addEventListener('DOMContentLoaded', () => {
+            loadRepositories();
+            const regionEl = document.getElementById('region');
+            const endpointEl = document.getElementById('endpoint');
+            const typeEl = document.getElementById('repoType');
+            const form = getRepoForm();
+            if (regionEl) regionEl.addEventListener('change', () => syncEndpointFromRegion(false));
+            if (typeEl) typeEl.addEventListener('change', () => updateCloudOptions(false));
+            if (endpointEl) endpointEl.addEventListener('focus', () => updateCloudOptions(false));
+            if (form) form.addEventListener('submit', submitRepositoryForm);
+        });
+
+        async function loadRepositories() {
+            try {
+                const response = await fetch('/api/repositories/');
+                const repos = await response.json();
+
+                const container = document.getElementById('reposContainer');
+
+                if (!repos || repos.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state" style="grid-column:1/-1;">
+                            <div class="empty-icon"><i class="fas fa-inbox"></i></div>
+                            <p>Nenhum repositório configurado</p>
+                            <p style="font-size: 0.9em; margin-top: 10px;">Clique em "Novo Repositório" para começar</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const typeLabels = {
+                    'local': 'Local',
+                    'b2': 'Backblaze B2',
+                    'wasabi': 'Wasabi',
+                    'gcs': 'Google Cloud',
+                    'sftp': 'SFTP/Rede',
+                    's3': 'Amazon S3',
+                    'azure': 'Azure Blob'
+                };
+
+                container.innerHTML = repos.map(repo => {
+                    const engine = (repo.engine || 'restic').toLowerCase();
+                    const storageType = (repo.type || 'local').toLowerCase();
+                    const storageLabel = typeLabels[storageType] || storageType.toUpperCase();
+                    const status = repo.status || 'active';
+                    const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
+                    const initIcon = repo.initialized ? 'fa-check-circle' : 'fa-times-circle';
+                    const initColor = repo.initialized ? 'var(--success)' : 'var(--danger)';
+                    const initText = repo.initialized ? 'Inicializado' : 'Não inicializado';
+                    const displayPath = repo.path || repo.bucket || '-';
+
+                    return `
+                    <div class="gboc-box engine-${engine} storage-${storageType}">
+                        <div class="gboc-box-title">${repo.name}</div>
+                        <div class="gboc-box-info">
+                            <div class="gboc-box-row"><i class="fas fa-cloud"></i><span class="row-value">${storageLabel}</span></div>
+                            <div class="gboc-box-row"><i class="fas fa-folder-open"></i><span class="row-value" title="${displayPath}">${displayPath}</span></div>
+                            <div class="gboc-box-row"><i class="fas fa-cogs"></i><span class="row-value">${engine}</span></div>
+                            <div class="gboc-box-row"><i class="fas ${initIcon}" style="color:${initColor}"></i><span class="row-value">${initText}</span></div>
+                            <div class="gboc-box-row">
+                                <span class="gboc-box-status">
+                                    <span class="status-dot ${status}"></span> ${statusLabel}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="gboc-box-actions">
+                            <button class="gboc-action-btn act-test" onclick="initializeRepository(${repo.id},'${repo.name}', ${repo.initialized ? 'true' : 'false'})" title="${repo.initialized ? 'Reinicializar Repositório' : 'Inicializar Repositório'}" style="background:${repo.initialized ? 'rgba(237,137,54,.15)' : 'rgba(72,187,120,.15)'};color:${repo.initialized ? 'var(--warning)' : 'var(--success)'}">
+                                <i class="fas fa-rocket"></i>
+                            </button>
+                            <button class="gboc-action-btn act-test" onclick="testConnection(${repo.id})" title="Testar Conexão">
+                                <i class="fas fa-plug"></i>
+                            </button>
+                            <button class="gboc-action-btn act-edit" onclick="editRepository(${repo.id})" title="Editar">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="gboc-action-btn act-delete" onclick="deleteRepository(${repo.id})" title="Excluir">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>`;
+                }).join('');
+            } catch (error) {
+                console.error('Erro ao carregar repositórios:', error);
+                document.getElementById('reposContainer').innerHTML = `
+                    <div class="empty-state" style="grid-column:1/-1;">
+                        <div class="empty-icon"><i class="fas fa-exclamation-circle"></i></div>
+                        <p>Erro ao carregar repositórios</p>
+                        <p style="font-size: 0.9em; margin-top: 10px;">Tente novamente mais tarde</p>
+                    </div>
+                `;
+            }
+        }
+
+        function openCreateModal() {
+            resetRepositoryForm();
+            document.getElementById('createModal').style.display = 'block';
+            const repoTypeEl = document.getElementById('repoType');
+            if (repoTypeEl) repoTypeEl.value = '';
+        }
+
+        function closeCreateModal() {
+            document.getElementById('createModal').style.display = 'none';
+            resetRepositoryForm();
+        }
+
+        function setModalMode(isEdit, repoId = null) {
+            currentEditingRepoId = isEdit ? repoId : null;
+            const titleEl = document.getElementById('repoModalTitle');
+            const submitBtn = document.getElementById('repoSubmitButton');
+            const passwordEl = document.getElementById('repoPassword');
+            if (titleEl) {
+                titleEl.textContent = isEdit ? `Editar Repositório (ID: ${repoId})` : 'Criar Novo Repositório';
+                titleEl.style.color = '';
+            }
+            if (submitBtn) submitBtn.textContent = isEdit ? 'Salvar Alterações' : 'Criar Repositório';
+            if (passwordEl) {
+                passwordEl.required = !isEdit;
+                passwordEl.placeholder = isEdit
+                    ? 'Deixe em branco para manter a senha atual'
+                    : 'Senha usada para criptografar os backups';
+            }
+        }
+
+        function resetRepositoryForm() {
+            const form = getRepoForm();
+            if (form) form.reset();
+
+            const formError = document.getElementById('formError');
+            if (formError) {
+                formError.textContent = '';
+                formError.style.display = 'none';
+            }
+
+            const cloudFields = document.getElementById('cloudFields');
+            if (cloudFields) cloudFields.style.display = 'none';
+
+            const pathLabelEl = document.getElementById('pathLabel');
+            const pathInputEl = document.getElementById('repoPath');
+            if (pathLabelEl) pathLabelEl.textContent = 'Caminho Local';
+            if (pathInputEl) pathInputEl.placeholder = '/var/backups/repo';
+
+            ['repoPassword', 'accessKey', 'secretKey'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.style.backgroundColor = '';
+            });
+
+            updateCloudOptions(false);
+            setModalMode(false);
+        }
+
+        function getRepoForm() {
+            return document.getElementById('repoForm');
+        }
+
+        async function submitRepositoryForm(event) {
+            event.preventDefault();
+            if (currentEditingRepoId) {
+                return updateRepository(event, currentEditingRepoId);
+            }
+            return createRepository(event);
+        }
+
+        function updateTypeOptions() {
+            // Todos os motores suportam local e cloud
+            const engine = document.getElementById('repoEngine').value;
+            const typeSelect = document.getElementById('repoType');
+
+            typeSelect.innerHTML = `
+                <option value="">Selecione o tipo</option>
+                <option value="local">Local (Filesystem)</option>
+                <option value="s3">Amazon S3</option>
+                <option value="azure">Azure Blob Storage</option>
+                <option value="gcs">Google Cloud Storage</option>
+                <option value="b2">Backblaze B2</option>
+                <option value="wasabi">Wasabi</option>
+            `;
+        }
+
+        function updatePathPlaceholder() {
+            const typeEl = document.getElementById('repoType');
+            const pathInputEl = document.getElementById('repoPath');
+            const pathLabelEl = document.getElementById('pathLabel');
+            const cloudFieldsEl = document.getElementById('cloudFields');
+            const pathGroup = pathInputEl ? pathInputEl.closest('.form-group') : null;
+
+            if (!typeEl || !pathInputEl || !pathLabelEl || !cloudFieldsEl) return;
+
+            const type = typeEl.value;
+
+            if (type === 'local') {
+                // Para local, caminho é auto-gerado pelo servidor
+                if (pathGroup) pathGroup.style.display = 'none';
+                pathInputEl.removeAttribute('required');
+                pathInputEl.value = '';
+                cloudFieldsEl.style.display = 'none';
+            } else if (type) {
+                if (pathGroup) pathGroup.style.display = '';
+                pathLabelEl.textContent = 'Bucket / Contêiner';
+                pathInputEl.placeholder = 'Nome do bucket';
+                pathInputEl.setAttribute('required', '');
+                cloudFieldsEl.style.display = 'block';
+                updateCloudOptions(false);
+             } else {
+                // Nenhum tipo selecionado
+                if (pathGroup) pathGroup.style.display = '';
+                pathLabelEl.textContent = 'Caminho Local';
+                pathInputEl.placeholder = '/var/backups/repo';
+                pathInputEl.setAttribute('required', '');
+                cloudFieldsEl.style.display = 'none';
+             }
+         }
+
+        function clearTestDetails() {
+            const el = document.getElementById('testDetails');
+            if (el) { el.style.display = 'none'; el.textContent = ''; }
+        }
+
+        function showTestDetails(msg, ok = false) {
+            const el = document.getElementById('testDetails');
+            if (!el) return;
+            el.style.display = 'block';
+            el.style.color = ok ? 'var(--success)' : 'var(--danger)';
+            el.textContent = msg;
+        }
+
+        function collectRepoFormData() {
+            const nameEl = document.getElementById('repoName');
+            const engineEl = document.getElementById('repoEngine');
+            const typeEl = document.getElementById('repoType');
+            const pathEl = document.getElementById('repoPath');
+            const passwordEl = document.getElementById('repoPassword');
+
+            const data = {
+                name: nameEl ? nameEl.value : '',
+                engine: engineEl ? engineEl.value : '',
+                type: typeEl ? typeEl.value : '',
+                motor_password: passwordEl ? passwordEl.value : '',
+            };
+
+            if (data.type !== 'local') {
+                const bucketEl = document.getElementById('bucket');
+                const accessKeyEl = document.getElementById('accessKey');
+                const secretKeyEl = document.getElementById('secretKey');
+                const regionEl = document.getElementById('region');
+                const endpointEl = document.getElementById('endpoint');
+                const prefixEl = document.getElementById('prefix');
+
+                data.bucket = (bucketEl ? bucketEl.value : '') || (pathEl ? pathEl.value : '');
+                data.path = data.bucket;
+                data.access_key = accessKeyEl ? accessKeyEl.value : '';
+                data.secret_key = secretKeyEl ? secretKeyEl.value : '';
+                data.region = regionEl ? regionEl.value : '';
+                data.endpoint = endpointEl ? endpointEl.value : '';
+                data.prefix = prefixEl ? prefixEl.value : '';
+            }
+            return data;
+        }
+
+        async function testCurrentFormConnection() {
+            clearTestDetails();
+            const data = collectRepoFormData();
+
+            if (!data.name || !data.engine || !data.type || !data.motor_password) {
+                showTestDetails('Preencha nome, engine, tipo e motor_password para testar.');
+                return;
+            }
+
+
+            try {
+                const r = await fetch('/api/repositories/test-connection', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const d = await r.json();
+                const payload = d.data || d;
+                if (r.ok) {
+                    const summary = payload.summary || '✅ Teste OK';
+                    showTestDetails(summary, true);
+                } else {
+                    showTestDetails(`❌ Teste falhou\n${d.detail || d.message || 'Erro desconhecido'}`);
+                }
+            } catch (e) {
+                showTestDetails(`❌ Erro de comunicação no teste: ${e.message}`);
+            }
+        }
+
+        async function createRepository(event) {
+            event.preventDefault();
+            clearTestDetails();
+
+            const data = collectRepoFormData();
+            const formError = document.getElementById('formError');
+
+            if (!data.name || !data.engine || !data.type || !data.motor_password) {
+                if (formError) {
+                    formError.textContent = 'Preencha todos os campos obrigatórios';
+                    formError.style.display = 'block';
+                }
+                return;
+            }
+
+            if (data.type !== 'local' && !data.bucket) {
+                if (formError) {
+                    formError.textContent = 'Bucket / Contêiner é obrigatório para repositórios cloud';
+                    formError.style.display = 'block';
+                }
+                return;
+            }
+
+            if (formError) formError.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/repositories/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    const repoId = result?.id || result?.data?.id;
+                    const autoInit = document.getElementById('autoInitialize')?.checked;
+
+                    closeCreateModal();
+                    const form = document.querySelector('form');
+                    if (form) form.reset();
+                    showNotification('Repositório criado com sucesso!', 'success');
+
+                    // Auto-inicializar se checkbox marcado
+                    if (autoInit && repoId) {
+                        showNotification('Inicializando repositório...', 'info');
+                        try {
+                            const initResp = await fetch(`/api/repositories/${repoId}/initialize`, { method: 'POST' });
+                            const initData = await initResp.json();
+                            if (initResp.ok && (initData.success || initData.status === 'ok')) {
+                                showNotification('Repositório inicializado com sucesso!', 'success');
+                            } else {
+                                showNotification('Repositório criado mas inicialização falhou. Use o botão 🚀 para tentar novamente.', 'warning');
+                            }
+                        } catch (e) {
+                            showNotification('Repositório criado mas inicialização falhou: ' + e.message, 'warning');
+                        }
+                    }
+                    await loadRepositories();
+                } else {
+                    const err = await response.json();
+                    if (formError) {
+                        formError.textContent = err.detail || 'Erro ao criar repositório';
+                        formError.style.display = 'block';
+                    }
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                if (formError) {
+                    formError.textContent = 'Erro de conexão com o servidor';
+                    formError.style.display = 'block';
+                }
+            }
+        }
+
+        async function initializeRepository(repoId, repoName, alreadyInitialized = false) {
+            const actionLabel = alreadyInitialized ? 'reinicializar' : 'inicializar';
+            const confirmText = alreadyInitialized
+                ? `Reinicializar o repositório "${repoName}"?\n\nIsso irá reconfirmar/recriar a estrutura do motor no destino configurado.`
+                : `Inicializar o repositório "${repoName}"?\n\nIsso irá criar a estrutura do motor de backup no destino configurado.`;
+            if (!confirm(confirmText)) return;
+
+            const btn = event?.target?.closest('button');
+            try {
+                if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
+
+                const response = await fetch(`/api/repositories/${repoId}/initialize`, { method: 'POST' });
+                const data = await response.json();
+
+                if (!response.ok || !(data.success || data.status === 'ok')) {
+                    throw new Error(data.detail || data.error || data.message || `Falha ao ${actionLabel} repositório`);
+                }
+
+                await loadRepositories();
+                showNotification(`Repositório "${repoName}" ${alreadyInitialized ? 'reinicializado' : 'inicializado'} com sucesso!`, 'success');
+            } catch (error) {
+                showNotification(`Erro ao ${actionLabel} "${repoName}": ${error.message}`, 'error');
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-rocket"></i>'; }
+            }
+        }
+
+        async function testConnection(repoId) {
+            try {
+                const response = await fetch(`/api/repositories/${repoId}/validate`);
+                const raw = await response.json();
+                const result = raw?.data || raw;
+
+                if (response.ok && result.valid) {
+                    let engine = (result.engine || '').toUpperCase();
+                    let repoType = (result.repo_type || '').toUpperCase();
+                    let repoName = result.repository_name || result.name || '';
+
+                    if (!engine || !repoType) {
+                        try {
+                            const metaResp = await fetch(`/api/repositories/${repoId}`);
+                            const meta = await metaResp.json();
+                            engine = engine || String(meta?.engine || 'desconhecido').toUpperCase();
+                            repoType = repoType || String(meta?.type || 'desconhecido').toUpperCase();
+                            repoName = repoName || meta?.name || '';
+                        } catch (e) {}
+                    }
+
+                    const summary = result.summary || [
+                        repoName ? `Repositório: ${repoName}` : null,
+                        `Engine: ${engine || 'DESCONHECIDO'}`,
+                        `Tipo: ${repoType || 'DESCONHECIDO'}`,
+                        `Conexão local/engine: ${result.diagnostics?.local?.ok ? 'OK' : 'FALHA'} (${result.diagnostics?.local?.elapsed_ms || 0} ms)`,
+                        `Conexão secundária: ${result.diagnostics?.secondary?.checked ? (result.diagnostics?.secondary?.ok ? 'OK' : 'FALHA') : 'N/A'} (${result.diagnostics?.secondary?.elapsed_ms || 0} ms)`,
+                        `Autenticação: ${result.diagnostics?.auth?.checked ? (result.diagnostics?.auth?.ok ? 'OK' : 'FALHA') : 'N/A'} (${result.diagnostics?.auth?.elapsed_ms || 0} ms)`,
+                        `Tempo total: ${result.diagnostics?.total_elapsed_ms || 0} ms`
+                    ].filter(Boolean).join('\n');
+                    showNotification(`✅ Conexão válida\n${summary}`, 'success');
+                } else {
+                    const errorMsg = raw.detail || raw.message || result.message || 'Erro desconhecido';
+                    showNotification(`❌ Falha na conexão:\n${errorMsg}`, 'error');
+                }
+            } catch (error) {
+                console.error('Erro ao testar conexão:', error);
+                showNotification('Erro ao testar conexão: ' + error.message, 'error');
+            }
+        }
+
+        async function deleteRepository(repoId) {
+            if (!confirm('Tem certeza que quer deletar este repositório?')) return;
+            
+            try {
+                const response = await fetch(`/api/repositories/${repoId}`, { method: 'DELETE' });
+                if (response.ok) {
+                    loadRepositories();
+                    showNotification('Repositório deletado', 'success');
+                }
+            } catch (error) {
+                showNotification('Erro ao deletar repositório', 'error');
+            }
+        }
+
+        async function editRepository(repoId) {
+            try {
+                const urlParams = new URLSearchParams(window.location.search);
+                const hashParams = new URLSearchParams(window.location.hash.substring(1));
+                
+                const showSensitive = urlParams.get('test') === 'true' || hashParams.get('test') === 'true';
+                const url = `/api/repositories/${repoId}${showSensitive ? '?show_sensitive=true' : ''}`;
+                
+                const response = await fetch(url);
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.detail || `Erro ao carregar repositório (${response.status})`);
+                }
+                const repo = await response.json();
+
+                resetRepositoryForm();
+                setModalMode(true, repoId);
+                document.getElementById('createModal').style.display = 'block';
+
+                const repoNameEl = document.getElementById('repoName');
+                const repoEngineEl = document.getElementById('repoEngine');
+                const repoTypeEl = document.getElementById('repoType');
+                const repoPathEl = document.getElementById('repoPath');
+                const repoPasswordEl = document.getElementById('repoPassword');
+
+                if (repoNameEl) repoNameEl.value = repo.name || '';
+                if (repoEngineEl) repoEngineEl.value = repo.engine || 'restic';
+                if (repoTypeEl) repoTypeEl.value = repo.type || 'local';
+                if (repoPathEl) repoPathEl.value = repo.path || '';
+                updatePathPlaceholder();
+
+                if (repoPasswordEl) {
+                    if (showSensitive && repo.motor_password && repo.motor_password !== '********') {
+                        repoPasswordEl.value = repo.motor_password;
+                        repoPasswordEl.style.backgroundColor = '#2d5016';
+                    } else {
+                        repoPasswordEl.value = '';
+                    }
+                }
+
+                const cloudFields = document.getElementById('cloudFields');
+                if (repo.type !== 'local') {
+                    if (cloudFields) cloudFields.style.display = 'block';
+
+                    const bucketEl = document.getElementById('bucket');
+                    const regionEl = document.getElementById('region');
+                    const endpointEl = document.getElementById('endpoint');
+                    const prefixEl = document.getElementById('prefix');
+                    const accessKeyEl = document.getElementById('accessKey');
+                    const secretKeyEl = document.getElementById('secretKey');
+
+                    if (bucketEl) bucketEl.value = repo.bucket || repo.path || '';
+                    if (regionEl) regionEl.value = repo.region || '';
+                    if (endpointEl) endpointEl.value = repo.endpoint || '';
+                    if (prefixEl) prefixEl.value = repo.prefix || '';
+                    updateCloudOptions(false);
+
+                    if (accessKeyEl) {
+                        const accessKeyValue = repo.access_key || repo.aws_access_key || repo.b2_account_id || repo.azure_account_name || repo.gcs_project_id || '';
+                        accessKeyEl.value = (showSensitive && accessKeyValue !== '********') ? accessKeyValue : (accessKeyValue === '********' ? '' : accessKeyValue);
+                        if (showSensitive && accessKeyEl.value) accessKeyEl.style.backgroundColor = '#2d5016';
+                    }
+
+                    if (secretKeyEl) {
+                        const secretKeyValue = repo.secret_key || repo.aws_secret_key || repo.b2_account_key || '';
+                        secretKeyEl.value = (showSensitive && secretKeyValue && secretKeyValue !== '********') ? secretKeyValue : '';
+                        if (showSensitive && secretKeyEl.value) secretKeyEl.style.backgroundColor = '#2d5016';
+                    }
+                }
+            } catch (error) {
+                console.error('Erro ao carregar repositório:', error);
+                showNotification('Erro ao carregar dados do repositório: ' + error.message, 'error');
+            }
+        }
+
+        async function updateRepository(event, repoId) {
+            event.preventDefault();
+            const data = {};
+
+            // Campos básicos
+            const nameEl = document.getElementById('repoName');
+            const engineEl = document.getElementById('repoEngine');
+            const typeEl = document.getElementById('repoType');
+            const passwordEl = document.getElementById('repoPassword');
+            const pathEl = document.getElementById('repoPath');
+
+            const name = nameEl ? nameEl.value : '';
+            const engine = engineEl ? engineEl.value : '';
+            const type = typeEl ? typeEl.value : '';
+            const password = passwordEl ? passwordEl.value : '';
+            const path = pathEl ? pathEl.value : '';
+
+            if (name) data.name = name;
+            if (engine) data.engine = engine;
+            if (type) data.type = type;
+            if (password) data.motor_password = password;
+            if (path) data.path = path;
+            
+            // Campos cloud (enviar apenas valores realmente alterados)
+            if (type !== 'local') {
+                const bucketEl = document.getElementById('bucket');
+                const regionEl = document.getElementById('region');
+                const endpointEl = document.getElementById('endpoint');
+                const prefixEl = document.getElementById('prefix');
+                const accessKeyEl = document.getElementById('accessKey');
+                const secretKeyEl = document.getElementById('secretKey');
+
+                const bucket = bucketEl ? bucketEl.value : '';
+                const region = regionEl ? regionEl.value : '';
+                const endpoint = endpointEl ? endpointEl.value : '';
+                const prefix = prefixEl ? prefixEl.value : '';
+                const accessKey = accessKeyEl ? accessKeyEl.value : '';
+                const secretKey = secretKeyEl ? secretKeyEl.value : '';
+
+                if (bucket !== '') data.bucket = bucket;
+                if (region !== '') data.region = region;
+                if (endpoint !== '') data.endpoint = endpoint;
+                if (prefix !== '') data.prefix = prefix;
+
+                // Credenciais: só enviar se usuário digitou novo valor
+                if (accessKey && accessKey !== '********') data.access_key = accessKey;
+                if (secretKey && secretKey !== '********') data.secret_key = secretKey;
+            }
+
+            if (Object.keys(data).length === 0) {
+                showNotification('Nenhuma alteração fornecida', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/repositories/${repoId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    closeCreateModal();
+                    loadRepositories();
+                    showNotification('Repositório atualizado com sucesso!', 'success');
+                } else {
+                    const error = await response.json().catch(() => ({ detail: 'Erro desconhecido' }));
+                    const formError = document.getElementById('formError');
+                    if (formError) {
+                        formError.textContent = error.detail || 'Erro ao atualizar repositório';
+                        formError.style.display = 'block';
+                    }
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                const formError = document.getElementById('formError');
+                if (formError) {
+                    formError.textContent = 'Erro de conexão com o servidor: ' + error.message;
+                    formError.style.display = 'block';
+                }
+            }
+        }
+
+        function showNotification(message, type = 'info') {
+            // Usar toast notification se disponível, senão usar alert
+            if (window.showToast) {
+                showToast(message, type);
+            } else {
+                alert(message);
+            }
+        }
+    </script>
+</body>
+</html>

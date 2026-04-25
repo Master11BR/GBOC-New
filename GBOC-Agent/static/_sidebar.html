@@ -1,0 +1,114 @@
+<aside class="sidebar">
+    <div class="sidebar-header"><a href="/" class="logo"><i class="fas fa-shield-alt logo-icon"></i> GBOC 11.7c</a></div>
+    <div style="padding:0 4px 10px 4px;">
+        <button onclick="toggleTheme()" id="themeToggle" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;font-size:0.85em;transition:all 0.2s;">
+            <i class="fas fa-moon" id="themeIcon"></i> <span id="themeLabel">Tema</span>
+        </button>
+    </div>
+    <nav class="nav">
+        <a href="/" class="nav-link"><i class="fas fa-home nav-icon"></i> Dashboard</a>
+        <a href="/diagnostic.html" class="nav-link"><i class="fas fa-stethoscope nav-icon"></i> Diagnóstico</a>
+        <a href="/repositories.html" class="nav-link"><i class="fas fa-server nav-icon"></i> Repositórios</a>
+        <a href="/tasks.html" class="nav-link"><i class="fas fa-tasks nav-icon"></i> Tarefas</a>
+        <a href="/restore.html" class="nav-link"><i class="fas fa-undo nav-icon"></i> Restauração</a>
+        <a href="/replication.html" class="nav-link"><i class="fas fa-exchange-alt nav-icon"></i> Replicação</a>
+        <a href="/duplicati-native.html" class="nav-link"><i class="fas fa-plug nav-icon"></i> Duplicati Nativo</a>
+        <a href="/logs.html" class="nav-link"><i class="fas fa-file-alt nav-icon"></i> Logs</a>
+        <a href="/reports.html" class="nav-link"><i class="fas fa-chart-pie nav-icon"></i> Relatórios</a>
+        <a href="/database-backup.html" class="nav-link"><i class="fas fa-database nav-icon"></i> Backup BD</a>
+        <a href="/ransomware.html" class="nav-link"><i class="fas fa-shield-virus nav-icon"></i> Ransomware</a>
+        <a href="/compliance.html" class="nav-link"><i class="fas fa-clipboard-check nav-icon"></i> Compliance</a>
+        <a href="/alerts.html" class="nav-link"><i class="fas fa-bell nav-icon"></i> Alertas</a>
+        <a href="/users.html" class="nav-link"><i class="fas fa-user-shield nav-icon"></i> Segurança</a>
+        <a href="/integrity.html" class="nav-link"><i class="fas fa-check-double nav-icon"></i> Integridade</a>
+        <a href="/audit.html" class="nav-link"><i class="fas fa-clipboard-list nav-icon"></i> Audit Trail</a>
+        <a href="/notification-channels.html" class="nav-link"><i class="fas fa-bell nav-icon"></i> Canais de Notificação</a>
+        <a href="/changelog.html" class="nav-link"><i class="fas fa-clipboard-list nav-icon"></i> Changelog</a>
+        <a href="/settings.html" class="nav-link"><i class="fas fa-cogs nav-icon"></i> Configurações</a>
+        <a href="#" class="nav-link" id="sidebarLogoutLink" style="display:none;" onclick="gbocLogout(); return false;"><i class="fas fa-sign-out-alt nav-icon"></i> Sair</a>
+    </nav>
+    <div style="position:sticky;bottom:0;left:0;right:0;padding:10px 4px 0 4px;background:linear-gradient(180deg, rgba(0,0,0,0) 0%, var(--sidebar-bg) 40%);">
+        <div id="sidebarUserInfo" style="display:none;padding:8px 10px;margin-bottom:8px;border-radius:8px;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.2);font-size:0.8em;color:var(--text-secondary);text-align:center;">
+            <i class="fas fa-user-circle"></i> <span id="sidebarUsername"></span>
+        </div>
+        <div style="display:flex;gap:6px;justify-content:flex-end;">
+            <button onclick="gbocLogout()" id="logoutBtn" style="display:none;padding:10px 14px;border-radius:8px;border:1px solid var(--danger);background:rgba(240,107,107,.1);color:var(--danger);cursor:pointer;font-size:0.85em;transition:all 0.2s;" title="Sair">
+                <i class="fas fa-sign-out-alt"></i>
+            </button>
+        </div>
+    </div>
+</aside>
+<script>
+function toggleTheme(){
+    const current = document.documentElement.getAttribute('data-theme') || 'dark';
+    const next = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('gboc-theme', next);
+    updateThemeButton(next);
+}
+function updateThemeButton(theme){
+    const icon = document.getElementById('themeIcon');
+    const label = document.getElementById('themeLabel');
+    if(icon && label){
+        icon.className = theme === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
+        label.textContent = theme === 'dark' ? 'Tema Escuro' : 'Tema Claro';
+    }
+}
+function gbocSetupSidebarAuth(){
+    // Se há token no localStorage, sempre mostrar botão logout
+    const token = localStorage.getItem('gboc_token');
+    const user = localStorage.getItem('gboc_user');
+    if(user){
+        try {
+            const u = JSON.parse(user);
+            _gbocShowSidebarUser(u);
+        } catch(e){}
+    } else if(token){
+        // Tem token mas não tem user — mostrar logout mesmo assim
+        const btn = document.getElementById('logoutBtn');
+        if(btn) btn.style.display = 'block';
+    }
+    // Consulta a API para confirmar status
+    fetch('/api/auth/status').then(r => r.json()).then(data => {
+        if(data.authenticated && data.user){
+            _gbocShowSidebarUser(data.user);
+        } else if(data.auth_enabled){
+            // Auth habilitado mas não autenticado — mostrar logout para redirecionar ao login
+            const btn = document.getElementById('logoutBtn');
+            if(btn) btn.style.display = 'block';
+        }
+    }).catch(()=>{
+        // Se API falhar e há token, manter botão visível
+        if(token){
+            const btn = document.getElementById('logoutBtn');
+            if(btn) btn.style.display = 'block';
+        }
+    });
+}
+function _gbocShowSidebarUser(u){
+    const el = document.getElementById('sidebarUsername');
+    const info = document.getElementById('sidebarUserInfo');
+    const btn = document.getElementById('logoutBtn');
+    if(el) el.textContent = u.display_name || u.username || '';
+    if(info) info.style.display = 'block';
+    if(btn) btn.style.display = 'block';
+}
+async function gbocLogout(){
+    if(!confirm('Deseja realmente sair?')) return;
+    try {
+        await fetch('/api/auth/logout', {method:'POST'});
+    } catch(e){}
+    localStorage.removeItem('gboc_token');
+    localStorage.removeItem('gboc_user');
+    document.cookie = 'gboc_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+    window.location.href = '/login.html';
+}
+(function(){
+    const saved = localStorage.getItem('gboc-theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', saved);
+    // Executar setup de auth imediatamente (o DOM do sidebar já está pronto quando o script executa via insertAdjacentHTML)
+    // Aguardar um tick para garantir que os elementos já estão no DOM
+    setTimeout(gbocSetupSidebarAuth, 0);
+})();
+</script>
+

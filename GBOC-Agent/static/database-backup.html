@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GBOC Agent 11.7c - Backup de Banco de Dados</title>
+    <link rel="stylesheet" href="/static/style.css?v=11.9">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .stats-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:16px; margin-bottom:28px; }
+        .stat-card { background:var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:18px; text-align:center; }
+        .stat-card .val { font-size:1.8em; font-weight:700; }
+        .stat-card .lbl { font-size:.8em; color:var(--text-muted); margin-top:4px; }
+
+        .two-col { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+        @media(max-width:900px){ .two-col{grid-template-columns:1fr;} }
+
+        .panel { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+        .panel-header { padding:16px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+        .panel-header h3 { margin:0; display:flex; align-items:center; gap:8px; font-size:1em; }
+        .panel-body { padding:0; }
+
+        .conn-list { list-style:none; padding:0; margin:0; }
+        .conn-item { display:flex; align-items:center; gap:14px; padding:14px 20px; border-bottom:1px solid var(--border); transition:background .15s; }
+        .conn-item:hover { background:var(--card-hover); }
+        .conn-icon { font-size:1.5em; width:36px; text-align:center; }
+        .conn-meta { flex:1; }
+        .conn-meta strong { display:block; font-size:.92em; }
+        .conn-meta span { font-size:.8em; color:var(--text-muted); }
+        .conn-actions { display:flex; gap:6px; }
+        .conn-actions button { padding:6px 10px; font-size:.78em; }
+
+        .backup-table { width:100%; border-collapse:collapse; }
+        .backup-table th, .backup-table td { padding:11px 14px; text-align:left; border-bottom:1px solid var(--border); font-size:.85em; }
+        .backup-table th { background:var(--bg-input); color:var(--text-muted); font-weight:600; }
+
+        .badge-ok { background:rgba(72,187,120,.15); color:var(--success); padding:2px 10px; border-radius:20px; font-size:.8em; }
+        .badge-fail { background:rgba(245,101,101,.15); color:var(--danger); padding:2px 10px; border-radius:20px; font-size:.8em; }
+        .badge-run { background:rgba(66,153,225,.15); color:var(--primary); padding:2px 10px; border-radius:20px; font-size:.8em; }
+
+        .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:1000; align-items:center; justify-content:center; }
+        .modal-overlay.show { display:flex; }
+        .modal-box { background:var(--bg-card); border-radius:14px; padding:28px; width:520px; max-width:95vw; border:1px solid var(--border); }
+        .modal-box h3 { margin-bottom:20px; display:flex; align-items:center; gap:10px; }
+        .form-group { margin-bottom:14px; }
+        .form-group label { display:block; font-size:.85em; color:var(--text-muted); margin-bottom:5px; font-weight:600; }
+        .form-group input, .form-group select { width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--border); background:var(--bg-input); color:var(--text); font-size:.9em; }
+        .modal-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:20px; }
+        .empty-msg { text-align:center; color:var(--text-muted); padding:40px 20px; }
+    </style>
+    <script src="/static/auth_interceptor.js"></script>
+</head>
+<body>
+    <div class="app">
+        <main class="main-content">
+            <header class="header">
+                <div>
+                    <h1 class="page-title"><i class="fas fa-database" style="color:var(--warning)"></i> Backup de Banco de Dados</h1>
+                    <div class="page-subtitle">PostgreSQL · MySQL · SQLite — Backup, Restore, Test-Restore, Replicação</div>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" onclick="refresh()"><i class="fas fa-sync-alt"></i> Atualizar</button>
+                    <button class="btn btn-primary" onclick="openConnModal()"><i class="fas fa-plus"></i> Nova Conexão</button>
+                </div>
+            </header>
+
+            <div class="content">
+                <!-- Stats -->
+                <div class="stats-row" id="statsRow">
+                    <div class="stat-card"><div class="val" id="stConns">0</div><div class="lbl">Conexões</div></div>
+                    <div class="stat-card"><div class="val" id="stTotal">0</div><div class="lbl">Backups Totais</div></div>
+                    <div class="stat-card"><div class="val" id="stOk" style="color:var(--success)">0</div><div class="lbl">Sucesso</div></div>
+                    <div class="stat-card"><div class="val" id="stFail" style="color:var(--danger)">0</div><div class="lbl">Falhas</div></div>
+                    <div class="stat-card"><div class="val" id="stSize">0 B</div><div class="lbl">Tamanho Total</div></div>
+                    <div class="stat-card"><div class="val" id="stRate">0%</div><div class="lbl">Taxa Sucesso</div></div>
+                </div>
+
+                <div class="two-col">
+                    <!-- Connections -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h3><i class="fas fa-plug" style="color:var(--primary)"></i> Conexões</h3>
+                        </div>
+                        <div class="panel-body">
+                            <ul class="conn-list" id="connList">
+                                <li class="empty-msg">Nenhuma conexão configurada</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Recent Backups -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h3><i class="fas fa-history" style="color:var(--success)"></i> Backups Recentes</h3>
+                        </div>
+                        <div class="panel-body" style="overflow-x:auto;">
+                            <table class="backup-table">
+                                <thead><tr><th>Conexão</th><th>Arquivo</th><th>Status</th><th>Tamanho</th><th>Data</th><th>Ações</th></tr></thead>
+                                <tbody id="backupTableBody">
+                                    <tr><td colspan="6" class="empty-msg">Nenhum backup realizado</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Connection Modal -->
+    <div class="modal-overlay" id="connModal">
+        <div class="modal-box">
+            <h3><i class="fas fa-plug" style="color:var(--primary)"></i> <span id="connModalTitle">Nova Conexão</span></h3>
+            <input type="hidden" id="connEditId" value="">
+            <div class="form-group"><label>Nome</label><input type="text" id="cName" placeholder="Meu PostgreSQL"></div>
+            <div class="form-group"><label>Tipo</label>
+                <select id="cType" onchange="updatePortDefault()">
+                    <option value="postgresql">PostgreSQL</option>
+                    <option value="mysql">MySQL</option>
+                    <option value="sqlite">SQLite</option>
+                </select>
+            </div>
+            <div class="form-group" id="grpHost"><label>Host</label><input type="text" id="cHost" value="localhost"></div>
+            <div class="form-group" id="grpPort"><label>Porta</label><input type="number" id="cPort" value="5432"></div>
+            <div class="form-group"><label>Database / Caminho</label><input type="text" id="cDb" placeholder="nome_do_banco"></div>
+            <div class="form-group" id="grpUser"><label>Usuário</label><input type="text" id="cUser" value="postgres"></div>
+            <div class="form-group" id="grpPass"><label>Senha</label><input type="password" id="cPass"></div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeConnModal()">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveConn()"><i class="fas fa-save"></i> Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // ── Init ───────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', refresh);
+
+    async function refresh() {
+        await Promise.all([loadStats(), loadConnections(), loadBackups()]);
+    }
+
+    // ── Stats ──────────────────────────────────────────────
+    async function loadStats() {
+        try {
+            const res = await fetch('/api/database-backup/statistics');
+            const d = await res.json();
+            el('stConns').textContent = d.connections || 0;
+            el('stTotal').textContent = d.total_backups || 0;
+            el('stOk').textContent = d.completed || 0;
+            el('stFail').textContent = d.failed || 0;
+            el('stSize').textContent = fmtBytes(d.total_size_bytes || 0);
+            el('stRate').textContent = (d.success_rate || 0) + '%';
+        } catch(e) { console.error(e); }
+    }
+
+    // ── Connections ────────────────────────────────────────
+    async function loadConnections() {
+        try {
+            const res = await fetch('/api/database-backup/connections');
+            const data = await res.json();
+            const list = el('connList');
+            const items = data.connections || [];
+            if(!items.length) { list.innerHTML = '<li class="empty-msg">Nenhuma conexão configurada</li>'; return; }
+            const icons = {postgresql:'fa-elephant', mysql:'fa-dolphin', sqlite:'fa-file'};
+            const colors = {postgresql:'#4299e1', mysql:'#ed8936', sqlite:'#48bb78'};
+            list.innerHTML = items.map(c => `
+                <li class="conn-item">
+                    <i class="fas ${icons[c.db_type]||'fa-database'} conn-icon" style="color:${colors[c.db_type]||'#a0aec0'}"></i>
+                    <div class="conn-meta"><strong>${esc(c.name)}</strong><span>${esc(c.db_type)} · ${esc(c.host||'')}:${c.port||''} · ${esc(c.database_name||'')}</span></div>
+                    <div class="conn-actions">
+                        <button class="btn btn-secondary" onclick="testConn(${c.id})" title="Testar"><i class="fas fa-plug"></i></button>
+                        <button class="btn btn-primary" onclick="runBackup(${c.id})" title="Backup"><i class="fas fa-play"></i></button>
+                        <button class="btn btn-secondary" onclick="editConn(${c.id})" title="Editar"><i class="fas fa-edit"></i></button>
+                        <button class="btn btn-secondary" style="border-color:rgba(240,107,107,.3);color:var(--danger);" onclick="deleteConn(${c.id})" title="Excluir"><i class="fas fa-trash"></i></button>
+                    </div>
+                </li>`).join('');
+        } catch(e) { console.error(e); }
+    }
+
+    // ── Backups ────────────────────────────────────────────
+    async function loadBackups() {
+        try {
+            const res = await fetch('/api/database-backup/backups?limit=20');
+            const data = await res.json();
+            const tbody = el('backupTableBody');
+            const items = data.backups || [];
+            if(!items.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty-msg">Nenhum backup realizado</td></tr>'; return; }
+            tbody.innerHTML = items.map(b => {
+                const badge = b.status === 'completed' ? 'badge-ok' : b.status === 'running' ? 'badge-run' : 'badge-fail';
+                const dt = b.started_at ? gbocFormatDateTime(b.started_at) : '-';
+                return `<tr>
+                    <td>${esc(b.connection_name||'-')}</td>
+                    <td><code style="font-size:.85em">${esc(b.filename||'-')}</code></td>
+                    <td><span class="${badge}">${esc(b.status)}</span></td>
+                    <td>${fmtBytes(b.file_size||0)}</td>
+                    <td>${dt}</td>
+                    <td style="display:flex;gap:4px;">
+                        <button class="btn btn-secondary" style="padding:4px 8px;font-size:.75em;" onclick="restoreBackup(${b.id})" title="Restaurar"><i class="fas fa-undo"></i></button>
+                        <button class="btn btn-secondary" style="padding:4px 8px;font-size:.75em;" onclick="testRestore(${b.id})" title="Test Restore"><i class="fas fa-flask"></i></button>
+                        <button class="btn btn-secondary" style="padding:4px 8px;font-size:.75em;border-color:rgba(240,107,107,.3);color:var(--danger);" onclick="deleteBackup(${b.id})" title="Excluir"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>`;
+            }).join('');
+        } catch(e) { console.error(e); }
+    }
+
+    // ── Actions ────────────────────────────────────────────
+    async function runBackup(connId) {
+        if(!confirm('Iniciar backup agora?')) return;
+        try {
+            const res = await fetch(`/api/database-backup/connections/${connId}/backup`, {method:'POST'});
+            const data = await res.json();
+            if(data.success) alert(`✅ Backup concluído!\nArquivo: ${data.filename}\nTamanho: ${fmtBytes(data.file_size)}`);
+            else alert('❌ ' + (data.error || data.detail || 'Erro'));
+            refresh();
+        } catch(e) { alert('❌ ' + e.message); }
+    }
+
+    async function testConn(connId) {
+        try {
+            const res = await fetch(`/api/database-backup/connections/${connId}/test`, {method:'POST'});
+            const data = await res.json();
+            if(data.success) alert(`✅ Conexão OK!\n${data.version || ''}`);
+            else alert('❌ ' + (data.error || 'Falha'));
+        } catch(e) { alert('❌ ' + e.message); }
+    }
+
+    async function restoreBackup(id) {
+        if(!confirm('⚠️ ATENÇÃO: Restaurar sobrescreverá dados existentes. Continuar?')) return;
+        try {
+            const res = await fetch(`/api/database-backup/backups/${id}/restore`, {method:'POST'});
+            const data = await res.json();
+            if(data.success) alert('✅ Restauração concluída!');
+            else alert('❌ ' + (data.error || data.detail || 'Erro'));
+        } catch(e) { alert('❌ ' + e.message); }
+    }
+
+    async function testRestore(id) {
+        try {
+            const res = await fetch(`/api/database-backup/backups/${id}/test-restore`, {method:'POST'});
+            const data = await res.json();
+            if(data.success) alert(`✅ Test Restore OK!\nTabelas: ${data.tables_restored || data.tables || '?'}\nDuração: ${data.duration_seconds}s`);
+            else alert('❌ ' + (data.error || 'Falha'));
+        } catch(e) { alert('❌ ' + e.message); }
+    }
+
+    async function deleteBackup(id) {
+        if(!confirm('Excluir backup permanentemente?')) return;
+        try { await fetch(`/api/database-backup/backups/${id}`, {method:'DELETE'}); refresh(); }
+        catch(e) { alert('❌ ' + e.message); }
+    }
+
+    async function deleteConn(id) {
+        if(!confirm('Excluir conexão?')) return;
+        try { await fetch(`/api/database-backup/connections/${id}`, {method:'DELETE'}); refresh(); }
+        catch(e) { alert('❌ ' + e.message); }
+    }
+
+    // ── Connection Modal ──────────────────────────────────
+    function openConnModal(data) {
+        el('connEditId').value = data?.id || '';
+        el('connModalTitle').textContent = data ? 'Editar Conexão' : 'Nova Conexão';
+        el('cName').value = data?.name || '';
+        el('cType').value = data?.db_type || 'postgresql';
+        el('cHost').value = data?.host || 'localhost';
+        el('cPort').value = data?.port || 5432;
+        el('cDb').value = data?.database_name || '';
+        el('cUser').value = data?.username || 'postgres';
+        el('cPass').value = data?.password || '';
+        updatePortDefault();
+        el('connModal').classList.add('show');
+    }
+    function closeConnModal() { el('connModal').classList.remove('show'); }
+
+    function updatePortDefault() {
+        const t = el('cType').value;
+        const show = t !== 'sqlite';
+        el('grpHost').style.display = show ? '' : 'none';
+        el('grpPort').style.display = show ? '' : 'none';
+        el('grpUser').style.display = show ? '' : 'none';
+        el('grpPass').style.display = show ? '' : 'none';
+        if(t === 'mysql') el('cPort').value = 3306;
+        else if(t === 'postgresql') el('cPort').value = 5432;
+    }
+
+    async function saveConn() {
+        const id = el('connEditId').value;
+        const body = {
+            name: el('cName').value,
+            db_type: el('cType').value,
+            host: el('cHost').value,
+            port: parseInt(el('cPort').value),
+            database_name: el('cDb').value,
+            username: el('cUser').value,
+            password: el('cPass').value,
+            options: {}
+        };
+        try {
+            const url = id ? `/api/database-backup/connections/${id}` : '/api/database-backup/connections';
+            const method = id ? 'PUT' : 'POST';
+            const res = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+            if(!res.ok) throw new Error(`HTTP ${res.status}`);
+            closeConnModal();
+            refresh();
+        } catch(e) { alert('Erro: ' + e.message); }
+    }
+
+    async function editConn(id) {
+        try {
+            const res = await fetch('/api/database-backup/connections');
+            const data = await res.json();
+            const conn = (data.connections || []).find(c => c.id === id);
+            if(conn) openConnModal(conn);
+        } catch(e) { console.error(e); }
+    }
+
+    // ── Helpers ────────────────────────────────────────────
+    function el(id) { return document.getElementById(id); }
+    function esc(s) { const d = document.createElement('div'); d.textContent = s||''; return d.innerHTML; }
+    function fmtBytes(b) {
+        if(!b) return '0 B';
+        const u = ['B','KB','MB','GB','TB'];
+        let i = 0; while(b >= 1024 && i < u.length-1){ b /= 1024; i++; }
+        return b.toFixed(1) + ' ' + u[i];
+    }
+    </script>
+
+    <script src="/static/sidebar.js"></script>
+</body>
+</html>
+

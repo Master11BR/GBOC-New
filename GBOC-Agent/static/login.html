@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - GBOC Agent</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* ======================== NEUMORPHIC LOGIN ======================== */
+        *{margin:0;padding:0;box-sizing:border-box}
+
+        /* --- Theme tokens --- */
+        :root,[data-theme="dark"]{
+            --nm-bg:#2b2b3d;
+            --nm-surface:#32324a;
+            --nm-shadow-dark:rgba(0,0,0,.55);
+            --nm-shadow-light:rgba(255,255,255,.05);
+            --nm-inset-dark:rgba(0,0,0,.45);
+            --nm-inset-light:rgba(255,255,255,.04);
+            --nm-text:#e8e8f0;
+            --nm-text-muted:#9a9ab0;
+            --nm-accent:#667eea;
+            --nm-accent-hover:#7c8ff2;
+            --nm-input-bg:#2b2b3d;
+            --nm-icon:#7a7a95;
+            --nm-error-bg:rgba(245,101,101,.12);
+            --nm-error-border:rgba(245,101,101,.35);
+            --nm-error-text:#f56565;
+            --nm-info-bg:rgba(102,126,234,.12);
+            --nm-info-border:rgba(102,126,234,.35);
+            --nm-info-text:#667eea;
+        }
+        [data-theme="light"]{
+            --nm-bg:#e0e5ec;
+            --nm-surface:#e0e5ec;
+            --nm-shadow-dark:rgba(163,177,198,.6);
+            --nm-shadow-light:rgba(255,255,255,.8);
+            --nm-inset-dark:rgba(163,177,198,.5);
+            --nm-inset-light:rgba(255,255,255,.7);
+            --nm-text:#2d3748;
+            --nm-text-muted:#718096;
+            --nm-accent:#3b5fc0;
+            --nm-accent-hover:#4b6fd0;
+            --nm-input-bg:#e0e5ec;
+            --nm-icon:#8a9ab5;
+            --nm-error-bg:rgba(229,62,62,.08);
+            --nm-error-border:rgba(229,62,62,.3);
+            --nm-error-text:#c53030;
+            --nm-info-bg:rgba(59,95,192,.08);
+            --nm-info-border:rgba(59,95,192,.3);
+            --nm-info-text:#3b5fc0;
+        }
+
+        body{
+            font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+            background:var(--nm-bg);
+            color:var(--nm-text);
+            display:flex;align-items:center;justify-content:center;
+            min-height:100vh;
+            transition:background .3s,color .3s;
+        }
+
+        /* --- Card --- */
+        .login-container{width:100%;max-width:420px;padding:20px}
+        .login-card{
+            background:var(--nm-surface);
+            border-radius:24px;
+            padding:44px 36px 38px;
+            box-shadow:
+                8px 8px 20px var(--nm-shadow-dark),
+                -8px -8px 20px var(--nm-shadow-light);
+        }
+
+        /* --- Logo / header --- */
+        .login-logo{text-align:center;margin-bottom:30px}
+        .login-logo .logo-icon-wrap{
+            display:inline-flex;align-items:center;justify-content:center;
+            width:68px;height:68px;border-radius:20px;margin-bottom:16px;
+            background:var(--nm-surface);
+            box-shadow:
+                6px 6px 14px var(--nm-shadow-dark),
+                -6px -6px 14px var(--nm-shadow-light);
+        }
+        .login-logo .logo-icon-wrap i{font-size:1.8rem;color:var(--nm-accent)}
+        .login-logo h1{color:var(--nm-text);font-size:1.45rem;font-weight:700;letter-spacing:-.3px}
+        .login-logo p{color:var(--nm-text-muted);font-size:.82rem;margin-top:4px;font-weight:400}
+
+        /* --- Form --- */
+        .login-form .form-group{margin-bottom:20px}
+        .login-form label{
+            display:block;color:var(--nm-text-muted);
+            font-size:.78rem;font-weight:600;
+            margin-bottom:8px;padding-left:16px;
+            text-transform:uppercase;letter-spacing:.5px;
+        }
+        .input-wrapper{position:relative}
+        .input-wrapper i.field-icon{
+            position:absolute;left:18px;top:50%;transform:translateY(-50%);
+            color:var(--nm-icon);font-size:.9rem;
+            transition:color .25s;pointer-events:none;
+        }
+        .login-form input[type="text"],
+        .login-form input[type="password"]{
+            width:100%;padding:14px 18px 14px 48px;
+            border:none;outline:none;
+            border-radius:50px;
+            background:var(--nm-input-bg);
+            color:var(--nm-text);
+            font-size:.92rem;font-weight:500;
+            box-shadow:
+                inset 4px 4px 8px var(--nm-inset-dark),
+                inset -4px -4px 8px var(--nm-inset-light);
+            transition:box-shadow .25s;
+        }
+        .login-form input::placeholder{color:var(--nm-text-muted);opacity:.65}
+        .login-form input:focus{
+            box-shadow:
+                inset 4px 4px 8px var(--nm-inset-dark),
+                inset -4px -4px 8px var(--nm-inset-light),
+                0 0 0 2px var(--nm-accent);
+        }
+        .login-form input:focus + .field-icon,
+        .input-wrapper:focus-within i.field-icon{color:var(--nm-accent)}
+
+        /* --- Button --- */
+        .login-btn{
+            width:100%;padding:14px 20px;margin-top:6px;
+            border:none;outline:none;cursor:pointer;
+            border-radius:50px;
+            background:var(--nm-surface);
+            color:var(--nm-text-muted);
+            font-size:.92rem;font-weight:700;
+            display:flex;align-items:center;justify-content:center;gap:10px;
+            box-shadow:
+                6px 6px 16px var(--nm-shadow-dark),
+                -6px -6px 16px var(--nm-shadow-light);
+            transition:box-shadow .2s,color .2s,transform .15s;
+        }
+        .login-btn:hover{
+            color:var(--nm-accent);
+            box-shadow:
+                4px 4px 10px var(--nm-shadow-dark),
+                -4px -4px 10px var(--nm-shadow-light);
+        }
+        .login-btn:active{
+            box-shadow:
+                inset 3px 3px 8px var(--nm-inset-dark),
+                inset -3px -3px 8px var(--nm-inset-light);
+            transform:scale(.98);
+        }
+        .login-btn:disabled{
+            opacity:.5;cursor:not-allowed;
+            box-shadow:
+                4px 4px 10px var(--nm-shadow-dark),
+                -4px -4px 10px var(--nm-shadow-light);
+        }
+
+        /* --- Accent filled button (setup mode) --- */
+        .login-btn.accent-fill{
+            background:linear-gradient(135deg,var(--nm-accent),var(--nm-accent-hover));
+            color:var(--bg-dark);
+            box-shadow:
+                4px 4px 14px var(--nm-shadow-dark),
+                -4px -4px 14px var(--nm-shadow-light),
+                0 4px 18px rgba(102,126,234,.3);
+        }
+        .login-btn.accent-fill:hover{
+            box-shadow:
+                2px 2px 8px var(--nm-shadow-dark),
+                -2px -2px 8px var(--nm-shadow-light),
+                0 6px 24px rgba(102,126,234,.4);
+        }
+        .login-btn.accent-fill:active{
+            box-shadow:
+                inset 3px 3px 8px rgba(0,0,0,.3),
+                inset -3px -3px 8px rgba(255,255,255,.08);
+        }
+
+        /* --- Error / Info boxes --- */
+        .login-error{
+            background:var(--nm-error-bg);
+            border:1px solid var(--nm-error-border);
+            border-radius:14px;padding:12px 16px;
+            color:var(--nm-error-text);font-size:.83rem;
+            margin-bottom:18px;display:none;
+            box-shadow:inset 2px 2px 5px var(--nm-inset-dark),inset -2px -2px 5px var(--nm-inset-light);
+        }
+        .login-error.visible{display:flex;align-items:center;gap:8px}
+        .login-error i{flex-shrink:0}
+        .setup-info{
+            background:var(--nm-info-bg);
+            border:1px solid var(--nm-info-border);
+            border-radius:14px;padding:12px 16px;
+            color:var(--nm-info-text);font-size:.83rem;
+            margin-bottom:18px;text-align:center;
+            box-shadow:inset 2px 2px 5px var(--nm-inset-dark),inset -2px -2px 5px var(--nm-inset-light);
+        }
+
+        /* --- Version badge --- */
+        .version-badge{
+            text-align:center;margin-top:22px;
+            color:var(--nm-text-muted);font-size:.72rem;
+            letter-spacing:.3px;opacity:.6;
+        }
+
+        /* --- Subtle float animation on logo icon --- */
+        @keyframes nmFloat{
+            0%,100%{transform:translateY(0)}
+            50%{transform:translateY(-4px)}
+        }
+        .login-logo .logo-icon-wrap{animation:nmFloat 4s ease-in-out infinite}
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-logo">
+                <div class="logo-icon-wrap">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <h1>GBOC Agent</h1>
+                <p>Sistema de Backup Profissional</p>
+            </div>
+
+            <div id="setupInfo" class="setup-info" style="display:none;">
+                <i class="fas fa-info-circle"></i>
+                Primeiro acesso! Crie sua conta de administrador.
+            </div>
+
+            <div id="loginError" class="login-error">
+                <i class="fas fa-exclamation-circle"></i>
+                <span id="errorText"></span>
+            </div>
+
+            <form class="login-form" id="loginForm" onsubmit="handleSubmit(event)">
+                <div class="form-group" id="displayNameGroup" style="display:none;">
+                    <label for="displayName">Nome de Exibição</label>
+                    <div class="input-wrapper">
+                        <input type="text" id="displayName" placeholder="Administrador" autocomplete="name">
+                        <i class="fas fa-id-card field-icon"></i>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="username">Usuário</label>
+                    <div class="input-wrapper">
+                        <input type="text" id="username" placeholder="admin" required autocomplete="username">
+                        <i class="fas fa-user field-icon"></i>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="password">Senha</label>
+                    <div class="input-wrapper">
+                        <input type="password" id="password" placeholder="••••••••" required autocomplete="current-password">
+                        <i class="fas fa-lock field-icon"></i>
+                    </div>
+                </div>
+                <button type="submit" class="login-btn" id="submitBtn">
+                    <i class="fas fa-sign-in-alt" id="submitIcon"></i>
+                    <span id="submitText">Entrar</span>
+                </button>
+            </form>
+
+            <div class="version-badge">GBOC 11.7c</div>
+        </div>
+    </div>
+
+    <script>
+    let isSetupMode = false;
+
+    async function checkAuthStatus() {
+        try {
+            const res = await fetch('/api/auth/status');
+            const data = await res.json();
+            if (!data.auth_enabled) {
+                isSetupMode = true;
+                document.getElementById('setupInfo').style.display = 'block';
+                document.getElementById('displayNameGroup').style.display = 'block';
+                document.getElementById('submitText').textContent = 'Criar Conta';
+                document.getElementById('submitIcon').className = 'fas fa-user-plus';
+                document.getElementById('submitBtn').classList.add('accent-fill');
+            } else if (data.authenticated) {
+                window.location.href = '/';
+            }
+        } catch (e) {
+            console.error('Auth status check failed:', e);
+        }
+    }
+
+    async function handleSubmit(e) {
+        e.preventDefault();
+        const btn = document.getElementById('submitBtn');
+        const errorDiv = document.getElementById('loginError');
+        const errorText = document.getElementById('errorText');
+        btn.disabled = true;
+        errorDiv.classList.remove('visible');
+
+        const username = document.getElementById('username').value.trim();
+        const password = document.getElementById('password').value;
+
+        if (!username || !password) {
+            errorText.textContent = 'Preencha todos os campos';
+            errorDiv.classList.add('visible');
+            btn.disabled = false;
+            return;
+        }
+
+        try {
+            if (isSetupMode) {
+                const displayName = document.getElementById('displayName').value.trim() || username;
+                const res = await fetch('/api/auth/setup', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({username, password, display_name: displayName})
+                });
+                const data = await res.json();
+                if (!res.ok || data.status !== 'success') {
+                    errorText.textContent = data.detail || data.message || 'Erro ao criar conta';
+                    errorDiv.classList.add('visible');
+                    btn.disabled = false;
+                    return;
+                }
+                isSetupMode = false;
+            }
+
+            const res = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username, password})
+            });
+            const data = await res.json();
+
+            if (res.ok && data.status === 'success') {
+                localStorage.setItem('gboc_token', data.token);
+                localStorage.setItem('gboc_user', JSON.stringify(data.user));
+                window.location.href = '/';
+            } else {
+                errorText.textContent = data.detail || data.message || 'Credenciais inválidas';
+                errorDiv.classList.add('visible');
+            }
+        } catch (err) {
+            errorText.textContent = 'Erro de conexão com o servidor';
+            errorDiv.classList.add('visible');
+        }
+        btn.disabled = false;
+    }
+
+    (function(){
+        const saved = localStorage.getItem('gboc-theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', saved);
+        checkAuthStatus();
+    })();
+    </script>
+</body>
+</html>
+

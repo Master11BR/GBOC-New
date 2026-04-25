@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GBOC Agent 11.7c - Alertas & Notificações</title>
+    <link rel="stylesheet" href="/static/style.css?v=11.9">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:16px;margin-bottom:28px}
+        .stat-card{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:18px;text-align:center}
+        .stat-card .val{font-size:1.8em;font-weight:700}
+        .stat-card .lbl{font-size:.8em;color:var(--text-muted);margin-top:4px}
+
+        .panel{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px}
+        .panel-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+        .panel-header h3{margin:0;display:flex;align-items:center;gap:8px;font-size:1em}
+        .panel-body{padding:0}
+
+        .tbl{width:100%;border-collapse:collapse}
+        .tbl th,.tbl td{padding:11px 14px;text-align:left;border-bottom:1px solid var(--border);font-size:.85em}
+        .tbl th{background:var(--bg-input);color:var(--text-muted);font-weight:600}
+
+        .badge-ok{background:rgba(78,203,136,.15);color:var(--success);padding:2px 10px;border-radius:20px;font-size:.8em}
+        .badge-warn{background:rgba(240,169,64,.15);color:var(--warning);padding:2px 10px;border-radius:20px;font-size:.8em}
+        .badge-crit{background:rgba(240,107,107,.15);color:var(--danger);padding:2px 10px;border-radius:20px;font-size:.8em}
+        .badge-info{background:rgba(79,163,232,.15);color:var(--primary);padding:2px 10px;border-radius:20px;font-size:.8em}
+
+        .alert-item{display:flex;align-items:flex-start;gap:14px;padding:16px 20px;border-bottom:1px solid var(--border);transition:background .15s}
+        .alert-item:hover{background:var(--card-hover)}
+        .alert-item.unread{border-left:3px solid var(--primary)}
+        .alert-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.1em;flex-shrink:0}
+        .alert-icon.critical{background:rgba(240,107,107,.15);color:var(--danger)}
+        .alert-icon.warning{background:rgba(240,169,64,.15);color:var(--warning)}
+        .alert-icon.info{background:rgba(79,163,232,.15);color:var(--primary)}
+        .alert-icon.success{background:rgba(78,203,136,.15);color:var(--success)}
+
+        .filter-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:20px}
+        .filter-bar select,.filter-bar input{padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:.88em}
+
+        .two-col{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+        @media(max-width:900px){.two-col{grid-template-columns:1fr}}
+
+        .form-group{margin-bottom:14px}
+        .form-group label{display:block;font-size:.85em;color:var(--text-muted);margin-bottom:5px;font-weight:600}
+        .form-group input,.form-group select,.form-group textarea{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:.9em}
+
+        .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;align-items:center;justify-content:center}
+        .modal-overlay.show{display:flex}
+        .modal-box{background:var(--bg-card);border-radius:14px;padding:28px;width:560px;max-width:95vw;border:1px solid var(--border);max-height:85vh;overflow-y:auto}
+        .modal-box h3{margin-bottom:20px;display:flex;align-items:center;gap:10px}
+        .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}
+        .empty-msg{text-align:center;color:var(--text-muted);padding:40px 20px}
+    </style>
+    <script src="/static/auth_interceptor.js"></script>
+</head>
+<body>
+    <div class="app">
+        <main class="main-content">
+            <header class="header">
+                <div>
+                    <h1 class="page-title"><i class="fas fa-bell" style="color:var(--warning)"></i> Alertas & Notificações</h1>
+                    <div class="page-subtitle">Central de alertas, configuração de canais e regras de notificação</div>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" onclick="markAllRead()"><i class="fas fa-check-double"></i> Marcar Lidas</button>
+                    <button class="btn btn-secondary" onclick="loadAll()"><i class="fas fa-sync-alt"></i> Atualizar</button>
+                    <button class="btn btn-primary" onclick="openRuleModal()"><i class="fas fa-plus"></i> Nova Regra</button>
+                </div>
+            </header>
+
+            <!-- KPIs -->
+            <div class="stats-row">
+                <div class="stat-card"><div class="val" id="kpi-total">0</div><div class="lbl">Total de Alertas</div></div>
+                <div class="stat-card"><div class="val" id="kpi-unread" style="color:var(--primary)">0</div><div class="lbl">Não Lidos</div></div>
+                <div class="stat-card"><div class="val" id="kpi-crit" style="color:var(--danger)">0</div><div class="lbl">Críticos</div></div>
+                <div class="stat-card"><div class="val" id="kpi-channels">0</div><div class="lbl">Canais Ativos</div></div>
+            </div>
+
+            <!-- Filters -->
+            <div class="filter-bar">
+                <select id="flt-severity" onchange="loadAlerts()">
+                    <option value="">Todas Severidades</option>
+                    <option value="critical">Crítico</option>
+                    <option value="warning">Aviso</option>
+                    <option value="info">Info</option>
+                </select>
+                <select id="flt-status" onchange="loadAlerts()">
+                    <option value="">Todos Status</option>
+                    <option value="unread">Não Lidos</option>
+                    <option value="read">Lidos</option>
+                    <option value="resolved">Resolvidos</option>
+                </select>
+                <input type="text" id="flt-search" placeholder="Buscar alertas..." style="flex:1;min-width:200px" onkeyup="if(event.key==='Enter')loadAlerts()">
+                <button class="btn btn-primary" onclick="loadAlerts()"><i class="fas fa-search"></i></button>
+            </div>
+
+            <!-- Alerts List -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h3><i class="fas fa-list" style="color:var(--primary)"></i> Alertas Recentes</h3>
+                    <span id="alerts-count" style="font-size:.82em;color:var(--text-muted)"></span>
+                </div>
+                <div class="panel-body" id="alerts-list"><div class="empty-msg">Carregando...</div></div>
+            </div>
+
+            <div class="two-col">
+                <!-- Notification Rules -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3><i class="fas fa-cog" style="color:var(--primary)"></i> Regras de Notificação</h3>
+                    </div>
+                    <div class="panel-body" style="padding:0">
+                        <table class="tbl">
+                            <thead><tr><th>Nome</th><th>Evento</th><th>Canal</th><th>Status</th><th></th></tr></thead>
+                            <tbody id="rules-table"><tr><td colspan="5" class="empty-msg">Carregando...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Notification Channels -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3><i class="fas fa-paper-plane" style="color:var(--success)"></i> Canais de Notificação</h3>
+                        <button class="btn btn-sm btn-primary" onclick="openChannelModal()"><i class="fas fa-plus"></i></button>
+                    </div>
+                    <div class="panel-body" style="padding:0">
+                        <table class="tbl">
+                            <thead><tr><th>Canal</th><th>Tipo</th><th>Status</th><th></th></tr></thead>
+                            <tbody id="channels-table"><tr><td colspan="4" class="empty-msg">Carregando...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rule Modal -->
+            <div class="modal-overlay" id="rule-modal">
+                <div class="modal-box">
+                    <h3><i class="fas fa-bell" style="color:var(--primary)"></i> Nova Regra de Notificação</h3>
+                    <div class="form-group">
+                        <label>Nome da Regra</label>
+                        <input type="text" id="rule-name" placeholder="Ex: Alertar backup falho">
+                    </div>
+                    <div class="form-group">
+                        <label>Evento</label>
+                        <select id="rule-event">
+                            <option value="backup_failure">Falha de Backup</option>
+                            <option value="backup_success">Backup Concluído</option>
+                            <option value="disk_warning">Disco > 80%</option>
+                            <option value="agent_offline">Agente Offline</option>
+                            <option value="ransomware_detected">Ransomware Detectado</option>
+                            <option value="compliance_violation">Violação de Compliance</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Canal de Notificação</label>
+                        <select id="rule-channel"></select>
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn btn-secondary" onclick="closeRuleModal()">Cancelar</button>
+                        <button class="btn btn-success" onclick="createRule()"><i class="fas fa-check"></i> Criar</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Channel Modal -->
+            <div class="modal-overlay" id="channel-modal">
+                <div class="modal-box">
+                    <h3><i class="fas fa-paper-plane" style="color:var(--success)"></i> Novo Canal</h3>
+                    <div class="form-group">
+                        <label>Nome</label>
+                        <input type="text" id="ch-name" placeholder="Ex: E-mail TI">
+                    </div>
+                    <div class="form-group">
+                        <label>Tipo</label>
+                        <select id="ch-type" onchange="updateChannelConfig()">
+                            <option value="email">E-mail (SMTP)</option>
+                            <option value="webhook">Webhook (Teams/Slack/Discord)</option>
+                            <option value="telegram">Telegram</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Configuração (URL / Endereço)</label>
+                        <input type="text" id="ch-config" placeholder="email@empresa.com ou https://webhook.url">
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn btn-secondary" onclick="closeChannelModal()">Cancelar</button>
+                        <button class="btn btn-success" onclick="createChannel()"><i class="fas fa-check"></i> Criar</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/sidebar.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded',()=>{new UnifiedSidebar().initialize();loadAll()});
+    const API='/api/alerts';
+
+    async function loadAll(){
+        await Promise.allSettled([loadStats(), loadAlerts(), loadRules(), loadChannels()]);
+    }
+
+    async function loadStats(){
+        try{
+            const r=await fetch(API+'/statistics/summary');const d=await r.json();
+            const stats=d.overall||d.stats||d;
+            document.getElementById('kpi-total').textContent=stats.total||0;
+            const unread=(stats.total||0)-(stats.acknowledged_count||0);
+            document.getElementById('kpi-unread').textContent=unread>=0?unread:0;
+            document.getElementById('kpi-crit').textContent=(stats.by_severity||{}).critical||0;
+            // Count channels from notification-channels API
+            try{
+                const cr=await fetch('/api/notification-channels');const cd=await cr.json();
+                const chs=(cd.channels||[]).filter(c=>c.enabled!==false);
+                document.getElementById('kpi-channels').textContent=chs.length;
+            }catch(e2){document.getElementById('kpi-channels').textContent=0}
+        }catch(e){console.error('loadStats:',e)}
+    }
+
+    async function loadAlerts(){
+        try{
+            const sev=document.getElementById('flt-severity').value;
+            const st=document.getElementById('flt-status').value;
+            const q=document.getElementById('flt-search').value;
+            let url=API+'?limit=50';
+            if(sev)url+=`&severity=${sev}`;
+            if(st==='unread')url+=`&resolved=false`;
+            else if(st==='resolved')url+=`&resolved=true`;
+            const r=await fetch(url);const d=await r.json();
+            const alerts=d.alerts||[];
+            document.getElementById('alerts-count').textContent=`${alerts.length} alertas`;
+            const el=document.getElementById('alerts-list');
+            if(!alerts.length){el.innerHTML='<div class="empty-msg"><i class="fas fa-bell-slash" style="font-size:2em;opacity:.3;margin-bottom:8px;display:block"></i>Nenhum alerta encontrado</div>';return}
+            el.innerHTML=alerts.map(a=>{
+                const sev=a.severity||'info';
+                const iconCls=sev==='critical'?'critical':sev==='warning'?'warning':sev==='success'?'success':'info';
+                const icon=sev==='critical'?'exclamation-circle':sev==='warning'?'exclamation-triangle':'info-circle';
+                const isRead=a.acknowledged||false;
+                const ts=a.timestamp||a.created_at||'';
+                return `<div class="alert-item ${isRead?'':'unread'}">
+                    <div class="alert-icon ${iconCls}"><i class="fas fa-${icon}"></i></div>
+                    <div style="flex:1">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                            <strong style="font-size:.92em">${a.title||'Alerta'}</strong>
+                            <span style="font-size:.78em;color:var(--text-muted)">${ts?gbocFormatDateTime(ts):'Sem data'}</span>
+                        </div>
+                        <div style="font-size:.85em;color:var(--text-muted)">${a.message||''}</div>
+                        <div style="font-size:.75em;color:var(--text-muted);margin-top:4px">
+                            ${a.source?`<i class="fas fa-tag"></i> ${a.source} · `:''}
+                            ${a.type?`<span class="badge-info">${a.type}</span> · `:''}
+                            ${a.resolved?'<span class="badge-ok">RESOLVIDO</span>':isRead?'<span class="badge-info">LIDO</span>':'<span class="badge-warn">PENDENTE</span>'}
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:4px;flex-shrink:0">
+                        ${!isRead?`<button class="btn btn-sm btn-secondary" onclick="markRead(${a.id})" title="Marcar como lido"><i class="fas fa-check"></i></button>`:''}
+                        ${!a.resolved?`<button class="btn btn-sm btn-secondary" onclick="resolveAlert(${a.id})" title="Resolver"><i class="fas fa-check-double"></i></button>`:''}
+                        <button class="btn btn-sm btn-danger" onclick="deleteAlert(${a.id})" title="Excluir"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>`;
+            }).join('');
+        }catch(e){console.error('loadAlerts:',e)}
+    }
+
+    // Rules are stored locally (no backend API for rules)
+    let _localRules=JSON.parse(localStorage.getItem('gboc_alert_rules')||'[]');
+
+    function loadRules(){
+        const tb=document.getElementById('rules-table');
+        if(!_localRules.length){tb.innerHTML='<tr><td colspan="5" class="empty-msg">Nenhuma regra configurada</td></tr>';return}
+        tb.innerHTML=_localRules.map((r,i)=>`<tr>
+            <td style="font-weight:600">${r.name}</td>
+            <td style="font-size:.82em">${r.event||'—'}</td>
+            <td style="font-size:.82em">${r.channel_name||'—'}</td>
+            <td><span class="${r.enabled?'badge-ok':'badge-warn'}">${r.enabled?'ATIVA':'INATIVA'}</span></td>
+            <td><button class="btn btn-sm btn-danger" onclick="deleteRule(${i})"><i class="fas fa-trash"></i></button></td>
+        </tr>`).join('');
+    }
+
+    async function loadChannels(){
+        try{
+            const r=await fetch('/api/notification-channels');const d=await r.json();
+            const chs=d.channels||[];
+            const tb=document.getElementById('channels-table');
+            if(!chs.length){tb.innerHTML='<tr><td colspan="4" class="empty-msg">Nenhum canal configurado</td></tr>';return}
+            tb.innerHTML=chs.map(c=>`<tr>
+                <td style="font-weight:600">${c.name}</td>
+                <td style="font-size:.82em">${c.channel_type||c.type||'—'}</td>
+                <td><span class="${c.enabled!==false?'badge-ok':'badge-warn'}">${c.enabled!==false?'ATIVO':'INATIVO'}</span></td>
+                <td>
+                    <button class="btn btn-sm btn-secondary" onclick="testChannel(${c.id})" title="Testar"><i class="fas fa-paper-plane"></i></button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteChannel(${c.id})"><i class="fas fa-trash"></i></button>
+                </td>
+            </tr>`).join('');
+
+            // Populate rule modal channel dropdown
+            const sel=document.getElementById('rule-channel');
+            sel.innerHTML=chs.map(c=>`<option value="${c.id}">${c.name} (${c.channel_type||c.type})</option>`).join('');
+        }catch(e){console.error('loadChannels:',e)}
+    }
+
+    function openRuleModal(){document.getElementById('rule-modal').classList.add('show')}
+    function closeRuleModal(){document.getElementById('rule-modal').classList.remove('show')}
+    function openChannelModal(){document.getElementById('channel-modal').classList.add('show')}
+    function closeChannelModal(){document.getElementById('channel-modal').classList.remove('show')}
+
+    function createRule(){
+        const name=document.getElementById('rule-name').value.trim();
+        const event=document.getElementById('rule-event').value;
+        const sel=document.getElementById('rule-channel');
+        const channelName=sel.options[sel.selectedIndex]?sel.options[sel.selectedIndex].text:'';
+        if(!name){alert('Informe o nome');return}
+        closeRuleModal();
+        _localRules.push({name,event,channel_id:sel.value,channel_name:channelName,enabled:true});
+        localStorage.setItem('gboc_alert_rules',JSON.stringify(_localRules));
+        loadRules();
+    }
+
+    async function createChannel(){
+        const name=document.getElementById('ch-name').value.trim();
+        const type=document.getElementById('ch-type').value;
+        const configVal=document.getElementById('ch-config').value.trim();
+        if(!name||!configVal){alert('Preencha todos os campos');return}
+        closeChannelModal();
+        const configObj=type==='email'?{to_email:configVal}:type==='telegram'?{chat_id:configVal}:{url:configVal};
+        try{
+            const r=await fetch('/api/notification-channels',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,channel_type:type,config:configObj})});
+            if(!r.ok){const d=await r.json();alert('Erro: '+(d.detail||'Desconhecido'));return}
+            loadAll();
+        }catch(e){alert('Erro: '+e.message)}
+    }
+
+    function deleteRule(idx){if(!confirm('Excluir regra?'))return;_localRules.splice(idx,1);localStorage.setItem('gboc_alert_rules',JSON.stringify(_localRules));loadRules()}
+    async function deleteChannel(id){if(!confirm('Excluir canal?'))return;try{await fetch('/api/notification-channels/'+id,{method:'DELETE'});loadAll()}catch(e){alert(e.message)}}
+    async function testChannel(id){try{const r=await fetch('/api/notification-channels/'+id+'/test',{method:'POST'});const d=await r.json();alert(d.message||d.status||'Teste enviado!')}catch(e){alert(e.message)}}
+    async function markRead(id){try{await fetch(API+'/'+id+'/acknowledge',{method:'PUT'});loadAll()}catch(e){}}
+    async function markAllRead(){try{await fetch(API+'/bulk-action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'acknowledge',alert_ids:'all'})});loadAll()}catch(e){}}
+    async function resolveAlert(id){try{await fetch(API+'/'+id+'/resolve',{method:'PUT'});loadAll()}catch(e){}}
+    async function deleteAlert(id){if(!confirm('Excluir este alerta?'))return;try{await fetch(API+'/'+id,{method:'DELETE'});loadAll()}catch(e){}}
+    </script>
+</body>
+</html>
+

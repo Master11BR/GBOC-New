@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GBOC Agent 11.7c - Seguranca e Usuarios</title>
+    <link rel="stylesheet" href="/static/style.css?v=11.9">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:16px;margin-bottom:28px}
+        .stat-card{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:18px;text-align:center}
+        .stat-card .val{font-size:1.8em;font-weight:700}
+        .stat-card .lbl{font-size:.8em;color:var(--text-muted);margin-top:4px}
+        .three-col{display:grid;grid-template-columns:300px 1fr 1fr;gap:24px;margin-bottom:20px}
+        @media(max-width:1100px){.three-col{grid-template-columns:1fr}}
+        .panel{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px}
+        .panel-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+        .panel-header h3{margin:0;display:flex;align-items:center;gap:8px;font-size:1em}
+        .panel-body{padding:20px}
+        .tbl{width:100%;border-collapse:collapse}
+        .tbl th,.tbl td{padding:11px 14px;text-align:left;border-bottom:1px solid var(--border);font-size:.85em}
+        .tbl th{background:var(--bg-input);color:var(--text-muted);font-weight:600}
+        .badge-ok{background:rgba(72,187,120,.15);color:var(--success);padding:2px 10px;border-radius:20px;font-size:.8em}
+        .badge-warn{background:rgba(237,137,54,.15);color:var(--warning);padding:2px 10px;border-radius:20px;font-size:.8em}
+        .badge-crit{background:rgba(245,101,101,.15);color:var(--danger);padding:2px 10px;border-radius:20px;font-size:.8em}
+        .badge-info{background:rgba(66,153,225,.15);color:var(--primary);padding:2px 10px;border-radius:20px;font-size:.8em}
+        .user-card{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border);transition:background .15s}
+        .user-card:hover{background:var(--card-hover)}
+        .user-avatar{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.1em;font-weight:700;flex-shrink:0}
+        .user-avatar.admin{background:rgba(245,101,101,.15);color:var(--danger)}
+        .user-avatar.operator{background:rgba(66,153,225,.15);color:var(--primary)}
+        .user-avatar.viewer{background:rgba(72,187,120,.15);color:var(--success)}
+        .profile-card{text-align:center;padding:28px 20px}
+        .profile-avatar{width:72px;height:72px;border-radius:16px;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;font-size:1.8em;font-weight:800;background:rgba(99,102,241,.12);color:var(--primary);border:2px solid rgba(99,102,241,.3)}
+        .profile-name{font-size:1.1em;font-weight:700;margin-bottom:2px}
+        .profile-role{font-size:.82em;color:var(--text-muted);margin-bottom:16px}
+        .setting-item{margin-bottom:14px}
+        .setting-item label{display:block;font-size:.85em;color:var(--text-muted);margin-bottom:5px;font-weight:600}
+        .setting-item input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:.9em;box-sizing:border-box}
+        .pw-msg{display:none;padding:8px 12px;border-radius:6px;font-size:.85em;margin-top:8px}
+        .pw-msg.ok{display:block;background:rgba(72,187,120,.12);color:var(--success);border:1px solid rgba(72,187,120,.3)}
+        .pw-msg.err{display:block;background:rgba(245,101,101,.12);color:var(--danger);border:1px solid rgba(245,101,101,.3)}
+        .form-group{margin-bottom:14px}
+        .form-group label{display:block;font-size:.85em;color:var(--text-muted);margin-bottom:5px;font-weight:600}
+        .form-group input,.form-group select{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:.9em;box-sizing:border-box}
+        .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;align-items:center;justify-content:center}
+        .modal-overlay.show{display:flex}
+        .modal-box{background:var(--bg-card);border-radius:14px;padding:28px;width:480px;max-width:95vw;border:1px solid var(--border);max-height:85vh;overflow-y:auto}
+        .modal-box h3{margin-bottom:20px;display:flex;align-items:center;gap:10px}
+        .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}
+        .empty-msg{text-align:center;color:var(--text-muted);padding:40px 20px}
+    </style>
+    <script src="/static/auth_interceptor.js"></script>
+</head>
+<body>
+    <div class="app">
+        <main class="main-content">
+            <header class="header">
+                <div>
+                    <h1 class="page-title"><i class="fas fa-user-shield" style="color:var(--primary)"></i> Seguran&#231;a &amp; Usu&#225;rios</h1>
+                    <div class="page-subtitle">Autentica&#231;&#227;o, gerenciamento de usu&#225;rios, senhas e auditoria de acesso</div>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" onclick="loadAll()"><i class="fas fa-sync-alt"></i> Atualizar</button>
+                    <button class="btn btn-primary" onclick="openUserModal()"><i class="fas fa-user-plus"></i> Novo Usu&#225;rio</button>
+                    <button class="btn btn-danger" onclick="gbocLogout()"><i class="fas fa-sign-out-alt"></i> Sair</button>
+                </div>
+            </header>
+
+            <div class="stats-row">
+                <div class="stat-card"><div class="val" id="kpi-users">0</div><div class="lbl">Usu&#225;rios</div></div>
+                <div class="stat-card"><div class="val" id="kpi-admins">0</div><div class="lbl">Administradores</div></div>
+                <div class="stat-card"><div class="val" id="kpi-auth" style="color:var(--success)">---</div><div class="lbl">Autentica&#231;&#227;o</div></div>
+                <div class="stat-card"><div class="val" id="kpi-sessions">0</div><div class="lbl">Sess&#245;es Ativas</div></div>
+            </div>
+
+            <div class="three-col">
+                <div>
+                    <div class="panel" style="border:2px solid rgba(99,102,241,.2)">
+                        <div class="profile-card">
+                            <div class="profile-avatar" id="my-avatar">?</div>
+                            <div class="profile-name" id="my-name">Carregando...</div>
+                            <div class="profile-role" id="my-role"></div>
+                            <div style="font-size:.78em;color:var(--text-muted)" id="my-username"></div>
+                        </div>
+                        <div class="panel-body" style="padding-top:0">
+                            <h4 style="font-size:.9em;margin-bottom:12px;color:var(--text)"><i class="fas fa-key" style="color:var(--warning);margin-right:6px"></i> Alterar Senha</h4>
+                            <div class="setting-item">
+                                <label>Senha Atual</label>
+                                <input type="password" id="pw-current" placeholder="Digite a senha atual">
+                            </div>
+                            <div class="setting-item">
+                                <label>Nova Senha</label>
+                                <input type="password" id="pw-new" placeholder="M&#237;nimo 6 caracteres">
+                            </div>
+                            <div class="setting-item">
+                                <label>Confirmar Nova Senha</label>
+                                <input type="password" id="pw-confirm" placeholder="Repita a nova senha">
+                            </div>
+                            <div class="pw-msg" id="pw-msg"></div>
+                            <button class="btn btn-primary" onclick="changePassword()" style="width:100%;margin-top:8px">
+                                <i class="fas fa-key"></i> Alterar Senha
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3><i class="fas fa-users" style="color:var(--primary)"></i> Usu&#225;rios Cadastrados</h3>
+                    </div>
+                    <div class="panel-body" style="padding:0" id="users-list"><div class="empty-msg">Carregando...</div></div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3><i class="fas fa-clipboard-list" style="color:var(--warning)"></i> Auditoria de Acesso</h3>
+                    </div>
+                    <div class="panel-body" style="padding:0">
+                        <table class="tbl">
+                            <thead><tr><th>Usu&#225;rio</th><th>A&#231;&#227;o</th><th>IP</th><th>Data</th></tr></thead>
+                            <tbody id="audit-table"><tr><td colspan="4" class="empty-msg">Carregando...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-overlay" id="user-modal">
+                <div class="modal-box">
+                    <h3><i class="fas fa-user-plus" style="color:var(--primary)"></i> <span id="modal-user-title">Novo Usu&#225;rio</span></h3>
+                    <div class="form-group">
+                        <label>Nome de Exibi&#231;&#227;o</label>
+                        <input type="text" id="usr-display" placeholder="Nome Completo">
+                    </div>
+                    <div class="form-group">
+                        <label>Usu&#225;rio (login)</label>
+                        <input type="text" id="usr-username" placeholder="admin">
+                    </div>
+                    <div class="form-group">
+                        <label>Senha</label>
+                        <input type="password" id="usr-password" placeholder="M&#237;nimo 6 caracteres">
+                    </div>
+                    <div class="form-group">
+                        <label>Papel</label>
+                        <select id="usr-role">
+                            <option value="admin">Administrador (acesso total)</option>
+                            <option value="operator">Operador (backup/restore/tasks)</option>
+                            <option value="viewer">Visualizador (somente leitura)</option>
+                        </select>
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn btn-secondary" onclick="closeUserModal()">Cancelar</button>
+                        <button class="btn btn-success" onclick="createUser()"><i class="fas fa-check"></i> Salvar</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/sidebar.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded',function(){new UnifiedSidebar().initialize();loadAll()});
+    var AUTH_API='/api/auth';
+    var AUDIT_API='/api/audit';
+
+    async function loadAll(){
+        await Promise.allSettled([loadMyProfile(), loadUsers(), loadAudit()]);
+    }
+
+    async function loadMyProfile(){
+        try{
+            var r=await fetch(AUTH_API+'/status');var d=await r.json();
+            var u=d.user||{};
+            document.getElementById('my-avatar').textContent=(u.display_name||u.username||'?')[0].toUpperCase();
+            document.getElementById('my-name').textContent=u.display_name||u.username||'Usuario';
+            document.getElementById('my-username').textContent=u.username?'@'+u.username:'';
+            var role=u.role||'admin';
+            var roleLabels={admin:'Administrador',operator:'Operador',viewer:'Visualizador'};
+            var cls=role==='admin'?'badge-crit':role==='operator'?'badge-info':'badge-ok';
+            document.getElementById('my-role').innerHTML='<span class="'+cls+'">'+(roleLabels[role]||role)+'</span>';
+            document.getElementById('kpi-auth').textContent=d.auth_enabled?'Ativada':'Desativada';
+            document.getElementById('kpi-auth').style.color=d.auth_enabled?'var(--success)':'var(--warning)';
+        }catch(e){console.error('loadMyProfile:',e)}
+    }
+
+    async function changePassword(){
+        var cur=document.getElementById('pw-current').value;
+        var nw=document.getElementById('pw-new').value;
+        var cf=document.getElementById('pw-confirm').value;
+        if(!cur||!nw){showPwMsg('Preencha todos os campos','err');return}
+        if(nw.length<6){showPwMsg('Senha deve ter pelo menos 6 caracteres','err');return}
+        if(nw!==cf){showPwMsg('As senhas nao coincidem','err');return}
+        try{
+            var r=await fetch(AUTH_API+'/change-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({current_password:cur,new_password:nw})});
+            var d=await r.json();
+            if(!r.ok){showPwMsg(d.detail||'Erro ao alterar senha','err');return}
+            showPwMsg('Senha alterada com sucesso!','ok');
+            document.getElementById('pw-current').value='';
+            document.getElementById('pw-new').value='';
+            document.getElementById('pw-confirm').value='';
+        }catch(e){showPwMsg('Erro: '+e.message,'err')}
+    }
+
+    function showPwMsg(text,type){
+        var el=document.getElementById('pw-msg');
+        el.className='pw-msg '+type;
+        el.textContent=text;
+        if(type==='ok') setTimeout(function(){el.className='pw-msg';el.style.display='none'},3000);
+    }
+
+    async function loadUsers(){
+        try{
+            var r=await fetch(AUTH_API+'/users');var d=await r.json();
+            var users=d.users||[];
+            document.getElementById('kpi-users').textContent=users.length;
+            document.getElementById('kpi-admins').textContent=users.filter(function(u){return u.role==='admin'}).length;
+            document.getElementById('kpi-sessions').textContent=d.active_sessions||0;
+            var el=document.getElementById('users-list');
+            if(!users.length){el.innerHTML='<div class="empty-msg"><i class="fas fa-users" style="font-size:2em;opacity:.3;margin-bottom:8px;display:block"></i>Nenhum usuario cadastrado.<br><span style="font-size:.85em">O sistema opera sem autenticacao.</span></div>';return}
+            el.innerHTML=users.map(function(u){
+                var role=u.role||'viewer';
+                var initial=(u.display_name||u.username||'?')[0].toUpperCase();
+                var active=u.is_active!==false;
+                var cls2=role==='admin'?'badge-crit':role==='operator'?'badge-info':'badge-ok';
+                return '<div class="user-card">'+
+                    '<div class="user-avatar '+role+'">'+initial+'</div>'+
+                    '<div style="flex:1">'+
+                        '<div style="font-weight:600;font-size:.92em">'+(u.display_name||u.username)+(!active?' <span class="badge-warn">INATIVO</span>':'')+'</div>'+
+                        '<div style="font-size:.78em;color:var(--text-muted)">@'+u.username+' &middot; <span class="'+cls2+'">'+role.toUpperCase()+'</span></div>'+
+                        '<div style="font-size:.75em;color:var(--text-muted);margin-top:2px">Ultimo login: '+(u.last_login?gbocFormatDateTime(u.last_login):'Nunca')+'</div>'+
+                    '</div>'+
+                    '<div style="display:flex;gap:4px;flex-shrink:0">'+
+                        '<button class="btn btn-sm btn-secondary" onclick="resetPassword('+u.id+')" title="Resetar Senha"><i class="fas fa-key"></i></button>'+
+                        '<button class="btn btn-sm btn-danger" onclick="deleteUser('+u.id+')" title="Excluir"><i class="fas fa-trash"></i></button>'+
+                    '</div>'+
+                '</div>';
+            }).join('');
+        }catch(e){console.error('loadUsers:',e)}
+    }
+
+    function openUserModal(){document.getElementById('user-modal').classList.add('show')}
+    function closeUserModal(){document.getElementById('user-modal').classList.remove('show')}
+
+    async function createUser(){
+        var display_name=document.getElementById('usr-display').value.trim();
+        var username=document.getElementById('usr-username').value.trim();
+        var password=document.getElementById('usr-password').value;
+        var role=document.getElementById('usr-role').value;
+        if(!username||!password){alert('Preencha usuario e senha');return}
+        if(password.length<6){alert('Senha minima de 6 caracteres');return}
+        closeUserModal();
+        try{
+            var r=await fetch(AUTH_API+'/users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({display_name:display_name||username,username:username,password:password,role:role})});
+            if(!r.ok){var d=await r.json();alert('Erro: '+(d.detail||'Desconhecido'));return}
+            document.getElementById('usr-display').value='';
+            document.getElementById('usr-username').value='';
+            document.getElementById('usr-password').value='';
+            loadAll();
+        }catch(e){alert('Erro: '+e.message)}
+    }
+
+    async function deleteUser(id){
+        if(!confirm('Excluir este usuario permanentemente?'))return;
+        try{await fetch(AUTH_API+'/users/'+id,{method:'DELETE'});loadAll()}catch(e){alert(e.message)}
+    }
+
+    async function resetPassword(id){
+        var pw=prompt('Nova senha (minimo 6 caracteres):');
+        if(!pw) return;
+        if(pw.length<6){alert('Senha minima de 6 caracteres');return}
+        try{
+            var r=await fetch(AUTH_API+'/users/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
+            if(!r.ok){var d=await r.json();alert('Erro: '+(d.detail||''));return}
+            alert('Senha alterada com sucesso!');
+        }catch(e){alert('Erro: '+e.message)}
+    }
+
+    async function loadAudit(){
+        try{
+            var r=await fetch(AUDIT_API+'/?limit=25');var d=await r.json();
+            var logs=d.entries||d.logs||d.audit_log||[];
+            var tb=document.getElementById('audit-table');
+            if(!logs.length){tb.innerHTML='<tr><td colspan="4" class="empty-msg">Nenhum registro de auditoria</td></tr>';return}
+            tb.innerHTML=logs.map(function(l){
+                var action=l.action||l.event_type||'---';
+                var isLogin=action.includes('login');
+                var isFail=action.includes('fail')||action.includes('error');
+                var cls3=isFail?'badge-crit':isLogin?'badge-ok':'badge-info';
+                return '<tr>'+
+                    '<td style="font-weight:600">'+(l.username||l.user||'---')+'</td>'+
+                    '<td><span class="'+cls3+'">'+action+'</span></td>'+
+                    '<td style="font-size:.82em;color:var(--text-muted)">'+(l.ip_address||l.ip||l.source_ip||'---')+'</td>'+
+                    '<td style="font-size:.82em;color:var(--text-muted)">'+(l.timestamp?gbocFormatDateTime(l.timestamp):'---')+'</td>'+
+                '</tr>';
+            }).join('');
+        }catch(e){console.error('loadAudit:',e)}
+    }
+
+    async function gbocLogout(){
+        if(!confirm('Deseja realmente sair?')) return;
+        try{await fetch(AUTH_API+'/logout',{method:'POST'})}catch(e){}
+        localStorage.removeItem('gboc_token');
+        localStorage.removeItem('gboc_user');
+        document.cookie='gboc_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+        window.location.href='/login.html';
+    }
+    </script>
+</body>
+</html>
+

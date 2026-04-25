@@ -1,0 +1,545 @@
+{
+  "version": "10.0a",
+  "timestamp": "2026-03-12T14:52:27.427192",
+  "system_info": {
+    "platform": "Windows",
+    "platform_release": "2025Server",
+    "platform_version": "10.0.26100",
+    "architecture": "AMD64",
+    "hostname": "Servidor-2025",
+    "processor": "AMD64 Family 23 Model 17 Stepping 0, AuthenticAMD",
+    "cpu_count": 8,
+    "cpu_percent": 2.0,
+    "memory_total_gb": 21.93,
+    "memory_used_gb": 9.48,
+    "memory_percent": 43.2,
+    "disk_total_gb": 931.51,
+    "disk_used_gb": 0.61,
+    "disk_percent": 0.1,
+    "python_version": "3.14.3",
+    "status": "OK"
+  },
+  "agent_status": {
+    "installed": true,
+    "version": "Unknown",
+    "database": "OK",
+    "config": null,
+    "engines": [
+      "advanced_statistics",
+      "analytics",
+      "auto_healer",
+      "backup_controller",
+      "backup_engine",
+      "backup_engine_manager",
+      "backup_importer",
+      "backup_synchronizer",
+      "backup_verifier",
+      "diagnostic_module",
+      "diagnostic_system",
+      "engine_validator",
+      "error_analyzer",
+      "error_capture",
+      "healer_engine",
+      "history_importer",
+      "metrics_collector",
+      "preemptive_diagnostic",
+      "realtime_backup_monitor",
+      "real_backup_executor",
+      "real_engine_importer",
+      "real_restore_manager",
+      "repository_manager",
+      "scheduler",
+      "task_manager"
+    ],
+    "issues": []
+  },
+  "server_status": {
+    "installed": true,
+    "version": "10.0a",
+    "database_config": "PostgreSQL",
+    "issues": []
+  },
+  "database_status": {
+    "agent_db": {
+      "status": "OK",
+      "size_mb": 0.07,
+      "tables": [
+        "backups",
+        "sqlite_sequence",
+        "repositories",
+        "tasks",
+        "system_logs",
+        "settings",
+        "detected_engines",
+        "imported_repositories",
+        "engine_backup_statistics"
+      ],
+      "table_count": 9,
+      "integrity": "OK"
+    },
+    "server_db": {
+      "type": "PostgreSQL",
+      "status": "Not checked (remote)"
+    },
+    "issues": []
+  },
+  "file_structure": {
+    "agent": {
+      "root": "E:\\GBOC\\GBOC-New\\gboc_v8",
+      "directories": {
+        "data": {
+          "exists": true,
+          "path": "E:\\GBOC\\GBOC-New\\gboc_v8\\data"
+        },
+        "logs": {
+          "exists": true,
+          "path": "E:\\GBOC\\GBOC-New\\gboc_v8\\logs"
+        },
+        "static": {
+          "exists": true,
+          "path": "E:\\GBOC\\GBOC-New\\gboc_v8\\static"
+        },
+        "api": {
+          "exists": true,
+          "path": "E:\\GBOC\\GBOC-New\\gboc_v8\\api"
+        },
+        "engines": {
+          "exists": true,
+          "path": "E:\\GBOC\\GBOC-New\\gboc_v8\\engines"
+        },
+        "storage_backends": {
+          "exists": true,
+          "path": "E:\\GBOC\\GBOC-New\\gboc_v8\\storage_backends"
+        }
+      },
+      "critical_files": {
+        "agent_server.py": {
+          "exists": true,
+          "path": "E:\\GBOC\\GBOC-New\\gboc_v8\\agent_server.py"
+        },
+        "start_server.py": {
+          "exists": true,
+          "path": "E:\\GBOC\\GBOC-New\\gboc_v8\\start_server.py"
+        },
+        "models.py": {
+          "exists": true,
+          "path": "E:\\GBOC\\GBOC-New\\gboc_v8\\models.py"
+        },
+        "shared_core.py": {
+          "exists": true,
+          "path": "E:\\GBOC\\GBOC-New\\gboc_v8\\shared_core.py"
+        },
+        "server_client.py": {
+          "exists": true,
+          "path": "E:\\GBOC\\GBOC-New\\gboc_v8\\server_client.py"
+        },
+        "server_config.py": {
+          "exists": true,
+          "path": "E:\\GBOC\\GBOC-New\\gboc_v8\\server_config.py"
+        }
+      }
+    },
+    "server": {
+      "root": "E:\\GBOC\\GBOC-New\\GBOC-Server",
+      "critical_files": {
+        "gboc_server.py": {
+          "exists": true,
+          "path": "E:\\GBOC\\GBOC-New\\GBOC-Server\\gboc_server.py"
+        }
+      }
+    }
+  },
+  "orphan_files": [
+    {
+      "file": "get_health_report.py",
+      "size_kb": 1.54,
+      "modified": "2025-12-19T14:36:51.452399",
+      "type": "python_module"
+    },
+    {
+      "file": "http_client.py",
+      "size_kb": 0.99,
+      "modified": "2025-12-18T02:03:19.283509",
+      "type": "python_module"
+    },
+    {
+      "file": "monitoring.py",
+      "size_kb": 4.59,
+      "modified": "2025-12-28T01:45:12.375539",
+      "type": "python_module"
+    },
+    {
+      "file": "run_complete_diagnostic.py",
+      "size_kb": 5.69,
+      "modified": "2026-03-10T00:29:52.220374",
+      "type": "python_module"
+    },
+    {
+      "file": "start_server.py",
+      "size_kb": 0.68,
+      "modified": "2026-01-01T15:05:41.545409",
+      "type": "python_module"
+    },
+    {
+      "file": "test_repository_loading.py",
+      "size_kb": 7.06,
+      "modified": "2026-02-18T11:59:23.634233",
+      "type": "python_module"
+    },
+    {
+      "file": "api\\advanced_stats_api.py",
+      "size_kb": 3.38,
+      "modified": "2026-03-10T00:28:16.542414",
+      "type": "python_module"
+    },
+    {
+      "file": "api\\alerts.py",
+      "size_kb": 23.76,
+      "modified": "2025-12-29T15:54:56.297669",
+      "type": "python_module"
+    },
+    {
+      "file": "api\\api_restore.py",
+      "size_kb": 7.97,
+      "modified": "2026-03-04T12:11:13.626723",
+      "type": "python_module"
+    },
+    {
+      "file": "api\\backup_control.py",
+      "size_kb": 2.81,
+      "modified": "2025-12-22T00:18:21.866739",
+      "type": "python_module"
+    },
+    {
+      "file": "api\\diagnostics.py",
+      "size_kb": 29.67,
+      "modified": "2025-12-08T21:36:00",
+      "type": "python_module"
+    },
+    {
+      "file": "api\\errors.py",
+      "size_kb": 0.87,
+      "modified": "2025-12-18T23:24:16.138156",
+      "type": "python_module"
+    },
+    {
+      "file": "api\\fs.py",
+      "size_kb": 2.43,
+      "modified": "2025-12-14T02:17:46.276816",
+      "type": "python_module"
+    },
+    {
+      "file": "api\\import_api.py",
+      "size_kb": 2.67,
+      "modified": "2025-12-08T21:34:01",
+      "type": "python_module"
+    },
+    {
+      "file": "api\\overview.py",
+      "size_kb": 4.51,
+      "modified": "2025-12-08T21:36:00",
+      "type": "python_module"
+    },
+    {
+      "file": "api\\preemptive_api.py",
+      "size_kb": 3.46,
+      "modified": "2026-03-10T00:28:26.671889",
+      "type": "python_module"
+    },
+    {
+      "file": "api\\smtp.py",
+      "size_kb": 6.75,
+      "modified": "2025-12-29T15:07:28.159692",
+      "type": "python_module"
+    },
+    {
+      "file": "api\\system_api.py",
+      "size_kb": 5.01,
+      "modified": "2026-03-10T00:28:45.037700",
+      "type": "python_module"
+    },
+    {
+      "file": "api\\tasks_ops.py",
+      "size_kb": 0.91,
+      "modified": "2025-12-18T16:32:17.008664",
+      "type": "python_module"
+    },
+    {
+      "file": "app\\main.py",
+      "size_kb": 0.75,
+      "modified": "2026-01-19T21:34:36.341593",
+      "type": "python_module"
+    },
+    {
+      "file": "engines\\advanced_statistics.py",
+      "size_kb": 14.43,
+      "modified": "2026-03-10T00:24:55.691094",
+      "type": "python_module"
+    },
+    {
+      "file": "engines\\analytics.py",
+      "size_kb": 24.9,
+      "modified": "2025-12-08T21:34:06",
+      "type": "python_module"
+    },
+    {
+      "file": "engines\\auto_healer.py",
+      "size_kb": 7.83,
+      "modified": "2025-12-08T21:34:04",
+      "type": "python_module"
+    },
+    {
+      "file": "engines\\backup_controller.py",
+      "size_kb": 8.48,
+      "modified": "2025-12-08T15:36:24.677078",
+      "type": "python_module"
+    },
+    {
+      "file": "engines\\backup_engine.py",
+      "size_kb": 0.11,
+      "modified": "2025-12-16T23:37:12.243100",
+      "type": "python_module"
+    },
+    {
+      "file": "engines\\backup_engine_manager.py",
+      "size_kb": 25.36,
+      "modified": "2025-12-28T12:36:40.886247",
+      "type": "python_module"
+    },
+    {
+      "file": "engines\\backup_importer.py",
+      "size_kb": 2.85,
+      "modified": "2025-12-08T21:34:06",
+      "type": "python_module"
+    },
+    {
+      "file": "engines\\backup_synchronizer.py",
+      "size_kb": 2.69,
+      "modified": "2025-12-17T22:05:33.368190",
+      "type": "python_module"
+    },
+    {
+      "file": "engines\\backup_verifier.py",
+      "size_kb": 8.81,
+      "modified": "2025-12-18T14:53:42.867352",
+      "type": "python_module"
+    },
+    {
+      "file": "engines\\diagnostic_module.py",
+      "size_kb": 41.09,
+      "modified": "2025-12-08T21:34:07",
+      "type": "python_module"
+    },
+    {
+      "file": "engines\\diagnostic_system.py",
+      "size_kb": 18.18,
+      "modified": "2026-03-10T09:40:05.797817",
+      "type": "python_module"
+    },
+    {
+      "file": "engines\\engine_validator.py",
+      "size_kb": 15.31,
+      "modified": "2025-12-30T23:12:34.867524",
+      "type": "python_module"
+    },
+    {
+      "file": "engines\\error_analyzer.py",
+      "size_kb": 12.61,
+      "modified": "2025-12-08T21:34:04",
+      "type": "python_module"
+    },
+    {
+      "file": "engines\\error_capture.py",
+      "size_kb": 12.9,
+      "modified": "2025-12-29T03:30:09.614312",
+      "type": "python_module"
+    },
+    {
+      "file": "engines\\healer_engine.py",
+      "size_kb": 20.26,
+      "modified": "2025-12-28T12:53:12.892515",
+      "type": "python_module"
+    },
+    {
+      "file": "engines\\history_importer.py",
+      "size_kb": 27.88,
+      "modified": "2025-12-22T10:52:40.494433",
+      "type": "python_module"
+    },
+    {
+      "file": "engines\\metrics_collector.py",
+      "size_kb": 14.65,
+      "modified": "2025-12-29T03:30:11.396174",
+      "type": "python_module"
+    },
+    {
+      "file": "engines\\preemptive_diagnostic.py",
+      "size_kb": 16.96,
+      "modified": "2026-03-10T00:25:37.950870",
+      "type": "python_module"
+    },
+    {
+      "file": "engines\\realtime_backup_monitor.py",
+      "size_kb": 12.19,
+      "modified": "2025-12-28T12:35:35.608858",
+      "type": "python_module"
+    },
+    {
+      "file": "engines\\real_backup_executor.py",
+      "size_kb": 0.2,
+      "modified": "2025-12-16T00:45:23.595671",
+      "type": "python_module"
+    },
+    {
+      "file": "engines\\real_engine_importer.py",
+      "size_kb": 16.78,
+      "modified": "2025-12-08T21:34:05",
+      "type": "python_module"
+    },
+    {
+      "file": "engines\\real_restore_manager.py",
+      "size_kb": 49.72,
+      "modified": "2026-02-17T16:08:31.598417",
+      "type": "python_module"
+    },
+    {
+      "file": "engines\\repository_manager.py",
+      "size_kb": 25.8,
+      "modified": "2026-03-12T13:33:13.747169",
+      "type": "python_module"
+    },
+    {
+      "file": "engines\\scheduler.py",
+      "size_kb": 1.89,
+      "modified": "2025-12-17T22:29:15.452276",
+      "type": "python_module"
+    },
+    {
+      "file": "engines\\task_manager.py",
+      "size_kb": 72.27,
+      "modified": "2026-02-16T17:24:53.724410",
+      "type": "python_module"
+    },
+    {
+      "file": "storage_backends\\base.py",
+      "size_kb": 2.97,
+      "modified": "2026-02-18T11:58:23.684458",
+      "type": "python_module"
+    },
+    {
+      "file": "storage_backends\\cloud.py",
+      "size_kb": 6.77,
+      "modified": "2026-02-18T11:59:07.464919",
+      "type": "python_module"
+    },
+    {
+      "file": "storage_backends\\local.py",
+      "size_kb": 7.03,
+      "modified": "2026-02-18T11:58:43.155745",
+      "type": "python_module"
+    },
+    {
+      "file": "app\\models\\all_models.py",
+      "size_kb": 3.41,
+      "modified": "2026-01-19T21:36:38.730511",
+      "type": "python_module"
+    },
+    {
+      "file": "app\\schemas\\repository.py",
+      "size_kb": 1.55,
+      "modified": "2026-01-19T21:34:10.128618",
+      "type": "python_module"
+    }
+  ],
+  "version_consistency": {
+    "target_version": "10.0a",
+    "agent_version": null,
+    "server_version": "10.0a",
+    "mismatches": []
+  },
+  "performance": {
+    "recommendations": [],
+    "metrics": {
+      "cpu_percent": 4.1,
+      "memory_percent": 43.2,
+      "memory_available_gb": 12.46
+    },
+    "duplicati_inspired_improvements": [
+      "Add compression support (like Duplicati's)",
+      "Implement deduplication for storage optimization",
+      "Add encryption for backup data",
+      "Implement incremental backups",
+      "Add backup verification system",
+      "Implement auto-throttling for network operations",
+      "Add retention policies for old backups",
+      "Implement backup chain management"
+    ]
+  },
+  "issues": [
+    "Agent version not detected"
+  ],
+  "warnings": [
+    "Agent version: None (should be 10.0a)"
+  ],
+  "improvements": [
+    "Consider integrating: get_health_report.py",
+    "Consider integrating: http_client.py",
+    "Consider integrating: monitoring.py",
+    "Consider integrating: run_complete_diagnostic.py",
+    "Consider integrating: start_server.py",
+    "Consider integrating: test_repository_loading.py",
+    "Consider integrating: api\\advanced_stats_api.py",
+    "Consider integrating: api\\alerts.py",
+    "Consider integrating: api\\api_restore.py",
+    "Consider integrating: api\\backup_control.py",
+    "Consider integrating: api\\diagnostics.py",
+    "Consider integrating: api\\errors.py",
+    "Consider integrating: api\\fs.py",
+    "Consider integrating: api\\import_api.py",
+    "Consider integrating: api\\overview.py",
+    "Consider integrating: api\\preemptive_api.py",
+    "Consider integrating: api\\smtp.py",
+    "Consider integrating: api\\system_api.py",
+    "Consider integrating: api\\tasks_ops.py",
+    "Consider integrating: app\\main.py",
+    "Consider integrating: engines\\advanced_statistics.py",
+    "Consider integrating: engines\\analytics.py",
+    "Consider integrating: engines\\auto_healer.py",
+    "Consider integrating: engines\\backup_controller.py",
+    "Consider integrating: engines\\backup_engine.py",
+    "Consider integrating: engines\\backup_engine_manager.py",
+    "Consider integrating: engines\\backup_importer.py",
+    "Consider integrating: engines\\backup_synchronizer.py",
+    "Consider integrating: engines\\backup_verifier.py",
+    "Consider integrating: engines\\diagnostic_module.py",
+    "Consider integrating: engines\\diagnostic_system.py",
+    "Consider integrating: engines\\engine_validator.py",
+    "Consider integrating: engines\\error_analyzer.py",
+    "Consider integrating: engines\\error_capture.py",
+    "Consider integrating: engines\\healer_engine.py",
+    "Consider integrating: engines\\history_importer.py",
+    "Consider integrating: engines\\metrics_collector.py",
+    "Consider integrating: engines\\preemptive_diagnostic.py",
+    "Consider integrating: engines\\realtime_backup_monitor.py",
+    "Consider integrating: engines\\real_backup_executor.py",
+    "Consider integrating: engines\\real_engine_importer.py",
+    "Consider integrating: engines\\real_restore_manager.py",
+    "Consider integrating: engines\\repository_manager.py",
+    "Consider integrating: engines\\scheduler.py",
+    "Consider integrating: engines\\task_manager.py",
+    "Consider integrating: storage_backends\\base.py",
+    "Consider integrating: storage_backends\\cloud.py",
+    "Consider integrating: storage_backends\\local.py",
+    "Consider integrating: app\\models\\all_models.py",
+    "Consider integrating: app\\schemas\\repository.py",
+    "Feature: Add compression support (like Duplicati's)",
+    "Feature: Implement deduplication for storage optimization",
+    "Feature: Add encryption for backup data",
+    "Feature: Implement incremental backups",
+    "Feature: Add backup verification system",
+    "Feature: Implement auto-throttling for network operations",
+    "Feature: Add retention policies for old backups",
+    "Feature: Implement backup chain management"
+  ],
+  "auto_fixes": []
+}

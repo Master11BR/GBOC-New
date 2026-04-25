@@ -1,0 +1,28 @@
+# GBOC v10.0a - Dependências Python
+
+# Core
+fastapi>=0.104.0
+uvicorn>=0.24.0
+pydantic>=2.0.0
+
+# Banco de dados
+psycopg2-binary>=2.9.9
+sqlalchemy>=2.0.0
+
+# Sistema e monitoramento
+psutil>=5.9.0
+
+# Utilidades
+python-multipart>=0.0.6
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+python-dateutil>=2.8.2
+
+# WebSocket
+websockets>=12.0
+
+# Email (opcional)
+aiosmtplib>=3.0.0
+
+# Logging
+python-json-logger>=2.0.0

@@ -1,0 +1,28 @@
+# GBOC Agent v10.0a - Dependências ULTRA Mínimas
+# Para Python 3.15+ (versões alpha sem wheels)
+# SEM pydantic (causa problemas com Rust)
+# ==========================================
+
+# Core Web Framework - versões antigas com wheels
+fastapi==0.100.0
+uvicorn==0.23.0
+
+# HTTP Client
+requests==2.31.0
+httpx==0.24.1
+
+# WebSocket
+websockets==11.0.3
+
+# System Monitoring
+psutil==5.9.5
+
+# Logging & Config
+python-dotenv==1.0.0
+
+# CLI
+click==8.1.7
+colorama==0.4.6
+
+# Utils
+Jinja2==3.1.2

@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "updated_at": 1777157637.237696,
+  "engines": {
+    "restic": {
+      "path": "C:\\Users\\Administrador\\AppData\\Local\\Microsoft\\WinGet\\Links\\restic.EXE",
+      "source": "PATH"
+    },
+    "kopia": {
+      "path": "C:\\Users\\Administrador\\AppData\\Local\\Programs\\KopiaUI\\resources\\server\\kopia.exe",
+      "source": "dir:C:\\Users\\Administrador\\AppData\\Local\\Programs\\KopiaUI\\resources\\server"
+    },
+    "duplicati": {
+      "path": "C:\\Program Files\\Duplicati 2\\Duplicati.CommandLine.exe",
+      "source": "dir:C:\\Program Files\\Duplicati 2"
+    },
+    "borg": {
+      "path": null,
+      "source": null
+    },
+    "rclone": {
+      "path": "C:\\Users\\Administrador\\AppData\\Local\\Microsoft\\WinGet\\Links\\rclone.EXE",
+      "source": "PATH"
+    }
+  }
+}

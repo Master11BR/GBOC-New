@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GBOC Dashboard</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@2.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); 
+            color: #e2e8f0; 
+            min-height: 100vh;
+        }
+        
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --bg-card: rgba(30, 41, 59, 0.8);
+            --border-color: #475569;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --accent-blue: #3b82f6;
+            --accent-green: #22c55e;
+            --accent-red: #ef4444;
+            --accent-yellow: #eab308;
+            --accent-purple: #8b5cf6;
+            --accent-orange: #f97316;
+        }
+
+        /* Glass Morphism Effect */
+        .glass-card {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(71, 85, 105, 0.3);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .gradient-border {
+            border: 2px solid transparent;
+            background: linear-gradient(var(--bg-secondary), var(--bg-secondary)) padding-box,
+                        linear-gradient(45deg, var(--accent-blue), var(--accent-purple)) border-box;
+        }
+
+        /* Navbar estilizada */
+        .navbar {
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border-color);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Cards de estatísticas melhorados */
+        .stat-card {
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--text-primary), var(--accent-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Agentes cards melhorados */
+        .agent-card {
+            transition: all 0.3s ease;
+            border-left: 4px solid var(--accent-green);
+        }
+
+        .agent-card.offline {
+            border-left-color: var(--accent-red);
+            opacity: 0.7;
+        }
+
+        .agent-card:hover {
+            transform: translateX(8px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Status badges */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .status-online {
+            background: rgba(34, 197, 94, 0.2);
+            color: var(--accent-green);
+            border: 1px solid var(--accent-green);
+        }
+
+        .status-offline {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--accent-red);
+            border: 1px solid var(--accent-red);
+        }
+
+        /* Charts container */
+        .chart-container {
+            position: relative;
+            height: 300px;
+            padding: 20px;
+        }
+
+        .chart-container.large {
+            height: 400px;
+        }
+
+        /* Loading animation */
+        .loading-spinner {
+            border: 4px solid var(--border-color);
+            border-top: 4px solid var(--accent-blue);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Pulse animation */
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        /* Responsive grid */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .dashboard-grid.two-cols {
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-secondary); }
+        ::-webkit-scrollbar-thumb { 
+            background: var(--border-color); 
+            border-radius: 4px; 
+        }
+        ::-webkit-scrollbar-thumb:hover { background: #5a6a80; }
+
+        /* Chart.js defaults */
+        Chart.defaults.color = 'var(--text-primary)';
+        Chart.defaults.font.family = 'Inter, sans-serif';
+        Chart.defaults.elements.point.borderWidth = 2;
+        Chart.defaults.elements.line.borderWidth = 3;
+        Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(15, 23, 42, 0.9)';
+        Chart.defaults.plugins.tooltip.borderColor = 'var(--border-color)';
+        Chart.defaults.plugins.tooltip.borderWidth = 1;
+    </style>
+</head>
+
+<body class="bg-gradient-to-br from-slate-900 to-slate-800">
+    <!-- Navigation -->
+    <nav class="navbar sticky top-0 z-50 px-6 py-4">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <h1 class="text-2xl font-bold">
+                    <span class="text-white">GBOC</span>
+                    <span class="text-blue-400">Dashboard</span>
+                </h1>
+                <div class="flex items-center gap-2 status-badge status-online">
+                    <div class="pulse-dot"></div>
+                    <span>Sistema Online</span>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-4">
+                <button id="refresh-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
+                    <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                    Atualizar
+                </button>
+                <div class="text-sm text-slate-400">
+                    Última atualização: <span id="last-update">Carregando...</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-6 py-8">
+        <!-- Estatísticas Principais -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="stat-card glass-card p-6 rounded-xl">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-slate-400 font-medium">Agentes Online</h3>
+                    <i data-lucide="server" class="w-6 h-6 text-green-400"></i>
+                </div>
+                <div class="stat-number" id="total-agents">0</div>
+                <div class="text-sm text-slate-400">
+                    <span id="offline-agents" class="text-red-400">0 offline</span>
+                </div>
+            </div>
+
+            <div class="stat-card glass-card p-6 rounded-xl">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-slate-400 font-medium">Backups 24h</h3>
+                    <i data-lucide="hard-drive" class="w-6 h-6 text-blue-400"></i>
+                </div>
+                <div class="stat-number" id="backups-24h">0</div>
+                <div class="text-sm text-slate-400">
+                    <span id="success-rate" class="text-green-400">100%</span> sucesso
+                </div>
+            </div>
+
+            <div class="stat-card glass-card p-6 rounded-xl">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-slate-400 font-medium">Dados (7 dias)</h3>
+                    <i data-lucide="database" class="w-6 h-6 text-purple-400"></i>
+                </div>
+                <div class="stat-number" id="total-data">0 GB</div>
+                <div class="text-sm text-slate-400">
+                    <span id="growth-rate" class="text-blue-400">+12%</span> vs semana anterior
+                </div>
+            </div>
+
+            <div class="stat-card glass-card p-6 rounded-xl">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-slate-400 font-medium">Alertas</h3>
+                    <i data-lucide="alert-triangle" class="w-6 h-6 text-yellow-400"></i>
+                </div>
+                <div class="stat-number" id="total-alerts">0</div>
+                <div class="text-sm text-slate-400">
+                    <span id="critical-alerts" class="text-red-400">0 críticos</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gráficos Principais -->
+        <div class="dashboard-grid two-cols mb-8">
+            <!-- Gráfico de Backups por Tempo -->
+            <div class="glass-card p-6 rounded-xl">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-xl font-semibold text-white">Backups por Tempo</h3>
+                    <select id="backup-time-period" class="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1 text-sm">
+                        <option value="24h">Últimas 24h</option>
+                        <option value="7d">Últimos 7 dias</option>
+                        <option value="30d">Últimos 30 dias</option>
+                    </select>
+                </div>
+                <div class="chart-container">
+                    <canvas id="backup-timeline-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Gráfico de Taxa de Sucesso -->
+            <div class="glass-card p-6 rounded-xl">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-xl font-semibold text-white">Taxa de Sucesso</h3>
+                    <div class="flex items-center gap-2">
+                        <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+                        <span class="text-sm text-slate-400">Sucesso</span>
+                        <div class="w-3 h-3 bg-red-500 rounded-full ml-4"></div>
+                        <span class="text-sm text-slate-400">Falhas</span>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="success-rate-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Gráfico de Volume de Dados -->
+            <div class="glass-card p-6 rounded-xl">
+                <h3 class="text-xl font-semibold text-white mb-6">Volume de Dados</h3>
+                <div class="chart-container">
+                    <canvas id="data-volume-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Gráfico de Ferramentas Utilizadas -->
+            <div class="glass-card p-6 rounded-xl">
+                <h3 class="text-xl font-semibold text-white mb-6">Ferramentas de Backup</h3>
+                <div class="chart-container">
+                    <canvas id="tools-usage-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Agentes e Logs -->
+        <div class="dashboard-grid mb-8">
+            <!-- Lista de Agentes -->
+            <div class="glass-card p-6 rounded-xl">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-xl font-semibold text-white">Agentes Conectados</h3>
+                    <div class="loading-spinner" id="agents-loading" style="display: none;"></div>
+                </div>
+                <div id="agents-list" class="space-y-4">
+                    <!-- Agentes serão carregados aqui -->
+                </div>
+            </div>
+
+            <!-- Log de Eventos -->
+            <div class="glass-card p-6 rounded-xl">
+                <h3 class="text-xl font-semibold text-white mb-6">Eventos Recentes</h3>
+                <div id="events-log" class="space-y-3 max-h-80 overflow-y-auto">
+                    <!-- Eventos serão carregados aqui -->
+                </div>
+            </div>
+
+            <!-- Status dos Repositórios -->
+            <div class="glass-card p-6 rounded-xl">
+                <h3 class="text-xl font-semibold text-white mb-6">Status dos Repositórios</h3>
+                <div id="repositories-status" class="space-y-4">
+                    <!-- Status dos repositórios -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Heatmap de Atividade -->
+        <div class="glass-card p-6 rounded-xl mb-8">
+            <h3 class="text-xl font-semibold text-white mb-6">Mapa de Calor - Atividade de Backup</h3>
+            <div class="chart-container large">
+                <canvas id="activity-heatmap"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===========================
+        // GBOC Dashboard - JavaScript Avançado
+        // ===========================
+        let charts = {};
+        let dashboardData = {};
+        let refreshInterval;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 GBOC Dashboard iniciado');
+            initializeDashboard();
+            setupEventListeners();
+            loadInitialData();
+            startAutoRefresh();
+        });
+
+        function initializeDashboard() {
+            // Inicializar ícones Lucide
+            lucide.createIcons();
+            
+            // Configurar temas dos gráficos
+            Chart.defaults.plugins.legend.labels.color = '#e2e8f0';
+            Chart.defaults.scales.x.ticks.color = '#94a3b8';
+            Chart.defaults.scales.y.ticks.color = '#94a3b8';
+            Chart.defaults.scales.x.grid.color = '#475569';
+            Chart.defaults.scales.y.grid.color = '#475569';
+            
+            console.log('✅ Dashboard inicializado');
+        }
+
+        function setupEventListeners() {
+            // Botão de atualizar
+            document.getElementById('refresh-btn').addEventListener('click', function() {
+                this.disabled = true;
+                this.innerHTML = '<i data-lucide="loader" class="w-4 h-4 animate-spin"></i> Atualizando...';
+                
+                loadAllData().finally(() => {
+                    this.disabled = false;
+                    this.innerHTML = '<i data-lucide="refresh-cw" class="w-4 h-4"></i> Atualizar';
+                    lucide.createIcons();
+                });
+            });
+
+            // Seletor de período
+            document.getElementById('backup-time-period').addEventListener('change', function() {
+                updateBackupTimelineChart(this.value);
+            });
+
+            console.log('🎯 Event listeners configurados');
+        }
+
+        async function loadInitialData() {
+            console.log('📊 Carregando dados iniciais...');
+            
+            try {
+                await loadAllData();
+                console.log('✅ Dados carregados com sucesso');
+            } catch (error) {
+                console.error('❌ Erro ao carregar dados:', error);
+                showErrorMessage('Erro ao conectar com o servidor GBOC');
+            }
+        }
+
+        async function loadAllData() {
+            const loadingTasks = [
+                loadDashboardStats(),
+                loadAgentsList(),
+                loadEventsLog(),
+                loadRepositoriesStatus()
+            ];
+
+            await Promise.allSettled(loadingTasks);
+            
+            // Criar gráficos após carregar dados
+            createCharts();
+            updateLastRefreshTime();
+        }
+
+        async function loadDashboardStats() {
+            try {
+                const response = await fetch('/api/v1/dashboard/stats');
+                if (response.ok) {
+                    const data = await response.json();
+                    updateDashboardStats(data);
+                    return data;
+                }
+            } catch (error) {
+                console.log('⚠️ Stats não disponíveis:', error);
+                // Usar dados mock para demonstração
+                updateDashboardStats(getMockStats());
+            }
+        }
+
+        async function loadAgentsList() {
+            try {
+                const response = await fetch('/api/v1/agents');
+                if (response.ok) {
+                    const data = await response.json();
+                    updateAgentsList(data);
+                    return data;
+                }
+            } catch (error) {
+                console.log('⚠️ Agentes não disponíveis:', error);
+                updateAgentsList(getMockAgents());
+            }
+        }
+
+        async function loadEventsLog() {
+            try {
+                const response = await fetch('/api/v1/events/recent');
+                if (response.ok) {
+                    const data = await response.json();
+                    updateEventsLog(data);
+                    return data;
+                }
+            } catch (error) {
+                console.log('⚠️ Eventos não disponíveis:', error);
+                updateEventsLog(getMockEvents());
+            }
+        }
+
+        async function loadRepositoriesStatus() {
+            try {
+                const response = await fetch('/api/v1/repositories/status');
+                if (response.ok) {
+                    const data = await response.json();
+                    updateRepositoriesStatus(data);
+                    return data;
+                }
+            } catch (error) {
+                console.log('⚠️ Repositórios não disponíveis:', error);
+                updateRepositoriesStatus(getMockRepositories());
+            }
+        }
+
+        function updateDashboardStats(data) {
+            document.getElementById('total-agents').textContent = data.total_agents || 0;
+            document.getElementById('offline-agents').textContent = `${data.offline_agents || 0} offline`;
+            document.getElementById('backups-24h').textContent = data.backups_24h || 0;
+            document.getElementById('success-rate').textContent = `${data.success_rate || 100}%`;
+            document.getElementById('total-data').textContent = `${data.total_gb_7d || 0} GB`;
+            document.getElementById('total-alerts').textContent = data.total_alerts || 0;
+            document.getElementById('critical-alerts').textContent = `${data.critical_alerts || 0} críticos`;
+            
+            dashboardData.stats = data;
+        }
+
+        function updateAgentsList(agents) {
+            const container = document.getElementById('agents-list');
+            
+            if (!agents || agents.length === 0) {
+                container.innerHTML = '<p class="text-slate-400 text-center py-8">Nenhum agente conectado</p>';
+                return;
+            }
+
+            container.innerHTML = agents.map(agent => `
+                <div class="agent-card glass-card p-4 rounded-lg ${agent.status === 'offline' ? 'offline' : ''}">
+                    <div class="flex items-center justify-between mb-2">
+                        <h4 class="font-semibold text-white">${agent.hostname}</h4>
+                        <div class="status-badge status-${agent.status}">
+                            <div class="w-2 h-2 rounded-full bg-current"></div>
+                            ${agent.status}
+                        </div>
+                    </div>
+                    <div class="text-sm text-slate-400 space-y-1">
+                        <div>OS: ${agent.os_info || 'N/A'}</div>
+                        <div>Versão: ${agent.agent_version || 'N/A'}</div>
+                        <div>Último heartbeat: ${formatTime(agent.last_heartbeat)}</div>
+                        <div>Jobs: ${agent.jobs_count || 0}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateEventsLog(events) {
+            const container = document.getElementById('events-log');
+            
+            if (!events || events.length === 0) {
+                container.innerHTML = '<p class="text-slate-400 text-center py-8">Nenhum evento recente</p>';
+                return;
+            }
+
+            container.innerHTML = events.map(event => `
+                <div class="flex items-start gap-3 p-3 bg-slate-800/50 rounded-lg">
+                    <div class="w-8 h-8 flex items-center justify-center rounded-full ${getEventColor(event.type)}">
+                        <i data-lucide="${getEventIcon(event.type)}" class="w-4 h-4"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-white text-sm font-medium">${event.message}</p>
+                        <p class="text-slate-400 text-xs">${formatTime(event.timestamp)} • ${event.agent_hostname || 'Sistema'}</p>
+                    </div>
+                </div>
+            `).join('');
+            
+            // Recriar ícones
+            lucide.createIcons();
+        }
+
+        function updateRepositoriesStatus(repositories) {
+            const container = document.getElementById('repositories-status');
+            
+            if (!repositories || repositories.length === 0) {
+                container.innerHTML = '<p class="text-slate-400 text-center py-8">Nenhum repositório configurado</p>';
+                return;
+            }
+
+            container.innerHTML = repositories.map(repo => `
+                <div class="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
+                    <div>
+                        <h4 class="text-white font-medium">${repo.name}</h4>
+                        <p class="text-slate-400 text-sm">${repo.type.toUpperCase()} • ${repo.size || 'N/A'}</p>
+                    </div>
+                    <div class="status-badge status-${repo.status === 'healthy' ? 'online' : 'offline'}">
+                        ${repo.status === 'healthy' ? 'Saudável' : 'Problemas'}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function createCharts() {
+            createBackupTimelineChart();
+            createSuccessRateChart();
+            createDataVolumeChart();
+            createToolsUsageChart();
+            createActivityHeatmap();
+        }
+
+        function createBackupTimelineChart() {
+            const ctx = document.getElementById('backup-timeline-chart').getContext('2d');
+            
+            charts.backupTimeline = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: getLast24Hours(),
+                    datasets: [{
+                        label: 'Backups Realizados',
+                        data: generateMockTimelineData(),
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: '#475569'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createSuccessRateChart() {
+            const ctx = document.getElementById('success-rate-chart').getContext('2d');
+            
+            charts.successRate = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Sucessos', 'Falhas'],
+                    datasets: [{
+                        data: [95, 5],
+                        backgroundColor: ['#22c55e', '#ef4444'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        function createDataVolumeChart() {
+            const ctx = document.getElementById('data-volume-chart').getContext('2d');
+            
+            charts.dataVolume = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab', 'Dom'],
+                    datasets: [{
+                        label: 'GB Transferidos',
+                        data: [45, 52, 38, 67, 71, 89, 94],
+                        backgroundColor: 'rgba(139, 92, 246, 0.8)',
+                        borderColor: '#8b5cf6',
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+
+        function createToolsUsageChart() {
+            const ctx = document.getElementById('tools-usage-chart').getContext('2d');
+            
+            charts.toolsUsage = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: ['Restic', 'Kopia', 'Duplicati'],
+                    datasets: [{
+                        data: [60, 35, 5],
+                        backgroundColor: [
+                            '#3b82f6',
+                            '#8b5cf6',
+                            '#f97316'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        function createActivityHeatmap() {
+            const ctx = document.getElementById('activity-heatmap').getContext('2d');
+            
+            // Simular dados de heatmap
+            const heatmapData = [];
+            const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
+            const hours = Array.from({length: 24}, (_, i) => i);
+            
+            days.forEach((day, dayIndex) => {
+                hours.forEach(hour => {
+                    heatmapData.push({
+                        x: hour,
+                        y: dayIndex,
+                        v: Math.floor(Math.random() * 10)
+                    });
+                });
+            });
+
+            charts.activityHeatmap = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'Atividade',
+                        data: heatmapData,
+                        backgroundColor: function(context) {
+                            const value = context.parsed.v;
+                            const alpha = value / 10;
+                            return `rgba(59, 130, 246, ${alpha})`;
+                        },
+                        pointRadius: function(context) {
+                            return Math.max(2, context.parsed.v);
+                        }
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Hora do Dia'
+                            },
+                            min: 0,
+                            max: 23
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Dia da Semana'
+                            },
+                            min: 0,
+                            max: 6,
+                            ticks: {
+                                callback: function(value) {
+                                    return days[value];
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                title: function(context) {
+                                    const point = context[0];
+                                    return `${days[point.parsed.y]} ${point.parsed.x}:00`;
+                                },
+                                label: function(context) {
+                                    return `Atividade: ${context.parsed.v}`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function startAutoRefresh() {
+            refreshInterval = setInterval(() => {
+                loadAllData();
+            }, 30000); // Refresh a cada 30 segundos
+        }
+
+        function updateLastRefreshTime() {
+            document.getElementById('last-update').textContent = new Date().toLocaleTimeString('pt-BR');
+        }
+
+        // ===========================
+        // FUNÇÕES UTILITÁRIAS
+        // ===========================
+
+        function getLast24Hours() {
+            const labels = [];
+            for (let i = 23; i >= 0; i--) {
+                const date = new Date();
+                date.setHours(date.getHours() - i);
+                labels.push(date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+            }
+            return labels;
+        }
+
+        function generateMockTimelineData() {
+            return Array.from({length: 24}, () => Math.floor(Math.random() * 10));
+        }
+
+        function formatTime(timestamp) {
+            if (!timestamp) return 'N/A';
+            const date = new Date(timestamp);
+            return date.toLocaleString('pt-BR');
+        }
+
+        function getEventIcon(type) {
+            const icons = {
+                'backup_success': 'check-circle',
+                'backup_failure': 'x-circle',
+                'agent_online': 'server',
+                'agent_offline': 'server-off',
+                'warning': 'alert-triangle',
+                'info': 'info'
+            };
+            return icons[type] || 'activity';
+        }
+
+        function getEventColor(type) {
+            const colors = {
+                'backup_success': 'bg-green-500/20 text-green-400',
+                'backup_failure': 'bg-red-500/20 text-red-400',
+                'agent_online': 'bg-blue-500/20 text-blue-400',
+                'agent_offline': 'bg-gray-500/20 text-gray-400',
+                'warning': 'bg-yellow-500/20 text-yellow-400',
+                'info': 'bg-blue-500/20 text-blue-400'
+            };
+            return colors[type] || 'bg-slate-500/20 text-slate-400';
+        }
+
+        function showErrorMessage(message) {
+            // Implementar toast de erro
+            console.error('🚨 Erro:', message);
+        }
+
+        // ===========================
+        // DADOS MOCK PARA DEMONSTRAÇÃO
+        // ===========================
+
+        function getMockStats() {
+            return {
+                total_agents: 3,
+                offline_agents: 1,
+                backups_24h: 47,
+                success_rate: 94.5,
+                total_gb_7d: 1250,
+                total_alerts: 2,
+                critical_alerts: 0
+            };
+        }
+
+        function getMockAgents() {
+            return [
+                {
+                    hostname: 'DESKTOP-PRINCIPAL',
+                    status: 'online',
+                    os_info: 'Windows 11 Pro',
+                    agent_version: '2.1.2',
+                    last_heartbeat: new Date().toISOString(),
+                    jobs_count: 4
+                },
+                {
+                    hostname: 'SERVIDOR-BACKUP',
+                    status: 'online',
+                    os_info: 'Ubuntu 22.04 LTS',
+                    agent_version: '2.1.1',
+                    last_heartbeat: new Date(Date.now() - 30000).toISOString(),
+                    jobs_count: 7
+                },
+                {
+                    hostname: 'NOTEBOOK-DEV',
+                    status: 'offline',
+                    os_info: 'Windows 10 Pro',
+                    agent_version: '2.0.9',
+                    last_heartbeat: new Date(Date.now() - 3600000).toISOString(),
+                    jobs_count: 2
+                }
+            ];
+        }
+
+        function getMockEvents() {
+            return [
+                {
+                    type: 'backup_success',
+                    message: 'Backup de documentos-importantes concluído com sucesso',
+                    timestamp: new Date(Date.now() - 300000).toISOString(),
+                    agent_hostname: 'DESKTOP-PRINCIPAL'
+                },
+                {
+                    type: 'backup_failure',
+                    message: 'Falha no backup de projetos-codigo - destino indisponível',
+                    timestamp: new Date(Date.now() - 900000).toISOString(),
+                    agent_hostname: 'SERVIDOR-BACKUP'
+                },
+                {
+                    type: 'agent_offline',
+                    message: 'Agente NOTEBOOK-DEV perdeu conexão',
+                    timestamp: new Date(Date.now() - 3600000).toISOString(),
+                    agent_hostname: null
+                },
+                {
+                    type: 'warning',
+                    message: 'Repositório B2 com 85% de capacidade utilizada',
+                    timestamp: new Date(Date.now() - 7200000).toISOString(),
+                    agent_hostname: null
+                }
+            ];
+        }
+
+        function getMockRepositories() {
+            return [
+                {
+                    name: 'backblaze-b2-principal',
+                    type: 'b2',
+                    status: 'healthy',
+                    size: '2.3 TB'
+                },
+                {
+                    name: 'amazon-s3-corporate',
+                    type: 's3',
+                    status: 'healthy',
+                    size: '1.8 TB'
+                },
+                {
+                    name: 'disco-local-backup',
+                    type: 'local',
+                    status: 'healthy',
+                    size: '500 GB'
+                }
+            ];
+        }
+
+        console.log('✅ GBOC Dashboard carregado com sucesso');
+    </script>
+</body>
+</html>
