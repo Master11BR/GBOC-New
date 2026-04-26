@@ -168,6 +168,7 @@
             <div class="nav-link" onclick="switchTab('alerts',this)"><i class="fas fa-bell"></i> Alertas</div>
             <div class="nav-link" onclick="switchTab('replication',this)"><i class="fas fa-exchange-alt"></i> Replicação</div>
             <div class="nav-link" onclick="switchTab('logs',this)"><i class="fas fa-file-alt"></i> Logs</div>
+            <div class="nav-link" onclick="switchTab('reports',this)"><i class="fas fa-chart-pie"></i> Relatórios</div>
             <div class="nav-link" onclick="switchTab('users',this)"><i class="fas fa-users-cog"></i> Usuários</div>
             <div class="nav-link" onclick="switchTab('config',this)"><i class="fas fa-cog"></i> Configurações</div>
         </nav>
@@ -390,6 +391,57 @@
                     <table class="data-table">
                         <thead><tr><th>Nível</th><th>Agente</th><th>Fonte</th><th>Mensagem</th><th>Data</th></tr></thead>
                         <tbody id="table-logs"><tr><td colspan="5" style="text-align:center;color:var(--text-muted)">Clique em Filtrar para carregar</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: REPORTS -->
+        <div id="tab-reports" class="tab-section">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+                <h2 style="font-size:1.3em;margin:0"><i class="fas fa-chart-pie" style="color:var(--primary);margin-right:8px"></i> Relatórios Consolidados</h2>
+                <div style="display:flex;gap:8px;align-items:center">
+                    <select id="rpt-days" style="padding:7px 12px;border-radius:7px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:.88em">
+                        <option value="7">Últimos 7 dias</option>
+                        <option value="30" selected>Últimos 30 dias</option>
+                        <option value="90">Últimos 90 dias</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="loadReportsTab()"><i class="fas fa-sync-alt"></i> Gerar</button>
+                </div>
+            </div>
+
+            <!-- KPIs Globais -->
+            <div class="kpi-grid" style="margin-bottom:20px" id="rpt-kpis">
+                <div class="kpi-card"><div class="kpi-header"><span>Total Agentes</span><div class="kpi-icon blue"><i class="fas fa-server"></i></div></div><div class="kpi-value" id="rpt-agents">—</div><div class="kpi-sub" id="rpt-online">— online</div></div>
+                <div class="kpi-card"><div class="kpi-header"><span>Execuções</span><div class="kpi-icon green"><i class="fas fa-play-circle"></i></div></div><div class="kpi-value" id="rpt-total">—</div><div class="kpi-sub" id="rpt-rate">—% sucesso</div></div>
+                <div class="kpi-card"><div class="kpi-header"><span>Falhas</span><div class="kpi-icon red"><i class="fas fa-times-circle"></i></div></div><div class="kpi-value" id="rpt-fails">—</div><div class="kpi-sub">no período</div></div>
+                <div class="kpi-card"><div class="kpi-header"><span>Volume Total</span><div class="kpi-icon orange"><i class="fas fa-database"></i></div></div><div class="kpi-value" id="rpt-bytes">—</div><div class="kpi-sub">dados processados</div></div>
+            </div>
+
+            <!-- Gráfico de tendência + tabela por agente -->
+            <div class="charts-row" style="margin-bottom:20px">
+                <div class="chart-panel">
+                    <h3 style="margin:0 0 14px;font-size:.95em"><i class="fas fa-chart-area" style="color:var(--primary);margin-right:8px"></i> Tendência Diária</h3>
+                    <canvas id="rpt-chart-trend" style="max-height:240px"></canvas>
+                </div>
+                <div class="chart-panel">
+                    <h3 style="margin:0 0 14px;font-size:.95em"><i class="fas fa-server" style="color:var(--primary);margin-right:8px"></i> Por Agente</h3>
+                    <div style="overflow-x:auto">
+                        <table class="data-table" style="font-size:.85em">
+                            <thead><tr><th>Agente</th><th>Status</th><th>Execuções</th><th>Sucesso</th><th>Falhas</th><th>Volume</th></tr></thead>
+                            <tbody id="rpt-agents-table"><tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Clique em Gerar</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top 10 Falhas -->
+            <div class="panel">
+                <h3 style="margin:0 0 14px;font-size:.95em"><i class="fas fa-exclamation-triangle" style="color:var(--danger);margin-right:8px"></i> Top Falhas Recentes</h3>
+                <div style="overflow-x:auto">
+                    <table class="data-table" style="font-size:.85em">
+                        <thead><tr><th>Agente</th><th>Job</th><th>Erro</th><th>Data</th></tr></thead>
+                        <tbody id="rpt-failures-table"><tr><td colspan="4" style="text-align:center;color:var(--text-muted)">Clique em Gerar</td></tr></tbody>
                     </table>
                 </div>
             </div>
@@ -809,6 +861,7 @@
             if(id==='alerts') loadServerAlerts();
             if(id==='replication') loadServerReplication();
             if(id==='users') loadServerUsers();
+            if(id==='reports') loadReportsTab();
         }
 
         let ws=null, _wsReconnectTimer=null, _wsBackoff=2000;
@@ -1510,9 +1563,22 @@
                                 </div>
                             </div>
                         </div>
-                        <button class="btn btn-primary" onclick="document.getElementById('agent-detail-panel').style.display='none'" style="flex-shrink:0">
-                            <i class="fas fa-times"></i> Fechar
-                        </button>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;flex-shrink:0;align-items:center">
+                            ${isOnline ? `
+                            <button class="btn" style="background:rgba(66,153,225,.12);color:var(--primary);border:1px solid var(--primary)" onclick="sendAgentCommand('${a.agent_id}','ping')">
+                                <i class="fas fa-satellite-dish"></i> Ping
+                            </button>
+                            <button class="btn" style="background:rgba(72,187,120,.12);color:var(--success);border:1px solid var(--success)" onclick="forceAgentSync('${a.agent_id}')">
+                                <i class="fas fa-sync-alt"></i> Sync Forçada
+                            </button>
+                            <button class="btn" style="background:rgba(245,101,101,.12);color:var(--danger);border:1px solid var(--danger)" onclick="disconnectAgent('${a.agent_id}')">
+                                <i class="fas fa-plug"></i> Desconectar
+                            </button>
+                            ` : ''}
+                            <button class="btn btn-primary" onclick="document.getElementById('agent-detail-panel').style.display='none'">
+                                <i class="fas fa-times"></i> Fechar
+                            </button>
+                        </div>
                     </div>
 
                     <!-- KPIs Row -->
@@ -2011,6 +2077,132 @@
             el.style.border=type==='ok'?'1px solid rgba(72,187,120,.3)':'1px solid rgba(245,101,101,.3)';
             el.textContent=text;
             if(type==='ok') setTimeout(()=>{ el.style.display='none'; }, 3000);
+        }
+
+        // ── Relatórios Consolidados ─────────────────────────────────────────
+        let _rptChart = null;
+        async function loadReportsTab(){
+            const days = document.getElementById('rpt-days').value || 30;
+            try{
+                const r = await fetch(`${API}/reports/consolidated?days=${days}`);
+                if(!r.ok) throw new Error(`HTTP ${r.status}`);
+                const d = await r.json();
+                const g = d.global || {};
+
+                // KPIs
+                document.getElementById('rpt-agents').textContent = g.total_agents ?? '—';
+                document.getElementById('rpt-online').textContent = `${g.online_agents??0} online`;
+                document.getElementById('rpt-total').textContent = g.total_reports ?? '—';
+                document.getElementById('rpt-rate').textContent = `${g.success_rate??0}% sucesso`;
+                document.getElementById('rpt-fails').textContent = g.fail_count ?? '—';
+                document.getElementById('rpt-bytes').textContent = fmtBytes(g.total_bytes||0);
+
+                // Tabela por agente
+                const tbody = document.getElementById('rpt-agents-table');
+                if((d.agents||[]).length === 0){
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Sem dados</td></tr>';
+                } else {
+                    tbody.innerHTML = d.agents.map(a=>{
+                        const rate = a.backups ? Math.round(a.successes/a.backups*100) : 0;
+                        const online = a.status==='online';
+                        return `<tr>
+                            <td><strong>${a.hostname||a.agent_id}</strong><br><span style="font-size:.8em;color:var(--text-muted)">${a.ip_address||''}</span></td>
+                            <td><span class="badge ${online?'badge-success':'badge-error'}">${online?'Online':'Offline'}</span></td>
+                            <td style="text-align:center">${a.backups}</td>
+                            <td style="text-align:center;color:var(--success)">${rate}%</td>
+                            <td style="text-align:center;color:${a.failures>0?'var(--danger)':'var(--text)'}">${a.failures}</td>
+                            <td>${fmtBytes(a.total_bytes||0)}</td>
+                        </tr>`;
+                    }).join('');
+                }
+
+                // Top Falhas
+                const ftbody = document.getElementById('rpt-failures-table');
+                if((d.top_failures||[]).length === 0){
+                    ftbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--success)"><i class="fas fa-check-circle"></i> Nenhuma falha no período</td></tr>';
+                } else {
+                    ftbody.innerHTML = d.top_failures.map(f=>`<tr>
+                        <td>${f.hostname||f.agent_id}</td>
+                        <td>${f.job_name||'—'}</td>
+                        <td style="color:var(--danger);font-size:.85em">${(f.error_message||'').substring(0,80)}${(f.error_message||'').length>80?'…':''}</td>
+                        <td style="font-size:.82em;color:var(--text-muted)">${f.executed_at?f.executed_at.substring(0,16).replace('T',' '):'—'}</td>
+                    </tr>`).join('');
+                }
+
+                // Gráfico de tendência
+                const trend = d.trend || [];
+                const labels = trend.map(t=>t.day);
+                const succData = trend.map(t=>t.successes);
+                const failData = trend.map(t=>t.failures);
+
+                const ctx = document.getElementById('rpt-chart-trend').getContext('2d');
+                if(_rptChart) _rptChart.destroy();
+                _rptChart = new Chart(ctx, {
+                    type:'bar',
+                    data:{
+                        labels,
+                        datasets:[
+                            {label:'Sucesso',data:succData,backgroundColor:'rgba(72,187,120,.7)',stack:'s'},
+                            {label:'Falhas',data:failData,backgroundColor:'rgba(245,101,101,.7)',stack:'s'},
+                        ]
+                    },
+                    options:{responsive:true,plugins:{legend:{position:'bottom'}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}
+                });
+            }catch(e){
+                console.error('loadReportsTab:', e);
+                showToast('Erro ao carregar relatório: '+e.message,'error');
+            }
+        }
+
+        // ── Gestão de Agentes ───────────────────────────────────────────────
+        async function disconnectAgent(agentId){
+            if(!confirm(`Desconectar agente ${agentId}?`)) return;
+            try{
+                const r=await fetch(`${API}/agents/${encodeURIComponent(agentId)}/disconnect`,{method:'POST'});
+                const d=await r.json().catch(()=>({}));
+                if(!r.ok) throw new Error(d.detail||`HTTP ${r.status}`);
+                showToast('Agente desconectado','success');
+                document.getElementById('agent-detail-panel').style.display='none';
+                await loadAgentsTab();
+            }catch(e){ showToast('Erro: '+e.message,'error'); }
+        }
+
+        async function sendAgentCommand(agentId, command, params){
+            try{
+                const r=await fetch(`${API}/agents/${encodeURIComponent(agentId)}/command`,{
+                    method:'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({command, params:params||{}})
+                });
+                const d=await r.json().catch(()=>({}));
+                if(!r.ok) throw new Error(d.detail||`HTTP ${r.status}`);
+                showToast(`Comando '${command}' enviado`,'success');
+            }catch(e){ showToast('Erro: '+e.message,'error'); }
+        }
+
+        async function forceAgentSync(agentId){
+            try{
+                const r=await fetch(`${API}/agents/${encodeURIComponent(agentId)}/force-sync`,{method:'POST'});
+                const d=await r.json().catch(()=>({}));
+                if(!r.ok) throw new Error(d.detail||`HTTP ${r.status}`);
+                showToast('Sincronização solicitada','success');
+            }catch(e){ showToast('Erro: '+e.message,'error'); }
+        }
+
+        function showToast(msg, type){
+            let container=document.getElementById('toast-container');
+            if(!container){
+                container=document.createElement('div');
+                container.id='toast-container';
+                container.style.cssText='position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px';
+                document.body.appendChild(container);
+            }
+            const toast=document.createElement('div');
+            const color=type==='success'?'var(--success)':type==='error'?'var(--danger)':'var(--primary)';
+            toast.style.cssText=`background:var(--bg-card);border:1px solid ${color};border-radius:8px;padding:12px 18px;color:var(--text);font-size:.9em;box-shadow:0 4px 12px rgba(0,0,0,.3);min-width:220px;display:flex;align-items:center;gap:10px`;
+            toast.innerHTML=`<span style="color:${color};font-size:1.1em"><i class="fas fa-${type==='success'?'check-circle':type==='error'?'times-circle':'info-circle'}"></i></span><span>${msg}</span>`;
+            container.appendChild(toast);
+            setTimeout(()=>toast.remove(), 3500);
         }
     </script>
 </body>
