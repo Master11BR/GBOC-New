@@ -846,6 +846,83 @@ async def notify_dashboard_update():
             except:
                 dashboard_connections.remove(ws)
 
+def _send_server_notification_sync(subject: str, body: str) -> Dict:
+    """
+    Envia notificação via SMTP e/ou Webhook conforme configuração do servidor.
+    Função síncrona — chame via asyncio.get_event_loop().run_in_executor para não bloquear.
+    """
+    results = []
+    conn = None
+    try:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("SELECT key, value FROM server_settings WHERE category = 'notifications'")
+        cfg = {r['key']: r['value'] for r in cur.fetchall()}
+    except Exception as e:
+        logger.warning(f"Não foi possível ler config de notificações: {e}")
+        cfg = {}
+    finally:
+        if conn:
+            try:
+                if 'cur' in dir() and cur: cur.close()
+            except Exception:
+                pass
+            release_db(conn)
+
+    # SMTP
+    if cfg.get('email_enabled', 'false').lower() == 'true':
+        try:
+            import smtplib
+            from email.mime.text import MIMEText
+            host = cfg.get('smtp_host', '')
+            port = int(cfg.get('smtp_port', 587))
+            user = cfg.get('smtp_username', '')
+            pwd  = cfg.get('smtp_password', '')
+            frm  = cfg.get('smtp_from', user)
+            to   = cfg.get('smtp_to', user)
+            if host and user:
+                msg = MIMEText(body, 'plain', 'utf-8')
+                msg['Subject'] = subject
+                msg['From']    = frm
+                msg['To']      = to
+                with smtplib.SMTP(host, port, timeout=15) as s:
+                    s.starttls()
+                    s.login(user, pwd)
+                    s.send_message(msg)
+                results.append({"channel": "email", "status": "sent", "to": to})
+        except Exception as e:
+            results.append({"channel": "email", "status": "error", "error": str(e)})
+            logger.warning(f"Falha ao enviar e-mail de notificação: {e}")
+
+    # Webhook
+    if cfg.get('webhook_enabled', 'false').lower() == 'true':
+        try:
+            import urllib.request
+            url = cfg.get('webhook_url', '')
+            if url:
+                payload = json.dumps({
+                    "text": f"🔔 *{subject}*\n{body}",
+                    "subject": subject,
+                    "body": body,
+                    "timestamp": _dt.now(timezone.utc).isoformat(),
+                }).encode('utf-8')
+                req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json'})
+                urllib.request.urlopen(req, timeout=10)
+                results.append({"channel": "webhook", "status": "sent", "url": url})
+        except Exception as e:
+            results.append({"channel": "webhook", "status": "error", "error": str(e)})
+            logger.warning(f"Falha ao enviar webhook de notificação: {e}")
+
+    return {"sent": results}
+
+
+async def _send_server_notification(subject: str, body: str) -> Dict:
+    """Wrapper assíncrono para _send_server_notification_sync."""
+    import asyncio
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _send_server_notification_sync, subject, body)
+
+
 async def save_agent_historical_data(conn, agent_id: str, data: Dict):
     """Salva dados históricos do agente"""
     try:
@@ -1353,6 +1430,84 @@ async def heartbeat(data: AgentHeartbeat):
     finally:
         if 'cur' in locals() and cur and not cur.closed: cur.close()
         release_db(conn)
+
+# ── Gestão de Agentes ─────────────────────────────────────────────────────────
+
+@app.post("/api/v1/agents/{agent_id}/disconnect")
+async def disconnect_agent(agent_id: str, request: Request):
+    """Desconecta um agente: fecha o WebSocket e marca como offline."""
+    _require_server_auth(request)
+    conn = None
+    try:
+        # Fechar WebSocket se estiver conectado
+        if agent_id in manager.active_connections:
+            try:
+                await manager.active_connections[agent_id].close()
+            except Exception:
+                pass
+            manager.disconnect(agent_id)
+
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("UPDATE agents SET status='offline' WHERE agent_id=%s", (agent_id,))
+        conn.commit()
+        await notify_dashboard_update()
+        return {"status": "success", "message": f"Agente {agent_id} desconectado"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(500, str(e))
+    finally:
+        if 'cur' in locals() and cur and not cur.closed: cur.close()
+        release_db(conn)
+
+
+@app.post("/api/v1/agents/{agent_id}/command")
+async def send_agent_command(agent_id: str, request: Request):
+    """Envia um comando ao agente via WebSocket. Suporta: sync, ping, collect_metrics."""
+    _require_server_auth(request)
+    try:
+        body = await request.json()
+        command = body.get("command", "ping")
+        params = body.get("params", {})
+
+        if agent_id not in manager.active_connections:
+            raise HTTPException(404, f"Agente {agent_id} não está conectado via WebSocket")
+
+        ws = manager.active_connections[agent_id]
+        message = json.dumps({"type": "command", "command": command, "params": params})
+        await ws.send_text(message)
+        return {"status": "success", "message": f"Comando '{command}' enviado ao agente {agent_id}"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.post("/api/v1/agents/{agent_id}/force-sync")
+async def force_agent_sync(agent_id: str, request: Request):
+    """Solicita sincronização forçada de um agente via WebSocket."""
+    _require_server_auth(request)
+    try:
+        if agent_id not in manager.active_connections:
+            raise HTTPException(404, f"Agente {agent_id} não está conectado via WebSocket")
+
+        ws = manager.active_connections[agent_id]
+        await ws.send_text(json.dumps({"type": "command", "command": "full_sync", "params": {}}))
+        return {"status": "success", "message": f"Sincronização solicitada ao agente {agent_id}"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+def _require_server_auth(request: Request):
+    """Helper: levanta 401 se não autenticado."""
+    user = _get_server_user_from_request(request)
+    if not user:
+        raise HTTPException(401, "Autenticação necessária")
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 @app.post("/api/v1/backups/report")
 async def report_backup(data: BackupReport):
@@ -3277,6 +3432,115 @@ async def import_server_settings(request: Request):
         release_db(conn)
 
 
+# ── Relatórios Consolidados ───────────────────────────────────────────────────
+
+@app.get("/api/v1/reports/consolidated")
+async def get_consolidated_report(request: Request, days: int = 30):
+    """
+    Relatório consolidado de todos os agentes: resumo por agente, totais globais,
+    top falhas, volume de dados, taxa de sucesso e tendência nos últimos N dias.
+    """
+    conn = None
+    try:
+        conn = get_db(); cur = conn.cursor(cursor_factory=RealDictCursor)
+
+        # Resumo global
+        cur.execute("""
+            SELECT
+                COUNT(DISTINCT a.agent_id) AS total_agents,
+                COUNT(DISTINCT CASE WHEN a.status='online' THEN a.agent_id END) AS online_agents,
+                COALESCE(SUM(br.total_bytes), 0) AS total_bytes,
+                COUNT(br.report_id) AS total_reports,
+                COUNT(CASE WHEN br.status='success' THEN 1 END) AS success_count,
+                COUNT(CASE WHEN br.status='failed'  THEN 1 END) AS fail_count
+            FROM agents a
+            LEFT JOIN backup_reports br
+                ON br.agent_id = a.agent_id
+                AND br.created_at >= LOCALTIMESTAMP - INTERVAL '%s days'
+        """, (days,))
+        g = cur.fetchone()
+
+        success_rate = round(g['success_count'] / g['total_reports'] * 100, 1) if g['total_reports'] else 0.0
+
+        # Por agente
+        cur.execute("""
+            SELECT
+                a.agent_id, a.hostname, a.ip_address, a.status,
+                a.agent_version, a.last_heartbeat,
+                COUNT(br.report_id) AS backups,
+                COUNT(CASE WHEN br.status='success' THEN 1 END) AS successes,
+                COUNT(CASE WHEN br.status='failed'  THEN 1 END) AS failures,
+                COALESCE(SUM(br.total_bytes), 0) AS total_bytes,
+                COALESCE(AVG(br.duration_seconds), 0) AS avg_duration
+            FROM agents a
+            LEFT JOIN backup_reports br
+                ON br.agent_id = a.agent_id
+                AND br.created_at >= LOCALTIMESTAMP - INTERVAL '%s days'
+            GROUP BY a.agent_id, a.hostname, a.ip_address, a.status, a.agent_version, a.last_heartbeat
+            ORDER BY backups DESC
+        """, (days,))
+        agents_data = cur.fetchall()
+        for row in agents_data:
+            row['last_heartbeat'] = row['last_heartbeat'].isoformat() if row.get('last_heartbeat') and hasattr(row['last_heartbeat'], 'isoformat') else None
+            row['avg_duration'] = round(float(row['avg_duration'] or 0), 1)
+            row['success_rate'] = round(row['successes'] / row['backups'] * 100, 1) if row['backups'] else 0.0
+
+        # Top 10 falhas recentes
+        cur.execute("""
+            SELECT br.agent_id, a.hostname, br.backup_type AS job_name, br.error_message, br.created_at AS executed_at
+            FROM backup_reports br
+            JOIN agents a ON a.agent_id = br.agent_id
+            WHERE br.status = 'failed'
+              AND br.created_at >= LOCALTIMESTAMP - INTERVAL '%s days'
+            ORDER BY br.created_at DESC
+            LIMIT 10
+        """, (days,))
+        failures = cur.fetchall()
+        for row in failures:
+            row['executed_at'] = row['executed_at'].isoformat() if row.get('executed_at') and hasattr(row['executed_at'], 'isoformat') else None
+
+        # Tendência diária (últimos N dias)
+        cur.execute("""
+            SELECT
+                DATE(created_at) AS day,
+                COUNT(*) AS total,
+                COUNT(CASE WHEN status='success' THEN 1 END) AS successes,
+                COUNT(CASE WHEN status='failed'  THEN 1 END) AS failures,
+                COALESCE(SUM(total_bytes), 0) AS bytes
+            FROM backup_reports
+            WHERE created_at >= LOCALTIMESTAMP - INTERVAL '%s days'
+            GROUP BY DATE(created_at)
+            ORDER BY day
+        """, (days,))
+        trend = cur.fetchall()
+        for row in trend:
+            row['day'] = row['day'].isoformat() if row.get('day') and hasattr(row['day'], 'isoformat') else str(row.get('day'))
+
+        return {
+            "period_days": days,
+            "generated_at": _dt.now(timezone.utc).isoformat(),
+            "global": {
+                "total_agents": g['total_agents'],
+                "online_agents": g['online_agents'],
+                "total_bytes": int(g['total_bytes'] or 0),
+                "total_reports": g['total_reports'],
+                "success_count": g['success_count'],
+                "fail_count": g['fail_count'],
+                "success_rate": success_rate,
+            },
+            "agents": [dict(r) for r in agents_data],
+            "top_failures": [dict(r) for r in failures],
+            "trend": [dict(r) for r in trend],
+        }
+    except Exception as e:
+        logger.error(f"Erro relatório consolidado: {e}")
+        raise HTTPException(500, str(e))
+    finally:
+        if 'cur' in locals() and cur: cur.close()
+        release_db(conn)
+
+# ─────────────────────────────────────────────────────────────────────────────
+
 @app.get("/api/v1/server/info")
 async def get_server_info():
     """Get comprehensive server information."""
@@ -3433,6 +3697,66 @@ async def test_server_notification(request: Request):
     finally:
         if 'cur' in locals() and cur: cur.close()
         if conn: release_db(conn)
+
+
+# ── Alertas críticos dos agentes → propagação de notificações ─────────────────
+
+_CRITICAL_SEVERITIES = {"critical", "high", "error"}
+
+@app.post("/api/v1/agents/alert")
+async def receive_agent_alert(request: Request):
+    """
+    Recebe alerta de um agente e propaga via SMTP/Webhook se a severidade for crítica.
+    Payload esperado: {agent_id, hostname, severity, title, message, timestamp?}
+    """
+    conn = None
+    try:
+        data = await request.json()
+        agent_id  = data.get("agent_id", "unknown")
+        hostname  = data.get("hostname", agent_id)
+        severity  = str(data.get("severity", "info")).lower()
+        title     = data.get("title", "Alerta")
+        message   = data.get("message", "")
+        ts        = data.get("timestamp", _dt.now(timezone.utc).isoformat())
+
+        # Persistir no system_events se tabela existir
+        try:
+            conn = get_db(); cur = conn.cursor()
+            cur.execute("""
+                INSERT INTO system_events (agent_id, event_type, severity, message, timestamp)
+                VALUES (%s, 'alert', %s, %s, COALESCE(%s::timestamp, LOCALTIMESTAMP))
+                ON CONFLICT DO NOTHING
+            """, (agent_id, severity, f"[{title}] {message}", ts))
+            conn.commit()
+        except Exception:
+            if conn: conn.rollback()
+
+        # Propagar se criticidade alta
+        if severity in _CRITICAL_SEVERITIES:
+            subject = f"[GBOC] 🚨 {severity.upper()} — {hostname}: {title}"
+            body = (
+                f"Agente  : {hostname} ({agent_id})\n"
+                f"Severidade: {severity.upper()}\n"
+                f"Título  : {title}\n"
+                f"Mensagem: {message}\n"
+                f"Data/Hora: {ts}\n"
+            )
+            result = await _send_server_notification(subject, body)
+            logger.warning(f"🔔 Alerta crítico de {hostname}: {title} — notificação: {result}")
+        else:
+            result = {"sent": []}
+
+        await notify_dashboard_update()
+        return {"status": "received", "propagated": severity in _CRITICAL_SEVERITIES, "notification": result}
+
+    except Exception as e:
+        logger.error(f"Erro ao processar alerta do agente: {e}")
+        raise HTTPException(500, str(e))
+    finally:
+        if 'cur' in locals() and cur and not cur.closed: cur.close()
+        if conn: release_db(conn)
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 
 def _fmt_bytes(b):

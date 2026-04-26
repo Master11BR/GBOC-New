@@ -60,3 +60,126 @@ async def list_backups() -> Dict[str, Any]:
     if result.get("status") == "error":
         raise HTTPException(status_code=502, detail=result)
     return result
+
+
+# ── Controle de Jobs ──────────────────────────────────────────────────────────
+
+@router.get("/progress")
+async def get_progress() -> Dict[str, Any]:
+    """Estado de progresso atual do Duplicati."""
+    service = get_duplicati_native_service()
+    result = service.get_progress()
+    if result.get("status") == "error":
+        raise HTTPException(status_code=502, detail=result)
+    return result
+
+
+@router.get("/serverstate")
+async def get_server_state() -> Dict[str, Any]:
+    """Estado do servidor Duplicati (scheduled, running, paused...)."""
+    service = get_duplicati_native_service()
+    result = service.get_server_state()
+    if result.get("status") == "error":
+        raise HTTPException(status_code=502, detail=result)
+    return result
+
+
+@router.post("/backups/{backup_id}/run")
+async def run_backup(backup_id: str) -> Dict[str, Any]:
+    """Inicia um job de backup manualmente."""
+    service = get_duplicati_native_service()
+    result = service.run_backup(backup_id)
+    if result.get("status") == "error":
+        raise HTTPException(status_code=502, detail=result)
+    return result
+
+
+@router.post("/backups/{backup_id}/stop")
+async def stop_backup(backup_id: str, abort: bool = False) -> Dict[str, Any]:
+    """Para ou aborta um job de backup em execução. Use abort=true para forçar."""
+    service = get_duplicati_native_service()
+    result = service.stop_backup(backup_id, abort=abort)
+    if result.get("status") == "error":
+        raise HTTPException(status_code=502, detail=result)
+    return result
+
+
+@router.get("/backups/{backup_id}/log")
+async def get_backup_log(backup_id: str, page_size: int = 20) -> Dict[str, Any]:
+    """Log de execuções de um job específico."""
+    service = get_duplicati_native_service()
+    result = service.get_backup_log(backup_id, page_size=page_size)
+    if result.get("status") == "error":
+        raise HTTPException(status_code=502, detail=result)
+    return result
+
+
+@router.post("/server/pause")
+async def pause_server() -> Dict[str, Any]:
+    """Pausa o agendador do Duplicati."""
+    service = get_duplicati_native_service()
+    result = service.pause_server()
+    if result.get("status") == "error":
+        raise HTTPException(status_code=502, detail=result)
+    return result
+
+
+@router.post("/server/resume")
+async def resume_server() -> Dict[str, Any]:
+    """Retoma o agendador do Duplicati."""
+    service = get_duplicati_native_service()
+    result = service.resume_server()
+    if result.get("status") == "error":
+        raise HTTPException(status_code=502, detail=result)
+    return result
+
+
+
+@router.get("/status")
+async def get_status() -> Dict[str, Any]:
+    service = get_duplicati_native_service()
+    return {
+        "config": service.get_config_summary(),
+        "probe": service.probe(),
+    }
+
+
+@router.get("/config")
+async def get_config() -> Dict[str, Any]:
+    service = get_duplicati_native_service()
+    return service.get_config_summary()
+
+
+@router.post("/config")
+async def save_config(payload: Dict[str, Any]) -> Dict[str, Any]:
+    try:
+        service = get_duplicati_native_service()
+        cfg = service.save_config(payload)
+        return {
+            "status": "success",
+            "message": "Configuração do Duplicati salva",
+            "config": {
+                "base_url": cfg.base_url,
+                "username": cfg.username,
+                "password_masked": service.get_config_summary().get("password_masked", ""),
+                "verify_tls": cfg.verify_tls,
+                "timeout_seconds": cfg.timeout_seconds,
+            },
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/discover")
+async def discover() -> Dict[str, Any]:
+    service = get_duplicati_native_service()
+    return {"endpoints": service.discover_endpoints()}
+
+
+@router.get("/backups")
+async def list_backups() -> Dict[str, Any]:
+    service = get_duplicati_native_service()
+    result = service.list_backups()
+    if result.get("status") == "error":
+        raise HTTPException(status_code=502, detail=result)
+    return result
