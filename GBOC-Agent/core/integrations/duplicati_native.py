@@ -187,6 +187,27 @@ class DuplicatiNativeService:
                 resp = self._session.get(url, timeout=cfg.timeout_seconds, verify=cfg.verify_tls)
         return resp
 
+    def _api_put(self, cfg: DuplicatiConfig, path: str, json_body: Any = None) -> requests.Response:
+        """PUT autenticado com retry de login se receber 401/403."""
+        self._ensure_authenticated(cfg)
+        url = f"{cfg.base_url}/{path.lstrip('/')}"
+        headers = {"X-XSRF-Token": self._xsrf_token or ""}
+        resp = self._session.put(
+            url,
+            json=json_body,
+            headers=headers,
+            timeout=cfg.timeout_seconds,
+            verify=cfg.verify_tls,
+        )
+        if resp.status_code in (401, 403):
+            self._authenticated = False
+            self._xsrf_token = None
+            if self._login(cfg):
+                headers = {"X-XSRF-Token": self._xsrf_token or ""}
+                resp = self._session.put(url, json=json_body, headers=headers,
+                                         timeout=cfg.timeout_seconds, verify=cfg.verify_tls)
+        return resp
+
     def _api_post(self, cfg: DuplicatiConfig, path: str, json_body: Any = None, data: Any = None) -> requests.Response:
         """POST autenticado com retry de login se receber 401/403."""
         self._ensure_authenticated(cfg)
@@ -392,6 +413,134 @@ class DuplicatiNativeService:
             resp = self._api_post(cfg, "api/v1/serverstate/resume")
             return {"status": "success" if resp.status_code == 200 else "error",
                     "message": f"HTTP {resp.status_code}"}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    # ──────────────────────────────────────────────
+    # Agendamento
+    # ──────────────────────────────────────────────
+
+    def set_schedule(self, backup_id: str, schedule: Dict[str, Any]) -> Dict[str, Any]:
+        """Define ou atualiza o agendamento de um job de backup.
+
+        Parâmetros esperados em ``schedule``:
+        - time (str)           : horário no formato "HH:MM" (ex: "02:00")
+        - repeat (str)         : intervalo no formato Duplicati (ex: "1D", "1W")
+        - allowed_days (list)  : dias permitidos ["mon","tue","wed","thu","fri","sat","sun"]
+        - tags (list)          : lista de tags opcionais
+        """
+        cfg = self.load_config()
+        try:
+            # Obter agendamento atual do backup para preservar campos não informados
+            resp_get = self._api_get(cfg, f"api/v1/backup/{backup_id}")
+            if resp_get.status_code != 200:
+                return {"status": "error", "message": f"Backup {backup_id} não encontrado (HTTP {resp_get.status_code})"}
+            current = resp_get.json()
+            current_schedule = current.get("Schedule") or {}
+
+            # Montar payload de agendamento
+            time_str = schedule.get("time", current_schedule.get("Time", "02:00"))
+            # Normalizar "HH:MM" para formato ISO com data fictícia esperada pelo Duplicati
+            if len(time_str) == 5:  # "HH:MM"
+                time_str = f"1970-01-01T{time_str}:00"
+
+            new_schedule = {
+                "ID": current_schedule.get("ID", 0),
+                "Tags": schedule.get("tags", current_schedule.get("Tags", [f"ID={backup_id}"])),
+                "Time": time_str,
+                "Repeat": schedule.get("repeat", current_schedule.get("Repeat", "1D")),
+                "LastRun": current_schedule.get("LastRun", "0001-01-01T00:00:00"),
+                "Rule": schedule.get("rule", current_schedule.get("Rule", "")),
+                "AllowedDays": schedule.get("allowed_days", current_schedule.get("AllowedDays", [])),
+            }
+
+            payload = {
+                "Backup": current.get("Backup", {}),
+                "Schedule": new_schedule,
+            }
+
+            resp = self._api_put(cfg, f"api/v1/backup/{backup_id}", payload)
+            if resp.status_code == 200:
+                return {"status": "success", "message": f"Agendamento do backup {backup_id} atualizado", "schedule": new_schedule}
+            return {"status": "error", "message": f"HTTP {resp.status_code}", "detail": resp.text[:300]}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    # ──────────────────────────────────────────────
+    # Restauração
+    # ──────────────────────────────────────────────
+
+    def restore_backup(self, backup_id: str, restore_options: Dict[str, Any]) -> Dict[str, Any]:
+        """Inicia uma restauração de arquivos de um backup.
+
+        Parâmetros em ``restore_options``:
+        - paths (list)          : caminhos a restaurar (vazio = tudo)
+        - restore_path (str)    : destino da restauração
+        - overwrite (bool)      : sobrescrever arquivos existentes (padrão False)
+        - time (str)            : versão a restaurar, ex: "now" ou ISO datetime
+        - passphrase (str)      : senha de decriptação (se necessário)
+        """
+        cfg = self.load_config()
+        try:
+            paths = restore_options.get("paths", [])
+            restore_path = restore_options.get("restore_path", "")
+            overwrite = restore_options.get("overwrite", False)
+            time_ver = restore_options.get("time", "now")
+            passphrase = restore_options.get("passphrase", "")
+
+            if not restore_path:
+                return {"status": "error", "message": "restore_path é obrigatório"}
+
+            payload: Dict[str, Any] = {
+                "paths": paths,
+                "time": time_ver,
+                "restore-path": restore_path,
+                "overwrite": overwrite,
+            }
+            if passphrase:
+                payload["passphrase"] = passphrase
+
+            resp = self._api_post(cfg, f"api/v1/backup/{backup_id}/restore", payload)
+            if resp.status_code == 200:
+                data = resp.json() if resp.text else {}
+                return {"status": "success", "message": f"Restauração do backup {backup_id} iniciada", "task": data}
+            return {"status": "error", "message": f"HTTP {resp.status_code}", "detail": resp.text[:300]}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    # ──────────────────────────────────────────────
+    # Monitor de Resultado (para alertas automáticos)
+    # ──────────────────────────────────────────────
+
+    def get_last_result(self, backup_id: str) -> Dict[str, Any]:
+        """Retorna o resultado (ParsedResult) da última execução do backup."""
+        cfg = self.load_config()
+        try:
+            resp = self._api_get(cfg, f"api/v1/backup/{backup_id}/log?pagesize=1")
+            if resp.status_code != 200:
+                return {"status": "error", "message": f"HTTP {resp.status_code}"}
+            entries = resp.json()
+            if not entries:
+                return {"status": "success", "result": None, "message": "Sem execuções registradas"}
+            entry = entries[0]
+            msg_raw = entry.get("Message", "")
+            parsed_result = "Unknown"
+            error_messages: List[str] = []
+            try:
+                import json as _json
+                data = _json.loads(msg_raw)
+                parsed_result = data.get("ParsedResult", "Unknown")
+                error_messages = data.get("Errors", []) or []
+            except Exception:
+                pass
+            return {
+                "status": "success",
+                "backup_id": backup_id,
+                "parsed_result": parsed_result,
+                "errors": error_messages,
+                "timestamp": entry.get("Timestamp"),
+                "raw_type": entry.get("Type"),
+            }
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
