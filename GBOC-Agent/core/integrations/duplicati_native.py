@@ -88,12 +88,34 @@ class DuplicatiNativeService:
 
     def _login(self, cfg: DuplicatiConfig) -> bool:
         """
-        Realiza login na API do Duplicati v2.x.
-        Fluxo: GET / → captura xsrf-token do cookie → POST /login com password + xsrf-token.
-        Sem senha configurada, marca como autenticado diretamente (Duplicati sem senha).
+        Realiza login na API do Duplicati.
+        Suporta dois fluxos:
+          - v2.3+ (Kestrel/JWT): POST /api/v1/auth/login → {"AccessToken": "<jwt>"}
+          - v2.x legado: GET / → xsrf-token → POST /login.cgi
+        Sem senha configurada, tenta acesso direto (Duplicati sem senha).
         """
         try:
-            # 1. GET / para obter o cookie xsrf-token inicial
+            # ── Fluxo v2.3+: JWT via /api/v1/auth/login ──────────────────────
+            login_url_jwt = cfg.base_url + "/api/v1/auth/login"
+            resp_jwt = self._session.post(
+                login_url_jwt,
+                json={"Password": cfg.password},
+                timeout=cfg.timeout_seconds,
+                verify=cfg.verify_tls,
+            )
+            if resp_jwt.status_code == 200:
+                try:
+                    token = resp_jwt.json().get("AccessToken", "")
+                    if token:
+                        self._session.headers.update({"Authorization": f"Bearer {token}"})
+                        self._xsrf_token = token
+                        self._authenticated = True
+                        logger.info("✅ Autenticado no Duplicati v2.3+ via JWT")
+                        return True
+                except Exception:
+                    pass
+
+            # ── Fluxo legado: sessão/XSRF via /login.cgi ──────────────────────
             home = self._session.get(
                 cfg.base_url + "/",
                 timeout=cfg.timeout_seconds,
@@ -109,25 +131,20 @@ class DuplicatiNativeService:
                 self._xsrf_token = xsrf
                 self._session.headers.update({"X-XSRF-Token": xsrf})
 
-            # 2. Se não há senha configurada, Duplicati não exige login
             if not cfg.password:
                 self._authenticated = True
                 return True
 
-            # 3. POST /login com password
             login_url = cfg.base_url + "/login.cgi"
             payload = {"Password": cfg.password}
-            headers = {"X-XSRF-Token": self._xsrf_token or ""}
             resp = self._session.post(
                 login_url,
                 data=payload,
-                headers=headers,
+                headers={"X-XSRF-Token": self._xsrf_token or ""},
                 timeout=cfg.timeout_seconds,
                 verify=cfg.verify_tls,
             )
-            # Duplicati retorna 200 com JSON {"Status":"OK"} ou redireciona após login
             if resp.status_code in (200, 302, 303):
-                # Atualizar xsrf-token após login (pode ter rotacionado)
                 new_xsrf = (
                     resp.cookies.get("xsrf-token")
                     or resp.cookies.get("XSRF-TOKEN")
@@ -137,7 +154,7 @@ class DuplicatiNativeService:
                     self._xsrf_token = new_xsrf
                     self._session.headers.update({"X-XSRF-Token": new_xsrf})
                 self._authenticated = True
-                logger.info("✅ Autenticado no Duplicati via sessão/XSRF")
+                logger.info("✅ Autenticado no Duplicati via sessão/XSRF (legado)")
                 return True
 
             logger.warning(f"Falha no login Duplicati: HTTP {resp.status_code}")
