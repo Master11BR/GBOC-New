@@ -134,52 +134,60 @@ async def resume_server() -> Dict[str, Any]:
     return result
 
 
+# ── Agendamento ───────────────────────────────────────────────────────────────
 
-@router.get("/status")
-async def get_status() -> Dict[str, Any]:
-    service = get_duplicati_native_service()
-    return {
-        "config": service.get_config_summary(),
-        "probe": service.probe(),
+@router.post("/backups/{backup_id}/schedule")
+async def set_schedule(backup_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Define ou atualiza o agendamento automático de um job de backup.
+
+    Corpo esperado:
+    ```json
+    {
+      "time": "02:00",
+      "repeat": "1D",
+      "allowed_days": ["mon","tue","wed","thu","fri"],
+      "tags": []
     }
-
-
-@router.get("/config")
-async def get_config() -> Dict[str, Any]:
+    ```
+    """
     service = get_duplicati_native_service()
-    return service.get_config_summary()
+    result = service.set_schedule(backup_id, payload)
+    if result.get("status") == "error":
+        raise HTTPException(status_code=502, detail=result)
+    return result
 
 
-@router.post("/config")
-async def save_config(payload: Dict[str, Any]) -> Dict[str, Any]:
-    try:
-        service = get_duplicati_native_service()
-        cfg = service.save_config(payload)
-        return {
-            "status": "success",
-            "message": "Configuração do Duplicati salva",
-            "config": {
-                "base_url": cfg.base_url,
-                "username": cfg.username,
-                "password_masked": service.get_config_summary().get("password_masked", ""),
-                "verify_tls": cfg.verify_tls,
-                "timeout_seconds": cfg.timeout_seconds,
-            },
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+# ── Restauração ───────────────────────────────────────────────────────────────
 
+@router.post("/backups/{backup_id}/restore")
+async def restore_backup(backup_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Inicia a restauração de arquivos de um backup.
 
-@router.get("/discover")
-async def discover() -> Dict[str, Any]:
+    Corpo esperado:
+    ```json
+    {
+      "restore_path": "C:\\RestoreDir",
+      "paths": [],
+      "overwrite": false,
+      "time": "now",
+      "passphrase": ""
+    }
+    ```
+    """
     service = get_duplicati_native_service()
-    return {"endpoints": service.discover_endpoints()}
+    result = service.restore_backup(backup_id, payload)
+    if result.get("status") == "error":
+        raise HTTPException(status_code=502, detail=result)
+    return result
 
 
-@router.get("/backups")
-async def list_backups() -> Dict[str, Any]:
+# ── Resultado da última execução ──────────────────────────────────────────────
+
+@router.get("/backups/{backup_id}/lastresult")
+async def get_last_result(backup_id: str) -> Dict[str, Any]:
+    """Retorna o ParsedResult e erros da última execução do backup."""
     service = get_duplicati_native_service()
-    result = service.list_backups()
+    result = service.get_last_result(backup_id)
     if result.get("status") == "error":
         raise HTTPException(status_code=502, detail=result)
     return result

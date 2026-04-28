@@ -65,6 +65,10 @@ class CentralServerClient:
         self.last_websocket_message = None
         self.shared_core = SharedCore()
 
+        # Monitor de resultado de backups Duplicati
+        self._duplicati_monitor_thread: Optional[threading.Thread] = None
+        self._duplicati_last_seen: Dict[str, Any] = {}   # backup_id -> último resultado visto
+
         # Carregar configuração sem testar conexão
         self._load_configuration_silent()
 
@@ -73,6 +77,111 @@ class CentralServerClient:
         if self.server_url:
             self._start_heartbeat()
             self._start_websocket()
+        self._start_duplicati_monitor()
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Monitor de Resultados Duplicati — alerta automático em caso de erro
+    # ──────────────────────────────────────────────────────────────────────────
+
+    def _start_duplicati_monitor(self):
+        """Inicia a thread de monitoramento de resultados de backup Duplicati."""
+        if self._duplicati_monitor_thread and self._duplicati_monitor_thread.is_alive():
+            return
+        self._duplicati_monitor_thread = threading.Thread(
+            target=self._duplicati_monitor_loop,
+            daemon=True,
+            name="DuplicatiMonitor",
+        )
+        self._duplicati_monitor_thread.start()
+        logger.info("🔍 Monitor Duplicati iniciado")
+
+    def _duplicati_monitor_loop(self):
+        """Loop de monitoramento: verifica resultado dos backups a cada 5 minutos."""
+        CHECK_INTERVAL = 300  # segundos
+        while True:
+            try:
+                self._check_duplicati_results()
+            except Exception as exc:
+                logger.debug(f"[DuplicatiMonitor] erro no ciclo: {exc}")
+            time.sleep(CHECK_INTERVAL)
+
+    def _check_duplicati_results(self):
+        """Consulta o Duplicati e emite alertas para backups com erro ou falha."""
+        try:
+            from core.integrations.duplicati_native import get_duplicati_native_service
+        except ImportError:
+            return
+
+        svc = get_duplicati_native_service()
+
+        # Listar todos os backups conhecidos
+        backups_resp = svc.list_backups()
+        if backups_resp.get("status") != "success":
+            return
+
+        items = backups_resp.get("items", [])
+        for item in items:
+            backup = item.get("Backup") or item
+            backup_id = str(backup.get("ID", ""))
+            backup_name = backup.get("Name", backup_id)
+            if not backup_id:
+                continue
+
+            result = svc.get_last_result(backup_id)
+            if result.get("status") != "success":
+                continue
+
+            parsed = result.get("parsed_result")
+            timestamp = result.get("timestamp")
+            errors = result.get("errors", [])
+
+            # Chave única para evitar alertas duplicados da mesma execução
+            cache_key = f"{backup_id}:{timestamp}"
+            if self._duplicati_last_seen.get(backup_id) == cache_key:
+                continue  # já processado
+
+            self._duplicati_last_seen[backup_id] = cache_key
+
+            if parsed in (None, "Unknown", "Success"):
+                continue  # sem erro: nada a fazer
+
+            # Montar mensagem de alerta
+            error_summary = "; ".join(str(e) for e in errors[:3]) if errors else "sem detalhes"
+            alert_msg = (
+                f"Backup '{backup_name}' (ID {backup_id}) terminou com '{parsed}'. "
+                f"Erros: {error_summary}"
+            )
+            logger.warning(f"🚨 [DuplicatiMonitor] {alert_msg}")
+
+            # Enviar alerta via WebSocket (assíncrono)
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    asyncio.ensure_future(self.send_realtime_alert(
+                        alert_type="duplicati_backup_error",
+                        message=alert_msg,
+                        details={
+                            "backup_id": backup_id,
+                            "backup_name": backup_name,
+                            "parsed_result": parsed,
+                            "errors": errors,
+                            "timestamp": timestamp,
+                        },
+                    ))
+                else:
+                    loop.run_until_complete(self.send_realtime_alert(
+                        alert_type="duplicati_backup_error",
+                        message=alert_msg,
+                        details={
+                            "backup_id": backup_id,
+                            "backup_name": backup_name,
+                            "parsed_result": parsed,
+                            "errors": errors,
+                            "timestamp": timestamp,
+                        },
+                    ))
+            except Exception as exc:
+                logger.warning(f"[DuplicatiMonitor] falha ao enviar alerta WebSocket: {exc}")
 
     def _load_configuration_silent(self):
         """Carrega configuração do servidor central sem testar conexão"""
