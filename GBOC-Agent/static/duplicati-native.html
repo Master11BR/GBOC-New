@@ -1,11 +1,21 @@
+<!--
+==============================================================================
+GBOC System v13.2.0 Enterprise Edition
+Copyright (c) 2026 Master11BR - Todos os direitos reservados.
+Propriedade Intelectual & Direitos Autorais Registrados.
+==============================================================================
+-->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GBOC Agent - Duplicati Nativo</title>
-    <link rel="stylesheet" href="/static/style.css?v=11.9">
+    <link rel="stylesheet" href="/static/style.css?v=13.2.0">
+    <link rel="stylesheet" href="/static/gboc-themes.css">
+    <link rel="stylesheet" href="/static/gboc-layout.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="/static/gboc-layout-manager.js"></script>
     <script src="/static/auth_interceptor.js"></script>
     <style>
         .dup-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
@@ -66,44 +76,6 @@
         <div class="content">
             <div class="dup-grid" style="margin-bottom:20px;">
 
-                <!-- Configuracao -->
-                <div class="status-card">
-                    <div class="status-header" style="margin-bottom:16px;">
-                        <h3 style="font-size:1em;color:var(--text);margin:0;">
-                            <i class="fas fa-plug" style="color:var(--primary);margin-right:8px;"></i>Configuracao de Conexao
-                        </h3>
-                    </div>
-                    <div class="conn-form">
-                        <label class="full">URL Base
-                            <input id="baseUrl" type="url" placeholder="http://localhost:8200">
-                        </label>
-                        <label>Usuario
-                            <input id="username" placeholder="Opcional">
-                        </label>
-                        <label>Senha
-                            <input id="password" type="password" placeholder="Opcional">
-                        </label>
-                        <label>Timeout (s)
-                            <input id="timeout" type="number" min="2" max="60" value="8">
-                        </label>
-                        <label style="flex-direction:row;align-items:center;gap:8px;padding-top:20px;">
-                            <input id="verifyTls" type="checkbox"> Validar TLS
-                        </label>
-                    </div>
-                    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;">
-                        <button class="btn btn-primary" onclick="saveConfig()">
-                            <i class="fas fa-save"></i> Salvar
-                        </button>
-                        <button class="btn btn-secondary" onclick="probe()">
-                            <i class="fas fa-heartbeat"></i> Testar Conexao
-                        </button>
-                        <button class="btn btn-secondary" onclick="discover()">
-                            <i class="fas fa-search"></i> Descobrir Endpoints
-                        </button>
-                    </div>
-                    <div id="connFeedback" class="feedback-block"></div>
-                </div>
-
                 <!-- Status -->
                 <div class="status-card">
                     <div class="status-header" style="margin-bottom:16px;">
@@ -160,23 +132,23 @@ async function apiCall(path, options) {
 async function loadConfig() {
     try {
         var cfg = await apiCall('/api/duplicati-native/config');
-        document.getElementById('baseUrl').value = cfg.base_url || '';
-        document.getElementById('username').value = cfg.username || '';
-        document.getElementById('timeout').value = cfg.timeout_seconds || 8;
-        document.getElementById('verifyTls').checked = !!cfg.verify_tls;
+        var elUrl = document.getElementById('baseUrl');
+        if (elUrl) elUrl.value = cfg.base_url || '';
     } catch(e) {}
 }
 async function saveConfig() {
+    var elUrl = document.getElementById('baseUrl');
+    if (!elUrl) return;
     hideFeedback('connFeedback');
     var btn = document.querySelector('[onclick="saveConfig()"]');
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...'; }
     try {
         var payload = {
-            base_url: document.getElementById('baseUrl').value.trim(),
-            username: document.getElementById('username').value.trim(),
-            password: document.getElementById('password').value,
-            timeout_seconds: Number(document.getElementById('timeout').value || 8),
-            verify_tls: document.getElementById('verifyTls').checked
+            base_url: elUrl.value.trim(),
+            username: (document.getElementById('username') ? document.getElementById('username').value.trim() : ''),
+            password: (document.getElementById('password') ? document.getElementById('password').value : ''),
+            timeout_seconds: Number((document.getElementById('timeout') ? document.getElementById('timeout').value : 8)),
+            verify_tls: (document.getElementById('verifyTls') ? document.getElementById('verifyTls').checked : false)
         };
         if (!payload.base_url) { showFeedback('connFeedback', 'URL Base obrigatoria', 'err'); return; }
         await apiCall('/api/duplicati-native/config', { method: 'POST', body: JSON.stringify(payload) });
@@ -192,23 +164,21 @@ function renderStatusRows(data) {
     var rows = document.getElementById('statusRows');
     var badge = document.getElementById('statusBadge');
     if (!rows) return;
-    if (!data || data.error) {
-        if (badge) { badge.className = 'dup-badge crit'; badge.innerHTML = '<i class="fas fa-times-circle"></i> Offline'; }
-        rows.innerHTML = '<div class="dup-status-row"><span class="dup-status-label">Situacao</span><span class="dup-status-value" style="color:var(--danger);"><i class="fas fa-exclamation-triangle"></i> Instancia nao acessivel</span></div>'
-            + '<div class="dup-status-row"><span class="dup-status-label">Detalhe</span><span class="dup-status-value" style="font-size:.82em;color:var(--text-muted);">' + ((data && data.error) || 'Verifique se o Duplicati esta em execucao e a URL esta correta.') + '</span></div>';
-        return;
-    }
-    var online = data.online !== false;
+
+    var online = data && data.online !== false && (data.probe ? data.probe.ok : true);
+    var probeObj = (data && data.probe) || {};
+    var msg = probeObj.message || (online ? '🟢 Instância Operacional' : '❌ Instância Offline');
+
     if (badge) {
         badge.className = 'dup-badge ' + (online ? 'ok' : 'crit');
-        badge.innerHTML = online ? '<i class="fas fa-check-circle"></i> Online' : '<i class="fas fa-times-circle"></i> Offline';
+        badge.innerHTML = online ? '<i class="fas fa-check-circle"></i> Operacional' : '<i class="fas fa-times-circle"></i> Offline';
     }
+
     var fields = [
-        ['Versao', data.server_version || data.version || '&mdash;'],
-        ['API Version', data.api_version || '&mdash;'],
-        ['OS', data.os || '&mdash;'],
-        ['URL', data.base_url || document.getElementById('baseUrl').value || '&mdash;'],
-        ['Autenticado', data.authenticated != null ? (data.authenticated ? 'Sim' : 'Nao') : '&mdash;']
+        ['Status Conexão', msg],
+        ['URL Base', data ? (data.base_url || (probeObj.base_url || 'http://localhost:8200')) : 'http://localhost:8200'],
+        ['Modo de Leitura', (probeObj.authenticated ? 'API HTTP Autenticada' : 'SQLite DB Direct Reader / Local')],
+        ['Instalação Local', (probeObj.installation && probeObj.installation.detected) ? 'Detectada no Sistema' : 'Serviço em Execução']
     ];
     rows.innerHTML = fields.map(function(f) {
         return '<div class="dup-status-row"><span class="dup-status-label">' + f[0] + '</span><span class="dup-status-value">' + f[1] + '</span></div>';
@@ -231,9 +201,10 @@ async function discover() {
     try {
         var data = await apiCall('/api/duplicati-native/discover');
         var found = data.endpoints || data.discovered || [];
+        var elUrl = document.getElementById('baseUrl');
         if (found.length) {
             showFeedback('connFeedback', '<i class="fas fa-check-circle"></i> Endpoints: ' + found.join(', '), 'ok');
-            if (found[0] && !document.getElementById('baseUrl').value) document.getElementById('baseUrl').value = found[0];
+            if (found[0] && elUrl && !elUrl.value) elUrl.value = found[0];
         } else {
             showFeedback('connFeedback', '<i class="fas fa-exclamation-circle"></i> Nenhum endpoint encontrado', 'warn');
         }
@@ -241,18 +212,48 @@ async function discover() {
         showFeedback('connFeedback', '<i class="fas fa-times-circle"></i> ' + e.message, 'err');
     }
 }
+function esc(s) {
+    if (!s) return '';
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 function fmtBytes(b) {
-    if (!b) return '&mdash;';
+    if (!b || isNaN(b)) return '—';
     b = Number(b);
-    if (b > 1e9) return (b/1e9).toFixed(1) + ' GB';
-    if (b > 1e6) return (b/1e6).toFixed(1) + ' MB';
-    if (b > 1e3) return (b/1e3).toFixed(0) + ' KB';
+    if (b >= 1e9) return (b / 1e9).toFixed(2).replace('.', ',') + ' GB';
+    if (b >= 1e6) return (b / 1e6).toFixed(2).replace('.', ',') + ' MB';
+    if (b >= 1e3) return (b / 1e3).toFixed(1).replace('.', ',') + ' KB';
     return b + ' B';
 }
+
 function fmtDate(dt) {
-    if (!dt) return '&mdash;';
-    try { return new Date(dt).toLocaleString('pt-BR'); } catch(e) { return dt; }
+    if (!dt) return '—';
+    try {
+        var s = String(dt).trim();
+        if (s.length === 16 && s[8] === 'T' && s[15] === 'Z') {
+            s = s.substring(0,4) + '-' + s.substring(4,6) + '-' + s.substring(6,8) + 'T' + s.substring(9,11) + ':' + s.substring(11,13) + ':' + s.substring(13,15) + 'Z';
+        }
+        var d = new Date(s);
+        if (isNaN(d.getTime())) return String(dt);
+        return d.toLocaleString('pt-BR');
+    } catch(e) { return String(dt); }
 }
+
+function fmtDuration(dur) {
+    if (!dur) return '—';
+    var s = String(dur);
+    var parts = s.split(':');
+    if (parts.length === 3) {
+        var hrs = parseInt(parts[0], 10);
+        var mins = parseInt(parts[1], 10);
+        var secs = Math.round(parseFloat(parts[2]));
+        if (hrs > 0) return hrs + 'h ' + mins + 'm';
+        if (mins > 0) return mins + 'm ' + secs + 's';
+        return secs + 's';
+    }
+    return s;
+}
+
 function stClass(st) {
     if (!st) return 'info';
     var s = String(st).toLowerCase();
@@ -261,37 +262,66 @@ function stClass(st) {
     if (s.includes('run') || s.includes('active')) return 'info';
     return 'warn';
 }
+
+async function runDuplicatiBackup(jobId) {
+    if (!confirm('Deseja iniciar a execução deste backup agora?')) return;
+    try {
+        await apiCall('/api/duplicati-native/backups/' + jobId + '/run', { method: 'POST' });
+        alert('🚀 Execução do backup enviada com sucesso ao Duplicati!');
+        setTimeout(loadBackups, 2000);
+    } catch(e) {
+        alert('⚠️ Erro ao acionar backup: ' + e.message);
+    }
+}
+
 async function loadBackups() {
     var cont = document.getElementById('backupsContainer');
-    if (cont) cont.innerHTML = '<div class="section-spinner"><i class="fas fa-circle-notch fa-spin"></i> Carregando...</div>';
+    if (cont) cont.innerHTML = '<div class="section-spinner"><i class="fas fa-circle-notch fa-spin"></i> Carregando backups...</div>';
     try {
         var data = await apiCall('/api/duplicati-native/backups');
-        var list = Array.isArray(data) ? data : (data.backups || data.data || []);
+        var list = Array.isArray(data) ? data : (data.items || data.backups || data.data || []);
         if (!list.length) {
-            cont.innerHTML = '<div class="empty-backups"><i class="fas fa-database"></i><p>Nenhum backup configurado no Duplicati</p><p style="font-size:.85em;">Verifique se a instancia esta conectada e acessivel.</p></div>';
+            cont.innerHTML = '<div class="empty-backups"><i class="fas fa-database"></i><p>Nenhum backup configurado no Duplicati</p><p style="font-size:.85em;">Verifique se a instância está conectada e acessível.</p></div>';
             return;
         }
         cont.innerHTML = list.map(function(b) {
-            var name    = (b.Backup && b.Backup.Name) || b.name || b.ID || '(sem nome)';
-            var bId     = (b.Backup && b.Backup.ID)   || b.id   || '&mdash;';
-            var desc    = (b.Backup && b.Backup.Description) || b.description || '';
-            var meta    = (b.Backup && b.Backup.Metadata) || {};
+            var bk = b.Backup || {};
+            var meta = bk.Metadata || {};
+            var name = bk.Name || b.name || '(sem nome)';
+            var bId = bk.ID || b.id || '—';
+            var desc = bk.Description || b.description || '';
+            var destLabel = b.target_label || (meta.TargetURL && meta.TargetURL.includes('wasabi') ? 'Wasabi S3' : 'Destino Remoto');
+
             var lastRun = fmtDate(meta.LastBackupDate || b.last_run);
-            var size    = fmtBytes(meta.SourceFilesSize || b.source_size);
-            var lastSt  = meta.LastBackupResult || b.last_status || '&mdash;';
-            var cls     = stClass(lastSt);
-            var srcs    = ((b.Backup && b.Backup.Sources) || b.sources || []).slice(0,3).join(', ') || '&mdash;';
-            return '<div class="backup-card">'
-                + '<div class="backup-card-header">'
-                + '<span class="backup-card-name"><i class="fas fa-shield-alt" style="color:var(--primary);margin-right:6px;"></i>' + name + '</span>'
-                + '<span class="dup-badge ' + cls + '">' + lastSt + '</span>'
+            var sourceSize = fmtBytes(meta.SourceFilesSize || b.source_size);
+            var targetSize = fmtBytes(meta.TargetFilesSize || b.target_size);
+            var versions = meta.BackupListCount || b.versions_count || '0';
+            var duration = fmtDuration(meta.LastBackupDuration || b.duration);
+            var lastSt = meta.LastBackupResult || b.last_status || 'Success';
+            var cls = stClass(lastSt);
+
+            var schedRepeat = (b.schedule && b.schedule.repeat) ? ('A cada ' + b.schedule.repeat) : 'Manual';
+
+            return '<div class="backup-card" style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:16px;box-shadow:0 4px 12px rgba(0,0,0,0.15);">'
+                + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:12px;">'
+                + '  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
+                + '    <strong style="font-size:1.15em;color:var(--text);"><i class="fas fa-shield-alt" style="color:var(--primary);margin-right:8px;"></i>' + esc(name) + '</strong>'
+                + '    <span class="dup-badge ok" style="background:rgba(66,153,225,0.15);color:#4299e1;border:1px solid rgba(66,153,225,0.3);padding:4px 12px;border-radius:12px;font-size:0.82em;"><i class="fas fa-cloud"></i> ' + esc(destLabel) + '</span>'
+                + '    <span class="dup-badge ok" style="background:rgba(72,187,120,0.15);color:#48bb78;border:1px solid rgba(72,187,120,0.3);padding:4px 12px;border-radius:12px;font-size:0.82em;"><i class="fas fa-history"></i> ' + esc(versions) + ' Versões</span>'
+                + '    <span class="dup-badge ' + cls + '">' + esc(lastSt) + '</span>'
+                + '  </div>'
+                + '  <div style="display:flex;gap:8px;">'
+                + '    <button class="btn btn-primary btn-sm" onclick="runDuplicatiBackup(\'' + bId + '\')"><i class="fas fa-play"></i> Iniciar Backup</button>'
+                + '  </div>'
                 + '</div>'
-                + (desc ? '<div style="font-size:.82em;color:var(--text-muted);margin-bottom:6px;">' + desc + '</div>' : '')
-                + '<div class="backup-card-meta">'
-                + '<span><i class="fas fa-hashtag" style="opacity:.6"></i> ID: ' + bId + '</span>'
-                + '<span><i class="fas fa-clock" style="opacity:.6"></i> Ultimo: ' + lastRun + '</span>'
-                + '<span><i class="fas fa-hdd" style="opacity:.6"></i> ' + size + '</span>'
-                + '<span><i class="fas fa-folder" style="opacity:.6"></i> ' + srcs + '</span>'
+                + (desc ? '<div style="font-size:0.88em;color:var(--text-muted);margin-bottom:12px;"><i class="fas fa-info-circle"></i> ' + esc(desc) + '</div>' : '')
+                + '<div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(170px, 1fr));gap:12px;font-size:0.86em;background:var(--bg-input);padding:14px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);">'
+                + '  <div><span style="color:var(--text-muted);display:block;font-size:0.8em;">ID DO JOB</span><strong style="color:var(--text);">#' + esc(bId) + '</strong></div>'
+                + '  <div><span style="color:var(--text-muted);display:block;font-size:0.8em;">ÚLTIMO BACKUP</span><strong style="color:var(--text);">' + lastRun + '</strong></div>'
+                + '  <div><span style="color:var(--text-muted);display:block;font-size:0.8em;">DURAÇÃO</span><strong style="color:var(--text);">' + duration + '</strong></div>'
+                + '  <div><span style="color:var(--text-muted);display:block;font-size:0.8em;">TAMANHO ORIGEM</span><strong style="color:var(--text);">' + sourceSize + '</strong></div>'
+                + '  <div><span style="color:var(--text-muted);display:block;font-size:0.8em;">TAMANHO DESTINO</span><strong style="color:var(--text);">' + targetSize + '</strong></div>'
+                + '  <div><span style="color:var(--text-muted);display:block;font-size:0.8em;">AGENDAMENTO</span><strong style="color:var(--text);">' + esc(schedRepeat) + '</strong></div>'
                 + '</div></div>';
         }).join('');
     } catch(e) {

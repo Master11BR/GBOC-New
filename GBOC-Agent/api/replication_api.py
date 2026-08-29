@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 11.7c - Replication API
+GBOC 13.2.0 - Replication API
 CRUD for replication policies, trigger replication, 3-2-1 status, history.
 """
 

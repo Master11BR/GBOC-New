@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC Agent 11.7c - API Repositories
+GBOC Agent 13.2.0 - API Repositories
 ✅ Aceita payload flexível do frontend
 ✅ Integra com RepositoryManager
 ✅ Inicialização em background
@@ -8,7 +8,7 @@ GBOC Agent 11.7c - API Repositories
 
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from typing import List, Dict, Any, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 import logging
 import psycopg2
 import json
@@ -41,8 +41,7 @@ class RepositoryCreateRequest(BaseModel):
     access_key: Optional[str] = None
     secret_key: Optional[str] = None
 
-    class Config:
-        extra = "allow"
+    model_config = ConfigDict(extra="allow")
     
     def get_type(self) -> str:
         return self.type or self.repo_type or "local"
@@ -72,8 +71,7 @@ class RepositoryUpdateRequest(BaseModel):
     azure_account_name: Optional[str] = None
     azure_account_key: Optional[str] = None
     
-    class Config:
-        extra = "allow"
+    model_config = ConfigDict(extra="allow")
 
 
 class SuccessResponse(BaseModel):

@@ -1,54 +1,72 @@
+<!--
+==============================================================================
+GBOC System v13.2.0 Enterprise Edition
+Copyright (c) 2026 Master11BR - Todos os direitos reservados.
+Propriedade Intelectual & Direitos Autorais Registrados.
+==============================================================================
+-->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GBOC Agent 11.7c - Seguranca e Usuarios</title>
-    <link rel="stylesheet" href="/static/style.css?v=11.9">
+    <title>GBOC Agent 13.2.0 - Usuários & Níveis de Acesso</title>
+    <link rel="stylesheet" href="/static/style.css?v=13.2.0">
+    <link rel="stylesheet" href="/static/gboc-themes.css">
+    <link rel="stylesheet" href="/static/gboc-layout.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="/static/gboc-layout-manager.js"></script>
     <style>
-        .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:16px;margin-bottom:28px}
-        .stat-card{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:18px;text-align:center}
-        .stat-card .val{font-size:1.8em;font-weight:700}
-        .stat-card .lbl{font-size:.8em;color:var(--text-muted);margin-top:4px}
-        .three-col{display:grid;grid-template-columns:300px 1fr 1fr;gap:24px;margin-bottom:20px}
-        @media(max-width:1100px){.three-col{grid-template-columns:1fr}}
-        .panel{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px}
-        .panel-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
-        .panel-header h3{margin:0;display:flex;align-items:center;gap:8px;font-size:1em}
-        .panel-body{padding:20px}
-        .tbl{width:100%;border-collapse:collapse}
-        .tbl th,.tbl td{padding:11px 14px;text-align:left;border-bottom:1px solid var(--border);font-size:.85em}
-        .tbl th{background:var(--bg-input);color:var(--text-muted);font-weight:600}
-        .badge-ok{background:rgba(72,187,120,.15);color:var(--success);padding:2px 10px;border-radius:20px;font-size:.8em}
-        .badge-warn{background:rgba(237,137,54,.15);color:var(--warning);padding:2px 10px;border-radius:20px;font-size:.8em}
-        .badge-crit{background:rgba(245,101,101,.15);color:var(--danger);padding:2px 10px;border-radius:20px;font-size:.8em}
-        .badge-info{background:rgba(66,153,225,.15);color:var(--primary);padding:2px 10px;border-radius:20px;font-size:.8em}
-        .user-card{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border);transition:background .15s}
-        .user-card:hover{background:var(--card-hover)}
-        .user-avatar{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.1em;font-weight:700;flex-shrink:0}
-        .user-avatar.admin{background:rgba(245,101,101,.15);color:var(--danger)}
-        .user-avatar.operator{background:rgba(66,153,225,.15);color:var(--primary)}
-        .user-avatar.viewer{background:rgba(72,187,120,.15);color:var(--success)}
-        .profile-card{text-align:center;padding:28px 20px}
-        .profile-avatar{width:72px;height:72px;border-radius:16px;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;font-size:1.8em;font-weight:800;background:rgba(99,102,241,.12);color:var(--primary);border:2px solid rgba(99,102,241,.3)}
-        .profile-name{font-size:1.1em;font-weight:700;margin-bottom:2px}
-        .profile-role{font-size:.82em;color:var(--text-muted);margin-bottom:16px}
-        .setting-item{margin-bottom:14px}
-        .setting-item label{display:block;font-size:.85em;color:var(--text-muted);margin-bottom:5px;font-weight:600}
-        .setting-item input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:.9em;box-sizing:border-box}
-        .pw-msg{display:none;padding:8px 12px;border-radius:6px;font-size:.85em;margin-top:8px}
-        .pw-msg.ok{display:block;background:rgba(72,187,120,.12);color:var(--success);border:1px solid rgba(72,187,120,.3)}
-        .pw-msg.err{display:block;background:rgba(245,101,101,.12);color:var(--danger);border:1px solid rgba(245,101,101,.3)}
-        .form-group{margin-bottom:14px}
-        .form-group label{display:block;font-size:.85em;color:var(--text-muted);margin-bottom:5px;font-weight:600}
-        .form-group input,.form-group select{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:.9em;box-sizing:border-box}
-        .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;align-items:center;justify-content:center}
-        .modal-overlay.show{display:flex}
-        .modal-box{background:var(--bg-card);border-radius:14px;padding:28px;width:480px;max-width:95vw;border:1px solid var(--border);max-height:85vh;overflow-y:auto}
-        .modal-box h3{margin-bottom:20px;display:flex;align-items:center;gap:10px}
-        .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}
-        .empty-msg{text-align:center;color:var(--text-muted);padding:40px 20px}
+        .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 18px; text-align: center; }
+        .stat-card .val { font-size: 1.8em; font-weight: 700; }
+        .stat-card .lbl { font-size: .8em; color: var(--text-muted); margin-top: 4px; }
+
+        .tabs-header { display: flex; gap: 8px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+        .tab-btn { padding: 12px 20px; border: none; background: none; color: var(--text-muted); font-size: 0.92em; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; display: flex; align-items: center; gap: 8px; }
+        .tab-btn:hover { color: var(--primary); }
+        .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); background: rgba(0, 240, 255, 0.04); border-radius: 6px 6px 0 0; }
+
+        .tab-pane { display: none; }
+        .tab-pane.active { display: block; }
+
+        .panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 20px; }
+        .panel-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .panel-header h3 { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 1.05em; }
+        .panel-body { padding: 20px; }
+
+        .tbl { width: 100%; border-collapse: collapse; }
+        .tbl th, .tbl td { padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--border); font-size: .88em; }
+        .tbl th { background: var(--bg-input); color: var(--text-muted); font-weight: 600; }
+
+        .badge-ok { background: rgba(72, 187, 120, 0.15); color: var(--success); padding: 3px 10px; border-radius: 20px; font-size: 0.78em; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+        .badge-warn { background: rgba(237, 137, 54, 0.15); color: var(--warning); padding: 3px 10px; border-radius: 20px; font-size: 0.78em; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+        .badge-crit { background: rgba(245, 101, 101, 0.15); color: var(--danger); padding: 3px 10px; border-radius: 20px; font-size: 0.78em; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+        .badge-info { background: rgba(66, 153, 225, 0.15); color: var(--primary); padding: 3px 10px; border-radius: 20px; font-size: 0.78em; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+        .badge-purple { background: rgba(128, 90, 213, 0.15); color: var(--accent); padding: 3px 10px; border-radius: 20px; font-size: 0.78em; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-size: .85em; color: var(--text-muted); margin-bottom: 6px; font-weight: 600; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-input); color: var(--text); font-size: .9em; box-sizing: border-box; }
+
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+        .modal-overlay.show { display: flex; }
+        .modal-box { background: var(--bg-card); border-radius: 14px; padding: 28px; width: 620px; max-width: 95vw; border: 1px solid var(--border); max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
+        .modal-box h3 { margin: 0 0 20px 0; display: flex; align-items: center; gap: 10px; font-size: 1.2em; }
+        .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); }
+
+        .perm-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; margin-top: 12px; }
+        .perm-card { background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+        .perm-card-header { display: flex; justify-content: space-between; align-items: center; font-size: 0.85em; font-weight: 700; color: var(--primary); margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+        .perm-item { display: flex; align-items: center; gap: 8px; font-size: 0.82em; margin-bottom: 6px; cursor: pointer; }
+        .perm-item input { width: auto; cursor: pointer; }
+
+        .profile-card { text-align: center; padding: 20px 16px; }
+        .profile-avatar { width: 64px; height: 64px; border-radius: 16px; margin: 0 auto 12px; display: flex; align-items: center; justify-content: center; font-size: 1.6em; font-weight: 800; background: rgba(99, 102, 241, 0.12); color: var(--primary); border: 2px solid rgba(99, 102, 241, 0.3); }
+
+        .pw-msg { display: none; padding: 8px 12px; border-radius: 6px; font-size: .85em; margin-top: 8px; }
+        .pw-msg.ok { display: block; background: rgba(72, 187, 120, 0.12); color: var(--success); border: 1px solid rgba(72, 187, 120, 0.3); }
+        .pw-msg.err { display: block; background: rgba(245, 101, 101, 0.12); color: var(--danger); border: 1px solid rgba(245, 101, 101, 0.3); }
     </style>
     <script src="/static/auth_interceptor.js"></script>
 </head>
@@ -57,254 +75,690 @@
         <main class="main-content">
             <header class="header">
                 <div>
-                    <h1 class="page-title"><i class="fas fa-user-shield" style="color:var(--primary)"></i> Seguran&#231;a &amp; Usu&#225;rios</h1>
-                    <div class="page-subtitle">Autentica&#231;&#227;o, gerenciamento de usu&#225;rios, senhas e auditoria de acesso</div>
+                    <h1 class="page-title"><i class="fas fa-user-shield" style="color:var(--primary)"></i> Segurança, Usuários & Níveis de Acesso</h1>
+                    <div class="page-subtitle">Gerenciamento completo de usuários, CRUD de níveis de acesso e permissões customizadas</div>
                 </div>
                 <div class="header-actions">
                     <button class="btn btn-secondary" onclick="loadAll()"><i class="fas fa-sync-alt"></i> Atualizar</button>
-                    <button class="btn btn-primary" onclick="openUserModal()"><i class="fas fa-user-plus"></i> Novo Usu&#225;rio</button>
-                    <button class="btn btn-danger" onclick="gbocLogout()"><i class="fas fa-sign-out-alt"></i> Sair</button>
+                    <button class="btn btn-primary" onclick="openUserModal()"><i class="fas fa-user-plus"></i> Novo Usuário</button>
+                    <button class="btn btn-success" onclick="openRoleModal()"><i class="fas fa-plus-circle"></i> Novo Nível Customizado</button>
                 </div>
             </header>
 
             <div class="stats-row">
-                <div class="stat-card"><div class="val" id="kpi-users">0</div><div class="lbl">Usu&#225;rios</div></div>
-                <div class="stat-card"><div class="val" id="kpi-admins">0</div><div class="lbl">Administradores</div></div>
-                <div class="stat-card"><div class="val" id="kpi-auth" style="color:var(--success)">---</div><div class="lbl">Autentica&#231;&#227;o</div></div>
-                <div class="stat-card"><div class="val" id="kpi-sessions">0</div><div class="lbl">Sess&#245;es Ativas</div></div>
+                <div class="stat-card"><div class="val" id="kpi-users">0</div><div class="lbl">Usuários Cadastrados</div></div>
+                <div class="stat-card"><div class="val" id="kpi-roles" style="color:var(--primary)">0</div><div class="lbl">Níveis de Acesso</div></div>
+                <div class="stat-card"><div class="val" id="kpi-auth" style="color:var(--success)">---</div><div class="lbl">Status Autenticação</div></div>
+                <div class="stat-card"><div class="val" id="kpi-sessions" style="color:var(--warning)">0</div><div class="lbl">Sessões Ativas</div></div>
             </div>
 
-            <div class="three-col">
-                <div>
-                    <div class="panel" style="border:2px solid rgba(99,102,241,.2)">
-                        <div class="profile-card">
-                            <div class="profile-avatar" id="my-avatar">?</div>
-                            <div class="profile-name" id="my-name">Carregando...</div>
-                            <div class="profile-role" id="my-role"></div>
-                            <div style="font-size:.78em;color:var(--text-muted)" id="my-username"></div>
+            <!-- NAVEGAÇÃO DE ABAS DE GERENCIAMENTO -->
+            <div class="tabs-header">
+                <button class="tab-btn active" onclick="switchTab('tab-users')" id="tab-btn-users">
+                    <i class="fas fa-users"></i> Usuários do Sistema (CRUD)
+                </button>
+                <button class="tab-btn" onclick="switchTab('tab-roles')" id="tab-btn-roles">
+                    <i class="fas fa-layer-group"></i> Níveis de Acesso & Permissões Customizadas
+                </button>
+                <button class="tab-btn" onclick="switchTab('tab-audit')" id="tab-btn-audit">
+                    <i class="fas fa-clipboard-list"></i> Trilha de Auditoria
+                </button>
+            </div>
+
+            <!-- ABA 1: CRUD DE USUÁRIOS -->
+            <div class="tab-pane active" id="tab-users">
+                <div style="display:grid;grid-template-columns:320px 1fr;gap:20px;">
+                    <div>
+                        <div class="panel" style="border:2px solid rgba(99,102,241,0.2)">
+                            <div class="profile-card">
+                                <div class="profile-avatar" id="my-avatar">?</div>
+                                <div style="font-size:1.1em;font-weight:700" id="my-name">Carregando...</div>
+                                <div style="margin-top:4px" id="my-role"></div>
+                                <div style="font-size:.78em;color:var(--text-muted);margin-top:4px" id="my-username"></div>
+                            </div>
+                            <div class="panel-body" style="padding-top:0">
+                                <h4 style="font-size:.9em;margin-bottom:12px;color:var(--text)"><i class="fas fa-key" style="color:var(--warning);margin-right:6px"></i> Alterar Minha Senha</h4>
+                                <div class="form-group">
+                                    <label>Senha Atual</label>
+                                    <input type="password" id="pw-current" placeholder="Digite a senha atual">
+                                </div>
+                                <div class="form-group">
+                                    <label>Nova Senha</label>
+                                    <input type="password" id="pw-new" placeholder="Mínimo 8 caracteres">
+                                </div>
+                                <div class="form-group">
+                                    <label>Confirmar Nova Senha</label>
+                                    <input type="password" id="pw-confirm" placeholder="Repita a nova senha">
+                                </div>
+                                <div class="pw-msg" id="pw-msg"></div>
+                                <button class="btn btn-primary" onclick="changePassword()" style="width:100%;margin-top:6px">
+                                    <i class="fas fa-key"></i> Alterar Senha
+                                </button>
+                            </div>
                         </div>
-                        <div class="panel-body" style="padding-top:0">
-                            <h4 style="font-size:.9em;margin-bottom:12px;color:var(--text)"><i class="fas fa-key" style="color:var(--warning);margin-right:6px"></i> Alterar Senha</h4>
-                            <div class="setting-item">
-                                <label>Senha Atual</label>
-                                <input type="password" id="pw-current" placeholder="Digite a senha atual">
-                            </div>
-                            <div class="setting-item">
-                                <label>Nova Senha</label>
-                                <input type="password" id="pw-new" placeholder="M&#237;nimo 6 caracteres">
-                            </div>
-                            <div class="setting-item">
-                                <label>Confirmar Nova Senha</label>
-                                <input type="password" id="pw-confirm" placeholder="Repita a nova senha">
-                            </div>
-                            <div class="pw-msg" id="pw-msg"></div>
-                            <button class="btn btn-primary" onclick="changePassword()" style="width:100%;margin-top:8px">
-                                <i class="fas fa-key"></i> Alterar Senha
-                            </button>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h3><i class="fas fa-users" style="color:var(--primary)"></i> Gerenciamento de Usuários do Agente</h3>
+                            <button class="btn btn-sm btn-primary" onclick="openUserModal()"><i class="fas fa-user-plus"></i> Novo Usuário</button>
+                        </div>
+                        <div class="panel-body" style="padding:0">
+                            <table class="tbl">
+                                <thead>
+                                    <tr>
+                                        <th>Usuário</th>
+                                        <th>Nome de Exibição</th>
+                                        <th>Nível de Acesso</th>
+                                        <th>Status</th>
+                                        <th>Último Login</th>
+                                        <th style="text-align:right">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="users-table-body">
+                                    <tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-muted)">Carregando usuários...</td></tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
+            </div>
 
+            <!-- ABA 2: CRUD DE NÍVEIS DE ACESSO E PERMISSÕES -->
+            <div class="tab-pane" id="tab-roles">
                 <div class="panel">
                     <div class="panel-header">
-                        <h3><i class="fas fa-users" style="color:var(--primary)"></i> Usu&#225;rios Cadastrados</h3>
-                    </div>
-                    <div class="panel-body" style="padding:0" id="users-list"><div class="empty-msg">Carregando...</div></div>
-                </div>
-
-                <div class="panel">
-                    <div class="panel-header">
-                        <h3><i class="fas fa-clipboard-list" style="color:var(--warning)"></i> Auditoria de Acesso</h3>
+                        <div>
+                            <h3><i class="fas fa-layer-group" style="color:var(--primary)"></i> Níveis de Acesso & Permissões Customizadas</h3>
+                            <p style="font-size:0.82em;color:var(--text-muted);margin:4px 0 0 0">Configure perfis de segurança nativos ou crie novos níveis de acesso com permissões granulares por módulo.</p>
+                        </div>
+                        <button class="btn btn-success" onclick="openRoleModal()"><i class="fas fa-plus-circle"></i> Criar Nível Customizado</button>
                     </div>
                     <div class="panel-body" style="padding:0">
                         <table class="tbl">
-                            <thead><tr><th>Usu&#225;rio</th><th>A&#231;&#227;o</th><th>IP</th><th>Data</th></tr></thead>
-                            <tbody id="audit-table"><tr><td colspan="4" class="empty-msg">Carregando...</td></tr></tbody>
+                            <thead>
+                                <tr>
+                                    <th>Nível / Identificador</th>
+                                    <th>Nome de Exibição</th>
+                                    <th>Descrição</th>
+                                    <th>Tipo Nível</th>
+                                    <th>Usuários Vinculados</th>
+                                    <th>Permissões Concedidas</th>
+                                    <th style="text-align:right">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="roles-table-body">
+                                <tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-muted)">Carregando níveis de acesso...</td></tr>
+                            </tbody>
                         </table>
                     </div>
                 </div>
             </div>
 
-            <div class="modal-overlay" id="user-modal">
-                <div class="modal-box">
-                    <h3><i class="fas fa-user-plus" style="color:var(--primary)"></i> <span id="modal-user-title">Novo Usu&#225;rio</span></h3>
-                    <div class="form-group">
-                        <label>Nome de Exibi&#231;&#227;o</label>
-                        <input type="text" id="usr-display" placeholder="Nome Completo">
+            <!-- ABA 3: TRILHA DE AUDITORIA -->
+            <div class="tab-pane" id="tab-audit">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3><i class="fas fa-clipboard-list" style="color:var(--warning)"></i> Trilha de Auditoria de Acesso</h3>
                     </div>
-                    <div class="form-group">
-                        <label>Usu&#225;rio (login)</label>
-                        <input type="text" id="usr-username" placeholder="admin">
-                    </div>
-                    <div class="form-group">
-                        <label>Senha</label>
-                        <input type="password" id="usr-password" placeholder="M&#237;nimo 6 caracteres">
-                    </div>
-                    <div class="form-group">
-                        <label>Papel</label>
-                        <select id="usr-role">
-                            <option value="admin">Administrador (acesso total)</option>
-                            <option value="operator">Operador (backup/restore/tasks)</option>
-                            <option value="viewer">Visualizador (somente leitura)</option>
-                        </select>
-                    </div>
-                    <div class="modal-actions">
-                        <button class="btn btn-secondary" onclick="closeUserModal()">Cancelar</button>
-                        <button class="btn btn-success" onclick="createUser()"><i class="fas fa-check"></i> Salvar</button>
+                    <div class="panel-body" style="padding:0">
+                        <table class="tbl">
+                            <thead>
+                                <tr><th>Usuário</th><th>Ação Registrada</th><th>Endereço IP</th><th>Data / Hora</th></tr>
+                            </thead>
+                            <tbody id="audit-table-body">
+                                <tr><td colspan="4" style="text-align:center;padding:24px;color:var(--text-muted)">Carregando registros...</td></tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
+
+            <!-- MODAL: USUÁRIO (CRIAR / EDITAR) -->
+            <div class="modal-overlay" id="user-modal">
+                <div class="modal-box">
+                    <h3><i class="fas fa-user-shield" style="color:var(--primary)"></i> <span id="modal-user-title">Novo Usuário</span></h3>
+                    <input type="hidden" id="usr-id" value="">
+                    
+                    <div class="form-group">
+                        <label>Nome Completo / Exibição</label>
+                        <input type="text" id="usr-display" placeholder="Ex: Carlos Oliveira">
+                    </div>
+                    <div class="form-group">
+                        <label>Login / Usuário</label>
+                        <input type="text" id="usr-username" placeholder="ex: coliveira">
+                    </div>
+                    <div class="form-group">
+                        <label>Senha <span id="usr-pw-hint" style="font-size:0.8em;color:var(--text-muted)">(obrigatória)</span></label>
+                        <input type="password" id="usr-password" placeholder="Mínimo 8 caracteres (maiúsculas, minúsculas, números e símbolo)">
+                    </div>
+                    <div class="form-group">
+                        <label>Nível de Acesso (Role)</label>
+                        <select id="usr-role">
+                            <option value="">Carregando níveis...</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="usr-status-group" style="display:none">
+                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                            <input type="checkbox" id="usr-active" checked style="width:auto"> Usuário Ativo no Sistema
+                        </label>
+                    </div>
+
+                    <div class="modal-actions">
+                        <button class="btn btn-secondary" onclick="closeUserModal()">Cancelar</button>
+                        <button class="btn btn-success" onclick="saveUser()"><i class="fas fa-check"></i> Salvar Usuário</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODAL: NÍVEL DE ACESSO & PERMISSÕES (CRIAR / EDITAR ROLE) -->
+            <div class="modal-overlay" id="role-modal">
+                <div class="modal-box" style="width:780px">
+                    <h3><i class="fas fa-layer-group" style="color:var(--success)"></i> <span id="modal-role-title">Novo Nível Customizado</span></h3>
+                    <input type="hidden" id="role-id" value="">
+                    
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                        <div class="form-group">
+                            <label>Identificador Técnico (Slug)</label>
+                            <input type="text" id="role-name" placeholder="ex: analista_infra">
+                        </div>
+                        <div class="form-group">
+                            <label>Nome de Exibição do Nível</label>
+                            <input type="text" id="role-display" placeholder="ex: Analista de Infraestrutura">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Descrição das Atribuições</label>
+                        <input type="text" id="role-desc" placeholder="ex: Acesso de leitura a backups e execução de restaurações">
+                    </div>
+
+                    <div class="form-group">
+                        <label><i class="fas fa-key" style="color:var(--primary)"></i> Matriz de Permissões Mapeadas por Módulo</label>
+                        <div class="perm-grid" id="permissions-matrix-container">
+                            <!-- Preenchido via JS dinamicamente com checkboxes por módulo -->
+                        </div>
+                    </div>
+
+                    <div class="modal-actions">
+                        <button class="btn btn-secondary" onclick="closeRoleModal()">Cancelar</button>
+                        <button class="btn btn-success" onclick="saveRole()"><i class="fas fa-check"></i> Salvar Nível de Acesso</button>
+                    </div>
+                </div>
+            </div>
+
         </main>
     </div>
 
     <script src="/static/sidebar.js"></script>
     <script>
-    document.addEventListener('DOMContentLoaded',function(){new UnifiedSidebar().initialize();loadAll()});
-    var AUTH_API='/api/auth';
-    var AUDIT_API='/api/audit';
+    var AUTH_API = '/api/auth';
+    var AUDIT_API = '/api/audit';
 
-    async function loadAll(){
-        await Promise.allSettled([loadMyProfile(), loadUsers(), loadAudit()]);
+    var cachedRoles = [];
+    var availablePermissions = [];
+    var permissionsGrouped = {};
+
+    document.addEventListener('DOMContentLoaded', function(){
+        new UnifiedSidebar().initialize();
+        loadAll();
+    });
+
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+        
+        const btn = document.getElementById('tab-btn-' + tabId.replace('tab-', ''));
+        const pane = document.getElementById(tabId);
+        if (btn) btn.classList.add('active');
+        if (pane) pane.classList.add('active');
     }
 
-    async function loadMyProfile(){
-        try{
-            var r=await fetch(AUTH_API+'/status');var d=await r.json();
-            var u=d.user||{};
-            document.getElementById('my-avatar').textContent=(u.display_name||u.username||'?')[0].toUpperCase();
-            document.getElementById('my-name').textContent=u.display_name||u.username||'Usuario';
-            document.getElementById('my-username').textContent=u.username?'@'+u.username:'';
-            var role=u.role||'admin';
-            var roleLabels={admin:'Administrador',operator:'Operador',viewer:'Visualizador'};
-            var cls=role==='admin'?'badge-crit':role==='operator'?'badge-info':'badge-ok';
-            document.getElementById('my-role').innerHTML='<span class="'+cls+'">'+(roleLabels[role]||role)+'</span>';
-            document.getElementById('kpi-auth').textContent=d.auth_enabled?'Ativada':'Desativada';
-            document.getElementById('kpi-auth').style.color=d.auth_enabled?'var(--success)':'var(--warning)';
-        }catch(e){console.error('loadMyProfile:',e)}
+    async function loadAll() {
+        await Promise.allSettled([loadPermissionsCatalog(), loadMyProfile(), loadRoles(), loadUsers(), loadAudit()]);
     }
 
-    async function changePassword(){
-        var cur=document.getElementById('pw-current').value;
-        var nw=document.getElementById('pw-new').value;
-        var cf=document.getElementById('pw-confirm').value;
-        if(!cur||!nw){showPwMsg('Preencha todos os campos','err');return}
-        if(nw.length<6){showPwMsg('Senha deve ter pelo menos 6 caracteres','err');return}
-        if(nw!==cf){showPwMsg('As senhas nao coincidem','err');return}
-        try{
-            var r=await fetch(AUTH_API+'/change-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({current_password:cur,new_password:nw})});
-            var d=await r.json();
-            if(!r.ok){showPwMsg(d.detail||'Erro ao alterar senha','err');return}
-            showPwMsg('Senha alterada com sucesso!','ok');
-            document.getElementById('pw-current').value='';
-            document.getElementById('pw-new').value='';
-            document.getElementById('pw-confirm').value='';
-        }catch(e){showPwMsg('Erro: '+e.message,'err')}
+    async function loadPermissionsCatalog() {
+        try {
+            const r = await fetch(AUTH_API + '/permissions');
+            const d = await r.json();
+            availablePermissions = d.permissions || [];
+            permissionsGrouped = d.grouped_by_module || {};
+        } catch(e) {
+            console.error('loadPermissionsCatalog:', e);
+        }
     }
 
-    function showPwMsg(text,type){
-        var el=document.getElementById('pw-msg');
-        el.className='pw-msg '+type;
-        el.textContent=text;
-        if(type==='ok') setTimeout(function(){el.className='pw-msg';el.style.display='none'},3000);
+    async function loadMyProfile() {
+        try {
+            const r = await fetch(AUTH_API + '/status');
+            const d = await r.json();
+            const u = d.user || {};
+            document.getElementById('my-avatar').textContent = (u.display_name || u.username || '?')[0].toUpperCase();
+            document.getElementById('my-name').textContent = u.display_name || u.username || 'Usuário';
+            document.getElementById('my-username').textContent = u.username ? '@' + u.username : '';
+            const role = u.role || 'admin';
+            document.getElementById('my-role').innerHTML = '<span class="badge-crit">' + role.toUpperCase() + '</span>';
+            document.getElementById('kpi-auth').textContent = d.auth_enabled ? 'Ativada' : 'Desativada';
+            document.getElementById('kpi-auth').style.color = d.auth_enabled ? 'var(--success)' : 'var(--warning)';
+        } catch(e) {
+            console.error('loadMyProfile:', e);
+        }
     }
 
-    async function loadUsers(){
-        try{
-            var r=await fetch(AUTH_API+'/users');var d=await r.json();
-            var users=d.users||[];
-            document.getElementById('kpi-users').textContent=users.length;
-            document.getElementById('kpi-admins').textContent=users.filter(function(u){return u.role==='admin'}).length;
-            document.getElementById('kpi-sessions').textContent=d.active_sessions||0;
-            var el=document.getElementById('users-list');
-            if(!users.length){el.innerHTML='<div class="empty-msg"><i class="fas fa-users" style="font-size:2em;opacity:.3;margin-bottom:8px;display:block"></i>Nenhum usuario cadastrado.<br><span style="font-size:.85em">O sistema opera sem autenticacao.</span></div>';return}
-            el.innerHTML=users.map(function(u){
-                var role=u.role||'viewer';
-                var initial=(u.display_name||u.username||'?')[0].toUpperCase();
-                var active=u.is_active!==false;
-                var cls2=role==='admin'?'badge-crit':role==='operator'?'badge-info':'badge-ok';
-                return '<div class="user-card">'+
-                    '<div class="user-avatar '+role+'">'+initial+'</div>'+
-                    '<div style="flex:1">'+
-                        '<div style="font-weight:600;font-size:.92em">'+(u.display_name||u.username)+(!active?' <span class="badge-warn">INATIVO</span>':'')+'</div>'+
-                        '<div style="font-size:.78em;color:var(--text-muted)">@'+u.username+' &middot; <span class="'+cls2+'">'+role.toUpperCase()+'</span></div>'+
-                        '<div style="font-size:.75em;color:var(--text-muted);margin-top:2px">Ultimo login: '+(u.last_login?gbocFormatDateTime(u.last_login):'Nunca')+'</div>'+
-                    '</div>'+
-                    '<div style="display:flex;gap:4px;flex-shrink:0">'+
-                        '<button class="btn btn-sm btn-secondary" onclick="resetPassword('+u.id+')" title="Resetar Senha"><i class="fas fa-key"></i></button>'+
-                        '<button class="btn btn-sm btn-danger" onclick="deleteUser('+u.id+')" title="Excluir"><i class="fas fa-trash"></i></button>'+
-                    '</div>'+
-                '</div>';
+    async function loadRoles() {
+        try {
+            const r = await fetch(AUTH_API + '/roles');
+            const d = await r.json();
+            cachedRoles = d.roles || [];
+            
+            document.getElementById('kpi-roles').textContent = cachedRoles.length;
+            
+            // Preencher tabela de Roles
+            const tbody = document.getElementById('roles-table-body');
+            if (!cachedRoles.length) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text-muted)">Nenhum nível cadastrado</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = cachedRoles.map(role => {
+                const isSys = role.is_system;
+                const sysBadge = isSys ? '<span class="badge-info"><i class="fas fa-lock"></i> Sistema</span>' : '<span class="badge-purple"><i class="fas fa-palette"></i> Customizado</span>';
+                
+                let permsHtml = '';
+                if (role.permissions.includes('*')) {
+                    permsHtml = '<span class="badge-crit"><i class="fas fa-star"></i> Todas (Administrador)</span>';
+                } else if (role.permissions.length === 0) {
+                    permsHtml = '<span class="badge-warn">Nenhuma Permissão</span>';
+                } else {
+                    permsHtml = `<span class="badge-ok"><i class="fas fa-check-circle"></i> ${role.permissions.length} Permissões</span>`;
+                }
+
+                const deleteBtn = isSys ? 
+                    `<button class="btn btn-sm btn-secondary" disabled title="Nível do Sistema não pode ser excluído"><i class="fas fa-lock"></i></button>` :
+                    `<button class="btn btn-sm btn-danger" onclick="deleteRole(${role.id})" title="Excluir Nível"><i class="fas fa-trash"></i></button>`;
+
+                return `<tr>
+                    <td><strong>${role.name}</strong></td>
+                    <td><span style="font-weight:600;color:var(--primary)">${role.display_name}</span></td>
+                    <td style="font-size:0.84em;color:var(--text-muted)">${role.description || '-'}</td>
+                    <td>${sysBadge}</td>
+                    <td><strong style="color:var(--text)">${role.user_count}</strong> usuário(s)</td>
+                    <td>${permsHtml}</td>
+                    <td style="text-align:right">
+                        <div style="display:flex;gap:4px;justify-content:flex-end">
+                            <button class="btn btn-sm btn-secondary" onclick="openRoleModal(${role.id})" title="Editar Permissões"><i class="fas fa-edit"></i></button>
+                            ${deleteBtn}
+                        </div>
+                    </td>
+                </tr>`;
             }).join('');
-        }catch(e){console.error('loadUsers:',e)}
+
+            // Atualizar Select do Modal Usuário
+            updateUserRoleDropdown();
+        } catch(e) {
+            console.error('loadRoles:', e);
+        }
     }
 
-    function openUserModal(){document.getElementById('user-modal').classList.add('show')}
-    function closeUserModal(){document.getElementById('user-modal').classList.remove('show')}
+    function updateUserRoleDropdown() {
+        const sel = document.getElementById('usr-role');
+        if (!cachedRoles.length) {
+            sel.innerHTML = '<option value="admin">Administrador Total</option>';
+            return;
+        }
+        sel.innerHTML = cachedRoles.map(r => `<option value="${r.name}">${r.display_name} (${r.name})</option>`).join('');
+    }
 
-    async function createUser(){
-        var display_name=document.getElementById('usr-display').value.trim();
-        var username=document.getElementById('usr-username').value.trim();
-        var password=document.getElementById('usr-password').value;
-        var role=document.getElementById('usr-role').value;
-        if(!username||!password){alert('Preencha usuario e senha');return}
-        if(password.length<6){alert('Senha minima de 6 caracteres');return}
+    async function loadUsers() {
+        try {
+            const r = await fetch(AUTH_API + '/users');
+            const d = await r.json();
+            const users = d.users || [];
+            document.getElementById('kpi-users').textContent = users.length;
+            document.getElementById('kpi-sessions').textContent = d.active_sessions || 0;
+
+            const tbody = document.getElementById('users-table-body');
+            if (!users.length) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-muted)"><i class="fas fa-users" style="font-size:2em;opacity:.3;margin-bottom:8px;display:block"></i>Nenhum usuário cadastrado.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = users.map(u => {
+                const active = u.is_active !== false;
+                const statusBadge = active ? '<span class="badge-ok">ATIVO</span>' : '<span class="badge-crit">INATIVO</span>';
+                
+                // Encontrar role display
+                const roleObj = cachedRoles.find(r => r.name === u.role);
+                const roleName = roleObj ? roleObj.display_name : u.role.toUpperCase();
+                const roleBadge = u.role === 'admin' ? 'badge-crit' : 'badge-info';
+
+                return `<tr>
+                    <td>
+                        <div style="display:flex;align-items:center;gap:10px">
+                            <div style="width:32px;height:32px;border-radius:8px;background:rgba(0,240,255,0.1);color:var(--primary);display:flex;align-items:center;justify-content:center;font-weight:700">
+                                ${(u.display_name || u.username)[0].toUpperCase()}
+                            </div>
+                            <div>
+                                <strong style="font-size:0.92em">@${u.username}</strong>
+                            </div>
+                        </div>
+                    </td>
+                    <td>${u.display_name || u.username}</td>
+                    <td><span class="${roleBadge}">${roleName}</span></td>
+                    <td>${statusBadge}</td>
+                    <td style="font-size:0.82em;color:var(--text-muted)">${u.last_login ? gbocFormatDateTime(u.last_login) : 'Nunca'}</td>
+                    <td style="text-align:right">
+                        <div style="display:flex;gap:4px;justify-content:flex-end">
+                            <button class="btn btn-sm btn-secondary" onclick="editUser(${u.id})" title="Editar Usuário"><i class="fas fa-edit"></i></button>
+                            <button class="btn btn-sm btn-warning" onclick="resetPassword(${u.id})" title="Alterar Senha"><i class="fas fa-key"></i></button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id})" title="Excluir"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+        } catch(e) {
+            console.error('loadUsers:', e);
+        }
+    }
+
+    function openUserModal(userId = null) {
+        document.getElementById('usr-id').value = userId || '';
+        document.getElementById('usr-display').value = '';
+        document.getElementById('usr-username').value = '';
+        document.getElementById('usr-username').disabled = false;
+        document.getElementById('usr-password').value = '';
+        document.getElementById('usr-active').checked = true;
+        
+        if (userId) {
+            document.getElementById('modal-user-title').textContent = 'Editar Usuário';
+            document.getElementById('usr-pw-hint').textContent = '(opcional se não quiser alterar)';
+            document.getElementById('usr-status-group').style.display = 'block';
+
+            // Carregar dados
+            fetch(AUTH_API + '/users').then(r => r.json()).then(d => {
+                const u = (d.users || []).find(x => x.id === userId);
+                if (u) {
+                    document.getElementById('usr-display').value = u.display_name || '';
+                    document.getElementById('usr-username').value = u.username || '';
+                    document.getElementById('usr-username').disabled = true;
+                    document.getElementById('usr-role').value = u.role || 'admin';
+                    document.getElementById('usr-active').checked = u.is_active !== false;
+                }
+            });
+        } else {
+            document.getElementById('modal-user-title').textContent = 'Novo Usuário';
+            document.getElementById('usr-pw-hint').textContent = '(obrigatória)';
+            document.getElementById('usr-status-group').style.display = 'none';
+        }
+
+        document.getElementById('user-modal').classList.add('show');
+    }
+
+    function closeUserModal() { document.getElementById('user-modal').classList.remove('show'); }
+
+    async function saveUser() {
+        const userId = document.getElementById('usr-id').value;
+        const display_name = document.getElementById('usr-display').value.trim();
+        const username = document.getElementById('usr-username').value.trim();
+        const password = document.getElementById('usr-password').value;
+        const role = document.getElementById('usr-role').value;
+        const is_active = document.getElementById('usr-active').checked;
+
+        if (!userId && (!username || !password)) {
+            alert('Preencha nome de usuário e senha');
+            return;
+        }
+
         closeUserModal();
-        try{
-            var r=await fetch(AUTH_API+'/users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({display_name:display_name||username,username:username,password:password,role:role})});
-            if(!r.ok){var d=await r.json();alert('Erro: '+(d.detail||'Desconhecido'));return}
-            document.getElementById('usr-display').value='';
-            document.getElementById('usr-username').value='';
-            document.getElementById('usr-password').value='';
+
+        try {
+            let r;
+            if (userId) {
+                const payload = { display_name, role, is_active };
+                if (password) payload.new_password = password;
+                r = await fetch(AUTH_API + '/users/' + userId, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+            } else {
+                r = await fetch(AUTH_API + '/users', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ display_name: display_name || username, username, password, role })
+                });
+            }
+
+            const d = await r.json();
+            if (!r.ok) {
+                alert('Erro: ' + (d.detail || 'Falha ao salvar usuário'));
+                return;
+            }
             loadAll();
-        }catch(e){alert('Erro: '+e.message)}
+        } catch(e) {
+            alert('Erro: ' + e.message);
+        }
     }
 
-    async function deleteUser(id){
-        if(!confirm('Excluir este usuario permanentemente?'))return;
-        try{await fetch(AUTH_API+'/users/'+id,{method:'DELETE'});loadAll()}catch(e){alert(e.message)}
+    function editUser(id) { openUserModal(id); }
+
+    async function deleteUser(id) {
+        if (!confirm('Excluir este usuário permanentemente?')) return;
+        try {
+            const r = await fetch(AUTH_API + '/users/' + id, { method: 'DELETE' });
+            const d = await r.json();
+            if (!r.ok) { alert('Erro: ' + (d.detail || 'Falha ao remover usuário')); return; }
+            loadAll();
+        } catch(e) {
+            alert(e.message);
+        }
     }
 
-    async function resetPassword(id){
-        var pw=prompt('Nova senha (minimo 6 caracteres):');
-        if(!pw) return;
-        if(pw.length<6){alert('Senha minima de 6 caracteres');return}
-        try{
-            var r=await fetch(AUTH_API+'/users/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
-            if(!r.ok){var d=await r.json();alert('Erro: '+(d.detail||''));return}
+    async function resetPassword(id) {
+        const pw = prompt('Digite a nova senha para este usuário:');
+        if (!pw) return;
+        try {
+            const r = await fetch(AUTH_API + '/users/' + id, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ new_password: pw })
+            });
+            const d = await r.json();
+            if (!r.ok) { alert('Erro: ' + (d.detail || 'Falha ao alterar senha')); return; }
             alert('Senha alterada com sucesso!');
-        }catch(e){alert('Erro: '+e.message)}
+        } catch(e) {
+            alert('Erro: ' + e.message);
+        }
     }
 
-    async function loadAudit(){
-        try{
-            var r=await fetch(AUDIT_API+'/?limit=25');var d=await r.json();
-            var logs=d.entries||d.logs||d.audit_log||[];
-            var tb=document.getElementById('audit-table');
-            if(!logs.length){tb.innerHTML='<tr><td colspan="4" class="empty-msg">Nenhum registro de auditoria</td></tr>';return}
-            tb.innerHTML=logs.map(function(l){
-                var action=l.action||l.event_type||'---';
-                var isLogin=action.includes('login');
-                var isFail=action.includes('fail')||action.includes('error');
-                var cls3=isFail?'badge-crit':isLogin?'badge-ok':'badge-info';
-                return '<tr>'+
-                    '<td style="font-weight:600">'+(l.username||l.user||'---')+'</td>'+
-                    '<td><span class="'+cls3+'">'+action+'</span></td>'+
-                    '<td style="font-size:.82em;color:var(--text-muted)">'+(l.ip_address||l.ip||l.source_ip||'---')+'</td>'+
-                    '<td style="font-size:.82em;color:var(--text-muted)">'+(l.timestamp?gbocFormatDateTime(l.timestamp):'---')+'</td>'+
-                '</tr>';
+    // ============================================================================
+    // ROLES & PERMISSIONS MODAL & ACTIONS
+    // ============================================================================
+
+    function openRoleModal(roleId = null) {
+        document.getElementById('role-id').value = roleId || '';
+        document.getElementById('role-name').value = '';
+        document.getElementById('role-name').disabled = false;
+        document.getElementById('role-display').value = '';
+        document.getElementById('role-desc').value = '';
+
+        // Renderizar checkboxes de permissões
+        renderPermissionsMatrix();
+
+        if (roleId) {
+            const role = cachedRoles.find(r => r.id === roleId);
+            if (role) {
+                document.getElementById('modal-role-title').textContent = 'Editar Nível: ' + role.display_name;
+                document.getElementById('role-name').value = role.name;
+                document.getElementById('role-name').disabled = role.is_system;
+                document.getElementById('role-display').value = role.display_name;
+                document.getElementById('role-desc').value = role.description || '';
+
+                // Marcar permissões
+                const perms = role.permissions || [];
+                document.querySelectorAll('.perm-chk').forEach(chk => {
+                    chk.checked = perms.includes('*') || perms.includes(chk.value);
+                });
+            }
+        } else {
+            document.getElementById('modal-role-title').textContent = 'Criar Novo Nível Customizado';
+        }
+
+        document.getElementById('role-modal').classList.add('show');
+    }
+
+    function closeRoleModal() { document.getElementById('role-modal').classList.remove('show'); }
+
+    function renderPermissionsMatrix() {
+        const container = document.getElementById('permissions-matrix-container');
+        if (!Object.keys(permissionsGrouped).length) {
+            container.innerHTML = '<div style="color:var(--text-muted)">Carregando matriz de permissões...</div>';
+            return;
+        }
+
+        let html = '';
+        for (const [mod, perms] of Object.entries(permissionsGrouped)) {
+            html += `<div class="perm-card">
+                <div class="perm-card-header">
+                    <span>${mod}</span>
+                    <button class="btn btn-sm btn-secondary" type="button" onclick="toggleModulePerms('${mod}', true)" style="font-size:0.75em;padding:2px 6px">Todos</button>
+                </div>`;
+            
+            for (const p of perms) {
+                html += `<label class="perm-item">
+                    <input type="checkbox" class="perm-chk perm-mod-${mod}" value="${p.id}">
+                    <span>${p.name}</span>
+                </label>`;
+            }
+            html += `</div>`;
+        }
+        container.innerHTML = html;
+    }
+
+    function toggleModulePerms(mod, state) {
+        document.querySelectorAll(`.perm-mod-${mod}`).forEach(c => c.checked = state);
+    }
+
+    async function saveRole() {
+        const roleId = document.getElementById('role-id').value;
+        const name = document.getElementById('role-name').value.trim();
+        const display_name = document.getElementById('role-display').value.trim();
+        const description = document.getElementById('role-desc').value.trim();
+
+        const permissions = Array.from(document.querySelectorAll('.perm-chk:checked')).map(c => c.value);
+
+        if (!roleId && (!name || !display_name)) {
+            alert('Preencha o identificador técnico e o nome de exibição do nível');
+            return;
+        }
+
+        closeRoleModal();
+
+        try {
+            let r;
+            if (roleId) {
+                r = await fetch(AUTH_API + '/roles/' + roleId, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ display_name, description, permissions })
+                });
+            } else {
+                r = await fetch(AUTH_API + '/roles', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ name, display_name, description, permissions })
+                });
+            }
+
+            const d = await r.json();
+            if (!r.ok) {
+                alert('Erro: ' + (d.detail || 'Falha ao salvar nível de acesso'));
+                return;
+            }
+            loadAll();
+        } catch(e) {
+            alert('Erro: ' + e.message);
+        }
+    }
+
+    async function deleteRole(roleId) {
+        if (!confirm('Excluir este nível de acesso customizado?')) return;
+        try {
+            const r = await fetch(AUTH_API + '/roles/' + roleId, { method: 'DELETE' });
+            const d = await r.json();
+            if (!r.ok) { alert('Erro: ' + (d.detail || 'Falha ao excluir nível')); return; }
+            loadAll();
+        } catch(e) {
+            alert(e.message);
+        }
+    }
+
+    async function changePassword() {
+        const cur = document.getElementById('pw-current').value;
+        const nw = document.getElementById('pw-new').value;
+        const cf = document.getElementById('pw-confirm').value;
+        if (!cur || !nw) { showPwMsg('Preencha todos os campos', 'err'); return; }
+        if (nw !== cf) { showPwMsg('As senhas não coincidem', 'err'); return; }
+        try {
+            const r = await fetch(AUTH_API + '/change-password', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ current_password: cur, new_password: nw })
+            });
+            const d = await r.json();
+            if (!r.ok) { showPwMsg(d.detail || 'Erro ao alterar senha', 'err'); return; }
+            showPwMsg('Senha alterada com sucesso!', 'ok');
+            document.getElementById('pw-current').value = '';
+            document.getElementById('pw-new').value = '';
+            document.getElementById('pw-confirm').value = '';
+        } catch(e) {
+            showPwMsg('Erro: ' + e.message, 'err');
+        }
+    }
+
+    function showPwMsg(text, type) {
+        const el = document.getElementById('pw-msg');
+        el.className = 'pw-msg ' + type;
+        el.textContent = text;
+        if (type === 'ok') setTimeout(() => { el.className = 'pw-msg'; el.style.display = 'none'; }, 3000);
+    }
+
+    async function loadAudit() {
+        try {
+            const r = await fetch(AUDIT_API + '/?limit=25');
+            const d = await r.json();
+            const logs = d.entries || d.logs || d.audit_log || [];
+            const tb = document.getElementById('audit-table-body');
+            if (!logs.length) {
+                tb.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--text-muted)">Nenhum registro de auditoria encontrado.</td></tr>';
+                return;
+            }
+            tb.innerHTML = logs.map(l => {
+                const action = l.action || l.event_type || '---';
+                const isLogin = action.includes('login');
+                const isFail = action.includes('fail') || action.includes('error');
+                const cls3 = isFail ? 'badge-crit' : isLogin ? 'badge-ok' : 'badge-info';
+                return `<tr>
+                    <td style="font-weight:600">${l.username || l.user || '---'}</td>
+                    <td><span class="${cls3}">${action}</span></td>
+                    <td style="font-size:.82em;color:var(--text-muted)">${l.ip_address || l.ip || l.source_ip || '---'}</td>
+                    <td style="font-size:.82em;color:var(--text-muted)">${l.timestamp ? gbocFormatDateTime(l.timestamp) : '---'}</td>
+                </tr>`;
             }).join('');
-        }catch(e){console.error('loadAudit:',e)}
+        } catch(e) {
+            console.error('loadAudit:', e);
+        }
     }
 
-    async function gbocLogout(){
-        if(!confirm('Deseja realmente sair?')) return;
-        try{await fetch(AUTH_API+'/logout',{method:'POST'})}catch(e){}
+    async function gbocLogout() {
+        if (!confirm('Deseja realmente sair do sistema?')) return;
+        try { await fetch(AUTH_API + '/logout', { method: 'POST' }); } catch(e) {}
         localStorage.removeItem('gboc_token');
         localStorage.removeItem('gboc_user');
-        document.cookie='gboc_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-        window.location.href='/login.html';
+        document.cookie = 'gboc_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+        window.location.href = '/login.html';
     }
     </script>
 </body>
 </html>
-

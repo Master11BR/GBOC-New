@@ -1,4 +1,4 @@
-# GBOC v10.0a - Dependências Python
+# GBOC v13.2.0 - Dependências Python
 
 # Core
 fastapi>=0.104.0

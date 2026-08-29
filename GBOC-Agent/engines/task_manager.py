@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC Agent 11.7c - Task Manager
+GBOC Agent 13.2.0 - Task Manager
 [OK] Usa motor_password para repositórios locais e cloud_password para nuvem
 """
 
@@ -22,6 +22,7 @@ from logging.handlers import RotatingFileHandler
 
 from engines.engine_paths import get_engine_path_or_raise, get_engine_path
 from engines.realtime_backup_monitor import RealTimeBackupMonitor
+from engines.auto_verify_engine import AutoVerifyEngine
 from native_engine.engine import GBOCNativeEngine
 
 logger = logging.getLogger(__name__)
@@ -50,6 +51,7 @@ class TaskManager:
 
         # Inicializar Monitor com SharedCore
         self.monitor = RealTimeBackupMonitor(self.core)
+        self.auto_verify_engine = AutoVerifyEngine(self.core)
         # Alias de logger para compatibilidade com métodos que usam self.logger
         self.logger = logger
 
@@ -810,6 +812,13 @@ class TaskManager:
                 )
                 self.monitor.complete_backup(task_id, snapshot_id=snapshot_id)
                 logger.info(f"✅ Tarefa {task_name} concluída com sucesso")
+
+                # 🛡️ Auto-Verificação Pós-Backup (SureRestore On-Completion)
+                try:
+                    if hasattr(self, 'auto_verify_engine') and self.auto_verify_engine:
+                        self.auto_verify_engine.trigger_post_backup_verification_async(task_id, execution_id)
+                except Exception as _ave_err:
+                    logger.warning(f"[SureRestore] Aviso ao disparar auto-verificação pós-backup: {_ave_err}")
             else:
                 error_msg = result.get('error', 'Erro desconhecido')
                 self._update_execution(execution_id, 'failed', error_message=error_msg)

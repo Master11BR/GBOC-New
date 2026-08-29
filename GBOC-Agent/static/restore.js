@@ -1,3 +1,10 @@
+/*
+==============================================================================
+GBOC System v13.2.0 Enterprise Edition
+Copyright (c) 2026 Master11BR - Todos os direitos reservados.
+Propriedade Intelectual & Direitos Autorais Registrados.
+==============================================================================
+*/
 // ============================================================================
 // GBOC Agent v9.0 - restore.js
 // UI para restauração de arquivos de snapshots
@@ -63,9 +70,41 @@ document.addEventListener('DOMContentLoaded', () => {
     
     loadRepositories();
     attachEventListeners();
+    checkActiveRestoreOnLoad();
+
+    if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission().catch(() => {});
+    }
     
     console.log('✅ Página de restauração inicializada');
 });
+
+async function checkActiveRestoreOnLoad() {
+    try {
+        const res = await fetch('/api/restore/active');
+        if (res.ok) {
+            const data = await res.json();
+            if (data.status === 'running' && data.active) {
+                openRestoreModal(data.active.id);
+                return;
+            }
+        }
+
+        const cached = localStorage.getItem('gboc_active_restore_id');
+        if (cached) {
+            const stRes = await fetch(`/api/restore/status/${cached}`);
+            if (stRes.ok) {
+                const stData = await stRes.json();
+                const info = stData.data || stData;
+                if (info.status === 'running' || info.status === 'preparing') {
+                    openRestoreModal(cached);
+                } else {
+                    localStorage.removeItem('gboc_active_restore_id');
+                }
+            }
+        }
+    } catch (e) {}
+}
 
 // ============================================================================
 // EVENT LISTENERS
@@ -137,22 +176,47 @@ function attachEventListeners() {
 
 async function loadRepositories() {
     try {
-        const res = await fetch('/api/repositories/');
-        if (!res.ok) throw new Error('Falha ao carregar repositórios');
-        
-        const data = await res.json();
-        const repos = data.snapshots || data.data || (Array.isArray(data) ? data : data);
+        const [repoRes, dupRes] = await Promise.allSettled([
+            fetch('/api/repositories/'),
+            fetch('/api/duplicati-native/backups')
+        ]);
+
+        let repos = [];
+        if (repoRes.status === 'fulfilled' && repoRes.value.ok) {
+            const data = await repoRes.value.json();
+            repos = data.snapshots || data.data || (Array.isArray(data) ? data : []);
+        }
+
+        let dupBackups = [];
+        if (dupRes.status === 'fulfilled' && dupRes.value.ok) {
+            const data = await dupRes.value.json();
+            dupBackups = data.items || [];
+        }
+
+        const mappedDup = dupBackups.map(item => {
+            const b = item.Backup || item;
+            const bId = String(b.ID || item.id || '1');
+            return {
+                id: `dup_native_${bId}`,
+                name: b.Name || item.name || `Duplicati Backup #${bId}`,
+                type: 'duplicati_native',
+                is_duplicati_native: true,
+                duplicati_id: bId
+            };
+        });
+
+        const allRepos = [...repos, ...mappedDup];
         const select = document.getElementById('restore-repository');
         
         if (!select) return;
         
-        select.innerHTML = '<option value="">Selecione um repositório...</option>';
+        select.innerHTML = '<option value="">Selecione um repositório ou backup...</option>';
         
-        if (repos && Array.isArray(repos) && repos.length > 0) {
-            repos.forEach(repo => {
+        if (allRepos && allRepos.length > 0) {
+            allRepos.forEach(repo => {
                 const opt = document.createElement('option');
                 opt.value = repo.id;
-                opt.textContent = `${repo.name} (${repo.type})`;
+                opt.textContent = `${repo.name} (${(repo.type || 'local').toUpperCase()})`;
                 select.appendChild(opt);
             });
         } else {
@@ -165,7 +229,7 @@ async function loadRepositories() {
 }
 
 async function onRepositoryChange(e) {
-    currentRepositoryId = parseInt(e.target.value);
+    currentRepositoryId = e.target.value;
     currentSnapshotId = null;
     currentPath = '/';
     
@@ -184,22 +248,26 @@ async function onRepositoryChange(e) {
 
 async function loadSnapshots() {
     const select = document.getElementById('restore-snapshot');
-    if (select) {
-        select.innerHTML = '<option value="">Carregando snapshots...</option>';
-    }
+    if (!select) return;
+    
+    select.innerHTML = '<option value="">Carregando snapshots...</option>';
+    select.disabled = true;
     clearFiles();
     hideRestoreDiagnostic();
-
+    
     try {
-        const res = await fetch(`/api/restore/snapshots/${currentRepositoryId}`);
-        if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
-            const detail = errData.detail || errData.message || 'Falha ao carregar snapshots';
-            showRestoreDiagnostic(detail);
-            try { await diagnoseSnapshots(); } catch (_) {}
-            throw new Error(detail);
+        let snapshotsUrl = `/api/restore/snapshots/${currentRepositoryId}`;
+        if (String(currentRepositoryId).startsWith('dup_native_')) {
+            const dupId = String(currentRepositoryId).replace('dup_native_', '');
+            snapshotsUrl = `/api/duplicati-native/backups/${dupId}/filesets`;
         }
 
+        const res = await fetch(snapshotsUrl);
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            const detail = error.detail || error.message || 'Falha ao carregar snapshots';
+            throw new Error(detail);
+        }
         const data = await res.json();
 
         if (!select) return;
@@ -457,8 +525,10 @@ async function startRestore() {
         }
 
         const data = await res.json();
+        const restoreId = data.restore_id || data.id;
+        localStorage.setItem('gboc_active_restore_id', restoreId);
         showToast('Restauração iniciada!', 'success');
-        openRestoreModal(data.restore_id || data.id);
+        openRestoreModal(restoreId);
     } catch (e) {
         console.error('Erro ao iniciar restauração:', e);
         showRestoreDiagnostic(e.message);
@@ -544,12 +614,23 @@ async function updateRestoreStatus(restoreId) {
                 clearInterval(restorePollingInterval);
                 restorePollingInterval = null;
             }
+            localStorage.removeItem('gboc_active_restore_id');
             if ((status.status === 'completed' || status.status === 'success') && progressBar) {
                 progressBar.style.width = '100%';
                 progressBar.textContent = '100%';
             }
-            const toastType = (status.status === 'completed' || status.status === 'success') ? 'success' : (status.status === 'partial' ? 'warning' : 'error');
-            showToast(`Restauração ${status.status}`, toastType);
+            const isSuccess = (status.status === 'completed' || status.status === 'success');
+            const toastType = isSuccess ? 'success' : (status.status === 'partial' ? 'warning' : 'error');
+            showToast(`Restauração finalizada: ${status.status}`, toastType);
+
+            if ('Notification' in window && Notification.permission === 'granted') {
+                try {
+                    new Notification('GBOC - Restauração Concluída', {
+                        body: `Processo #${restoreId} finalizado com status: ${status.status} (${status.files_restored || 0} arquivos).`,
+                        icon: '/favicon.ico'
+                    });
+                } catch(exN) {}
+            }
         }
     } catch (e) {
         console.error('Erro ao atualizar status:', e);
@@ -564,7 +645,8 @@ function getStatusClass(status) {
         'success': 'success',
         'partial': 'warning',
         'failed': 'danger',
-        'cancelled': 'warning'
+        'cancelled': 'warning',
+        'interrupted': 'danger'
     };
     return statusMap[status] || 'secondary';
 }
@@ -616,13 +698,13 @@ function renderRestoreHistory(history) {
 
     // Cabeçalho
     const header = document.createElement('div');
-    header.style.cssText = 'display:grid; grid-template-columns:1fr 100px 100px 100px 1fr; gap:10px; padding:12px 15px; background:var(--bg-card); border-bottom:2px solid var(--border); font-weight:600; color:var(--text); font-size:0.9em;';
-    header.innerHTML = `<div>Data</div><div>Status</div><div>Arquivos</div><div>Duração</div><div>Destino</div>`;
+    header.style.cssText = 'display:grid; grid-template-columns:1fr 90px 80px 80px 1fr 90px; gap:8px; padding:12px 15px; background:var(--bg-card); border-bottom:2px solid var(--border); font-weight:600; color:var(--text); font-size:0.85em;';
+    header.innerHTML = `<div>Data</div><div>Status</div><div>Arquivos</div><div>Duração</div><div>Destino</div><div style="text-align:right;">Ações</div>`;
     list.appendChild(header);
 
     history.forEach(item => {
         const row = document.createElement('div');
-        row.style.cssText = 'display:grid; grid-template-columns:1fr 100px 100px 100px 1fr; gap:10px; padding:12px 15px; border-bottom:1px solid var(--border); align-items:center; color:var(--text); font-size:0.85em;';
+        row.style.cssText = 'display:grid; grid-template-columns:1fr 90px 80px 80px 1fr 90px; gap:8px; padding:10px 15px; border-bottom:1px solid var(--border); align-items:center; color:var(--text); font-size:0.82em;';
 
         const date = gbocFormatDateTime(item.created_at);
         const normalizedStatus = item.status === 'success' ? 'completed' : item.status;
@@ -639,6 +721,11 @@ function renderRestoreHistory(history) {
             <div>${item.files_restored || 0}</div>
             <div>${duration}</div>
             <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${item.target_path}">${item.target_path}</div>
+            <div style="text-align:right;">
+                <button class="btn btn-sm btn-secondary" onclick="openRestoreModal(${item.id})" style="padding:3px 7px;font-size:0.78em;">
+                    <i class="fas fa-eye"></i> Monitor
+                </button>
+            </div>
         `;
         list.appendChild(row);
     });

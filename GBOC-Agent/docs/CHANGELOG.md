@@ -1,10 +1,67 @@
+<!-- Copyright (c) 2026 Master11BR - GBOC System v13.2.0 Enterprise. Todos os direitos reservados. -->
+
 # GBOC — Changelog de Atualizações
 
 > Histórico completo de versões, correções e melhorias do sistema GBOC (Agente + Servidor).
 
 ---
 
-## 11.7c — 2025-03 (Atual)
+## 13.2.0 — 2026-08-08 (Patch Release — Hotfixes de Navegação, Validação e Ransomware)
+
+### 🛠️ Correções de UX, Roteamento e UI
+- **Roteamento Estático no Agente (`agent_server.py`)**:
+  - Corrigida a prioridade de busca de caminhos de arquivos HTML no roteador de fallback. Agora as requisições para `/tasks.html`, `/repositories.html` e `/duplicati-native.html` buscam os arquivos correspondentes na pasta `static/` antes de reverter para a tela inicial (`index.html`). Isso resolve o bug em que clicar nas opções do menu redirecionava o usuário de volta ao dashboard inicial.
+- **Detecção de Nome do Motor na UI (`engines.html`)**:
+  - Corrigido o título dos cards dos motores locais que mostravam `undefined`. Substituído `engine.display_name` por `engine.name` no template do card, casando com a propriedade real retornada pela API do Agente.
+
+### 🔒 Segurança, Otimizações de Desempenho e Sentinel
+- **Otimização de Varredura de Ransomware (`ransomware_detector.py`)**:
+  - Otimizada a função `calculate_directory_entropy` e `scan_for_suspicious_extensions` adicionando condições de parada `break` no loop externo do `os.walk` após atingir o limite `max_files`, interrompendo instantaneamente a travessia de diretórios gigantes.
+  - Otimizada a varredura do motor YARA (`scan_with_yara`), adicionando um limite estrito de escaneamento de até 100 arquivos e ignorando arquivos com tamanho maior que 10 MB (evitando processamento e leitura de blocos binários gigantes). Isso resolve o problema de travamento ("módulo guardian travado") que ocorria quando o watchdog rodava a stack de segurança sobre a pasta de dados.
+
+### 🔌 Paridade de Senhas e Validação de Motores
+- **Recuperação Resiliente de Senhas no Agente (`repository_manager.py`)**:
+  - Unificação de todos os campos possíveis de senha de criptografia (`motor_password`, `encryption_password`, `password`, `cloud_password`) no método de normalização. Ao obter a configuração de um repositório, o Agente agora consolida e garante que todos os campos de credenciais estejam disponíveis, corrigindo falhas na validação ou no teste de conexões de repositórios que ocorriam por divergência ou ausência da coluna exata de senha.
+
+### 📈 Versionamento
+- **Versionamento Semântico (SemVer)**:
+  - Incremento global de versão para **13.2.0** em todos os arquivos de configuração de versão e templates usando `version_unifier.py` e atualização do `BUILD_DATE` para **2026-08-08**.
+
+---
+
+## 13.2.0 — 2026-08-05 (Minor Release — Módulos GUI Storage & Job Alert)
+
+### 🚀 Novos Módulos e Funcionalidades
+- **Módulo GUI Storage Usage & Growth (`modules/storage`)**:
+  - Implementação do backend (`storage_router.py`), frontend JS (`storage.js`) e componente HTML (`storage.html`) no Servidor Central (`GBOC-Server`) e no Agente (`GBOC-Agent`).
+  - Coleta em tempo real de estatísticas e capacidade dos volumes usando dados empíricos do sistema (`shutil.disk_usage`) com gráfico de crescimento (Chart.js).
+- **Módulo GUI Job Failure & Alert Monitor (`modules/job_alert`)**:
+  - Implementação do backend (`job_alert_router.py`), frontend JS (`job_alert.js`) e componente HTML (`job_alert.html`) no Servidor Central (`GBOC-Server`) e no Agente (`GBOC-Agent`).
+  - Centralização de falhas de jobs ativas, retentativas, botão de marcar como resolvido e testes de envio de alertas em canais configurados.
+
+### 🛠️ Correções de UX e Arquitetura
+- **Correção dos Submenus Sanfona da Sidebar**:
+  - Exportação global das funções `window.toggleNavGroup` e `window.initNavGroups` em `sidebar.js`, resolvendo o bloqueio de execução de scripts dinâmicos inseridos via `insertAdjacentHTML`.
+- **Conformidade Estrita com AGENTS.md / ARCHITECTURE_POLICIES.md**:
+  - Reorganização dos roteadores de `api/` para `modules/storage/storage_router.py` e `modules/job_alert/job_alert_router.py` (`1 Módulo = 1 Diretório`).
+- **Versionamento Semântico (SemVer)**:
+  - Incremento global para **13.2.0** via `version_control.py` e `version_unifier.py`.
+
+---
+
+## 13.2.0 — 2026-08 (Versão Consolidada Pós-Recuperação)
+
+### 🚀 Destaques da Release
+
+- **Unificação Geral de Versão (13.2.0)**: Sincronização completa de todos os módulos (`GBOC-Server`, `GBOC-Agent`, `SharedCore`, `Ransomware Shield`, `Diagnostic System` e `version_unifier.py`).
+- **Recuperação e Consolidação de Código**: Restauração da base de código (recuperada após perda por falha de disco), consolidando todas as melhorias até Agosto de 2026.
+- **Suporte Pydantic v2**: Atualização dos validadores de modelos Pydantic no `GBOC-Server`.
+- **Estabilidade nos Testes**: Correção de codificação UTF-8 no Windows e ajuste de asserções assíncronas na Dead Letter Queue (`tests.py`).
+- **Documentação Mestra**: Reformulação total do `README.md` principal na raiz e atualização do `INSTALADORES_README.md`.
+
+---
+
+## 13.2.0 — 2026-04
 
 ### 🧩 UI e Navegação
 
@@ -15,7 +72,7 @@
   - download/visualização/exclusão de snapshots
   - diff entre snapshots e diff snapshot vs config atual
 - **Sidebar atualizada**:
-  - versão visual `GBOC 11.7c`
+  - versão visual `GBOC 13.2.0`
   - novo item **Config Manager** no menu
 - **Unificação de páginas legadas**:
   - `overview.html` agora redireciona para `/`
@@ -79,8 +136,8 @@
   - script de limpeza forçada agora suporta `-ForceKill` para encerrar processos `kopia/restic/duplicati` antes da remoção
 
 - **Versionamento de scripts (.bat/.ps1) atualizado**:
-  - `start_agent.bat` e `start_agent.ps1`: v10.0a → **11.7c**
-  - scripts de instalação/diagnóstico em `scripts/`: padronizados para **11.7c**
+  - `start_agent.bat` e `start_agent.ps1`: v13.2.0 → **13.2.0**
+  - scripts de instalação/diagnóstico em `scripts/`: padronizados para **13.2.0**
 
 - **Server Dashboard Analytics (correções)**:
   - corrigido erro JS `ReferenceError: rjson is not defined` em `loadLogAgentFilter()`
@@ -182,7 +239,7 @@
 - **Tabela `server_settings`** criada com 33 configurações padrão em 7 categorias: Geral, Sincronização, Segurança, Database, Retenção, Notificações, Interface
 - **10 endpoints REST**: GET/PUT settings, GET/PUT category, bulk update, reset, export, import, server info, maintenance cleanup, test notification
 - **Dashboard `tab-config`** reescrito: cards de informação (versão, DB, conexões), formulário editável com 7 abas, export/import JSON, manutenção, reset
-- **Versão Server**: 11.7c → **11.7c**
+- **Versão Server**: 13.2.0 → **13.2.0**
 
 ### 🐛 Correções
 
@@ -192,7 +249,7 @@
 
 ### 📈 Métricas
 
-| Métrica | 11.7c | 11.7c |
+| Métrica | 13.2.0 | 13.2.0 |
 |---------|--------|--------|
 | APIs registradas (agente) | 25 | **27** |
 | Endpoints REST (agente) | ~150 | **~175** |
@@ -201,7 +258,7 @@
 
 ---
 
-## 11.7c — 2025-03
+## 13.2.0 — 2025-03
 
 ### 🏗️ Reorganização de Projeto
 
@@ -241,7 +298,7 @@
 
 ---
 
-## v11.0a — 2025-02
+## v13.2.0 — 2025-02
 
 ### 🔧 Motores de Backup
 
@@ -266,7 +323,7 @@
 
 ---
 
-## v10.0a — 2024-12
+## v13.2.0 — 2024-12
 
 ### 📈 Estatísticas Avançadas
 
@@ -309,7 +366,7 @@
 
 ---
 
-## v9.0 → v10.0a — Migração
+## v9.0 → v13.2.0 — Migração
 
 ### 🗃️ Banco de Dados
 

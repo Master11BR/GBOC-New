@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GBOC Agent 13.2.0 - Uso e Crescimento de Armazenamento</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/gboc-themes.css">
+    <link rel="stylesheet" href="/static/gboc-layout.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="/static/gboc-layout-manager.js"></script>
+    <style>
+        .repo-usage-card { background:var(--bg-input); border:1px solid var(--border); border-radius:12px; padding:16px; }
+        .usage-bar-track { background:var(--sidebar-bg); border-radius:6px; height:8px; overflow:hidden; margin:8px 0; }
+        .usage-bar-fill { height:100%; border-radius:6px; transition:width 0.6s ease; }
+        .sz-label { font-size:0.78em; color:var(--text-muted); }
+        .engine-badge { font-size:0.7em; padding:2px 8px; border-radius:20px; font-weight:700; }
+        .engine-restic { background:rgba(99,102,241,0.15); color:#818cf8; }
+        .engine-kopia  { background:rgba(56,178,172,0.15); color:#38b2ac; }
+        .engine-duplicati { background:rgba(237,137,54,0.15); color:#ed8936; }
+        .engine-unknown { background:rgba(160,174,192,0.15); color:#a0aec0; }
+        .alert-cfg-row { display:flex; gap:12px; align-items:flex-end; }
+    </style>
+</head>
+<body>
+<div class="app-layout">
+    <div id="sidebar-container"></div>
+    <main class="main-content">
+        <header class="page-header">
+            <div>
+                <h2><i class="fas fa-hdd" style="color:var(--primary)"></i> Uso e Crescimento de Armazenamento</h2>
+                <p style="font-size:0.85em;color:var(--text-muted)">Monitoramento real do tamanho físico dos repositórios. Alertas de crescimento e retenção configuráveis.</p>
+            </div>
+            <div style="display:flex;gap:10px">
+                <button class="btn btn-secondary" onclick="triggerScan()"><i class="fas fa-sync"></i> Scan Agora</button>
+                <button class="btn btn-primary" onclick="openAlertConfig()"><i class="fas fa-bell"></i> Configurar Alertas</button>
+            </div>
+        </header>
+
+        <!-- Stats Row -->
+        <div class="stats-row">
+            <div class="stat-card"><div class="val" id="stat-total-gb">-</div><div class="lbl">Total em Uso (GB)</div></div>
+            <div class="stat-card"><div class="val" id="stat-repo-count">-</div><div class="lbl">Repositórios Ativos</div></div>
+            <div class="stat-card"><div class="val" id="stat-largest-gb">-</div><div class="lbl">Maior Repositório (GB)</div></div>
+            <div class="stat-card"><div class="val" id="stat-last-scan" style="font-size:0.8em">-</div><div class="lbl">Último Scan</div></div>
+        </div>
+
+        <!-- Repositories Usage List -->
+        <div class="panel" style="margin-top:20px">
+            <div class="panel-header">
+                <h3><i class="fas fa-server" style="color:var(--primary)"></i> Repositórios — Uso Atual</h3>
+            </div>
+            <div class="panel-body" id="repo-usage-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px">
+                <div style="text-align:center;padding:30px;color:var(--text-muted);grid-column:1/-1">
+                    <i class="fas fa-spinner fa-spin" style="font-size:2em;display:block;margin-bottom:10px"></i>
+                    Coletando dados reais do sistema de arquivos...
+                </div>
+            </div>
+        </div>
+
+        <!-- Growth Trend Chart -->
+        <div class="panel" style="margin-top:20px">
+            <div class="panel-header">
+                <h3><i class="fas fa-chart-line" style="color:#48bb78"></i> Tendência de Crescimento (30 dias)</h3>
+                <select id="history-repo-filter" onchange="loadHistory()" class="form-control" style="max-width:240px">
+                    <option value="">Todos os repositórios</option>
+                </select>
+            </div>
+            <div class="panel-body" style="height:280px">
+                <canvas id="growth-chart"></canvas>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- Alert Config Modal -->
+<div id="alert-config-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.65);z-index:9999;align-items:center;justify-content:center">
+    <div style="background:var(--bg-input);width:460px;border-radius:16px;border:1px solid var(--border);padding:22px;color:var(--text)">
+        <h3 style="margin-top:0"><i class="fas fa-bell" style="color:var(--primary)"></i> Configurar Alertas de Armazenamento</h3>
+        <div class="form-group">
+            <label>Alertar quando repositório ultrapassar (GB) <span style="color:var(--text-muted);font-size:0.8em">(0 = desativado)</span></label>
+            <input type="number" id="cfg-threshold-gb" min="0" value="0" step="10">
+        </div>
+        <div class="form-group">
+            <label>Alertar quando crescimento semanal ultrapassar (%) <span style="color:var(--text-muted);font-size:0.8em">(0 = desativado)</span></label>
+            <input type="number" id="cfg-growth-pct" min="0" value="0" step="5">
+        </div>
+        <div class="form-group">
+            <label>Intervalo de scan automático (horas)</label>
+            <input type="number" id="cfg-scan-interval" min="1" max="168" value="6">
+        </div>
+        <div class="form-group">
+            <label>Retenção do histórico (dias)</label>
+            <input type="number" id="cfg-history-days" min="7" max="365" value="90">
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px">
+            <button class="btn btn-secondary" onclick="closeAlertConfig()">Cancelar</button>
+            <button class="btn btn-primary" onclick="saveAlertConfig()"><i class="fas fa-save"></i> Salvar</button>
+        </div>
+    </div>
+</div>
+
+<script src="/static/sidebar.js"></script>
+<script>
+const API = '/api/v1/storage';
+let _growthChart = null;
+let _repoData = [];
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (typeof UnifiedSidebar !== 'undefined') new UnifiedSidebar().initialize();
+    loadUsage();
+    loadHistory();
+    loadConfig();
+    setInterval(loadUsage, 120000);
+});
+
+function _engineClass(engine) {
+    const e = (engine || '').toLowerCase();
+    if (e === 'restic') return 'engine-restic';
+    if (e === 'kopia') return 'engine-kopia';
+    if (e === 'duplicati') return 'engine-duplicati';
+    return 'engine-unknown';
+}
+
+function _colorForSize(sizeGb, maxGb) {
+    if (!maxGb) return '#6366f1';
+    const pct = sizeGb / maxGb;
+    if (pct > 0.85) return '#f56565';
+    if (pct > 0.65) return '#ed8936';
+    return '#48bb78';
+}
+
+async function loadUsage() {
+    try {
+        const r = await fetch(`${API}/usage`);
+        const d = await r.json();
+        _repoData = d.repositories || [];
+
+        // Update stats
+        const totalGb = _repoData.reduce((a, r) => a + (r.size_gb || 0), 0);
+        const maxGb = Math.max(..._repoData.map(r => r.size_gb || 0), 0);
+        document.getElementById('stat-total-gb').textContent = totalGb.toFixed(2);
+        document.getElementById('stat-repo-count').textContent = _repoData.length;
+        document.getElementById('stat-largest-gb').textContent = maxGb.toFixed(2);
+        document.getElementById('stat-last-scan').textContent = new Date().toLocaleTimeString('pt-BR');
+
+        // Populate filter
+        const sel = document.getElementById('history-repo-filter');
+        const existing = new Set(Array.from(sel.options).map(o => o.value));
+        _repoData.forEach(r => {
+            if (!existing.has(r.repository_id)) {
+                const opt = document.createElement('option');
+                opt.value = r.repository_id;
+                opt.textContent = r.repository_name || r.repository_id;
+                sel.appendChild(opt);
+            }
+        });
+
+        // Render cards
+        const container = document.getElementById('repo-usage-list');
+        if (!_repoData.length) {
+            container.innerHTML = `<div style="text-align:center;padding:30px;color:var(--text-muted);grid-column:1/-1">
+                <i class="fas fa-inbox" style="font-size:2em;display:block;margin-bottom:10px"></i>
+                Nenhum repositório ativo encontrado.
+            </div>`;
+            return;
+        }
+        container.innerHTML = _repoData.map(repo => {
+            const pct = maxGb > 0 ? Math.min((repo.size_gb / maxGb) * 100, 100) : 0;
+            const color = _colorForSize(repo.size_gb, maxGb);
+            const sizeLabel = repo.size_gb >= 1024
+                ? (repo.size_gb / 1024).toFixed(2) + ' TB'
+                : repo.size_gb.toFixed(2) + ' GB';
+            return `<div class="repo-usage-card">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                    <div style="font-weight:700;font-size:0.9em"><i class="fas fa-server" style="color:var(--primary);margin-right:6px"></i>${repo.repository_name || repo.repository_id}</div>
+                    <span class="engine-badge ${_engineClass(repo.engine)}">${repo.engine || 'N/A'}</span>
+                </div>
+                <div style="font-size:0.75em;color:var(--text-muted);margin-bottom:6px;word-break:break-all">${repo.path || 'Caminho não informado'}</div>
+                <div class="usage-bar-track">
+                    <div class="usage-bar-fill" style="width:${pct.toFixed(1)}%;background:${color}"></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                    <span class="sz-label"><i class="fas fa-weight"></i> ${sizeLabel}</span>
+                    ${repo.snapshot_count > 0 ? `<span class="sz-label"><i class="fas fa-camera"></i> ${repo.snapshot_count} snapshots</span>` : ''}
+                    <span class="sz-label">${pct.toFixed(0)}% do maior</span>
+                </div>
+            </div>`;
+        }).join('');
+    } catch(e) {
+        document.getElementById('repo-usage-list').innerHTML = `<div style="color:#f56565;padding:20px;grid-column:1/-1"><i class="fas fa-exclamation-triangle"></i> Erro ao carregar: ${e.message}</div>`;
+    }
+}
+
+async function loadHistory() {
+    const repoId = document.getElementById('history-repo-filter').value;
+    const url = repoId ? `${API}/history?days=30&repository_id=${repoId}` : `${API}/history?days=30`;
+    try {
+        const r = await fetch(url);
+        const d = await r.json();
+        const history = d.history || [];
+
+        if (_growthChart) { _growthChart.destroy(); _growthChart = null; }
+
+        const ctx = document.getElementById('growth-chart').getContext('2d');
+
+        // Group by repo, build datasets
+        const byRepo = {};
+        history.forEach(h => {
+            const key = h.repository_name || h.repository_id;
+            if (!byRepo[key]) byRepo[key] = [];
+            byRepo[key].push({ x: h.recorded_at, y: h.size_gb });
+        });
+
+        const colors = ['#6366f1','#48bb78','#ed8936','#38b2ac','#9f7aea','#f56565'];
+        const datasets = Object.entries(byRepo).map(([name, points], i) => ({
+            label: name,
+            data: points,
+            borderColor: colors[i % colors.length],
+            backgroundColor: colors[i % colors.length] + '22',
+            tension: 0.4, fill: true, pointRadius: 3
+        }));
+
+        if (!datasets.length) {
+            ctx.canvas.style.display = 'none';
+            ctx.canvas.parentElement.innerHTML += `<div style="text-align:center;padding:40px;color:var(--text-muted)"><i class="fas fa-chart-line" style="font-size:2em;display:block;margin-bottom:10px"></i>Dados de histórico ainda não disponíveis.<br><span style="font-size:0.85em">Execute um scan para começar a coletar dados.</span></div>`;
+            return;
+        }
+
+        _growthChart = new Chart(ctx, {
+            type: 'line',
+            data: { datasets },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                parsing: { xAxisKey: 'x', yAxisKey: 'y' },
+                plugins: {
+                    legend: { labels: { color: '#a0aec0', font: { size: 11 } } },
+                    tooltip: { callbacks: { label: (c) => ` ${c.dataset.label}: ${c.parsed.y.toFixed(2)} GB` } }
+                },
+                scales: {
+                    x: { type: 'time', time: { unit: 'day' }, ticks: { color: '#718096' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                    y: { ticks: { color: '#718096', callback: v => v.toFixed(1) + ' GB' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+                }
+            }
+        });
+    } catch(e) {
+        console.error('loadHistory:', e);
+    }
+}
+
+async function triggerScan() {
+    const btn = event.target;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Scanning...';
+    try {
+        await fetch(`${API}/scan`, {method:'POST'});
+        await loadUsage();
+        await loadHistory();
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-sync"></i> Scan Agora';
+    }
+}
+
+async function loadConfig() {
+    try {
+        const r = await fetch(`${API}/config`);
+        const d = await r.json();
+        const c = d.config || {};
+        document.getElementById('cfg-threshold-gb').value = c.alert_threshold_gb || 0;
+        document.getElementById('cfg-growth-pct').value = c.alert_growth_pct_per_week || 0;
+        document.getElementById('cfg-scan-interval').value = c.scan_interval_hours || 6;
+        document.getElementById('cfg-history-days').value = c.history_days || 90;
+    } catch(e) {}
+}
+
+function openAlertConfig() { document.getElementById('alert-config-modal').style.display = 'flex'; }
+function closeAlertConfig() { document.getElementById('alert-config-modal').style.display = 'none'; }
+
+async function saveAlertConfig() {
+    const cfg = {
+        alert_threshold_gb: parseFloat(document.getElementById('cfg-threshold-gb').value),
+        alert_growth_pct_per_week: parseFloat(document.getElementById('cfg-growth-pct').value),
+        scan_interval_hours: parseInt(document.getElementById('cfg-scan-interval').value),
+        history_days: parseInt(document.getElementById('cfg-history-days').value)
+    };
+    try {
+        await fetch(`${API}/config`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(cfg)});
+        closeAlertConfig();
+        alert('Configuração de alertas de armazenamento salva!');
+    } catch(e) { alert('Erro ao salvar: ' + e.message); }
+}
+</script>
+</body>
+</html>

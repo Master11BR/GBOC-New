@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 11.7c - Ransomware Guardian (Watchdog Automatico)
+GBOC 13.2.0 - Ransomware Guardian (Watchdog Automatico)
 
 Modulo de protecao ATIVA contra ransomware.
 Roda em background como thread daemon e executa:
@@ -86,11 +86,29 @@ class RansomwareGuardian:
 
         while not self._stop_event.is_set():
             try:
+                # 1. Verificação contínua de Canary Files (Honeypots)
                 result = self._check_canaries()
                 if result and result.get('threat_detected'):
                     self._handle_threat(result)
+
+                # 2. Execução automática da Stack de 7 Ferramentas de Segurança (Piloto Automático)
+                try:
+                    from engines.ransomware_detector import run_integrated_multi_tool_scan
+                    data_dir = os.environ.get('AGENT_DATA_DIR', os.path.join(os.getcwd(), 'data'))
+                    if os.path.exists(data_dir):
+                        multi_res = run_integrated_multi_tool_scan(data_dir)
+                        if multi_res and multi_res.get('threat_level') in ('high', 'critical'):
+                            logger.critical(f"[Guardian] Ameaca detectada pela Stack de 7 Ferramentas: {multi_res.get('threat_level').upper()}")
+                            self._handle_threat({
+                                'threat_detected': True,
+                                'multi_tool_summary': multi_res,
+                                'detected_at': datetime.now().isoformat()
+                            })
+                except Exception as m_err:
+                    logger.debug(f"[Guardian] Erro na varredura automatica de 7 ferramentas: {m_err}")
+
             except Exception as e:
-                logger.error(f"[Guardian] Erro na verificacao: {e}", exc_info=True)
+                logger.error(f"[Guardian] Erro no piloto automatico de seguranca: {e}", exc_info=True)
 
             # Dormir no intervalo, mas acordar se stop for chamado
             self._stop_event.wait(timeout=self.check_interval)
@@ -546,7 +564,7 @@ class RansomwareGuardian:
             f"  2. Isole a maquina da rede se possivel\n"
             f"  3. Acesse o painel GBOC para revisar o incidente\n"
             f"  4. NAO restaure backups antes de confirmar que o ataque foi contido\n\n"
-            f"--- GBOC Ransomware Guardian 11.7c ---"
+            f"--- GBOC Ransomware Guardian 13.2.0 ---"
         )
 
         # 6a. SMTP (e-mail)

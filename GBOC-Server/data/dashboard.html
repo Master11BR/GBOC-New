@@ -441,7 +441,7 @@
 
         async function loadDashboardStats() {
             try {
-                const response = await fetch('/api/v1/dashboard/stats');
+                const response = await fetch(window.GBOC_API_BASE + '/api/v1/dashboard/stats');
                 if (response.ok) {
                     const data = await response.json();
                     updateDashboardStats(data);
@@ -456,7 +456,7 @@
 
         async function loadAgentsList() {
             try {
-                const response = await fetch('/api/v1/agents');
+                const response = await fetch(window.GBOC_API_BASE + '/api/v1/agents');
                 if (response.ok) {
                     const data = await response.json();
                     updateAgentsList(data);
@@ -470,7 +470,7 @@
 
         async function loadEventsLog() {
             try {
-                const response = await fetch('/api/v1/events/recent');
+                const response = await fetch(window.GBOC_API_BASE + '/api/v1/events/recent');
                 if (response.ok) {
                     const data = await response.json();
                     updateEventsLog(data);
@@ -484,7 +484,7 @@
 
         async function loadRepositoriesStatus() {
             try {
-                const response = await fetch('/api/v1/repositories/status');
+                const response = await fetch(window.GBOC_API_BASE + '/api/v1/repositories/status');
                 if (response.ok) {
                     const data = await response.json();
                     updateRepositoriesStatus(data);

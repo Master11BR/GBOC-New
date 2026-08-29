@@ -1,3 +1,5 @@
+<!-- Copyright (c) 2026 Master11BR - GBOC System v13.2.0 Enterprise. Todos os direitos reservados. -->
+
 # Copilot Instructions
 
 ## Diretrizes de projeto

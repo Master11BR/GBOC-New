@@ -1,4 +1,4 @@
-# GBOC Server v10.0a - Dependências
+# GBOC Server v13.2.0 - Dependências
 fastapi==0.135.1
 uvicorn[standard]==0.41.0
 hypercorn[h2]>=0.17.0

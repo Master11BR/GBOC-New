@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agentes Cadastrados - GBOC Server</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/gboc-themes.css">
+    <link rel="stylesheet" href="/static/gboc-layout.css">
+    <script src="/static/gboc-layout-manager.js"></script>
+    <script src="/modules/agents/agents.js"></script>
+</head>
+<body class="layout-vertical">
+    <main class="main-content" style="padding:24px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+            <h2 style="font-size:1.4em;margin:0;display:flex;align-items:center;gap:10px">
+                <i class="fas fa-desktop" style="color:var(--primary)"></i> Agentes Cadastrados no Servidor Central
+            </h2>
+            <button class="btn btn-primary" onclick="loadAgentsList()"><i class="fas fa-sync-alt"></i> Atualizar Agentes</button>
+        </div>
+        <div class="panel" style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:20px">
+            <table class="data-table" style="width:100%">
+                <thead>
+                    <tr>
+                        <th>Hostname</th>
+                        <th>Endereço IP</th>
+                        <th>Sistema Operacional</th>
+                        <th>Versão Agente</th>
+                        <th>Último Heartbeat</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="agents-table-body">
+                    <tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Carregando lista de agentes...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+</body>
+</html>

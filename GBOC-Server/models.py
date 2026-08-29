@@ -79,7 +79,7 @@ class BackupReportRequest(BaseModel):
     start_time: str
     end_time: str
     duration_seconds: float = Field(ge=0)
-    status: str = Field(..., regex="^(success|failed|partial)$")
+    status: str = Field(..., pattern="^(success|failed|partial)$")
     files_new: Optional[int] = 0
     files_changed: Optional[int] = 0
     data_added: Optional[int] = 0
@@ -149,7 +149,7 @@ class FullSyncRequest(BaseModel):
 class ManualSyncRequest(BaseModel):
     """Requisição de sincronização manual"""
     agent_id: str
-    sync_type: str = Field(..., regex="^(full|repositories|tasks|metrics)$")
+    sync_type: str = Field(..., pattern="^(full|repositories|tasks|metrics)$")
     since_timestamp: Optional[str] = None
 
 # ===========================
@@ -158,7 +158,7 @@ class ManualSyncRequest(BaseModel):
 
 class HealthCheckResponse(BaseModel):
     """Resposta de health check"""
-    status: str = Field(..., regex="^(healthy|degraded|unhealthy)$")
+    status: str = Field(..., pattern="^(healthy|degraded|unhealthy)$")
     timestamp: str
     checks: Optional[Dict[str, Any]] = None
 
@@ -186,7 +186,7 @@ class SettingUpdateRequest(BaseModel):
 
 class StandardResponse(BaseModel):
     """Resposta padrão da API"""
-    status: str = Field(..., regex="^(success|error|warning)$")
+    status: str = Field(..., pattern="^(success|error|warning)$")
     message: Optional[str] = None
     data: Optional[Dict[str, Any]] = None
     timestamp: Optional[str] = None

@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Usuários & Níveis de Acesso - GBOC Server</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/gboc-themes.css">
+    <link rel="stylesheet" href="/static/gboc-layout.css">
+    <script src="/static/gboc-layout-manager.js"></script>
+    <script src="/modules/users/users.js"></script>
+    <style>
+        .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 18px; text-align: center; }
+        .stat-card .val { font-size: 1.8em; font-weight: 700; }
+        .stat-card .lbl { font-size: .8em; color: var(--text-muted); margin-top: 4px; }
+
+        .tabs-header { display: flex; gap: 8px; border-bottom: 1px solid var(--border); margin-bottom: 20px; flex-wrap: wrap; }
+        .tab-btn { padding: 12px 20px; border: none; background: none; color: var(--text-muted); font-size: 0.92em; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; display: flex; align-items: center; gap: 8px; }
+        .tab-btn:hover { color: var(--primary); }
+        .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); background: rgba(0, 240, 255, 0.04); border-radius: 6px 6px 0 0; }
+
+        .tab-pane { display: none; }
+        .tab-pane.active { display: block; }
+
+        .panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 20px; }
+        .panel-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .panel-header h3 { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 1.05em; }
+        .panel-body { padding: 20px; }
+
+        .tbl { width: 100%; border-collapse: collapse; }
+        .tbl th, .tbl td { padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--border); font-size: .88em; }
+        .tbl th { background: var(--bg-input); color: var(--text-muted); font-weight: 600; }
+
+        .badge-ok { background: rgba(72, 187, 120, 0.15); color: var(--success); padding: 3px 10px; border-radius: 20px; font-size: 0.78em; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+        .badge-warn { background: rgba(237, 137, 54, 0.15); color: var(--warning); padding: 3px 10px; border-radius: 20px; font-size: 0.78em; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+        .badge-crit { background: rgba(245, 101, 101, 0.15); color: var(--danger); padding: 3px 10px; border-radius: 20px; font-size: 0.78em; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+        .badge-info { background: rgba(66, 153, 225, 0.15); color: var(--primary); padding: 3px 10px; border-radius: 20px; font-size: 0.78em; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+        .badge-purple { background: rgba(128, 90, 213, 0.15); color: #805ad5; padding: 3px 10px; border-radius: 20px; font-size: 0.78em; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-size: .85em; color: var(--text-muted); margin-bottom: 6px; font-weight: 600; }
+        .form-group input, .form-group select { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-input); color: var(--text); font-size: .9em; box-sizing: border-box; }
+
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+        .modal-overlay.show { display: flex; }
+        .modal-box { background: var(--bg-card); border-radius: 14px; padding: 28px; width: 620px; max-width: 95vw; border: 1px solid var(--border); max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
+        .modal-box h3 { margin: 0 0 20px 0; display: flex; align-items: center; gap: 10px; font-size: 1.2em; }
+        .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); }
+
+        .perm-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-top: 12px; }
+        .perm-card { background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+        .perm-card-header { font-size: 0.85em; font-weight: 700; color: var(--primary); margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+        .perm-item { display: flex; align-items: center; gap: 8px; font-size: 0.82em; margin-bottom: 6px; cursor: pointer; color: var(--text); }
+        .perm-item input { width: auto; cursor: pointer; }
+
+        .profile-card { text-align: center; padding: 20px 16px; }
+        .profile-avatar { width: 64px; height: 64px; border-radius: 16px; margin: 0 auto 12px; display: flex; align-items: center; justify-content: center; font-size: 1.6em; font-weight: 800; background: rgba(99, 102, 241, 0.12); color: var(--primary); border: 2px solid rgba(99, 102, 241, 0.3); }
+
+        .pw-msg { display: none; padding: 8px 12px; border-radius: 6px; font-size: .85em; margin-top: 8px; }
+        .pw-msg.ok { display: block; background: rgba(72, 187, 120, 0.12); color: var(--success); border: 1px solid rgba(72, 187, 120, 0.3); }
+        .pw-msg.err { display: block; background: rgba(245, 101, 101, 0.12); color: var(--danger); border: 1px solid rgba(245, 101, 101, 0.3); }
+    </style>
+</head>
+<body class="layout-vertical">
+    <main class="main-content" style="padding:24px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+            <div>
+                <h1 style="font-size:1.4em;margin:0;display:flex;align-items:center;gap:10px">
+                    <i class="fas fa-user-shield" style="color:var(--primary)"></i> Segurança, Usuários &amp; Níveis de Acesso
+                </h1>
+                <div style="font-size:.85em;color:var(--text-muted);margin-top:2px">Gerenciamento de usuários, níveis de acesso customizados e auditoria do Servidor Central</div>
+            </div>
+            <div style="display:flex;gap:8px">
+                <button class="btn btn-secondary" onclick="loadAllUsersModule()"><i class="fas fa-sync-alt"></i> Atualizar</button>
+                <button class="btn btn-primary" onclick="openUserModal()"><i class="fas fa-user-plus"></i> Novo Usuário</button>
+                <button class="btn btn-success" onclick="openRoleModal()"><i class="fas fa-plus-circle"></i> Novo Nível Customizado</button>
+            </div>
+        </div>
+
+        <!-- KPI CARDS -->
+        <div class="stats-row">
+            <div class="stat-card"><div class="val" id="kpi-users">0</div><div class="lbl">Usuários Cadastrados</div></div>
+            <div class="stat-card"><div class="val" id="kpi-roles" style="color:var(--primary)">0</div><div class="lbl">Níveis de Acesso</div></div>
+            <div class="stat-card"><div class="val" id="kpi-auth" style="color:var(--success)">Ativada</div><div class="lbl">Status Autenticação</div></div>
+            <div class="stat-card"><div class="val" id="kpi-sessions" style="color:var(--warning)">1</div><div class="lbl">Sessões Ativas</div></div>
+        </div>
+
+        <!-- NAVEGAÇÃO DE ABAS -->
+        <div class="tabs-header">
+            <button class="tab-btn active" onclick="switchUsersTab('tab-users')" id="tab-btn-users">
+                <i class="fas fa-users"></i> Usuários do Sistema (CRUD)
+            </button>
+            <button class="tab-btn" onclick="switchUsersTab('tab-roles')" id="tab-btn-roles">
+                <i class="fas fa-layer-group"></i> Níveis de Acesso &amp; Permissões Customizadas
+            </button>
+            <button class="tab-btn" onclick="switchUsersTab('tab-audit')" id="tab-btn-audit">
+                <i class="fas fa-clipboard-list"></i> Trilha de Auditoria
+            </button>
+        </div>
+
+        <!-- ABA 1: CRUD DE USUÁRIOS -->
+        <div class="tab-pane active" id="tab-users">
+            <div style="display:grid;grid-template-columns:320px 1fr;gap:20px;">
+                <div>
+                    <div class="panel" style="border:2px solid rgba(99,102,241,0.2)">
+                        <div class="profile-card">
+                            <div class="profile-avatar" id="my-avatar">A</div>
+                            <div style="font-size:1.1em;font-weight:700" id="my-name">Administrador Master</div>
+                            <div style="margin-top:4px" id="my-role"><span class="badge-crit">ADMIN</span></div>
+                            <div style="font-size:.78em;color:var(--text-muted);margin-top:4px" id="my-username">@admin</div>
+                        </div>
+                        <div class="panel-body" style="padding-top:0">
+                            <h4 style="font-size:.9em;margin-bottom:12px;color:var(--text)"><i class="fas fa-key" style="color:var(--warning);margin-right:6px"></i> Alterar Minha Senha</h4>
+                            <div class="form-group">
+                                <label>Senha Atual</label>
+                                <input type="password" id="pw-current" placeholder="Digite a senha atual">
+                            </div>
+                            <div class="form-group">
+                                <label>Nova Senha</label>
+                                <input type="password" id="pw-new" placeholder="Mínimo 8 caracteres">
+                            </div>
+                            <div class="form-group">
+                                <label>Confirmar Nova Senha</label>
+                                <input type="password" id="pw-confirm" placeholder="Repita a nova senha">
+                            </div>
+                            <div class="pw-msg" id="pw-msg"></div>
+                            <button class="btn btn-primary" onclick="changeMyPassword()" style="width:100%;margin-top:6px">
+                                <i class="fas fa-key"></i> Alterar Senha
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3><i class="fas fa-users" style="color:var(--primary)"></i> Gerenciamento de Usuários do Servidor</h3>
+                        <button class="btn btn-sm btn-primary" onclick="openUserModal()"><i class="fas fa-user-plus"></i> Novo Usuário</button>
+                    </div>
+                    <div class="panel-body" style="padding:0">
+                        <table class="tbl">
+                            <thead>
+                                <tr>
+                                    <th>Usuário</th>
+                                    <th>Nome de Exibição</th>
+                                    <th>Nível de Acesso</th>
+                                    <th>Empresa Vinculada</th>
+                                    <th>Status</th>
+                                    <th>Último Login</th>
+                                    <th style="text-align:right">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-table-body">
+                                <tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-muted)">Carregando usuários...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ABA 2: CRUD DE ROLES & PERMISSÕES -->
+        <div class="tab-pane" id="tab-roles">
+            <div class="panel">
+                <div class="panel-header">
+                    <div>
+                        <h3><i class="fas fa-layer-group" style="color:var(--primary)"></i> Níveis de Acesso &amp; Permissões Customizadas</h3>
+                        <p style="font-size:0.82em;color:var(--text-muted);margin:4px 0 0 0">Configure perfis de segurança ou crie novos níveis de acesso com permissões granulares por módulo.</p>
+                    </div>
+                    <button class="btn btn-success" onclick="openRoleModal()"><i class="fas fa-plus-circle"></i> Criar Nível Customizado</button>
+                </div>
+                <div class="panel-body" style="padding:0">
+                    <table class="tbl">
+                        <thead>
+                            <tr>
+                                <th>Nível / Slug</th>
+                                <th>Nome de Exibição</th>
+                                <th>Descrição</th>
+                                <th>Tipo Nível</th>
+                                <th>Usuários Vinculados</th>
+                                <th>Permissões Concedidas</th>
+                                <th style="text-align:right">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="roles-table-body">
+                            <tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-muted)">Carregando níveis de acesso...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ABA 3: TRILHA DE AUDITORIA -->
+        <div class="tab-pane" id="tab-audit">
+            <div class="panel">
+                <div class="panel-header">
+                    <h3><i class="fas fa-clipboard-list" style="color:var(--warning)"></i> Trilha de Auditoria do Servidor Central</h3>
+                </div>
+                <div class="panel-body" style="padding:0">
+                    <table class="tbl">
+                        <thead>
+                            <tr><th>Usuário</th><th>Ação Registrada</th><th>Detalhes</th><th>Endereço IP</th><th>Data / Hora</th></tr>
+                        </thead>
+                        <tbody id="audit-table-body">
+                            <tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-muted)">Carregando registros...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL: USUÁRIO (CRIAR / EDITAR) -->
+        <div class="modal-overlay" id="user-modal">
+            <div class="modal-box">
+                <h3><i class="fas fa-user-shield" style="color:var(--primary)"></i> <span id="modal-user-title">Novo Usuário</span></h3>
+                <input type="hidden" id="usr-id" value="">
+                
+                <div class="form-group">
+                    <label>Nome Completo / Exibição</label>
+                    <input type="text" id="usr-display" placeholder="Ex: Carlos Oliveira">
+                </div>
+                <div class="form-group">
+                    <label>Login / Usuário</label>
+                    <input type="text" id="usr-username" placeholder="ex: coliveira">
+                </div>
+                <div class="form-group">
+                    <label>Senha <span id="usr-pw-hint" style="font-size:0.8em;color:var(--text-muted)">(obrigatória)</span></label>
+                    <input type="password" id="usr-password" placeholder="Mínimo 8 caracteres">
+                </div>
+                <div class="form-group">
+                    <label>Nível de Acesso (Role)</label>
+                    <select id="usr-role">
+                        <option value="">Carregando níveis...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Empresa Vinculada (Tenant)</label>
+                    <select id="usr-tenant">
+                        <option value="">Nenhuma (Administrador Global)</option>
+                    </select>
+                </div>
+                <div class="form-group" id="usr-status-group" style="display:none">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                        <input type="checkbox" id="usr-active" checked style="width:auto"> Usuário Ativo no Sistema
+                    </label>
+                </div>
+
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" onclick="closeUserModal()">Cancelar</button>
+                    <button class="btn btn-success" onclick="saveUser()"><i class="fas fa-check"></i> Salvar Usuário</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL: NÍVEL DE ACESSO & PERMISSÕES -->
+        <div class="modal-overlay" id="role-modal">
+            <div class="modal-box" style="width:780px">
+                <h3><i class="fas fa-layer-group" style="color:var(--success)"></i> <span id="modal-role-title">Novo Nível Customizado</span></h3>
+                <input type="hidden" id="role-id" value="">
+                
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                    <div class="form-group">
+                        <label>Identificador Técnico (Slug)</label>
+                        <input type="text" id="role-name" placeholder="ex: analista_infra">
+                    </div>
+                    <div class="form-group">
+                        <label>Nome de Exibição do Nível</label>
+                        <input type="text" id="role-display" placeholder="ex: Analista de Infraestrutura">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Descrição das Atribuições</label>
+                    <input type="text" id="role-desc" placeholder="ex: Acesso de leitura a backups e execução de restaurações">
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-key" style="color:var(--primary)"></i> Matriz de Permissões Mapeadas por Módulo</label>
+                    <div class="perm-grid" id="permissions-matrix-container">
+                        <!-- Preenchido via JS dinamicamente com checkboxes por módulo -->
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" onclick="closeRoleModal()">Cancelar</button>
+                    <button class="btn btn-success" onclick="saveRole()"><i class="fas fa-check"></i> Salvar Nível de Acesso</button>
+                </div>
+            </div>
+        </div>
+    </main>
+</body>
+</html>

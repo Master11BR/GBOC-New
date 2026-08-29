@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-🔧 GBOC Agent 11.7c - MOTOR ENGINE MANAGER
+🔧 GBOC Agent 13.2.0 - MOTOR ENGINE MANAGER
 Detecta, importa e gerencia motores de backup instalados
 """
 

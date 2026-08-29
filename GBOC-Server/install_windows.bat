@@ -1,3 +1,9 @@
+@REM ==============================================================================
+@REM GBOC System v13.2.0 Enterprise Edition
+@REM Copyright (c) 2026 Master11BR - Todos os direitos reservados.
+@REM Propriedade Intelectual & Direitos Autorais Registrados.
+@REM ==============================================================================
+
 @echo off
 REM ===================================================
 REM GBOC Server - Instalador Windows
@@ -117,7 +123,7 @@ REM Cria atalho para iniciar servidor
 echo [6/6] Criando atalhos...
 echo @echo off > start_server.bat
 echo call venv\Scripts\activate.bat >> start_server.bat
-echo python gboc_server.py >> start_server.bat
+echo python server_gboc.py >> start_server.bat
 echo     [OK] Atalho criado: start_server.bat
 echo.
 

@@ -1,0 +1,438 @@
+<!--
+==============================================================================
+GBOC System v13.2.0 Enterprise Edition
+Module: Active Directory Dedicated Backup & Recovery
+Copyright (c) 2026 Master11BR - Todos os direitos reservados.
+==============================================================================
+-->
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backup &amp; Recuperação do Active Directory - GBOC Agent</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/gboc-themes.css">
+    <link rel="stylesheet" href="/static/gboc-layout.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="/static/gboc-layout-manager.js"></script>
+    <script src="/static/sidebar.js"></script>
+    <script src="/static/active-directory.js"></script>
+    <style>
+        .ad-nav-tabs {
+            display: flex;
+            gap: 10px;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 12px;
+            margin-bottom: 24px;
+            overflow-x: auto;
+        }
+        .ad-tab-btn {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.86em;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.25s ease;
+            white-space: nowrap;
+        }
+        .ad-tab-btn:hover {
+            color: var(--text);
+            border-color: var(--primary);
+        }
+        .ad-tab-btn.active {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+        .ad-tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+        .ad-tab-content.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .ad-hud-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            position: relative;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+        }
+        .ad-console-box {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 14px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 0.82em;
+            color: var(--text-muted);
+            height: 180px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            line-height: 1.5;
+        }
+        .ad-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.84em;
+        }
+        .ad-table th {
+            background: var(--bg-input);
+            padding: 10px;
+            text-align: left;
+            border-bottom: 2px solid var(--border);
+            color: var(--text);
+        }
+        .ad-table td {
+            padding: 10px;
+            border-bottom: 1px solid var(--border);
+            color: var(--text);
+        }
+        .fsmo-pill {
+            background: var(--bg-input);
+            padding: 10px 14px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-layout">
+        <div id="sidebar-container"></div>
+        <main class="main-content" style="padding:24px 30px;">
+            <header class="page-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:20px;">
+                <div>
+                    <h2 style="display:flex; align-items:center; gap:10px; font-size:1.45em; margin:0;">
+                        <i class="fas fa-sitemap" style="color:#38b2ac"></i> Módulo Completo de Backup do Active Directory (AD DS)
+                    </h2>
+                    <p style="font-size:0.85em; color:var(--text-muted); margin:4px 0 0 0;">
+                        Proteção integral para bases NTDS.dit, SYSVOL, Registro, FSMO Roles, zonas DNS e recuperação granular de objetos.
+                    </p>
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn btn-primary" onclick="switchAdTab('backup')">
+                        <i class="fas fa-plus"></i> Novo Backup AD
+                    </button>
+                </div>
+            </header>
+
+            <!-- Navigation Tabs -->
+            <div class="ad-nav-tabs">
+                <button class="ad-tab-btn active" id="tab-btn-topology" onclick="switchAdTab('topology')">
+                    <i class="fas fa-network-wired"></i> 1. Topologia &amp; FSMO Roles
+                </button>
+                <button class="ad-tab-btn" id="tab-btn-backup" onclick="switchAdTab('backup')">
+                    <i class="fas fa-shield-alt"></i> 2. Backup do Active Directory
+                </button>
+                <button class="ad-tab-btn" id="tab-btn-history" onclick="switchAdTab('history')">
+                    <i class="fas fa-history"></i> 3. Histórico de Snapshots
+                </button>
+                <button class="ad-tab-btn" id="tab-btn-objects" onclick="switchAdTab('objects')">
+                    <i class="fas fa-users"></i> 4. Explorador Granular de Objetos
+                </button>
+                <button class="ad-tab-btn" id="tab-btn-health" onclick="switchAdTab('health')">
+                    <i class="fas fa-stethoscope"></i> 5. Saúde &amp; Replicação (DCDiag)
+                </button>
+                <button class="ad-tab-btn" id="tab-btn-recovery" onclick="switchAdTab('recovery')">
+                    <i class="fas fa-tools"></i> 6. Assistente de Restauração (DSRM)
+                </button>
+            </div>
+
+            <!-- TAB 1: TOPOLOGIA & FSMO ROLES -->
+            <div class="ad-tab-content active" id="tab-content-topology">
+                <div class="two-col" style="display:grid; grid-template-columns:1fr 1fr; gap:24px;">
+                    <div class="ad-hud-card">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                            <h3 style="font-size:1.05em; margin:0; display:flex; align-items:center; gap:8px;">
+                                <i class="fas fa-cubes" style="color:var(--primary)"></i> Parâmetros da Floresta &amp; Domínio
+                            </h3>
+                            <span id="ad-is-dc-badge" class="badge badge-info"><i class="fas fa-spinner fa-spin"></i> Identificando...</span>
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:10px;">
+                            <div class="fsmo-pill">
+                                <span style="font-size:0.85em; color:var(--text-muted);">Nome do Domínio (DNSRoot):</span>
+                                <strong style="font-size:0.9em; color:var(--text);" id="ad-domain-name">Carregando...</strong>
+                            </div>
+                            <div class="fsmo-pill">
+                                <span style="font-size:0.85em; color:var(--text-muted);">Nome da Floresta:</span>
+                                <strong style="font-size:0.9em; color:var(--text);" id="ad-forest-name">Carregando...</strong>
+                            </div>
+                            <div class="fsmo-pill">
+                                <span style="font-size:0.85em; color:var(--text-muted);">Nível Funcional do Domínio:</span>
+                                <strong style="font-size:0.9em; color:var(--text);" id="ad-domain-level">Windows Server 2016+</strong>
+                            </div>
+                            <div class="fsmo-pill">
+                                <span style="font-size:0.85em; color:var(--text-muted);">Nível Funcional da Floresta:</span>
+                                <strong style="font-size:0.9em; color:var(--text);" id="ad-forest-level">Windows Server 2016+</strong>
+                            </div>
+                            <div class="fsmo-pill">
+                                <span style="font-size:0.85em; color:var(--text-muted);">Lixeira do Active Directory:</span>
+                                <span id="ad-recycle-bin-status">Verificando...</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="ad-hud-card">
+                        <h3 style="font-size:1.05em; margin-top:0; margin-bottom:16px; display:flex; align-items:center; gap:8px;">
+                            <i class="fas fa-crown" style="color:#ecc94b"></i> Detentores dos 5 Papéis FSMO (Master Roles)
+                        </h3>
+                        <div style="display:flex; flex-direction:column; gap:8px;">
+                            <div class="fsmo-pill">
+                                <div><strong style="font-size:0.85em;">Schema Master (Floresta):</strong></div>
+                                <div style="font-size:0.8em; color:var(--primary);" id="fsmo-schema">N/A</div>
+                            </div>
+                            <div class="fsmo-pill">
+                                <div><strong style="font-size:0.85em;">Domain Naming Master (Floresta):</strong></div>
+                                <div style="font-size:0.8em; color:var(--primary);" id="fsmo-naming">N/A</div>
+                            </div>
+                            <div class="fsmo-pill">
+                                <div><strong style="font-size:0.85em;">PDC Emulator (Domínio):</strong></div>
+                                <div style="font-size:0.8em; color:var(--primary);" id="fsmo-pdc">N/A</div>
+                            </div>
+                            <div class="fsmo-pill">
+                                <div><strong style="font-size:0.85em;">RID Master (Domínio):</strong></div>
+                                <div style="font-size:0.8em; color:var(--primary);" id="fsmo-rid">N/A</div>
+                            </div>
+                            <div class="fsmo-pill">
+                                <div><strong style="font-size:0.85em;">Infrastructure Master (Domínio):</strong></div>
+                                <div style="font-size:0.8em; color:var(--primary);" id="fsmo-infra">N/A</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ad-hud-card" style="margin-top:24px;">
+                    <h3 style="font-size:1.05em; margin-top:0; margin-bottom:14px; display:flex; align-items:center; gap:8px;">
+                        <i class="fas fa-server" style="color:#4299e1"></i> Controladores de Domínio (DCs) e Catálogos Globais
+                    </h3>
+                    <div id="ad-dcs-list">
+                        <div style="padding:10px; color:var(--text-muted); font-size:0.85em;">Carregando inventário de controladores...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: BACKUP DO ACTIVE DIRECTORY -->
+            <div class="ad-tab-content" id="tab-content-backup">
+                <div class="two-col" style="display:grid; grid-template-columns:1.2fr 1fr; gap:24px;">
+                    <div class="ad-hud-card">
+                        <h3 style="font-size:1.05em; margin-top:0; display:flex; align-items:center; gap:8px;">
+                            <i class="fas fa-play-circle" style="color:var(--primary)"></i> Executar Backup a Quente do AD DS
+                        </h3>
+                        <p style="font-size:0.82em; color:var(--text-muted); margin-bottom:16px;">
+                            O GBOC coordena o NTDS VSS Writer para congelamento atômico do banco de dados `NTDS.dit`, transações `edb.log`, scripts e políticas GPO da pasta `SYSVOL`, registro `SAM`/`SECURITY`/`SYSTEM` e zonas DNS integradas.
+                        </p>
+                        <div class="form-group" style="margin-bottom:14px;">
+                            <label style="font-size:0.85em; font-weight:600; display:block; margin-bottom:6px;">Nome Identificador do Snapshot</label>
+                            <input type="text" id="ad-backup-custom-name" class="form-control" placeholder="AD_Backup_Diario_Consolidado" style="width:100%; padding:10px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px; background:var(--bg-input); padding:14px; border-radius:8px; border:1px solid var(--border);">
+                            <label style="display:flex; align-items:center; gap:8px; font-size:0.85em; cursor:pointer;">
+                                <input type="checkbox" id="ad-bkp-sysvol" checked style="width:18px; height:18px;">
+                                <span>Incluir Políticas de Grupo (GPOs) e Scripts de Logon da pasta SYSVOL</span>
+                            </label>
+                            <label style="display:flex; align-items:center; gap:8px; font-size:0.85em; cursor:pointer;">
+                                <input type="checkbox" id="ad-bkp-registry" checked style="width:18px; height:18px;">
+                                <span>Exportar Hives do Registro do Windows (SAM, SECURITY, SYSTEM)</span>
+                            </label>
+                            <label style="display:flex; align-items:center; gap:8px; font-size:0.85em; cursor:pointer;">
+                                <input type="checkbox" id="ad-bkp-dns" checked style="width:18px; height:18px;">
+                                <span>Exportar Zonas DNS e Registros de Serviço SRV (_ldap, _kerberos)</span>
+                            </label>
+                        </div>
+                        <button class="btn btn-primary" onclick="startAdBackupJob()" style="width:100%; padding:12px; font-weight:700;">
+                            <i class="fas fa-shield-alt"></i> Iniciar Backup Completo do Active Directory
+                        </button>
+                    </div>
+
+                    <div class="ad-hud-card">
+                        <h4 style="margin-top:0; font-size:0.95em;"><i class="fas fa-lock" style="color:var(--success)"></i> Proteção contra USN Rollback</h4>
+                        <p style="font-size:0.82em; color:var(--text-muted); line-height:1.7;">
+                            O backup do GBOC Agent respeita o ciclo de <strong>Tombstone Lifetime (180 dias)</strong> do Active Directory, garantindo que snapshots antigos não sejam restaurados incorretamente, o que provocaria corrupção de sequências USN e tombstone nas réplicas do domínio.
+                        </p>
+                        <div style="background:var(--bg-input); padding:12px; border-radius:8px; border:1px solid var(--border); font-size:0.8em; margin-top:14px;">
+                            <div><i class="fas fa-check-circle" style="color:var(--success)"></i> Suporte a Restauração Não-Autoritativa (Normal)</div>
+                            <div style="margin-top:6px;"><i class="fas fa-check-circle" style="color:var(--success)"></i> Suporte a Restauração Autoritativa (NTDSUTIL)</div>
+                            <div style="margin-top:6px;"><i class="fas fa-check-circle" style="color:var(--success)"></i> Validação de Consistência ESENT/Jet 100%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: HISTÓRICO DE SNAPSHOTS -->
+            <div class="ad-tab-content" id="tab-content-history">
+                <div class="ad-hud-card">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                        <h3 style="font-size:1.1em; margin:0; display:flex; align-items:center; gap:8px;">
+                            <i class="fas fa-history" style="color:var(--primary)"></i> Snapshots do Active Directory em Disco
+                        </h3>
+                        <button class="btn btn-sm btn-secondary" onclick="loadAdBackupHistory()"><i class="fas fa-sync"></i> Atualizar</button>
+                    </div>
+                    <div style="overflow-x:auto;">
+                        <table class="ad-table">
+                            <thead>
+                                <tr>
+                                    <th>Identificador do Snapshot</th>
+                                    <th>Domínio</th>
+                                    <th>Tamanho</th>
+                                    <th>Data / Hora</th>
+                                    <th>Status VSS</th>
+                                    <th style="text-align:right;">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ad-history-table-body">
+                                <tr><td colspan="6" style="text-align:center; padding:18px; color:var(--text-muted);">Carregando histórico de backups...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 4: EXPLORADOR GRANULAR DE OBJETOS -->
+            <div class="ad-tab-content" id="tab-content-objects">
+                <div class="ad-hud-card">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px; margin-bottom:16px;">
+                        <div>
+                            <h3 style="font-size:1.1em; margin:0; display:flex; align-items:center; gap:8px;">
+                                <i class="fas fa-users" style="color:var(--primary)"></i> Catálogo de Objetos do Active Directory
+                            </h3>
+                            <p style="font-size:0.82em; color:var(--text-muted); margin:4px 0 0 0;">
+                                Pesquise usuários, grupos de segurança e GPOs para restauração granular sem reiniciar o servidor.
+                            </p>
+                        </div>
+                        <div style="display:flex; gap:10px;">
+                            <select id="ad-obj-filter" onchange="searchAdGranularObjects()" style="padding:8px 12px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
+                                <option value="all">Todos os Objetos</option>
+                                <option value="user">Apenas Usuários</option>
+                                <option value="group">Apenas Grupos</option>
+                                <option value="gpo">Políticas GPO</option>
+                            </select>
+                            <input type="text" id="ad-obj-search" placeholder="Filtrar por nome / login..." onkeyup="if(event.key==='Enter') searchAdGranularObjects()" style="padding:8px 12px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text); width:240px;">
+                            <button class="btn btn-primary" onclick="searchAdGranularObjects()"><i class="fas fa-search"></i> Filtrar</button>
+                        </div>
+                    </div>
+
+                    <div style="overflow-x:auto;">
+                        <table class="ad-table">
+                            <thead>
+                                <tr>
+                                    <th>Tipo</th>
+                                    <th>Nome de Exibição / Conta</th>
+                                    <th>DistinguishedName (DN)</th>
+                                    <th>Associação / Escopo</th>
+                                    <th style="text-align:right;">Restauração</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ad-granular-table-body">
+                                <tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">Clique em Filtrar para carregar os objetos.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 5: SAÚDE & REPLICAÇÃO (DCDIAG) -->
+            <div class="ad-tab-content" id="tab-content-health">
+                <div class="two-col" style="display:grid; grid-template-columns:1fr 1fr; gap:24px;">
+                    <div class="ad-hud-card">
+                        <h3 style="font-size:1.05em; margin-top:0; margin-bottom:14px; display:flex; align-items:center; gap:8px;">
+                            <i class="fas fa-heartbeat" style="color:#e53e3e"></i> Compartilhamentos Críticos do Domínio
+                        </h3>
+                        <div style="display:flex; flex-direction:column; gap:10px;">
+                            <div class="fsmo-pill">
+                                <div><strong style="font-size:0.85em;">Compartilhamento SYSVOL:</strong></div>
+                                <span id="ad-health-sysvol" class="badge badge-success"><i class="fas fa-check"></i> Compartilhado</span>
+                            </div>
+                            <div class="fsmo-pill">
+                                <div><strong style="font-size:0.85em;">Compartilhamento NETLOGON:</strong></div>
+                                <span id="ad-health-netlogon" class="badge badge-success"><i class="fas fa-check"></i> Compartilhado</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="ad-hud-card">
+                        <h3 style="font-size:1.05em; margin-top:0; margin-bottom:14px; display:flex; align-items:center; gap:8px;">
+                            <i class="fas fa-sync" style="color:#4299e1"></i> Resumo de Replicação entre DCs (Repadmin)
+                        </h3>
+                        <div class="ad-console-box" id="ad-repadmin-output">Consultando status de replicação com os parceiros de domínio...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 6: ASSISTENTE DE RESTAURAÇÃO (DSRM & AUTORITATIVA) -->
+            <div class="ad-tab-content" id="tab-content-recovery">
+                <div class="two-col" style="display:grid; grid-template-columns:1.2fr 1fr; gap:24px;">
+                    <div class="ad-hud-card">
+                        <h3 style="font-size:1.05em; margin-top:0; display:flex; align-items:center; gap:8px;">
+                            <i class="fas fa-terminal" style="color:#ed8936"></i> Gerador de Script para Restauração Autoritativa
+                        </h3>
+                        <p style="font-size:0.82em; color:var(--text-muted); margin-bottom:16px;">
+                            Caso uma Unidade Organizacional (OU) inteira tenha sido deletada acidentalmente, a restauração autoritativa instrui o `ntdsutil` a aumentar o número de versão USN dos objetos em 100.000 para forçar a replicação autoritativa para todos os outros DCs da floresta.
+                        </p>
+                        <div class="form-group" style="margin-bottom:14px;">
+                            <label style="font-size:0.85em; font-weight:600; display:block; margin-bottom:6px;">DistinguishedName (DN) da OU Alvo para Restauração</label>
+                            <input type="text" id="ad-restore-target-ou" class="form-control" placeholder="OU=Diretoria,DC=empresa,DC=local" style="width:100%; padding:10px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
+                        </div>
+                        <button class="btn btn-warning" onclick="generateAuthoritativeScriptAction()" style="width:100%; padding:12px; font-weight:700;">
+                            <i class="fas fa-code"></i> Gerar Script de Recuperação Autoritativa (NTDSUTIL)
+                        </button>
+                        <div class="ad-console-box" id="ad-authoritative-script-output" style="display:none; margin-top:16px;"></div>
+                    </div>
+
+                    <div class="ad-hud-card">
+                        <h4 style="margin-top:0; font-size:0.95em;"><i class="fas fa-info-circle" style="color:var(--primary)"></i> Procedimento Passo a Passo</h4>
+                        <ol style="font-size:0.82em; color:var(--text-muted); line-height:1.8; padding-left:18px; margin:14px 0;">
+                            <li>Reinicie o Controlador de Domínio pressionando F8 e selecione <strong>Directory Services Restore Mode (DSRM)</strong>.</li>
+                            <li>Efetue login com a conta de Administrador do DSRM.</li>
+                            <li>Restaure o snapshot do Active Directory via GBOC Agent.</li>
+                            <li>Execute o script autoritativo gerado para marcar a OU como autoritativa.</li>
+                            <li>Reinicie o servidor em modo normal.</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL DE MONITORAMENTO DE BACKUP AD -->
+    <div id="ad-monitor-modal" class="modal" style="display:none; position:fixed; z-index:3500; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.75); backdrop-filter:blur(4px);">
+        <div class="modal-content" style="background:var(--bg-card); margin:8vh auto; padding:24px; border-radius:12px; width:90%; max-width:760px; border:1px solid var(--border); box-shadow:0 20px 60px rgba(0,0,0,0.6);">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:12px; margin-bottom:16px;">
+                <h3 id="ad-modal-title" style="margin:0; font-size:1.15em; color:var(--text); display:flex; align-items:center; gap:8px;">
+                    <i class="fas fa-spinner fa-spin" style="color:var(--primary)"></i> Backup do Active Directory
+                </h3>
+                <button onclick="closeAdMonitorModal()" style="background:none; border:none; color:var(--text-muted); font-size:1.4em; cursor:pointer;">&times;</button>
+            </div>
+            <div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <span id="ad-modal-status-text" style="font-weight:700; font-size:0.9em; color:var(--text);">Executando backup...</span>
+                    <span id="ad-modal-progress-pct" style="font-weight:700; color:var(--primary);">0%</span>
+                </div>
+                <div style="background:var(--bg-input); height:12px; border-radius:6px; overflow:hidden; border:1px solid var(--border); margin-bottom:16px;">
+                    <div id="ad-modal-progress-fill" style="height:100%; background:linear-gradient(90deg, var(--primary), var(--success)); width:0%; transition:width 0.3s ease;"></div>
+                </div>
+                <div style="font-size:0.8em; font-weight:600; color:var(--text-muted); margin-bottom:6px;">LOG STREAM DO PROCESSO:</div>
+                <div class="ad-console-box" id="ad-live-logs">Aguardando dados...</div>
+                <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:20px;">
+                    <button class="btn btn-secondary" onclick="closeAdMonitorModal()"><i class="fas fa-times"></i> Fechar Monitor</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

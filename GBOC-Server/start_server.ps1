@@ -1,9 +1,17 @@
+<#
+==============================================================================
+GBOC System v13.2.0 Enterprise Edition
+Copyright (c) 2026 Master11BR - Todos os direitos reservados.
+Propriedade Intelectual & Direitos Autorais Registrados.
+==============================================================================
+#>
+
 # ========================================
-# GBOC Server v10.0a - Inicializacao
+# GBOC Server v13.2.0 - Inicializacao
 # ========================================
 
 Write-Host "`n========================================" -ForegroundColor Cyan
-Write-Host "  GBOC Server v10.0a - Iniciando..." -ForegroundColor Cyan
+Write-Host "  GBOC Server v13.2.0 - Iniciando..." -ForegroundColor Cyan
 Write-Host "========================================`n" -ForegroundColor Cyan
 
 $PythonExe = $null
@@ -39,7 +47,7 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-Write-Host "[OK] Iniciando GBOC Server v10.0a..." -ForegroundColor Green
+Write-Host "[OK] Iniciando GBOC Server v13.2.0..." -ForegroundColor Green
 Write-Host "Comando Python: $PythonExe $($PythonBaseArgs -join ' ')`n" -ForegroundColor Gray
 
 Write-Host "Servidor disponivel em:" -ForegroundColor Yellow
@@ -74,7 +82,7 @@ $logFile = Join-Path $PSScriptRoot "startup_out.log"
 $errFile = Join-Path $PSScriptRoot "startup_err.log"
 
 # 1ª tentativa de start
-Invoke-Python gboc_server.py 1> $logFile 2> $errFile
+Invoke-Python server_gboc.py 1> $logFile 2> $errFile
 
 # Se caiu por erro de permissão no schema, tentar auto-fix e uma única retomada
 $combined = ""
@@ -89,7 +97,7 @@ if ($combined -match "permission denied for schema public") {
         try {
             & $initScript -DbHost "localhost" -DbPort 5432 -SuperUser "postgres"
             Write-Host "[INFO] Reintentando start do servidor..." -ForegroundColor Cyan
-            Invoke-Python gboc_server.py
+            Invoke-Python server_gboc.py
         } catch {
             Write-Host "[ERRO] Falha ao executar init_db.ps1: $($_.Exception.Message)" -ForegroundColor Red
             Write-Host "Execute manualmente: .\scripts\init_db.ps1" -ForegroundColor Yellow

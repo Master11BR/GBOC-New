@@ -1,0 +1,16 @@
+{
+  "provider": "deepseek",
+  "ollama_url": "http://localhost:11434",
+  "ollama_model": "gemma4:latest",
+  "groq_api_key": "",
+  "groq_model": "gemma4:latest",
+  "gemini_api_key": "",
+  "openai_api_key": "",
+  "openai_model": "gemma4:latest",
+  "system_prompt": "Você é o GBOC Server Copilot AI, assistente central especialista em orquestração de backups, monitoramento de agentes remotos, RMM e conformidade.",
+  "custom_endpoint": "http://localhost:11434",
+  "ollama_host": "http://localhost:11434",
+  "model": "gemma4:latest",
+  "api_key": "",
+  "task_history_limit": 10
+}

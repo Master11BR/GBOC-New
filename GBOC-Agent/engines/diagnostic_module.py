@@ -1,5 +1,5 @@
 """
-GBOC Diagnostic Module - 11.7c
+GBOC Diagnostic Module - 13.2.0
 Sistema completo de diagnóstico com análise profunda e recomendações inteligentes
 """
 import psutil

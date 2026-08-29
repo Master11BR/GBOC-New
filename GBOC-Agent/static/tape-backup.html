@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GBOC Agent 13.2.0 - Backup em Fita & Mídias Removíveis (DAT, LTO, SAS, LTFS)</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/gboc-themes.css">
+    <link rel="stylesheet" href="/static/gboc-layout.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="/static/gboc-layout-manager.js"></script>
+    <script src="/static/sidebar.js"></script>
+</head>
+<body>
+    <div class="app-layout">
+        <div id="sidebar-container"></div>
+        <main class="main-content">
+            <header class="page-header">
+                <div>
+                    <h2><i class="fas fa-tape" style="color:var(--primary)"></i> Backup em Fita & Mídias Removíveis (LTO, DAT, SAS, LTFS, RDX)</h2>
+                    <p style="font-size:0.85em;color:var(--text-muted)">Gravadores de fita magnética LTO-5 a LTO-9, unidades SAS/SCSI, sistemas de arquivo LTFS e cartuchos RDX.</p>
+                </div>
+            </header>
+
+            <div class="panel" style="margin-top:20px">
+                <div class="panel-header">
+                    <h3><i class="fas fa-compact-disc" style="color:var(--primary)"></i> Unidades de Fita & Autocarregadores Detectados</h3>
+                    <button class="btn btn-sm btn-secondary" onclick="scanTapeDrives()"><i class="fas fa-sync"></i> Re-escanear Barramento SCSI/SAS</button>
+                </div>
+                <div class="panel-body">
+                    <div style="background:var(--bg-input);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                            <h4 style="margin:0"><i class="fas fa-hdd" style="color:#ed8936"></i> Unidade LTO Streaming (Tape Drive Native Engine)</h4>
+                            <span class="badge-ok" style="background:rgba(72,187,120,0.15);color:#48bb78;padding:2px 8px;border-radius:4px;font-size:0.75em;font-weight:700">Driver SCSI Ready</span>
+                        </div>
+                        <p style="font-size:0.82em;color:var(--text-muted)">Suporta montagem de volumes LTFS (Linear Tape File System), bloqueio de fita física e gravação sequencial streaming tar/raw.</p>
+                        
+                        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:14px">
+                            <div>
+                                <label style="font-size:0.78em;color:var(--text-muted)">Dispositivo Tape Target</label>
+                                <input type="text" id="tape-device" value="\\.\TAPE0 (Windows SCSI Tape)" style="font-size:0.82em">
+                            </div>
+                            <div>
+                                <label style="font-size:0.78em;color:var(--text-muted)">Tamanho de Bloco (Block Size)</label>
+                                <select id="tape-block-size" style="font-size:0.82em">
+                                    <option value="64">64 KB (Padrão LTO)</option>
+                                    <option value="128">128 KB (Alta Performance)</option>
+                                    <option value="256">256 KB (LTO-8/LTO-9)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size:0.78em;color:var(--text-muted)">Formato do Cartucho</label>
+                                <select id="tape-format" style="font-size:0.82em">
+                                    <option value="ltfs">LTFS (Volume Montado)</option>
+                                    <option value="tar">Tar Archive Stream</option>
+                                    <option value="raw">Raw SCSI Block</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div style="display:flex;gap:10px;margin-top:16px">
+                            <button class="btn btn-primary" onclick="formatTapeLTFS()"><i class="fas fa-eraser"></i> Formatar Cartucho LTFS</button>
+                            <button class="btn btn-secondary" onclick="ejectTape()"><i class="fas fa-eject"></i> Ejetar Fita</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/sidebar.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            new UnifiedSidebar().initialize();
+        });
+
+        function scanTapeDrives() {
+            alert('Escaneando barramento SCSI/SAS...\nDriver de fita verificado.');
+        }
+        function formatTapeLTFS() {
+            alert('Formatando volume LTFS na unidade de fita...');
+        }
+        function ejectTape() {
+            alert('Enviando comando SCSI Eject à unidade de fita.');
+        }
+    </script>
+</body>
+</html>

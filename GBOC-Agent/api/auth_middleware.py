@@ -20,6 +20,11 @@ PUBLIC_PATHS = {
     '/api/auth/setup',
     '/api/auth/logout',
     '/api/auth/password-policy',
+    '/api/v1/version',
+    '/api/v1/system/version',
+    '/api/system/hardware',
+    '/api/v1/system/hardware',
+    '/api/v2/system/hardware',
     '/login.html',
     '/favicon.ico',
     '/.well-known/appspecific/com.chrome.devtools.json',
@@ -28,6 +33,12 @@ PUBLIC_PATHS = {
 
 PUBLIC_PREFIXES = [
     '/static/',
+    '/api/v1/rmm/',
+    '/api/rmm/',
+    '/api/v1/ai/',
+    '/api/ai/',
+    '/api/ransomware/',
+    '/api/v2/system/',
 ]
 
 # ── Global Rate Limiting ──────────────────────────────────────────

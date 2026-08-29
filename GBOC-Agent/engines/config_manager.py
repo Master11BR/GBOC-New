@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 11.7c - Configuration Manager Engine
+GBOC 13.2.0 - Configuration Manager Engine
 Export/import entire system configuration (tasks, repositories, settings, schedules, policies).
 Supports JSON/YAML formats, versioned snapshots, diff between configs.
 """

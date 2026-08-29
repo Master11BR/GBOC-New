@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 11.7c - Sistema de Diagnóstico Preemptivo
+GBOC 13.2.0 - Sistema de Diagnóstico Preemptivo
 Detecta e previne problemas antes que aconteçam
 """
 

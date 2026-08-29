@@ -1,5 +1,12 @@
+/*
+==============================================================================
+GBOC System v13.2.0 Enterprise Edition
+Copyright (c) 2026 Master11BR - Todos os direitos reservados.
+Propriedade Intelectual & Direitos Autorais Registrados.
+==============================================================================
+*/
 /**
- * GBOC v10.0a - WebSocket Client
+ * GBOC v13.2.0 - WebSocket Client
  * Auto-reconnecting WebSocket with event dispatching.
  */
 class GBOCWebSocket {

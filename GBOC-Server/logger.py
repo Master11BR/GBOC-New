@@ -1,4 +1,4 @@
-﻿"""
+"""
 GBOC Server - Sistema de Logging Estruturado
 Suporta JSON logging para melhor análise em produção
 """
@@ -69,15 +69,19 @@ def setup_logger(name: str) -> logging.Logger:
     logger.addHandler(console_handler)
 
     # Handler para arquivo com rotação
-    os.makedirs(LOG_DIR, exist_ok=True)
-    file_handler = RotatingFileHandler(
-        LOG_FILE,
-        maxBytes=LOG_MAX_SIZE_MB * 1024 * 1024,
-        backupCount=LOG_BACKUP_COUNT,
-    )
-    file_handler.setLevel(LOG_LEVEL)
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
+    try:
+        os.makedirs(LOG_DIR, exist_ok=True)
+        os.makedirs(os.path.dirname(os.path.abspath(LOG_FILE)), exist_ok=True)
+        file_handler = RotatingFileHandler(
+            LOG_FILE,
+            maxBytes=LOG_MAX_SIZE_MB * 1024 * 1024,
+            backupCount=LOG_BACKUP_COUNT,
+        )
+        file_handler.setLevel(LOG_LEVEL)
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+    except Exception:
+        pass
 
     return logger
 

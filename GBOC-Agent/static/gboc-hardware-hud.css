@@ -1,0 +1,381 @@
+/* ==============================================================================
+   GBOC System v13.2.0 Enterprise Edition
+   Widget: Hardware, CPU, Disks & S.M.A.R.T. Telemetry HUD
+   ============================================================================== */
+
+.gboc-hw-hud-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(4, 9, 20, 0.65);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 99999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.gboc-hw-hud-backdrop.show {
+    display: flex;
+    opacity: 1;
+}
+
+.gboc-hw-hud-card {
+    background: linear-gradient(135deg, rgba(17, 24, 39, 0.96) 0%, rgba(10, 15, 29, 0.98) 100%);
+    border: 1px solid rgba(59, 130, 246, 0.35);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 30px rgba(59, 130, 246, 0.2);
+    border-radius: 16px;
+    width: 90%;
+    max-width: 640px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    color: #f8fafc;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    transform: scale(0.92) translateY(20px);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.gboc-hw-hud-backdrop.show .gboc-hw-hud-card {
+    transform: scale(1) translateY(0);
+}
+
+/* Header */
+.gboc-hw-hud-header {
+    padding: 16px 20px;
+    background: rgba(30, 41, 59, 0.5);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.gboc-hw-hud-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #60a5fa;
+}
+
+.gboc-hw-hud-title i {
+    font-size: 1.25rem;
+    color: #38bdf8;
+    filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.5));
+}
+
+.gboc-hw-hud-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.gboc-hw-btn-icon {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #cbd5e1;
+    border-radius: 8px;
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.gboc-hw-btn-icon:hover {
+    background: rgba(59, 130, 246, 0.25);
+    color: #fff;
+    border-color: rgba(59, 130, 246, 0.5);
+}
+
+/* Content Body */
+.gboc-hw-hud-body {
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* Thermal Comparison Hero Banner */
+.gboc-hw-thermal-hero {
+    background: linear-gradient(135deg, rgba(30, 58, 138, 0.35) 0%, rgba(15, 23, 42, 0.7) 100%);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 12px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.gboc-hw-thermal-hero-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #93c5fd;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.gboc-hw-thermal-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 10px;
+}
+
+.gboc-hw-thermal-cell {
+    background: rgba(15, 23, 42, 0.65);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.gboc-hw-thermal-cell-label {
+    font-size: 0.72rem;
+    color: #94a3b8;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    text-transform: uppercase;
+}
+
+.gboc-hw-thermal-cell-value {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #f1f5f9;
+}
+
+.gboc-hw-thermal-cell-sub {
+    font-size: 0.72rem;
+    color: #64748b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Host Badge */
+.gboc-hw-host-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(15, 23, 42, 0.6);
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    font-size: 0.84rem;
+    color: #94a3b8;
+}
+
+.gboc-hw-host-meta strong {
+    color: #f1f5f9;
+}
+
+/* Sections */
+.gboc-hw-section {
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.gboc-hw-section-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #94a3b8;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+/* CPU Widget */
+.gboc-hw-cpu-grid {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+    align-items: center;
+}
+
+.gboc-hw-cpu-name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #f1f5f9;
+}
+
+.gboc-hw-cpu-sub {
+    font-size: 0.8rem;
+    color: #64748b;
+    margin-top: 2px;
+}
+
+.gboc-hw-temp-badge {
+    background: rgba(34, 197, 94, 0.15);
+    border: 1px solid rgba(34, 197, 94, 0.4);
+    color: #4ade80;
+    padding: 5px 10px;
+    border-radius: 16px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.gboc-hw-temp-badge.high {
+    background: rgba(234, 179, 8, 0.15);
+    border-color: rgba(234, 179, 8, 0.4);
+    color: #facc15;
+}
+
+.gboc-hw-temp-badge.critical {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.5);
+    color: #f87171;
+    animation: pulseGlow 1.5s infinite;
+}
+
+/* Progress Bar */
+.gboc-hw-progress-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.gboc-hw-progress-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: #94a3b8;
+}
+
+.gboc-hw-progress-track {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    height: 8px;
+    overflow: hidden;
+    position: relative;
+}
+
+.gboc-hw-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #3b82f6, #06b6d4);
+    border-radius: 6px;
+    transition: width 0.4s ease;
+}
+
+.gboc-hw-progress-bar.warning {
+    background: linear-gradient(90deg, #eab308, #f97316);
+}
+
+.gboc-hw-progress-bar.danger {
+    background: linear-gradient(90deg, #ef4444, #dc2626);
+}
+
+/* Disks & SMART List */
+.gboc-hw-disks-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.gboc-hw-disk-item {
+    background: rgba(30, 41, 59, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.gboc-hw-disk-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.gboc-hw-disk-name {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #e2e8f0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.gboc-hw-disk-spec {
+    font-size: 0.75rem;
+    color: #64748b;
+}
+
+.gboc-hw-disk-badges {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.gboc-hw-smart-badge {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(34, 197, 94, 0.15);
+    color: #4ade80;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.gboc-hw-smart-badge.warning {
+    background: rgba(234, 179, 8, 0.15);
+    color: #facc15;
+    border-color: rgba(234, 179, 8, 0.3);
+}
+
+.gboc-hw-smart-badge.danger {
+    background: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+    border-color: rgba(239, 68, 68, 0.4);
+}
+
+/* Footer */
+.gboc-hw-hud-footer {
+    padding: 12px 20px;
+    background: rgba(15, 23, 42, 0.8);
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.78rem;
+    color: #64748b;
+}
+
+@keyframes pulseGlow {
+    0% { opacity: 0.7; transform: scale(0.98); }
+    50% { opacity: 1; transform: scale(1.02); }
+    100% { opacity: 0.7; transform: scale(0.98); }
+}

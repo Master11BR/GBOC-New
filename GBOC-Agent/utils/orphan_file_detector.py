@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 11.7c - Sistema de Detecção e Integração de Arquivos Órfãos
+GBOC 13.2.0 - Sistema de Detecção e Integração de Arquivos Órfãos
 Encontra e integra arquivos que não estão sendo utilizados pelo sistema
 """
 
@@ -28,7 +28,7 @@ class OrphanFileDetector:
     def scan_system(self) -> Dict[str, Any]:
         """Escaneia sistema completo"""
         logger.info("=" * 80)
-        logger.info("GBOC 11.7c - DETECTOR DE ARQUIVOS ÓRFÃOS")
+        logger.info("GBOC 13.2.0 - DETECTOR DE ARQUIVOS ÓRFÃOS")
         logger.info("=" * 80)
         
         # 1. Mapear todos os arquivos Python
@@ -315,7 +315,7 @@ class OrphanFileDetector:
         try:
             with open(text_file, 'w', encoding='utf-8') as f:
                 f.write("=" * 80 + "\n")
-                f.write("GBOC 11.7c - RELATÓRIO DE ARQUIVOS ÓRFÃOS\n")
+                f.write("GBOC 13.2.0 - RELATÓRIO DE ARQUIVOS ÓRFÃOS\n")
                 f.write("=" * 80 + "\n\n")
                 
                 f.write(f"Data: {report['timestamp']}\n\n")

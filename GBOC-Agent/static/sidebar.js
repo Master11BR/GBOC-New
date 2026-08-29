@@ -1,10 +1,33 @@
+/*
+==============================================================================
+GBOC System v13.2.0 Enterprise Edition
+Copyright (c) 2026 Master11BR - Todos os direitos reservados.
+Propriedade Intelectual & Direitos Autorais Registrados.
+==============================================================================
+*/
 /**
  * GBOC Agent - Unified Sidebar Module
  * Sistema unificado de sidebar para todas as páginas
  */
 
 // ============================================================================
-// 1. CONFIGURAÇÕES E CONSTANTES
+// 1. AUTO-INJEÇÃO SÍNCRONA DO LAYOUT MANAGER (GUI HORIZONTAL / VERTICAL)
+// ============================================================================
+(function autoInjectLayoutManager() {
+    if (!window.GBOCLayout && !document.getElementById('gboc-layout-manager-script')) {
+        const s = document.createElement('script');
+        s.id = 'gboc-layout-manager-script';
+        s.src = '/static/gboc-layout-manager.js';
+        if (document.head) {
+            document.head.appendChild(s);
+        } else {
+            document.addEventListener('DOMContentLoaded', () => document.head.appendChild(s));
+        }
+    }
+})();
+
+// ============================================================================
+// 2. CONFIGURAÇÕES E CONSTANTES
 // ============================================================================
 const SIDEBAR_CONFIG = {
     SELECTORS: {
@@ -58,11 +81,24 @@ class UnifiedSidebar {
 
             console.log('🔵 UnifiedSidebar: Inicializando...');
 
+            // Injetar Layout Manager (GUI Horizontal/Vertical + Botão Paleta de Cores)
+            if (!window.GBOCLayout && !document.getElementById('gboc-layout-manager-script')) {
+                const lmScript = document.createElement('script');
+                lmScript.id = 'gboc-layout-manager-script';
+                lmScript.src = '/static/gboc-layout-manager.js';
+                document.head.appendChild(lmScript);
+            }
+
             // Carregar HTML do sidebar
             await this._loadSidebarHtml();
 
             // Injetar sidebar no DOM
             this._injectSidebar();
+
+            // Inicializar grupos colapsáveis e autenticação da sidebar
+            if (typeof window.initNavGroups === 'function') {
+                window.initNavGroups();
+            }
 
             // Configurar navegação ativa
             this._updateActiveLink();
@@ -124,19 +160,26 @@ class UnifiedSidebar {
      * @private
      */
     _injectSidebar() {
-        const appDiv = document.querySelector(SIDEBAR_CONFIG.SELECTORS.APP);
+        const appDiv = document.querySelector(SIDEBAR_CONFIG.SELECTORS.APP) ||
+                       document.querySelector('.app-layout') ||
+                       document.querySelector('#sidebar-container') ||
+                       document.body;
+
         if (!appDiv) {
-            throw new Error(`Elemento ${SIDEBAR_CONFIG.SELECTORS.APP} não encontrado`);
+            throw new Error(`Nenhum container válido para o sidebar foi encontrado.`);
         }
 
         // Remover sidebar existente se houver
-        const existingSidebar = appDiv.querySelector(SIDEBAR_CONFIG.SELECTORS.SIDEBAR);
+        const existingSidebar = document.querySelector(SIDEBAR_CONFIG.SELECTORS.SIDEBAR);
         if (existingSidebar) {
             existingSidebar.remove();
         }
 
-        // Inserir novo sidebar no início do container principal
-        appDiv.insertAdjacentHTML('afterbegin', this._sidebarHtml);
+        if (appDiv.id === 'sidebar-container') {
+            appDiv.innerHTML = this._sidebarHtml;
+        } else {
+            appDiv.insertAdjacentHTML('afterbegin', this._sidebarHtml);
+        }
         console.log('✅ Sidebar injetado no DOM');
     }
 
@@ -238,48 +281,30 @@ class UnifiedSidebar {
 
         const fallbackHtml = `
         <aside class="sidebar">
-            <div class="sidebar-header">
-                <a href="/" class="logo">
-                    <i class="fas fa-shield-alt logo-icon"></i> GBOC Agent
-                </a>
-            </div>
-            <nav class="nav">
-                <a href="/" class="nav-link ${this.currentPage === 'dashboard' ? 'active' : ''}">
-                    <i class="fas fa-home nav-icon"></i> Dashboard
-                </a>
-                <a href="/repositories.html" class="nav-link ${this.currentPage === 'repositories' ? 'active' : ''}">
-                    <i class="fas fa-server nav-icon"></i> Repositórios
-                </a>
-                <a href="/tasks.html" class="nav-link ${this.currentPage === 'tasks' ? 'active' : ''}">
-                    <i class="fas fa-tasks nav-icon"></i> Tarefas
-                </a>
-                <a href="/restore.html" class="nav-link ${this.currentPage === 'restore' ? 'active' : ''}">
-                    <i class="fas fa-undo nav-icon"></i> Restauração
-                </a>
-                <a href="/duplicati-native.html" class="nav-link">
-                    <i class="fas fa-plug nav-icon"></i> Duplicati Nativo
-                </a>
-                <a href="/logs.html" class="nav-link ${this.currentPage === 'logs' ? 'active' : ''}">
-                    <i class="fas fa-file-alt nav-icon"></i> Logs
-                </a>
-                <a href="/overview.html" class="nav-link ${this.currentPage === 'overview' ? 'active' : ''}">
-                    <i class="fas fa-chart-line nav-icon"></i> Overview
-                </a>
-                <a href="/statistics.html" class="nav-link ${this.currentPage === 'statistics' ? 'active' : ''}">
-                    <i class="fas fa-chart-bar nav-icon"></i> Estatísticas
-                </a>
-                <a href="/settings.html" class="nav-link ${this.currentPage === 'settings' ? 'active' : ''}">
-                    <i class="fas fa-cogs nav-icon"></i> Configurações
-                </a>
-                <a href="#" class="nav-link" onclick="gbocLogout(); return false;">
-                    <i class="fas fa-sign-out-alt nav-icon"></i> Sair
-                </a>
+            <nav class="nav" style="padding-top:16px">
+                <a href="/index.html" class="nav-link ${this.currentPage === 'dashboard' ? 'active' : ''}"><i class="fas fa-home nav-icon"></i> <span>Dashboard Agente</span></a>
+                <div class="nav-group" id="fb-grp-tasks">
+                    <button class="nav-group-header" onclick="toggleNavGroup('fb-grp-tasks')"><span><i class="fas fa-tasks nav-icon"></i> Tarefas & Motores</span><i class="fas fa-chevron-down nav-group-arrow"></i></button>
+                    <div class="nav-group-items open" id="items-fb-grp-tasks">
+                        <a href="/tasks.html" class="nav-link nav-sub"><i class="fas fa-list-check nav-icon"></i> <span>Tarefas de Backup</span></a>
+                        <a href="/repositories.html" class="nav-link nav-sub"><i class="fas fa-database nav-icon"></i> <span>Repositórios Locais</span></a>
+                        <a href="/restore.html" class="nav-link nav-sub"><i class="fas fa-undo nav-icon"></i> <span>Assistente Restauração</span></a>
+                        <a href="/engines.html" class="nav-link nav-sub"><i class="fas fa-cogs nav-icon"></i> <span>Motores Nativos</span></a>
+                    </div>
+                </div>
             </nav>
         </aside>`;
 
-        const appDiv = document.querySelector(SIDEBAR_CONFIG.SELECTORS.APP);
+        const appDiv = document.querySelector(SIDEBAR_CONFIG.SELECTORS.APP) ||
+                       document.querySelector('.app-layout') ||
+                       document.querySelector('#sidebar-container') ||
+                       document.body;
         if (appDiv) {
-            appDiv.insertAdjacentHTML('afterbegin', fallbackHtml);
+            if (appDiv.id === 'sidebar-container') {
+                appDiv.innerHTML = fallbackHtml;
+            } else {
+                appDiv.insertAdjacentHTML('afterbegin', fallbackHtml);
+            }
             console.log('✅ Sidebar de fallback criado');
         }
     }
@@ -427,13 +452,163 @@ window.gbocFormatDateTime = function(value) {
     }
 };
 
-// ============================================================================
-// 4. INICIALIZAÇÃO
-// ============================================================================
+/**
+ * Função global para alternar o tema do sistema (Dark / Light)
+ */
+window.toggleTheme = function() {
+    const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem(SIDEBAR_CONFIG.STORAGE.THEME, newTheme);
+    window.updateThemeButton(newTheme);
+};
+
+window.updateThemeButton = function(theme) {
+    const iconEl = document.getElementById(SIDEBAR_CONFIG.SELECTORS.THEME_ICON);
+    const labelEl = document.getElementById(SIDEBAR_CONFIG.SELECTORS.THEME_LABEL);
+    if (iconEl) {
+        iconEl.className = theme === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
+    }
+    if (labelEl) {
+        labelEl.innerText = theme === 'dark' ? 'Tema Escuro' : 'Tema Claro';
+    }
+};
+
+/**
+ * Funções globais de navegação colapsável da Sidebar (Grupos de Menu)
+ */
+window.initNavGroups = function() {
+    const groups = ['grp-backup','grp-virt','grp-security','grp-monitor','grp-system'];
+    const cur = window.location.pathname;
+    groups.forEach(grpId => {
+        const items = document.getElementById('items-' + grpId);
+        const arrow = document.getElementById('arrow-' + grpId);
+        if (!items) return;
+        const hasActive = Array.from(items.querySelectorAll('a')).some(a => {
+            const href = a.getAttribute('href');
+            return href && cur.startsWith(href) && href !== '/';
+        });
+        const savedOpen = localStorage.getItem('gboc-nav-' + grpId);
+        const shouldOpen = hasActive || savedOpen === 'open';
+        if (shouldOpen) {
+            items.classList.add('open');
+            if (arrow) arrow.style.transform = 'rotate(180deg)';
+        }
+    });
+};
+
+window.toggleNavGroup = function(grpId) {
+    const items = document.getElementById('items-' + grpId);
+    const arrow = document.getElementById('arrow-' + grpId);
+    if (!items) return;
+    const isOpen = items.classList.toggle('open');
+    if (arrow) arrow.style.transform = isOpen ? 'rotate(180deg)' : '';
+    localStorage.setItem('gboc-nav-' + grpId, isOpen ? 'open' : 'closed');
+};
+
+/**
+ * Funções globais de autenticação no Sidebar
+ */
+window.gbocSetupSidebarAuth = function() {
+    const token = localStorage.getItem('gboc_token');
+    const user = localStorage.getItem('gboc_user');
+    if(user){
+        try {
+            const u = JSON.parse(user);
+            _gbocShowSidebarUser(u);
+        } catch(e){}
+    } else if(token){
+        const btn = document.getElementById('logoutBtn');
+        if(btn) btn.style.display = 'block';
+    }
+    fetch('/api/auth/status').then(r => r.json()).then(data => {
+        if(data.authenticated && data.user){
+            _gbocShowSidebarUser(data.user);
+        } else if(data.auth_enabled){
+            const btn = document.getElementById('logoutBtn');
+            if(btn) btn.style.display = 'block';
+        }
+    }).catch(()=>{
+        if(token){
+            const btn = document.getElementById('logoutBtn');
+            if(btn) btn.style.display = 'block';
+        }
+    });
+};
+
+function _gbocShowSidebarUser(u){
+    const el = document.getElementById('sidebarUsername');
+    const info = document.getElementById('sidebarUserInfo');
+    const btn = document.getElementById('logoutBtn');
+    if(el) el.textContent = u.display_name || u.username || '';
+    if(info) info.style.display = 'block';
+    if(btn) btn.style.display = 'block';
+}
+
+window.gbocLogout = async function(){
+    if(!confirm('Deseja realmente sair?')) return;
+    try {
+        await fetch('/api/auth/logout', {method:'POST'});
+    } catch(e){}
+    localStorage.removeItem('gboc_token');
+    localStorage.removeItem('gboc_user');
+    document.cookie = 'gboc_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+    window.location.href = '/login.html';
+};
+
+/**
+ * Unifica o indicador de status de conexão do cabeçalho em todas as páginas do sistema
+ */
+window.gbocSyncConnectionStatus = async function() {
+    const dot = document.getElementById('wsDot');
+    const label = document.getElementById('wsLabel');
+
+    try {
+        const res = await fetch('/api/system/info');
+        if (res.ok) {
+            const info = await res.json();
+            const ver = info.gboc_version || '13.2.0';
+
+            if (dot && label) {
+                dot.className = 'ws-dot on';
+                dot.style.background = 'var(--success)';
+                dot.style.display = 'inline-block';
+                dot.style.width = '8px';
+                dot.style.height = '8px';
+                dot.style.borderRadius = '50%';
+                dot.style.marginRight = '4px';
+
+                label.textContent = 'v' + ver + ' • Online (Conectado)';
+                label.style.color = 'var(--success)';
+                label.style.fontWeight = '600';
+                label.style.fontSize = '.85em';
+            }
+
+            const appVerEl = document.getElementById('app-version');
+            if (appVerEl) {
+                appVerEl.textContent = 'v' + ver;
+            }
+        } else {
+            throw new Error('API Inacessível');
+        }
+    } catch(e) {
+        if (dot && label) {
+            dot.className = 'ws-dot off';
+            dot.style.background = 'var(--danger)';
+            label.textContent = 'Offline (Desconectado)';
+            label.style.color = 'var(--danger)';
+        }
+    }
+};
 
 // Inicialização automática quando DOM estiver pronto
 document.addEventListener('DOMContentLoaded', async function() {
+    const savedTheme = localStorage.getItem(SIDEBAR_CONFIG.STORAGE.THEME) || 'dark';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    window.updateThemeButton(savedTheme);
     await window.unifiedSidebar.initialize();
+    window.gbocSyncConnectionStatus();
+    setInterval(window.gbocSyncConnectionStatus, 10000);
 });
 
 console.log('✅ UnifiedSidebar module loaded');

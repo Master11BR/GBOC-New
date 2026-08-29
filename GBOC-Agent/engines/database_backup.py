@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 11.7c - Database Backup Engine
+GBOC 13.2.0 - Database Backup Engine
 Supports PostgreSQL (pg_dump), MySQL (mysqldump), SQLite (file copy).
 Backup, restore, test-restore, listing.
 """

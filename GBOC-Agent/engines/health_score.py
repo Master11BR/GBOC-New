@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 11.7c - Módulo Unificado de Health Score
+GBOC 13.2.0 - Módulo Unificado de Health Score
 Cálculo padronizado de saúde do sistema usado em todos os endpoints.
 
 Pesos:

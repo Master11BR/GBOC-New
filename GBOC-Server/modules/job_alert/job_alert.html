@@ -1,0 +1,44 @@
+<!-- GBOC Server v13.2.0 — Fragmento de Jobs com Falha & Monitor de Alertas -->
+<div class="panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:12px">
+        <h3><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i> Central de Jobs com Falha & Monitor de Alertas</h3>
+        <div style="display:flex;gap:8px">
+            <button class="btn btn-warning" onclick="testServerAlertChannel()"><i class="fas fa-paper-plane"></i> Testar Alertas</button>
+            <button class="btn btn-primary" onclick="loadServerJobAlertData()"><i class="fas fa-sync-alt"></i> Atualizar</button>
+        </div>
+    </div>
+
+    <div class="kpi-grid" style="margin-bottom:20px">
+        <div class="kpi-card">
+            <div class="kpi-header"><span>Jobs com Falha</span><div class="kpi-icon red"><i class="fas fa-exclamation-circle"></i></div></div>
+            <div class="kpi-value" id="srv-job-failed-count">0</div>
+            <div class="kpi-sub">Falhas ativas</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-header"><span>Escalações</span><div class="kpi-icon orange"><i class="fas fa-bell"></i></div></div>
+            <div class="kpi-value" id="srv-job-escalated-count">0</div>
+            <div class="kpi-sub">Notificações enviadas</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-header"><span>Taxa de Resolução</span><div class="kpi-icon green"><i class="fas fa-check-double"></i></div></div>
+            <div class="kpi-value" id="srv-job-resolved-rate">100%</div>
+            <div class="kpi-sub">Recuperados</div>
+        </div>
+    </div>
+
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Status</th>
+                <th>ID da Tarefa / Job</th>
+                <th>Agente Origem</th>
+                <th>Causa do Erro</th>
+                <th>Retentativas</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody id="table-server-job-failures">
+            <tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Carregando falhas de jobs...</td></tr>
+        </tbody>
+    </table>
+</div>

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 11.7c - Configuration Export/Import API
+GBOC 13.2.0 - Configuration Export/Import API
 Export/import system configuration, versioned snapshots, diff between configs.
 """
 

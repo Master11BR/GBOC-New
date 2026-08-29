@@ -1,4 +1,11 @@
 /*
+==============================================================================
+GBOC System v13.2.0 Enterprise Edition
+Copyright (c) 2026 Master11BR - Todos os direitos reservados.
+Propriedade Intelectual & Direitos Autorais Registrados.
+==============================================================================
+*/
+/*
  * 🔔 GBOC Agent - Toast Notifications (BLINDADO)
  * - Não quebra se carregado no <head> (espera document.body existir)
  * - Cria showToast() global e compatível com legado

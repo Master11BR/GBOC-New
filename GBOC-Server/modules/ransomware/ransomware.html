@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ransomware Guardian - GBOC Server</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/gboc-themes.css">
+    <link rel="stylesheet" href="/static/gboc-layout.css">
+    <script src="/static/gboc-layout-manager.js"></script>
+    <script src="/modules/ransomware/ransomware.js"></script>
+    <style>
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; text-align: center; }
+        .stat-card .val { font-size: 1.8em; font-weight: 700; }
+        .stat-card .lbl { font-size: .82em; color: var(--text-muted); margin-top: 4px; }
+    </style>
+</head>
+<body class="layout-vertical">
+    <main class="main-content" style="padding:24px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+            <div>
+                <h2 style="font-size:1.4em;margin:0;display:flex;align-items:center;gap:10px">
+                    <i class="fas fa-shield-virus" style="color:var(--danger)"></i> Ransomware Guardian — Proteção Anti-Ransomware &amp; WORM
+                </h2>
+                <div style="font-size:.85em;color:var(--text-muted);margin-top:2px" id="rw-status-label">SENTINEL ACTIVE — Carregando telemetria real...</div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button class="btn btn-secondary" onclick="syncRansomwareCentral()"><i class="fas fa-database"></i> Sincronizar Agentes</button>
+                <button class="btn btn-warning" onclick="runGuardianAIDiagnostic()"><i class="fas fa-brain"></i> Diagnóstico IA</button>
+                <button class="btn btn-primary" onclick="loadServerRansomwareData()"><i class="fas fa-sync-alt"></i> Atualizar Telemetria</button>
+            </div>
+        </div>
+
+        <!-- KPI CARDS REAIS -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="val" id="rw-kpi-protected" style="color:var(--success)">0</div>
+                <div class="lbl">Agentes Protegidos</div>
+            </div>
+            <div class="stat-card">
+                <div class="val" id="rw-kpi-canaries" style="color:var(--primary)">0</div>
+                <div class="lbl">Canary Files (Honeyfiles)</div>
+            </div>
+            <div class="stat-card">
+                <div class="val" id="rw-kpi-compromised" style="color:var(--danger)">0</div>
+                <div class="lbl">Canaries Comprometidos</div>
+            </div>
+            <div class="stat-card">
+                <div class="val" id="rw-kpi-worm" style="color:var(--success)">ATIVO</div>
+                <div class="lbl">Trava WORM Imutável</div>
+            </div>
+            <div class="stat-card">
+                <div class="val" id="rw-kpi-central-events" style="color:var(--primary)">0</div>
+                <div class="lbl">Eventos Centralizados</div>
+            </div>
+            <div class="stat-card">
+                <div class="val" id="rw-kpi-central-incidents" style="color:var(--warning)">0</div>
+                <div class="lbl">Incidentes Centralizados</div>
+            </div>
+        </div>
+
+        <div class="panel" style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:24px">
+            <h3 style="margin-bottom:10px;font-size:1.05em;display:flex;align-items:center;gap:8px">
+                <i class="fas fa-brain" style="color:var(--warning)"></i> Diagnóstico IA Guardian (Híbrido)
+            </h3>
+            <div id="rw-ai-summary" style="font-size:.9em;color:var(--text-muted)">Aguardando execução do diagnóstico IA...</div>
+        </div>
+
+        <!-- STATUS DA PROTEÇÃO LOCAL -->
+        <div class="panel" style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:24px">
+            <h3 style="margin-bottom:16px;font-size:1.05em;display:flex;align-items:center;gap:8px">
+                <i class="fas fa-shield-alt" style="color:var(--primary)"></i> Status da Proteção Integrada (Host Local)
+            </h3>
+            <div id="local-protection-card" class="stat-card" style="text-align:left; display:flex; justify-content:space-between; align-items:center; transition: all 0.3s ease;">
+                <div>
+                    <h4 style="margin:0; font-size:1.1em" id="av-name">Carregando...</h4>
+                    <p style="margin:4px 0 0; font-size:0.85em; color:var(--text-muted)" id="av-status-text">Verificando serviço de antivírus...</p>
+                </div>
+                <i class="fas fa-circle-notch fa-spin" id="av-icon" style="font-size:2em; color:var(--text-muted)"></i>
+            </div>
+            
+            <h4 style="margin-top:20px; font-size:0.95em; margin-bottom:10px"><i class="fas fa-clipboard-list"></i> Últimos Eventos de Segurança (Log do Sistema)</h4>
+            <table class="data-table" style="width:100%">
+                <thead>
+                    <tr>
+                        <th style="width:200px">Data / Hora</th>
+                        <th style="width:100px">Event ID</th>
+                        <th>Mensagem (Security Log)</th>
+                    </tr>
+                </thead>
+                <tbody id="local-events-table">
+                    <tr><td colspan="3" style="text-align:center;color:var(--text-muted)">Carregando eventos de segurança local...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- TABELA DE AGENTES -->
+        <div class="panel" style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:24px">
+            <h3 style="margin-bottom:16px;font-size:1.05em;display:flex;align-items:center;gap:8px">
+                <i class="fas fa-server" style="color:var(--primary)"></i> Telemetria de Canários por Agente Remoto
+            </h3>
+            <table class="data-table" style="width:100%">
+                <thead>
+                    <tr>
+                        <th>Agente</th>
+                        <th>IP</th>
+                        <th>Status Proteção</th>
+                        <th>Canários Ativos</th>
+                        <th>Comprometidos</th>
+                        <th>Nível de Ameaça</th>
+                        <th>Última Varredura</th>
+                    </tr>
+                </thead>
+                <tbody id="rw-agents-table">
+                    <tr><td colspan="7" style="text-align:center;color:var(--text-muted)">Carregando status anti-ransomware dos agentes...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- TABELA DE LOGS E EVENTOS DE RANSOMWARE -->
+        <div class="panel" style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px">
+            <h3 style="margin-bottom:16px;font-size:1.05em;display:flex;align-items:center;gap:8px">
+                <i class="fas fa-list-alt" style="color:var(--warning)"></i> Eventos de Segurança &amp; Varreduras Anti-Ransomware
+            </h3>
+            <table class="data-table" style="width:100%">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Tipo Evento</th>
+                        <th>Origem</th>
+                        <th>Mensagem</th>
+                        <th>Data / Hora</th>
+                    </tr>
+                </thead>
+                <tbody id="rw-events-table">
+                    <tr><td colspan="5" style="text-align:center;color:var(--text-muted)">Carregando eventos de segurança...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+</body>
+</html>

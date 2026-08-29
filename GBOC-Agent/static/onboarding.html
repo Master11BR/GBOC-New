@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GBOC Agent 13.2.0 - Assistente de Configuração</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/gboc-themes.css">
+    <link rel="stylesheet" href="/static/gboc-layout.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="/static/gboc-layout-manager.js"></script>
+    <script src="/static/sidebar.js"></script>
+    <style>
+        body { background:var(--sidebar-bg); }
+        .onboarding-wrap { max-width:720px; margin:40px auto; padding:0 20px 60px; }
+
+        /* Progress Steps */
+        .ob-steps { display:flex; align-items:center; justify-content:center; gap:0; margin:32px 0 40px; }
+        .ob-step { flex:1; display:flex; flex-direction:column; align-items:center; gap:8px; position:relative; }
+        .ob-step:not(:last-child)::after { content:''; position:absolute; top:20px; left:calc(50% + 22px); right:calc(-50% + 22px); height:2px; background:var(--border); z-index:0; transition:background 0.4s; }
+        .ob-step.done:not(:last-child)::after { background:var(--primary); }
+        .ob-num { width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:0.9em; border:2px solid var(--border); background:var(--bg-input); color:var(--text-muted); z-index:1; transition:all 0.3s; }
+        .ob-step.active .ob-num { background:var(--primary); color:#fff; border-color:var(--primary); box-shadow:0 0 0 5px rgba(99,102,241,0.2); }
+        .ob-step.done .ob-num { background:rgba(72,187,120,0.2); border-color:#48bb78; color:#48bb78; }
+        .ob-label { font-size:0.72em; text-align:center; color:var(--text-muted); font-weight:600; }
+        .ob-step.active .ob-label { color:var(--primary); }
+        .ob-step.done .ob-label { color:#48bb78; }
+
+        /* Panels */
+        .ob-panel { display:none; animation:fadeUp 0.35s ease; }
+        .ob-panel.active { display:block; }
+        @keyframes fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+
+        .ob-card { background:var(--bg-input); border:1px solid var(--border); border-radius:16px; padding:28px 32px; }
+        .ob-icon { font-size:2.5em; margin-bottom:16px; display:block; }
+        .ob-card h2 { font-size:1.3em; margin:0 0 8px; }
+        .ob-card .subtitle { color:var(--text-muted); font-size:0.88em; margin-bottom:24px; }
+
+        .check-item { display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.05); }
+        .check-item:last-child { border-bottom:none; }
+        .check-icon { width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.8em; flex-shrink:0; }
+        .check-ok { background:rgba(72,187,120,0.15); color:#48bb78; }
+        .check-warn { background:rgba(237,137,54,0.15); color:#ed8936; }
+        .check-err { background:rgba(245,101,101,0.15); color:#f56565; }
+
+        .action-btns { display:flex; justify-content:space-between; align-items:center; margin-top:28px; }
+    </style>
+</head>
+<body>
+<div class="onboarding-wrap">
+    <!-- Logo Header -->
+    <div style="text-align:center;margin-bottom:8px">
+        <a href="/" style="display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:var(--text)">
+            <i class="fas fa-shield-alt" style="font-size:2em;color:var(--primary)"></i>
+            <span style="font-size:1.5em;font-weight:800">GBOC 13.2.0</span>
+        </a>
+        <p style="color:var(--text-muted);font-size:0.85em;margin:6px 0 0">Assistente de Configuração Inicial</p>
+    </div>
+
+    <!-- Steps -->
+    <div class="ob-steps" id="ob-steps">
+        <div class="ob-step active" data-step="1"><div class="ob-num">1</div><div class="ob-label">Verificação<br>do Sistema</div></div>
+        <div class="ob-step" data-step="2"><div class="ob-num">2</div><div class="ob-label">Servidor<br>Central</div></div>
+        <div class="ob-step" data-step="3"><div class="ob-num">3</div><div class="ob-label">Primeiro<br>Repositório</div></div>
+        <div class="ob-step" data-step="4"><div class="ob-num">4</div><div class="ob-label">Canal de<br>Alerta</div></div>
+        <div class="ob-step" data-step="5"><div class="ob-num"><i class="fas fa-check"></i></div><div class="ob-label">Concluído</div></div>
+    </div>
+
+    <!-- ── STEP 1: System Check ──────────────────────────────────── -->
+    <div class="ob-panel active" id="ob-panel-1">
+        <div class="ob-card">
+            <span class="ob-icon">🔍</span>
+            <h2>Verificação do Ambiente</h2>
+            <p class="subtitle">Verificando os pré-requisitos e ferramentas de backup disponíveis neste sistema.</p>
+            <div id="sys-check-list">
+                <div style="text-align:center;padding:20px;color:var(--text-muted)"><i class="fas fa-spinner fa-spin"></i> Verificando...</div>
+            </div>
+        </div>
+        <div class="action-btns">
+            <span></span>
+            <button class="btn btn-primary" id="btn1-next" onclick="goObStep(2)" disabled>Próximo <i class="fas fa-arrow-right"></i></button>
+        </div>
+    </div>
+
+    <!-- ── STEP 2: Central Server ──────────────────────────────────── -->
+    <div class="ob-panel" id="ob-panel-2">
+        <div class="ob-card">
+            <span class="ob-icon">🖥️</span>
+            <h2>Conectar ao Servidor Central GBOC</h2>
+            <p class="subtitle">O servidor central centraliza o gerenciamento de múltiplos agentes. Se você está testando localmente, pode pular esta etapa.</p>
+            <div class="form-group">
+                <label>URL do Servidor Central</label>
+                <input type="text" id="ob-server-url" placeholder="http://192.168.1.100:9300" value="">
+            </div>
+            <div class="form-group">
+                <label>Chave de API do Agente (se configurada)</label>
+                <input type="password" id="ob-server-apikey" placeholder="Deixe em branco se não configurado">
+            </div>
+            <div id="ob-server-test-result" style="display:none;padding:10px;border-radius:8px;margin-top:10px;font-size:0.85em"></div>
+            <button class="btn btn-secondary" onclick="testServerConnection()" style="margin-top:8px">
+                <i class="fas fa-plug"></i> Testar Conexão
+            </button>
+        </div>
+        <div class="action-btns">
+            <button class="btn btn-secondary" onclick="goObStep(1)"><i class="fas fa-arrow-left"></i> Voltar</button>
+            <div style="display:flex;gap:10px">
+                <button class="btn btn-secondary" onclick="goObStep(3)">Pular esta etapa</button>
+                <button class="btn btn-primary" id="btn2-next" onclick="saveServerAndNext()">Salvar & Próximo <i class="fas fa-arrow-right"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── STEP 3: First Repository ─────────────────────────────────── -->
+    <div class="ob-panel" id="ob-panel-3">
+        <div class="ob-card">
+            <span class="ob-icon">📦</span>
+            <h2>Criar Primeiro Repositório de Backup</h2>
+            <p class="subtitle">Um repositório é o destino onde seus backups serão armazenados. Comece com um repositório local.</p>
+            <div class="form-group">
+                <label>Nome do Repositório</label>
+                <input type="text" id="ob-repo-name" placeholder="ex: Backup_Local_Principal">
+            </div>
+            <div class="form-group">
+                <label>Caminho de Destino</label>
+                <input type="text" id="ob-repo-path" placeholder="ex: D:\Backups\GBOC ou /mnt/backup">
+            </div>
+            <div class="form-group">
+                <label>Motor de Backup</label>
+                <select id="ob-repo-engine">
+                    <option value="restic">Restic (recomendado — rápido, incremental, deduplicação)</option>
+                    <option value="kopia">Kopia (excelente para nuvem e objetos S3)</option>
+                    <option value="duplicati">Duplicati (compatível com múltiplos destinos)</option>
+                </select>
+            </div>
+            <div id="ob-repo-result" style="display:none;padding:10px;border-radius:8px;margin-top:10px;font-size:0.85em"></div>
+        </div>
+        <div class="action-btns">
+            <button class="btn btn-secondary" onclick="goObStep(2)"><i class="fas fa-arrow-left"></i> Voltar</button>
+            <div style="display:flex;gap:10px">
+                <button class="btn btn-secondary" onclick="goObStep(4)">Pular</button>
+                <button class="btn btn-primary" onclick="createFirstRepo()"><i class="fas fa-plus"></i> Criar Repositório</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── STEP 4: Alert Channel ─────────────────────────────────────── -->
+    <div class="ob-panel" id="ob-panel-4">
+        <div class="ob-card">
+            <span class="ob-icon">🔔</span>
+            <h2>Configurar Canal de Alerta</h2>
+            <p class="subtitle">Receba notificações imediatas quando um backup falhar. Configure pelo menos um canal para garantir que você seja alertado.</p>
+            <div style="display:grid;gap:10px;margin-bottom:20px">
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px;border-radius:10px;border:1px solid var(--border);transition:border-color 0.2s" id="card-email" onclick="selectAlertChannel('email')">
+                    <input type="radio" name="alert-ch" value="email"> <i class="fas fa-envelope" style="color:#6366f1"></i> <span>Email SMTP</span>
+                </label>
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px;border-radius:10px;border:1px solid var(--border);transition:border-color 0.2s" id="card-telegram" onclick="selectAlertChannel('telegram')">
+                    <input type="radio" name="alert-ch" value="telegram"> <i class="fab fa-telegram" style="color:#38b2ac"></i> <span>Telegram Bot</span>
+                </label>
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px;border-radius:10px;border:1px solid var(--border);transition:border-color 0.2s" id="card-webhook" onclick="selectAlertChannel('webhook')">
+                    <input type="radio" name="alert-ch" value="webhook"> <i class="fas fa-globe" style="color:#ed8936"></i> <span>Webhook HTTP (Slack, Teams, etc.)</span>
+                </label>
+            </div>
+            <div id="ob-channel-form"></div>
+        </div>
+        <div class="action-btns">
+            <button class="btn btn-secondary" onclick="goObStep(3)"><i class="fas fa-arrow-left"></i> Voltar</button>
+            <div style="display:flex;gap:10px">
+                <button class="btn btn-secondary" onclick="goObStep(5)">Pular</button>
+                <button class="btn btn-primary" onclick="saveAlertAndNext()"><i class="fas fa-save"></i> Salvar & Finalizar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── STEP 5: Done ──────────────────────────────────────────────── -->
+    <div class="ob-panel" id="ob-panel-5">
+        <div class="ob-card" style="text-align:center;padding:48px 32px">
+            <div style="font-size:4em;margin-bottom:16px">🎉</div>
+            <h2 style="font-size:1.6em;color:#48bb78">GBOC Agente Configurado!</h2>
+            <p style="color:var(--text-muted);margin-bottom:28px;font-size:0.9em">Seu agente GBOC 13.2.0 está pronto para proteger seus dados.<br>Acesse o dashboard para criar suas primeiras tarefas de backup.</p>
+            <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+                <a href="/" class="btn btn-primary btn-lg"><i class="fas fa-home"></i> Ir para o Dashboard</a>
+                <a href="/tasks.html" class="btn btn-secondary"><i class="fas fa-plus"></i> Criar Primeira Tarefa</a>
+                <a href="/repositories.html" class="btn btn-secondary"><i class="fas fa-server"></i> Ver Repositórios</a>
+            </div>
+            <div style="margin-top:24px;padding:14px;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:10px;font-size:0.82em;color:var(--text-muted)">
+                <i class="fas fa-robot" style="color:var(--primary)"></i> Precisa de ajuda? O <strong style="color:var(--primary)">GBOC Copilot</strong> está disponível em qualquer tela para responder dúvidas sobre configuração e uso.
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const SYSTEMS_TO_CHECK = [
+    { name: 'Restic', check: () => fetch(window.GBOC_API_BASE + '/api/v1/diagnostic/binary?name=restic'), icon: 'fa-check', label: 'Motor de backup Restic' },
+    { name: 'Kopia', check: () => fetch(window.GBOC_API_BASE + '/api/v1/diagnostic/binary?name=kopia'), icon: 'fa-check', label: 'Motor de backup Kopia' },
+    { name: 'Duplicati', check: () => fetch(window.GBOC_API_BASE + '/api/v1/diagnostic/binary?name=duplicati'), icon: 'fa-check', label: 'Motor Duplicati' },
+    { name: 'Python', check: () => fetch(window.GBOC_API_BASE + '/api/v1/diagnostic/binary?name=python'), icon: 'fa-check', label: 'Python Runtime' },
+];
+
+document.addEventListener('DOMContentLoaded', () => {
+    const saved = localStorage.getItem('gboc-theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', saved);
+    runSystemCheck();
+});
+
+function goObStep(n) {
+    document.querySelectorAll('.ob-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('ob-panel-' + n).classList.add('active');
+    document.querySelectorAll('.ob-step').forEach((el, i) => {
+        el.classList.remove('active','done');
+        if (i + 1 < n) el.classList.add('done');
+        if (i + 1 === n) el.classList.add('active');
+    });
+    window.scrollTo(0, 0);
+}
+
+async function runSystemCheck() {
+    const list = document.getElementById('sys-check-list');
+    list.innerHTML = '';
+
+    // Check connectivity to agent itself
+    const checks = [
+        { label: 'Servidor do Agente GBOC', url: '/api/v1/system/health', critical: true },
+        { label: 'Banco de Dados PostgreSQL', url: '/api/v1/diagnostic/db', critical: true },
+        { label: 'Restic (motor de backup)', url: '/api/v1/repositories/engines', critical: false },
+    ];
+
+    let allOk = true;
+    for (const chk of checks) {
+        let ok = false;
+        let msg = '';
+        try {
+            const r = await fetch(chk.url);
+            const d = await r.json();
+            ok = r.ok && (d.status === 'success' || d.healthy === true || d.ok === true || Array.isArray(d.engines));
+            msg = d.message || (ok ? 'OK' : 'Verificar configuração');
+        } catch(e) {
+            msg = 'Sem resposta: ' + e.message;
+        }
+        if (!ok && chk.critical) allOk = false;
+        const cls = ok ? 'check-ok' : (chk.critical ? 'check-err' : 'check-warn');
+        const ic = ok ? 'fa-check' : (chk.critical ? 'fa-times' : 'fa-exclamation');
+        list.innerHTML += `<div class="check-item">
+            <div class="check-icon ${cls}"><i class="fas ${ic}"></i></div>
+            <div><div style="font-weight:600;font-size:0.88em">${chk.label}</div>
+            <div style="font-size:0.75em;color:var(--text-muted)">${msg}</div></div>
+        </div>`;
+    }
+
+    document.getElementById('btn1-next').disabled = false;
+}
+
+async function testServerConnection() {
+    const url = document.getElementById('ob-server-url').value.trim();
+    const res = document.getElementById('ob-server-test-result');
+    if (!url) { res.style.display='block'; res.style.background='rgba(245,101,101,0.1)'; res.style.color='#f56565'; res.textContent='Informe a URL do servidor.'; return; }
+    res.style.display='block'; res.style.background='var(--bg-input)'; res.style.color='var(--text-muted)'; res.innerHTML='<i class="fas fa-spinner fa-spin"></i> Testando conexão...';
+    try {
+        const r = await fetch(`${url}/api/v1/health`, { signal: AbortSignal.timeout(5000) });
+        const d = await r.json();
+        res.style.background='rgba(72,187,120,0.1)'; res.style.color='#48bb78';
+        res.innerHTML='<i class="fas fa-check-circle"></i> Conexão com o servidor estabelecida!';
+    } catch(e) {
+        res.style.background='rgba(245,101,101,0.1)'; res.style.color='#f56565';
+        res.innerHTML=`<i class="fas fa-times-circle"></i> Não foi possível conectar: ${e.message}`;
+    }
+}
+
+function saveServerAndNext() {
+    const url = document.getElementById('ob-server-url').value.trim();
+    if (url) {
+        // Save to server config API
+        fetch(window.GBOC_API_BASE + '/api/v1/config/server-url', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({server_url: url}) }).catch(()=>{});
+    }
+    goObStep(3);
+}
+
+async function createFirstRepo() {
+    const name = document.getElementById('ob-repo-name').value.trim();
+    const path = document.getElementById('ob-repo-path').value.trim();
+    const engine = document.getElementById('ob-repo-engine').value;
+    const res = document.getElementById('ob-repo-result');
+
+    if (!name || !path) {
+        res.style.display='block'; res.style.background='rgba(245,101,101,0.1)'; res.style.color='#f56565';
+        res.textContent='Preencha o nome e o caminho do repositório.'; return;
+    }
+
+    try {
+        const r = await fetch(window.GBOC_API_BASE + '/api/v1/repositories', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, path, engine, status:'active'})});
+        const d = await r.json();
+        if (r.ok) {
+            res.style.display='block'; res.style.background='rgba(72,187,120,0.1)'; res.style.color='#48bb78';
+            res.innerHTML=`<i class="fas fa-check-circle"></i> Repositório criado com sucesso!`;
+            setTimeout(() => goObStep(4), 1200);
+        } else {
+            throw new Error(d.detail || 'Erro ao criar repositório');
+        }
+    } catch(e) {
+        res.style.display='block'; res.style.background='rgba(245,101,101,0.1)'; res.style.color='#f56565';
+        res.innerHTML=`<i class="fas fa-times-circle"></i> ${e.message}`;
+    }
+}
+
+function selectAlertChannel(ch) {
+    document.querySelectorAll('[id^="card-"]').forEach(el => el.style.borderColor='');
+    document.getElementById('card-' + ch).style.borderColor='var(--primary)';
+    document.querySelector(`input[value="${ch}"]`).checked = true;
+
+    const form = document.getElementById('ob-channel-form');
+    if (ch === 'email') {
+        form.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div class="form-group"><label style="font-size:0.8em">Host SMTP</label><input id="al-smtp-host" placeholder="smtp.gmail.com"></div>
+            <div class="form-group"><label style="font-size:0.8em">Porta</label><input id="al-smtp-port" value="587" type="number"></div>
+            <div class="form-group"><label style="font-size:0.8em">Usuário</label><input id="al-smtp-user" placeholder="backup@empresa.com"></div>
+            <div class="form-group"><label style="font-size:0.8em">Senha</label><input id="al-smtp-pass" type="password"></div>
+        </div>
+        <div class="form-group"><label style="font-size:0.8em">Destinatários</label><input id="al-smtp-rcpt" placeholder="admin@empresa.com, ti@empresa.com"></div>`;
+    } else if (ch === 'telegram') {
+        form.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div class="form-group"><label style="font-size:0.8em">Bot Token</label><input id="al-tg-token" type="password" placeholder="1234567890:AAE..."></div>
+            <div class="form-group"><label style="font-size:0.8em">Chat ID</label><input id="al-tg-chatid" placeholder="-1001234567890"></div>
+        </div>`;
+    } else {
+        form.innerHTML = `<div class="form-group"><label style="font-size:0.8em">URL do Webhook</label><input id="al-webhook-url" placeholder="https://hooks.slack.com/services/..."></div>`;
+    }
+}
+
+async function saveAlertAndNext() {
+    const ch = document.querySelector('input[name="alert-ch"]:checked');
+    if (!ch) { goObStep(5); return; }
+
+    let cfg = { alert_channels: {} };
+    if (ch.value === 'email') {
+        cfg.alert_channels.email = { enabled:true, smtp_host:document.getElementById('al-smtp-host')?.value, smtp_port:parseInt(document.getElementById('al-smtp-port')?.value||'587'), smtp_user:document.getElementById('al-smtp-user')?.value, smtp_pass:document.getElementById('al-smtp-pass')?.value, recipients:(document.getElementById('al-smtp-rcpt')?.value||'').split(',').map(s=>s.trim()).filter(Boolean) };
+    } else if (ch.value === 'telegram') {
+        cfg.alert_channels.telegram = { enabled:true, bot_token:document.getElementById('al-tg-token')?.value, chat_id:document.getElementById('al-tg-chatid')?.value };
+    } else {
+        cfg.alert_channels.webhook = { enabled:true, url:document.getElementById('al-webhook-url')?.value };
+    }
+
+    try {
+        await fetch(window.GBOC_API_BASE + '/api/v1/jobs/alert-config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(cfg)});
+    } catch(e) {}
+    goObStep(5);
+}
+</script>
+</body>
+</html>

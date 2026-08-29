@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-📋 GBOC Agent 11.7c - MODELS
+📋 GBOC Agent 13.2.0 - MODELS
 Estrutura de dados e validação Pydantic
 ✅ CORRIGIDO: Modelos de repositório flexíveis para criação/edição
 """
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, ConfigDict
 from typing import Dict, Any, List, Optional, Union, Literal
 from datetime import datetime
 from enum import Enum
@@ -24,9 +24,7 @@ class LocalRepository(BaseModel):
     motor_password: str = Field(..., min_length=1, alias="encryption_password")
     path: Optional[str] = Field(None, description="Caminho local do repositório")
 
-    class Config:
-        populate_by_name = True
-        extra = "allow"
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
 
 class CloudRepository(BaseModel):
@@ -53,9 +51,7 @@ class CloudRepository(BaseModel):
     gcs_project_id: Optional[str] = None
     gcs_credentials: Optional[str] = None
 
-    class Config:
-        populate_by_name = True
-        extra = "allow"
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
 
 class TaskType(str, Enum):
@@ -101,9 +97,7 @@ class RepositoryCreate(BaseModel):
     """
     repository: Union[LocalRepository, CloudRepository] = Field(..., discriminator='type')
 
-    class Config:
-        populate_by_name = True
-        extra = "allow"
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
     @property
     def type(self) -> str:
@@ -154,8 +148,7 @@ class RepositoryUpdate(BaseModel):
     azure_account_name: Optional[str] = None
     azure_account_key: Optional[str] = None
     
-    class Config:
-        extra = "allow"  # Permite campos extras sem erro
+    model_config = ConfigDict(extra="allow")
 
 
 class RepositoryResponse(BaseModel):
@@ -173,9 +166,7 @@ class RepositoryResponse(BaseModel):
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
     
-    class Config:
-        from_attributes = True
-        extra = "allow"
+    model_config = ConfigDict(from_attributes=True, extra="allow")
 
 
 # ==============================================================================
@@ -236,8 +227,7 @@ class TaskResponse(BaseModel):
     run_count: Optional[int] = 0
     success_count: Optional[int] = 0
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ==============================================================================
@@ -258,8 +248,7 @@ class TaskExecutionResponse(BaseModel):
     current_file: Optional[str] = None
     error_message: Optional[str] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ==============================================================================
@@ -287,8 +276,7 @@ class AlertResponse(BaseModel):
     resolved: bool = False
     details: Optional[str] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ==============================================================================
@@ -315,8 +303,7 @@ class SettingsResponse(BaseModel):
     value: Any
     updated_at: Optional[str] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ==============================================================================
@@ -340,8 +327,7 @@ class DiagnosticResponse(BaseModel):
     system_health: Optional[int] = None
     details: Optional[Dict[str, Any]] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ==============================================================================
@@ -377,8 +363,7 @@ class LogEntry(BaseModel):
     message: str
     details: Optional[str] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ==============================================================================

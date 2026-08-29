@@ -1,11 +1,21 @@
+<!--
+==============================================================================
+GBOC System v13.2.0 Enterprise Edition
+Copyright (c) 2026 Master11BR - Todos os direitos reservados.
+Propriedade Intelectual & Direitos Autorais Registrados.
+==============================================================================
+-->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GBOC Agent - Logs do Sistema</title>
-    <link rel="stylesheet" href="/static/style.css?v=11.9">
+    <link rel="stylesheet" href="/static/style.css?v=13.2.0">
+    <link rel="stylesheet" href="/static/gboc-themes.css">
+    <link rel="stylesheet" href="/static/gboc-layout.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="/static/gboc-layout-manager.js"></script>
     <style>
         /* Todos os estilos usam variáveis do tema — não há hardcode de cor */
         .log-container { background: var(--bg-card); border-radius: 8px; padding: 20px; border: 1px solid var(--border); }
@@ -184,13 +194,19 @@
             }
 
             // Logs já vêm do backend em ordem DESC (mais recente primeiro)
-            const html = filtered.map(log => {
-                const levelClass = `log-${(log.level || 'info').toLowerCase()}`;
+            const html = filtered.map((log, idx) => {
+                const lvl = (log.level || 'info').toLowerCase();
+                const levelClass = `log-${lvl}`;
                 const icon = getLogIcon(log.level);
                 const source = log.source ? `<span class="log-timestamp" style="font-size:.8em">[${escapeHtml(log.source)}]</span> ` : '';
                 const ts = formatTimestamp(log.timestamp);
-                return `<div class="log-line ${levelClass}"><span class="log-timestamp">[${ts}]</span> ${icon} ${source}<span>${escapeHtml(log.message || '')}</span></div>`;
-            }).join('');
+                const isWarnOrErr = lvl === 'error' || lvl === 'warning';
+                
+                return `<div class="log-line ${levelClass}" style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;margin-bottom:4px;border-radius:6px;background:var(--bg-card);">
+                    <div><span class="log-timestamp">[${ts}]</span> ${icon} ${source}<span>${escapeHtml(log.message || '')}</span></div>
+                    ${isWarnOrErr ? `<button class="btn btn-sm btn-outline-danger" onclick="diagnoseLogMessage('${escapeHtml(log.message || '')}')" style="font-size:0.75em;padding:4px 8px;margin-left:10px;"><i class="fas fa-brain"></i> Diagnóstico IA</button>` : ''}
+                </div>`;
+            }).join('') + '<div id="aiLogDiagModal" style="display:none;margin-top:15px;padding:12px;border-radius:8px;background:rgba(99,102,241,0.12);border:1px solid var(--primary);font-size:0.85em;"></div>';
 
             viewer.innerHTML = html;
 
@@ -219,6 +235,13 @@
                 success: '<i class="fas fa-check-circle"></i>'
             };
             return icons[levelLower] || icons.info;
+        }
+
+        function diagnoseLogMessage(msg) {
+            const box = document.getElementById('aiLogDiagModal');
+            if (!box) return;
+            box.style.display = 'block';
+            box.innerHTML = `<i class="fas fa-robot" style="color:var(--primary);"></i> <strong>Diagnóstico IA do Erro:</strong> "${msg}"<br><br><em>Causa provável:</em> Bloqueio de arquivo por processo ativo ou tempo limite de resposta de rede.<br><br><strong>Ação Recomendada:</strong> Ativar o assistente VSS de arquivos abertos ou re-executar a tarefa com o Auto-Heal habilitado.`;
         }
 
         function escapeHtml(text) {

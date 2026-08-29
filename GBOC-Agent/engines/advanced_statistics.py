@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 11.7c - Sistema de Análise Estatística Avançada
+GBOC 13.2.0 - Sistema de Análise Estatística Avançada
 Inspirado no Duplicati com estatísticas detalhadas e previsões
 """
 

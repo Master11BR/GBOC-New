@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 11.7c - Prometheus Metrics API
+GBOC 13.2.0 - Prometheus Metrics API
 Exposes /metrics endpoint in Prometheus text exposition format.
 Metrics: backup durations, sizes, success/failure counts, health score, SLA, storage.
 """

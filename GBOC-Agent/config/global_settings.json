@@ -1,0 +1,23 @@
+{
+    "version": "13.0.0-Enterprise",
+    "global_settings": {
+        "agent_name": "GBOC-Enterprise-Agent",
+        "max_bandwidth_mbps": 0,
+        "cpu_throttling_percent": 80,
+        "global_encryption_key": "gboc-master-key-v4",
+        "temp_directory": "./data/temp",
+        "log_level": "INFO",
+        "log_retention_days": 30,
+        "ransomware_shield_enabled": true,
+        "ransomware_sensitivity": "HIGH",
+        "ai_llm_config": {
+            "provider": "ollama",
+            "ollama_host": "http://localhost:11434",
+            "model": "llama3:latest",
+            "api_key": "",
+            "task_history_limit": 10,
+            "cloud_api_key": "",
+            "auto_diagnose_errors": true
+        }
+    }
+}

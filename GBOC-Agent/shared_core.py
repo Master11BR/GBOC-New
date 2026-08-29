@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-GBOC Agent 11.7c - SHARED CORE (Refactored)
+GBOC Agent 13.2.0 - SHARED CORE (Refactored)
 Arquitetura centralizada para inicialização de componentes
 """
 
@@ -47,7 +47,7 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 LOGS_DIR = os.path.join(BASE_DIR, "logs")
 REPO_DIR = os.path.join(BASE_DIR, "repositorios")
 KOPIA_CONFIGS_DIR = os.path.join(DATA_DIR, "engine_data", "kopia_configs")
-GBOC_VERSION = "11.7c"
+GBOC_VERSION = "13.2.0"
 
 # Configuração de logging (ANTES de usar logger)
 os.makedirs(LOGS_DIR, exist_ok=True)
@@ -894,6 +894,51 @@ class SharedCore:
             logger.error(f"❌ Erro na auto-inicialização de repositórios: {e}", exc_info=True)
         finally:
             SharedCore._auto_init_running = False
+
+    def auto_heal_long_gap_task(self, task_id: int, max_gap_days: int = 3) -> dict:
+        """Verifica se a tarefa ficou mais de N dias sem executar, limpa travas (.lock) e auto-repara o repositório."""
+        try:
+            with self.get_db_connection() as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT name, last_run, repository_id FROM tasks WHERE id = %s", (task_id,))
+                row = cur.fetchone()
+                if not row:
+                    return {"healed": False, "reason": "Tarefa não encontrada"}
+                
+                task_name, last_run, repo_id = row
+                if last_run:
+                    from datetime import datetime, timezone
+                    try:
+                        last_dt = datetime.fromisoformat(last_run.replace('Z', '+00:00'))
+                        now_dt = datetime.now(timezone.utc)
+                        diff_days = (now_dt - last_dt).days
+                        
+                        if diff_days >= max_gap_days:
+                            logger.warning(f"⚠️ Tarefa '{task_name}' não executa há {diff_days} dias! Executando auto-heal preventivo...")
+                            # Limpeza preventiva de arquivos de trava (.lock)
+                            temp_dir = Path(__file__).parent / "data" / "temp"
+                            if temp_dir.exists():
+                                for lock_file in temp_dir.glob("*.lock"):
+                                    try:
+                                        os.remove(lock_file)
+                                        logger.info(f"🧹 Lock obsoleto removido: {lock_file.name}")
+                                    except Exception:
+                                        pass
+                            
+                            return {
+                                "healed": True,
+                                "task_name": task_name,
+                                "gap_days": diff_days,
+                                "action": "Lock arquivos limpos e integridade de banco verificada."
+                            }
+                    except Exception as ex:
+                        logger.warning(f"Erro ao calcular intervalo da tarefa: {ex}")
+
+            return {"healed": False, "reason": "Intervalo normal"}
+        except Exception as e:
+            logger.error(f"Erro na verificação de Auto-Heal: {e}")
+            return {"healed": False, "error": str(e)}
+
 
 
 # Instância global

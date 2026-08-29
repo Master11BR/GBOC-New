@@ -1,4 +1,11 @@
-/* GBOC Agent v11.0 - Redesigned Theme System */
+/*
+==============================================================================
+GBOC System v13.2.0 Enterprise Edition
+Copyright (c) 2026 Master11BR - Todos os direitos reservados.
+Propriedade Intelectual & Direitos Autorais Registrados.
+==============================================================================
+*/
+/* GBOC Agent v13.2.0 - Redesigned Theme System */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 /* ======================== THEME VARIABLES ======================== */
@@ -42,11 +49,124 @@
     --info:       #0f766e;
     --accent:     #6d3fa8;
     --accent-gradient: linear-gradient(135deg, #1d6fbf 0%, #6d3fa8 100%);
-    --nm-shadow-dark:  rgba(163,177,198,.55);
-    --nm-shadow-light: rgba(255,255,255,.9);
     --nm-inset-dark:   rgba(163,177,198,.45);
     --nm-inset-light:  rgba(255,255,255,.7);
     color-scheme: light;
+}
+
+[data-theme="neon"] {
+    --bg-dark:    #050914;
+    --bg-card:    #0b1124;
+    --bg-input:   #070d1d;
+    --sidebar-bg: #080e1f;
+    --text:       #00f0ff;
+    --text-muted: #70a0c0;
+    --border:     #005577;
+    --card-hover: #101a35;
+    --primary:    #00f0ff;
+    --success:    #00ff66;
+    --warning:    #ffaa00;
+    --danger:     #ff0055;
+    --info:       #00e5ff;
+    --accent:     #ff00ff;
+    --accent-gradient: linear-gradient(135deg, #00f0ff 0%, #ff00ff 100%);
+    --nm-shadow-dark:  rgba(0,0,0,.9);
+    --nm-shadow-light: rgba(0,240,255,.2);
+    --nm-inset-dark:   rgba(0,0,0,.8);
+    --nm-inset-light:  rgba(0,240,255,.1);
+    color-scheme: dark;
+}
+
+[data-theme="contrast"] {
+    --bg-dark:    #000000;
+    --bg-card:    #111111;
+    --bg-input:   #222222;
+    --sidebar-bg: #000000;
+    --text:       #ffffff;
+    --text-muted: #ffffff;
+    --border:     #ffffff;
+    --card-hover: #333333;
+    --primary:    #ffff00;
+    --success:    #00ff00;
+    --warning:    #ffaa00;
+    --danger:     #ff0000;
+    --info:       #00ffff;
+    --accent:     #ffffff;
+    --accent-gradient: linear-gradient(135deg, #ffff00 0%, #ffffff 100%);
+    --nm-shadow-dark:  rgba(255,255,255,.2);
+    --nm-shadow-light: rgba(255,255,255,.2);
+    --nm-inset-dark:   rgba(255,255,255,.2);
+    --nm-inset-light:  rgba(255,255,255,.2);
+    color-scheme: dark;
+}
+
+[data-theme="unifi"] {
+    --bg-dark:    #0a111e;
+    --bg-card:    #101a2d;
+    --bg-input:   #0a1424;
+    --sidebar-bg: #08101c;
+    --text:       #e2e8f0;
+    --text-muted: #849bb5;
+    --border:     #1a2942;
+    --card-hover: #16243d;
+    --primary:    #006fff;
+    --success:    #00e5a3;
+    --warning:    #ffaa00;
+    --danger:     #ff3366;
+    --info:       #00b4ff;
+    --accent:     #006fff;
+    --accent-gradient: linear-gradient(135deg, #006fff 0%, #00b4ff 100%);
+    --nm-shadow-dark:  rgba(0,0,0,.6);
+    --nm-shadow-light: rgba(0,111,255,.15);
+    --nm-inset-dark:   rgba(0,0,0,.5);
+    --nm-inset-light:  rgba(0,111,255,.1);
+    color-scheme: dark;
+}
+
+[data-theme="bacula"] {
+    --bg-dark:    #f4f6f9;
+    --bg-card:    #ffffff;
+    --bg-input:   #ffffff;
+    --sidebar-bg: #1a365d;
+    --text:       #1e293b;
+    --text-muted: #64748b;
+    --border:     #cbd5e1;
+    --card-hover: #f1f5f9;
+    --primary:    #0056b3;
+    --success:    #16a34a;
+    --warning:    #d97706;
+    --danger:     #dc2626;
+    --info:       #0284c7;
+    --accent:     #0056b3;
+    --accent-gradient: linear-gradient(135deg, #1a365d 0%, #0056b3 100%);
+    --nm-shadow-dark:  rgba(148,163,184,.3);
+    --nm-shadow-light: rgba(255,255,255,.9);
+    --nm-inset-dark:   rgba(148,163,184,.2);
+    --nm-inset-light:  rgba(255,255,255,.8);
+    color-scheme: light;
+}
+
+[data-theme="fiorilli"] {
+    --bg-dark:    #090d16;
+    --bg-card:    #0f172a;
+    --bg-input:   #0a0f1d;
+    --sidebar-bg: #060a12;
+    --text:       #e2e8f0;
+    --text-muted: #64748b;
+    --border:     #1e293b;
+    --card-hover: #1e293b;
+    --primary:    #00f5a0;
+    --success:    #00f5a0;
+    --warning:    #f59e0b;
+    --danger:     #ef4444;
+    --info:       #00d2ff;
+    --accent:     #00d2ff;
+    --accent-gradient: linear-gradient(135deg, #00f5a0 0%, #00d2ff 100%);
+    --nm-shadow-dark:  rgba(0,0,0,.8);
+    --nm-shadow-light: rgba(0,245,160,.15);
+    --nm-inset-dark:   rgba(0,0,0,.6);
+    --nm-inset-light:  rgba(0,245,160,.1);
+    color-scheme: dark;
 }
 /* ======================== BASE ======================== */
 body { font-family: "Segoe UI", sans-serif; background: var(--bg-dark); color: var(--text); line-height: 1.6; transition: background 0.3s, color 0.3s; }

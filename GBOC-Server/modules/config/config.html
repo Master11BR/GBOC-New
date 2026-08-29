@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configurações - GBOC Server</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/gboc-themes.css">
+    <link rel="stylesheet" href="/static/gboc-layout.css">
+    <script src="/static/gboc-layout-manager.js"></script>
+    <script src="/modules/config/config.js"></script>
+    <style>
+        .cfg-subtab-pane { transition: all 0.3s ease; }
+        .alert-card { padding: 12px 16px; border-radius: 8px; font-size: 0.88em; margin-top: 8px; display: flex; align-items: center; gap: 10px; }
+        .alert-card.success { background: rgba(78, 203, 136, 0.12); border: 1px solid var(--success); color: var(--success); }
+        .alert-card.warning { background: rgba(240, 169, 64, 0.12); border: 1px solid var(--warning); color: var(--warning); }
+        .alert-card.info { background: rgba(79, 163, 232, 0.12); border: 1px solid var(--primary); color: var(--primary); }
+        .alert-card.error { background: rgba(240, 107, 107, 0.12); border: 1px solid var(--danger); color: var(--danger); }
+        .tabs { display: flex; gap: 8px; border-bottom: 1px solid var(--border); padding-bottom: 8px; flex-wrap: wrap; }
+        .tab-btn { background: transparent; border: none; color: var(--text-muted); padding: 10px 18px; font-weight: 600; border-radius: 8px; cursor: pointer; transition: all 0.2s; font-size: 0.9em; display: flex; align-items: center; gap: 8px; }
+        .tab-btn:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+        .tab-btn.active { color: #ffffff; background: var(--primary); }
+    </style>
+</head>
+<body class="layout-vertical">
+    <main class="main-content" style="padding: 24px;">
+        <h2 style="font-size:1.4em;margin-bottom:20px;display:flex;align-items:center;gap:10px">
+            <i class="fas fa-sliders-h" style="color:var(--primary)"></i> Configurações Gerais do Servidor Central
+        </h2>
+
+        <!-- Sub-Abas de Configuração -->
+        <div class="tabs" id="srv-config-subtabs" style="margin-bottom:24px">
+            <button class="tab-btn active" onclick="switchConfigSubTab('ai', this)"><i class="fas fa-brain"></i> IA &amp; LLMs</button>
+            <button class="tab-btn" onclick="switchConfigSubTab('server', this)"><i class="fas fa-cloud"></i> Servidor Central</button>
+            <button class="tab-btn" onclick="switchConfigSubTab('notifications', this)"><i class="fas fa-bell"></i> Notificações</button>
+            <button class="tab-btn" onclick="switchConfigSubTab('security', this)"><i class="fas fa-shield-alt"></i> Segurança</button>
+            <button class="tab-btn" onclick="switchConfigSubTab('system', this)"><i class="fas fa-cogs"></i> Sistema</button>
+        </div>
+
+        <!-- PAINEL 1: IA & LLMs (Formulário idêntico ao Agente) -->
+        <div id="cfg-subtab-ai" class="cfg-subtab-pane">
+            <div class="panel" style="max-width:860px;background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:24px">
+                <h3 style="display:flex;align-items:center;gap:10px;font-size:1.15em;margin-bottom:8px;color:var(--text)">
+                    <i class="fas fa-robot" style="color:var(--primary)"></i> Configuração do Assistente de IA &amp; LLM
+                </h3>
+                <p style="font-size:.85em;color:var(--text-muted);margin-bottom:24px;line-height:1.5">
+                    Configure o modelo de Inteligência Artificial usado para análise de logs, diagnósticos e resolução de erros.
+                </p>
+
+                <div style="margin-bottom:20px">
+                    <label style="display:block;font-size:.88em;font-weight:600;margin-bottom:8px;color:var(--text)" for="ai-provider"><i class="fas fa-microchip" style="color:var(--primary);margin-right:6px"></i> Provedor de IA</label>
+                    <select id="ai-provider" onchange="toggleAiFields()" style="width:100%;padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:.9em">
+                        <option value="ollama" selected>Ollama (IA Local - Llama / Mistral)</option>
+                        <option value="kimi">Kimi AI / Moonshot (Nuvem)</option>
+                        <option value="grok">Grok xAI (Nuvem)</option>
+                        <option value="openai">OpenAI (GPT-4o / GPT-4o-mini)</option>
+                        <option value="gemini">Google Gemini (Gemini 1.5 / 2.0)</option>
+                        <option value="deepseek">DeepSeek (V3 / R1 Nuvem)</option>
+                        <option value="claude">Anthropic Claude (3.5 Sonnet)</option>
+                        <option value="qwen">Qwen 2.5 (Alibaba / Ollama)</option>
+                        <option value="mistral">Mistral AI (Codestral / Le Chat)</option>
+                        <option value="llama3">Meta Llama 3.3 (70B Local/Cloud)</option>
+                        <option value="cohere">Cohere (Command R+)</option>
+                    </select>
+                </div>
+
+                <div style="margin-bottom:20px" id="group-ollama-host">
+                    <label style="display:block;font-size:.88em;font-weight:600;margin-bottom:8px;color:var(--text)" for="ai-ollama-host"><i class="fas fa-network-wired" style="color:var(--primary);margin-right:6px"></i> Host Ollama Local</label>
+                    <div style="display:flex;gap:10px">
+                        <input type="text" id="ai-ollama-host" value="http://localhost:11434" placeholder="http://localhost:11434" style="flex:1;padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:.9em">
+                        <button type="button" class="btn btn-primary" onclick="detectOllamaModels()"><i class="fas fa-search"></i> Detectar IA Local</button>
+                    </div>
+                </div>
+
+                <div style="margin-bottom:20px">
+                    <label style="display:block;font-size:.88em;font-weight:600;margin-bottom:8px;color:var(--text)" for="ai-model"><i class="fas fa-brain" style="color:var(--primary);margin-right:6px"></i> Modelo LLM de IA (Ollama / Cloud)</label>
+                    <div style="display:flex;gap:8px;flex-direction:column">
+                        <select id="ai-model-select" onchange="onModelSelectChanged(this.value)" style="width:100%;padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:.9em">
+                            <option value="llama3">🟢 llama3:latest (Instalado / Padrão)</option>
+                        </select>
+                        <div id="model-status-badge" style="font-size:0.83em;padding:6px 10px;border-radius:6px;background:rgba(255,255,255,0.05);color:var(--text-muted)">
+                            <i class="fas fa-info-circle"></i> Selecione um modelo da lista acima.
+                        </div>
+                        <input type="text" id="ai-model" value="llama3" placeholder="Ex: llama3, mistral, llama3.2:latest, deepseek-r1" style="width:100%;padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:.9em;margin-top:4px">
+                    </div>
+                </div>
+
+                <div style="margin-bottom:20px" id="group-api-key">
+                    <label style="display:block;font-size:.88em;font-weight:600;margin-bottom:8px;color:var(--text)" for="ai-api-key"><i class="fas fa-key" style="color:var(--warning);margin-right:6px"></i> Chave de API (Nuvem)</label>
+                    <input type="password" id="ai-api-key" placeholder="sk-..." style="width:100%;padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:.9em">
+                </div>
+
+                <div style="margin-bottom:24px">
+                    <label style="display:block;font-size:.88em;font-weight:600;margin-bottom:4px;color:var(--text)" for="task-history-limit"><i class="fas fa-list-ol" style="color:var(--primary);margin-right:6px"></i> Limite de Registros de Histórico de Backup</label>
+                    <div style="font-size:.78em;color:var(--text-muted);margin-bottom:8px">Quantidade de execuções exibidas no histórico do módulo de tarefas.</div>
+                    <input type="number" id="task-history-limit" value="10" min="1" max="100" style="width:140px;padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:.9em">
+                </div>
+                
+                <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:24px">
+                    <button id="btn-test-ai" class="btn btn-secondary" onclick="testAiConnection()"><i class="fas fa-plug"></i> Testar IA</button>
+                    <button id="btn-save-ai" class="btn btn-primary" onclick="saveAiSettings()"><i class="fas fa-save"></i> Salvar Configuração de IA</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- PAINEL 2: SERVIDOR CENTRAL -->
+        <div id="cfg-subtab-server" class="cfg-subtab-pane" style="display:none">
+            <div class="panel" style="max-width:860px;background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:24px">
+                <h3><i class="fas fa-cloud" style="color:var(--primary)"></i> Parâmetros do Servidor Central</h3>
+                <p style="font-size:.85em;color:var(--text-muted);margin-bottom:16px">Configurações de porta, TLS, timeouts e limites do servidor.</p>
+                <div id="settings-form" style="padding:16px 0">Carregando configurações...</div>
+                <button class="btn btn-success" onclick="saveCurrentTab()"><i class="fas fa-save"></i> Salvar Parâmetros</button>
+            </div>
+        </div>
+
+        <!-- PAINEL 3: NOTIFICAÇÕES -->
+        <div id="cfg-subtab-notifications" class="cfg-subtab-pane" style="display:none">
+            <div class="panel" style="max-width:860px;background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:24px">
+                <h3><i class="fas fa-bell" style="color:var(--warning)"></i> Canais de Notificação Centralizados</h3>
+                <p style="font-size:.85em;color:var(--text-muted)">Configure webhooks (Discord, Teams, Slack) e SMTP para alertas globais de backup.</p>
+            </div>
+        </div>
+
+        <!-- PAINEL 4: SEGURANÇA -->
+        <div id="cfg-subtab-security" class="cfg-subtab-pane" style="display:none">
+            <div class="panel" style="max-width:860px;background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:24px">
+                <h3><i class="fas fa-shield-alt" style="color:var(--danger)"></i> Políticas Globais de Segurança</h3>
+                <p style="font-size:.85em;color:var(--text-muted)">Retenção de logs, tokens de autenticação JWT e proteção contra brute-force.</p>
+            </div>
+        </div>
+
+        <!-- PAINEL 5: SISTEMA -->
+        <div id="cfg-subtab-system" class="cfg-subtab-pane" style="display:none">
+            <div class="panel" style="max-width:860px;background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:24px">
+                <h3><i class="fas fa-cogs" style="color:var(--primary)"></i> Manutenção do Sistema</h3>
+                <div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap">
+                    <button class="btn btn-warning" onclick="runCleanup()"><i class="fas fa-broom"></i> Limpeza de Dados Antigos</button>
+                    <button class="btn btn-secondary" onclick="exportSettings()"><i class="fas fa-download"></i> Exportar Configurações</button>
+                    <button class="btn btn-danger" onclick="resetAllSettings()"><i class="fas fa-undo"></i> Resetar para Padrão</button>
+                </div>
+            </div>
+        </div>
+    </main>
+</body>
+</html>

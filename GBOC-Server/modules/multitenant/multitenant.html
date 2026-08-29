@@ -1,0 +1,245 @@
+<!-- GBOC System v13.2.0 Enterprise Edition -->
+<!-- Module: Multi-Tenant MSP HTML Fragment -->
+
+<style>
+    .mt-stats-row { 
+        display: grid; 
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); 
+        gap: 16px; 
+        margin-bottom: 24px; 
+    }
+    .mt-stat-card { 
+        background: var(--bg-card); 
+        border: 1px solid var(--border); 
+        border-radius: 12px; 
+        padding: 20px; 
+        text-align: center;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        transition: transform 0.2s, border-color 0.2s;
+    }
+    .mt-stat-card:hover {
+        transform: translateY(-2px);
+        border-color: var(--primary);
+    }
+    .mt-stat-card .val { 
+        font-size: 2.2em; 
+        font-weight: 800; 
+        margin-bottom: 4px;
+    }
+    .mt-stat-card .lbl { 
+        font-size: .85em; 
+        color: var(--text-muted); 
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .mt-panel { 
+        background: var(--bg-card); 
+        border: 1px solid var(--border); 
+        border-radius: 14px; 
+        overflow: hidden; 
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+    }
+    .mt-panel-header { 
+        padding: 20px 24px; 
+        border-bottom: 1px solid var(--border); 
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+    .mt-panel-header h3 { 
+        margin: 0; 
+        display: flex; 
+        align-items: center; 
+        gap: 10px; 
+        font-size: 1.2em; 
+        font-weight: 700;
+    }
+    .mt-panel-body { 
+        padding: 24px; 
+    }
+
+    .mt-tbl { 
+        width: 100%; 
+        border-collapse: collapse; 
+    }
+    .mt-tbl th, .mt-tbl td { 
+        padding: 14px 16px; 
+        text-align: left; 
+        border-bottom: 1px solid var(--border); 
+        font-size: .9em; 
+    }
+    .mt-tbl th { 
+        background: var(--bg-input); 
+        color: var(--text-muted); 
+        font-weight: 600; 
+        text-transform: uppercase;
+        font-size: 0.8em;
+        letter-spacing: 0.5px;
+    }
+    .mt-tbl tr:hover {
+        background: rgba(255, 255, 255, 0.02);
+    }
+
+    .mt-modal-overlay { 
+        display: none; 
+        position: fixed; 
+        inset: 0; 
+        background: rgba(0, 0, 0, 0.8); 
+        z-index: 2000; 
+        align-items: center; 
+        justify-content: center; 
+        backdrop-filter: blur(5px); 
+    }
+    .mt-modal-overlay.show { 
+        display: flex; 
+    }
+    .mt-modal-box { 
+        background: var(--bg-card); 
+        border-radius: 16px; 
+        padding: 30px; 
+        width: 500px; 
+        max-width: 90vw; 
+        border: 1px solid var(--border); 
+        box-shadow: 0 24px 48px rgba(0, 0, 0, 0.6); 
+    }
+    .mt-modal-box h3 { 
+        margin: 0 0 20px 0; 
+        font-size: 1.3em; 
+        display: flex; 
+        align-items: center; 
+        gap: 10px;
+    }
+
+    .mt-form-group { 
+        margin-bottom: 18px; 
+    }
+    .mt-form-group label { 
+        display: block; 
+        font-size: .85em; 
+        color: var(--text-muted); 
+        margin-bottom: 8px; 
+        font-weight: 600; 
+    }
+    .mt-form-group input, .mt-form-group select { 
+        width: 100%; 
+        padding: 11px 14px; 
+        border-radius: 8px; 
+        border: 1px solid var(--border); 
+        background: var(--bg-input); 
+        color: var(--text); 
+        font-size: .95em; 
+        box-sizing: border-box; 
+        transition: border-color 0.2s;
+    }
+    .mt-form-group input:focus, .mt-form-group select:focus {
+        border-color: var(--primary);
+        outline: none;
+    }
+
+    .mt-badge-success { background: rgba(72, 187, 120, 0.15); color: var(--success); padding: 4px 12px; border-radius: 20px; font-size: 0.8em; font-weight: 600; }
+    .mt-badge-danger { background: rgba(245, 101, 101, 0.15); color: var(--danger); padding: 4px 12px; border-radius: 20px; font-size: 0.8em; font-weight: 600; }
+    .mt-badge-info { background: rgba(66, 153, 225, 0.15); color: var(--primary); padding: 4px 12px; border-radius: 20px; font-size: 0.8em; font-weight: 600; }
+    .mt-badge-warning { background: rgba(237, 137, 54, 0.15); color: var(--warning); padding: 4px 12px; border-radius: 20px; font-size: 0.8em; font-weight: 600; }
+</style>
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+    <div>
+        <h1 style="font-size:1.4em;margin:0;display:flex;align-items:center;gap:10px">
+            <i class="fas fa-building" style="color:var(--primary)"></i> Gestão Multi-Tenant & Organizações MSP
+        </h1>
+        <div style="font-size:.85em;color:var(--text-muted);margin-top:2px">Configuração de empresas atendidas, limites de licenciamento e cotas de agentes ativos</div>
+    </div>
+    <div style="display:flex;gap:8px">
+        <button class="btn btn-secondary" onclick="loadMultiTenantData()"><i class="fas fa-sync-alt"></i> Atualizar</button>
+        <button class="btn btn-primary" onclick="openOrgModal()"><i class="fas fa-plus"></i> Nova Organização</button>
+    </div>
+</div>
+
+<!-- KPIs -->
+<div class="mt-stats-row">
+    <div class="mt-stat-card">
+        <div class="val" id="mt-kpi-total" style="color:var(--primary)">0</div>
+        <div class="lbl">Total de Empresas</div>
+    </div>
+    <div class="mt-stat-card">
+        <div class="val" id="mt-kpi-active" style="color:var(--success)">0</div>
+        <div class="lbl">Organizações Ativas</div>
+    </div>
+    <div class="mt-stat-card">
+        <div class="val" id="mt-kpi-agents" style="color:var(--warning)">0</div>
+        <div class="lbl">Capacidade Total Agentes</div>
+    </div>
+</div>
+
+<div class="mt-panel">
+    <div class="mt-panel-header">
+        <h3><i class="fas fa-list" style="color:var(--primary)"></i> Organizações MSP Cadastradas</h3>
+        <button class="btn btn-sm btn-primary" onclick="openOrgModal()"><i class="fas fa-plus"></i> Nova Org</button>
+    </div>
+    <div class="mt-panel-body" style="padding:0">
+        <table class="mt-tbl">
+            <thead>
+                <tr>
+                    <th>ID da Org</th>
+                    <th>Nome da Organização</th>
+                    <th>Plano de Serviço</th>
+                    <th>Limite de Agentes</th>
+                    <th>Status</th>
+                    <th style="text-align:right">Ações</th>
+                </tr>
+            </thead>
+            <tbody id="multitenant-org-table">
+                <tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-muted)">Carregando organizações...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- MODAL ADICIONAR / EDITAR ORGANIZAÇÃO -->
+<div class="mt-modal-overlay" id="mt-org-modal">
+    <div class="mt-modal-box">
+        <h3 id="mt-modal-title"><i class="fas fa-plus-circle" style="color:var(--primary)"></i> Adicionar Organização MSP</h3>
+        
+        <div class="mt-form-group">
+            <label for="mt-org-id">ID da Organização (Slug único)</label>
+            <input type="text" id="mt-org-id" placeholder="ex: org-filial-sp">
+        </div>
+        
+        <div class="mt-form-group">
+            <label for="mt-org-name">Nome da Organização / Empresa</label>
+            <input type="text" id="mt-org-name" placeholder="ex: Filial São Paulo Ltda">
+        </div>
+        
+        <div class="mt-form-group">
+            <label for="mt-org-plan">Plano de Contrato</label>
+            <select id="mt-org-plan">
+                <option value="Standard">Standard</option>
+                <option value="Pro Managed">Pro Managed</option>
+                <option value="Enterprise 10x">Enterprise 10x</option>
+                <option value="Custom Premium">Custom Premium</option>
+            </select>
+        </div>
+        
+        <div class="mt-form-group">
+            <label for="mt-org-max-agents">Limite Máximo de Agentes</label>
+            <input type="number" id="mt-org-max-agents" value="25" min="1" max="10000">
+        </div>
+        
+        <div class="mt-form-group">
+            <label for="mt-org-status">Status da Conta</label>
+            <select id="mt-org-status">
+                <option value="active">Ativo / Operacional</option>
+                <option value="inactive">Inativo / Bloqueado</option>
+            </select>
+        </div>
+        
+        <div class="modal-actions" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end;">
+            <button class="btn btn-secondary" onclick="closeOrgModal()">Cancelar</button>
+            <button class="btn btn-primary" onclick="saveOrganization()">Salvar Organização</button>
+        </div>
+    </div>
+</div>

@@ -1,5 +1,13 @@
+<#
+==============================================================================
+GBOC System v13.2.0 Enterprise Edition
+Copyright (c) 2026 Master11BR - Todos os direitos reservados.
+Propriedade Intelectual & Direitos Autorais Registrados.
+==============================================================================
+#>
+
 # ============================================================================
-# GBOC Agent - Instalador Completo v1.0
+# GBOC Agent - Instalador Completo v13.2.0
 # ============================================================================
 # Instala e configura automaticamente:
 # - Python 3.11+
@@ -100,7 +108,7 @@ Write-Host @"
 
 ╔═══════════════════════════════════════════════════════════╗
 ║                                                           ║
-║          GBOC Agent - Instalador Completo v1.0           ║
+║          GBOC Agent - Instalador Completo v13.2.0           ║
 ║                                                           ║
 ╚═══════════════════════════════════════════════════════════╝
 
@@ -639,18 +647,28 @@ else {
 	exit 1
 }
 
-# Instalar dependências Python
-Write-Step "Instalando dependências Python"
+# Instalar dependências Python e Stack de Segurança
+Write-Step "Instalando dependências Python e Stack de Segurança"
 $requirementsPath = "$AGENT_DIR\requirements.txt"
 
 if (Test-Path $requirementsPath) {
 	& "$PYTHON_DIR\python.exe" -m pip install --upgrade pip --quiet
 	& "$PYTHON_DIR\python.exe" -m pip install -r $requirementsPath --quiet
-	Write-Success "Dependências instaladas"
+	& "$PYTHON_DIR\python.exe" -m pip install yara-python --quiet
+	Write-Success "Dependências e Stack YARA/Segurança instaladas com sucesso"
 }
 else {
 	Write-Error "Arquivo requirements.txt não encontrado"
 	exit 1
+}
+
+# Configurar Regra de Firewall
+Write-Step "Configurando Firewall do Windows"
+try {
+	New-NetFirewallRule -DisplayName "GBOC Agent" -Direction Inbound -LocalPort 9200 -Protocol TCP -Action Allow -ErrorAction SilentlyContinue | Out-Null
+	Write-Success "Regra de Firewall liberada na porta 9200 (TCP)"
+} catch {
+	Write-Warning "Não foi possível criar a regra de Firewall automaticamente"
 }
 
 # Criar arquivo .env

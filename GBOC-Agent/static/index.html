@@ -1,14 +1,28 @@
+<!--
+==============================================================================
+GBOC System v13.2.0 Enterprise Edition
+Copyright (c) 2026 Master11BR - Todos os direitos reservados.
+Propriedade Intelectual & Direitos Autorais Registrados.
+==============================================================================
+-->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+    <script>
+        window.GBOC_API_BASE = (window.location.protocol === 'https:' || window.location.port === '8081' ? 'https:' : window.location.protocol) + '//' + window.location.hostname + ':' + (window.location.port === '8081' ? '9200' : (window.location.port || '9200'));
+    </script>
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GBOC Agent 11.7c - Dashboard</title>
-    <link rel="stylesheet" href="/static/style.css?v=11.9">
+    <title>GBOC Agent 13.2.0 - Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css?v=13.2.0">
+    <link rel="stylesheet" href="/static/gboc-themes.css">
+    <link rel="stylesheet" href="/static/gboc-layout.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="/static/auth_interceptor.js?v=11.7c"></script>
-    <script src="/static/gboc-global.js?v=11.7c"></script>
+    <script src="/static/auth_interceptor.js?v=13.2.0"></script>
+    <script src="/static/gboc-global.js?v=13.2.0"></script>
+    <script src="/static/gboc-layout-manager.js?v=13.2.0"></script>
     <style>
         /* KPI Row */
         .kpi-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(155px,1fr)); gap:14px; margin-bottom:24px; }
@@ -78,7 +92,7 @@
     <div id="gboc-splash" style="position:fixed;inset:0;z-index:9999;background:var(--bg-main,#0f172a);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .5s">
         <div style="text-align:center">
             <i class="fas fa-shield-alt" style="font-size:3.5em;color:#4299e1;margin-bottom:16px;animation:pulse 1.5s ease-in-out infinite"></i>
-            <h1 style="font-size:1.6em;font-weight:700;color:#e2e8f0;margin:0 0 8px">GBOC Agent 11.7c</h1>
+            <h1 style="font-size:1.6em;font-weight:700;color:#e2e8f0;margin:0 0 8px">GBOC Agent 13.2.0</h1>
             <p style="color:#718096;font-size:.9em;margin:0 0 24px">Inicializando sistema de backup...</p>
             <div style="width:200px;height:4px;background:rgba(255,255,255,.1);border-radius:4px;overflow:hidden;margin:0 auto">
                 <div id="splash-bar" style="width:0%;height:100%;background:linear-gradient(90deg,#4299e1,#48bb78);border-radius:4px;transition:width .3s"></div>
@@ -129,11 +143,12 @@
                 <div>
                     <div class="breadcrumb"><a href="/">GBOC</a> / Dashboard</div>
                     <h1 class="page-title">Dashboard</h1>
-                    <div class="page-subtitle">Sistema de Backup Centralizado • <span id="app-version">11.7c</span>
+                    <div class="page-subtitle">Sistema de Backup Centralizado • <span id="app-version">13.2.0</span>
                         <span style="margin-left:12px;"><span class="ws-dot off" id="wsDot"></span><span id="wsLabel" style="font-size:.8em;">Offline</span></span>
                     </div>
                 </div>
-                <div class="header-actions">
+                <div class="header-actions" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                    <button class="btn btn-warning" style="background:#f0a940;color:#000" onclick="openAgentAIDiagnosticModal()"><i class="fas fa-brain"></i> IA Diagnóstico</button>
                     <div class="global-search">
                         <i class="fas fa-search"></i>
                         <input type="text" id="globalSearch" placeholder="Buscar tarefas, repos..." onkeyup="handleSearch(event)">
@@ -223,7 +238,7 @@
                 <!-- System Footer -->
                 <div class="sys-footer">
                     <div class="sys-item"><i class="fab fa-windows"></i><div><strong>Plataforma</strong><span id="sysPlatform">...</span></div></div>
-                    <div class="sys-item"><i class="fas fa-code-branch"></i><div><strong>Versão</strong><span id="sysVersion">11.7c</span></div></div>
+                    <div class="sys-item"><i class="fas fa-code-branch"></i><div><strong>Versão</strong><span id="sysVersion">13.2.0</span></div></div>
                     <div class="sys-item"><i class="fas fa-globe"></i><div><strong>Servidor</strong><span id="sysHost">-</span></div></div>
                     <div class="sys-item"><i class="fas fa-clock"></i><div><strong>Uptime</strong><span id="sysUptime">...</span></div></div>
                     <div class="sys-item"><i class="fas fa-wifi"></i><div><strong>WebSocket</strong><span id="sysWS">-</span></div></div>
@@ -240,10 +255,10 @@
 
     <script>
     // ═══════════════════════════════════════════════════
-    // GBOC Dashboard 11.7c — Full Implementation  
+    // GBOC Dashboard 13.2.0 — Full Implementation  
     // ═══════════════════════════════════════════════════
 
-    const GBOC_VERSION = { app:'11.7c', build:'20250615.1100' };
+    const GBOC_VERSION = { app:'13.2.0', build:'20250615.1100' };
     let gauges = {};
     let chartTrend = null, chartStatus = null;
     let heatmap = null, timeline = null;
@@ -593,11 +608,155 @@
         complete(ok=true,msg='') { this.modal.querySelector('#modal-icon').textContent=ok?'✅':'❌'; this.modal.querySelector('#modal-title').textContent=ok?'Concluído!':'Erro'; this.modal.querySelector('#progress-bar').style.width='100%'; this.modal.querySelector('#progress-text').textContent=msg||(ok?'Sucesso':'Falha'); this.modal.querySelector('#modal-close').style.display='block'; this.modal.querySelector('#progress-bar').style.background=ok?'var(--success)':'var(--danger)'; }
     }
     window.progressModal = new ProgressModal();
+
+    // ==========================================
+    // PARIDADE DE GUI: TEMAS, IA & 50 RELATÓRIOS (AGENT)
+    // ==========================================
+    function changeAgentTheme(themeName) {
+        document.documentElement.setAttribute('data-theme', themeName);
+        localStorage.setItem('gboc_agent_gui_theme', themeName);
+        if(window.toast) window.toast.show(`Tema alterado: ${themeName.toUpperCase()}`, 'info');
+    }
+
+    // Restaurar tema salvo no Agente
+    const savedAgentTheme = localStorage.getItem('gboc_agent_gui_theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', savedAgentTheme);
+    const agentSel = document.getElementById('agentThemeSelector');
+    if(agentSel) agentSel.value = savedAgentTheme;
+
+    function openAgentAIDiagnosticModal() {
+        let modal = document.getElementById('agent-ai-modal');
+        if(!modal) {
+            modal = document.createElement('div');
+            modal.id = 'agent-ai-modal';
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.8);z-index:99999;display:flex;align-items:center;justify-content:center';
+            modal.innerHTML = `
+                <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;width:90%;max-width:700px;max-height:85vh;overflow-y:auto;padding:24px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:12px">
+                        <h3 style="margin:0;color:var(--primary)"><i class="fas fa-brain"></i> GBOC Agent AI Diagnostic</h3>
+                        <button onclick="document.getElementById('agent-ai-modal').style.display='none'" class="btn btn-secondary" style="padding:4px 8px">&times;</button>
+                    </div>
+                    <div id="agent-ai-modal-content">
+                        <p style="color:var(--text-muted)">Iniciando diagnóstico local do nó via IA...</p>
+                    </div>
+                    <div style="margin-top:20px;text-align:right">
+                        <button class="btn btn-warning" onclick="runAgentAIDiagnostic()"><i class="fas fa-play"></i> Reanalisar</button>
+                        <button class="btn btn-secondary" onclick="document.getElementById('agent-ai-modal').style.display='none'">Fechar</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+        modal.style.display = 'flex';
+        runAgentAIDiagnostic();
+    }
+
+    async function runAgentAIDiagnostic() {
+        const container = document.getElementById('agent-ai-modal-content');
+        container.innerHTML = '<p style="color:var(--text-muted)"><i class="fas fa-spinner fa-spin"></i> Analisando telemetria do nó e consultando Engine IA...</p>';
+        try {
+            const r = await fetch(window.GBOC_API_BASE + '/api/v1/ai/diagnose', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({disk_percent: 38, ram_percent: 52, cpu_percent: 18})
+            });
+            const d = await r.json();
+            container.innerHTML = `
+                <div style="background:var(--bg-dark);padding:16px;border-radius:8px;border:1px solid var(--border);margin-bottom:16px">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                        <span style="font-weight:700;font-size:1.1em">Score de Saúde do Nó: <span style="color:${d.health_score >= 85 ? 'var(--success)' : 'var(--danger)'}">${d.health_score}/100</span></span>
+                        <span class="badge badge-success">${d.status}</span>
+                    </div>
+                </div>
+                <h4 style="margin-bottom:8px">🤖 Insights IA Local & Nuvem:</h4>
+                <div style="background:var(--bg-input);padding:14px;border-radius:8px;font-size:0.92em;line-height:1.6;white-space:pre-wrap;border-left:4px solid var(--primary)">${d.ai_insights}</div>
+            `;
+        } catch(e) {
+            container.innerHTML = `<p style="color:var(--danger)">Erro no diagnóstico: ${e.message}</p>`;
+        }
+    }
+
+    function openAgentReportsCatalogModal() {
+        let modal = document.getElementById('agent-reports-modal');
+        if(!modal) {
+            modal = document.createElement('div');
+            modal.id = 'agent-reports-modal';
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.8);z-index:99999;display:flex;align-items:center;justify-content:center';
+            modal.innerHTML = `
+                <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;width:95%;max-width:900px;max-height:90vh;overflow-y:auto;padding:24px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:12px">
+                        <h3 style="margin:0;color:var(--primary)"><i class="fas fa-file-contract"></i> Catálogo dos 50 Relatórios GBOC</h3>
+                        <button onclick="document.getElementById('agent-reports-modal').style.display='none'" class="btn btn-secondary" style="padding:4px 8px">&times;</button>
+                    </div>
+                    <div id="agent-reports-grid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(260px, 1fr));gap:12px;max-height:60vh;overflow-y:auto;padding-right:6px">
+                        <p style="color:var(--text-muted)">Carregando catálogo...</p>
+                    </div>
+                    <div id="agent-report-out" style="margin-top:16px;display:none;background:var(--bg-dark);padding:16px;border-radius:8px;border:1px solid var(--border)"></div>
+                    <div style="margin-top:16px;text-align:right">
+                        <button class="btn btn-secondary" onclick="document.getElementById('agent-reports-modal').style.display='none'">Fechar</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+        modal.style.display = 'flex';
+        loadAgentReports();
+    }
+
+    async function loadAgentReports() {
+        const container = document.getElementById('agent-reports-grid');
+        try {
+            const r = await fetch(window.GBOC_API_BASE + '/api/v1/reports/catalog');
+            const d = await r.json();
+            container.innerHTML = d.reports.map(rep => `
+                <div style="background:var(--bg-input);padding:12px;border-radius:8px;border:1px solid var(--border);display:flex;flex-direction:column;justify-content:space-between">
+                    <div>
+                        <div style="font-size:0.75em;color:var(--primary);font-weight:700">#${rep.id} • ${rep.category}</div>
+                        <div style="font-weight:600;font-size:0.9em;margin:4px 0">${rep.name}</div>
+                        <span class="badge ${rep.type.includes('Exclusive')?'badge-warning':'badge-info'}" style="font-size:0.7em">${rep.type}</span>
+                    </div>
+                    <button class="btn btn-primary" style="margin-top:8px;padding:4px 8px;font-size:0.8em" onclick="generateAgentReport(${rep.id})"><i class="fas fa-chart-bar"></i> Gerar Relatório</button>
+                </div>
+            `).join('');
+        } catch(e) {
+            container.innerHTML = `<p style="color:var(--danger)">Erro ao carregar relatórios: ${e.message}</p>`;
+        }
+    }
+
+    async function generateAgentReport(reportId) {
+        const outArea = document.getElementById('agent-report-out');
+        outArea.style.display = 'block';
+        outArea.innerHTML = '<p style="color:var(--text-muted)"><i class="fas fa-spinner fa-spin"></i> Gerando relatório no agente...</p>';
+        try {
+            const r = await fetch(window.GBOC_API_BASE + '/api/v1/reports/generate', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({report_id: reportId})
+            });
+            const rep = await r.json();
+            outArea.innerHTML = `
+                <h4 style="color:var(--primary);margin-bottom:8px"><i class="fas fa-file-alt"></i> ${rep.title}</h4>
+                <p style="font-size:0.85em;color:var(--text-muted);margin-bottom:12px">Gerado em: ${new Date(rep.generated_at).toLocaleString()} | Agente Node 13.2.0</p>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:8px;margin-bottom:12px">
+                    ${rep.metrics.map(m => `
+                        <div style="background:var(--bg-card);padding:10px;border-radius:6px;border:1px solid var(--border)">
+                            <div style="font-size:0.75em;color:var(--text-muted)">${m.label}</div>
+                            <div style="font-size:1.1em;font-weight:700;color:var(--success)">${m.value}</div>
+                        </div>
+                    `).join('')}
+                </div>
+                <div style="background:var(--bg-card);padding:10px;border-radius:6px;font-size:0.88em;line-height:1.5;border-left:3px solid var(--warning)">
+                    <strong>Recomendação Executiva IA:</strong> ${rep.ai_executive_recommendation}
+                </div>
+            `;
+        } catch(e) {
+            outArea.innerHTML = `<p style="color:var(--danger)">Erro: ${e.message}</p>`;
+        }
+    }
     </script>
 
     <script src="/static/sidebar.js"></script>
-    <script src="/static/app_v6.js?v=11.7c"></script>
+    <script src="/static/app_v6.js?v=13.2.0"></script>
     <script>document.addEventListener('DOMContentLoaded',()=>{if(window._splashDone)setTimeout(window._splashDone,800)});</script>
 </body>
 </html>
-

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": 1777157637.237696,
+  "updated_at": 1787957064.0207014,
   "engines": {
     "restic": {
       "path": "C:\\Users\\Administrador\\AppData\\Local\\Microsoft\\WinGet\\Links\\restic.EXE",
@@ -8,7 +8,7 @@
     },
     "kopia": {
       "path": "C:\\Users\\Administrador\\AppData\\Local\\Programs\\KopiaUI\\resources\\server\\kopia.exe",
-      "source": "dir:C:\\Users\\Administrador\\AppData\\Local\\Programs\\KopiaUI\\resources\\server"
+      "source": "scan:C:\\Users\\Administrador\\AppData\\Local\\Programs\\KopiaUI"
     },
     "duplicati": {
       "path": "C:\\Program Files\\Duplicati 2\\Duplicati.CommandLine.exe",

@@ -1,9 +1,16 @@
+/*
+==============================================================================
+GBOC System v13.2.0 Enterprise Edition
+Copyright (c) 2026 Master11BR - Todos os direitos reservados.
+Propriedade Intelectual & Direitos Autorais Registrados.
+==============================================================================
+*/
 /**
  * GBOC Agent - Global Functions
  * Funções utilitárias globais para todas as páginas
  */
 
-console.log('✅ GBOC Global Functions carregado - 11.7c');
+console.log('✅ GBOC Global Functions carregado - 13.2.0');
 
 // Logout function
 function handleLogout() {

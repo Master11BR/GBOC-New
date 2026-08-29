@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 11.7c - API de Verificação de Integridade
+GBOC 13.2.0 - API de Verificação de Integridade
 Executa restic check / kopia verify para validar integridade dos repositórios
 """
 
@@ -285,7 +285,7 @@ async def get_integrity_history():
                 _ensure_integrity_table(conn)
 
             cursor.execute("""
-                SELECT ic.id, r.name as repo_name, ic.engine, ic.status,
+                SELECT ic.id, ic.repository_id, r.name as repo_name, ic.engine, ic.status,
                        ic.started_at, ic.finished_at, ic.result_summary, ic.errors_found
                 FROM integrity_checks ic
                 JOIN repositories r ON ic.repository_id = r.id
@@ -295,9 +295,9 @@ async def get_integrity_history():
 
             history = []
             for row in cursor.fetchall():
-                raw_status = (row[3] or '').lower()
-                summary = row[6] or ''
-                errors_found = row[7] or 0
+                raw_status = (row[4] or '').lower()
+                summary = row[7] or ''
+                errors_found = row[8] or 0
 
                 display_status = raw_status
                 if raw_status in ('failed', 'error') and errors_found == 0:
@@ -308,11 +308,14 @@ async def get_integrity_history():
                         display_status = 'warning'
 
                 history.append({
-                    "id": row[0], "repository_name": row[1], "engine": row[2],
+                    "id": row[0],
+                    "repository_id": row[1],
+                    "repository_name": row[2],
+                    "engine": row[3],
                     "status": raw_status,
                     "display_status": display_status,
-                    "started_at": row[4].isoformat() if row[4] else None,
-                    "finished_at": row[5].isoformat() if row[5] else None,
+                    "started_at": row[5].isoformat() if hasattr(row[5], 'isoformat') and row[5] else (str(row[5]) if row[5] else None),
+                    "finished_at": row[6].isoformat() if hasattr(row[6], 'isoformat') and row[6] else (str(row[6]) if row[6] else None),
                     "result_summary": summary,
                     "errors_found": errors_found
                 })
@@ -502,7 +505,7 @@ def _check_restic(repo: Dict) -> Dict:
     restic = get_engine_path_or_raise('restic')
 
     # Reutilizar exatamente a mesma montagem de repositório/env do fluxo principal
-    rm = RepositoryManager(get_shared_core())
+    rm = RepositoryManager(_get_core())
     repo_arg, env, prep_error, _ = rm._build_restic_repo_and_env(repo, allow_init=False)
     if prep_error:
         return {"success": False, "summary": prep_error, "errors": 1, "output": ""}

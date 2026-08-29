@@ -1,43 +1,146 @@
+<!--
+==============================================================================
+GBOC System v13.2.0 Enterprise Edition
+Copyright (c) 2026 Master11BR - Todos os direitos reservados.
+Propriedade Intelectual & Direitos Autorais Registrados.
+==============================================================================
+-->
+<style>
+.sidebar {
+    width: var(--gboc-sidebar-width, 260px);
+    height: calc(100vh - var(--gboc-topbar-height, 58px));
+    position: fixed;
+    top: var(--gboc-topbar-height, 58px);
+    left: 0;
+    background: var(--sidebar-bg, #0b1329);
+    border-right: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+    display: flex;
+    flex-direction: column;
+    z-index: 1000;
+    overflow-y: auto;
+    overflow-x: hidden;
+    box-sizing: border-box;
+    transition: width var(--gboc-transition, 0.25s), min-width var(--gboc-transition, 0.25s);
+}
+.sidebar .nav {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 10px;
+}
+.nav-group { margin: 2px 0; }
+.nav-group-header {
+    width: 100%; background: transparent; border: none; color: var(--text, #f8fafc); cursor: pointer;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 12px; border-radius: 8px; font-size: 0.84em; font-weight: 600;
+    transition: background 0.2s;
+    text-align: left;
+}
+.nav-group-header:hover { background: var(--primary-soft, rgba(99, 102, 241, 0.12)); }
+.nav-group-arrow { font-size: 0.72em; transition: transform 0.25s; color: var(--text-muted, #64748b); }
+.nav-group-items {
+    overflow: hidden; max-height: 0; transition: max-height 0.3s ease;
+}
+.nav-group-items.open { max-height: 600px; }
+.nav-link.nav-sub { padding-left: 26px; font-size: 0.81em; }
+</style>
 <aside class="sidebar">
-    <div class="sidebar-header"><a href="/" class="logo"><i class="fas fa-shield-alt logo-icon"></i> GBOC 11.7c</a></div>
-    <div style="padding:0 4px 10px 4px;">
-        <button onclick="toggleTheme()" id="themeToggle" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;font-size:0.85em;transition:all 0.2s;">
-            <i class="fas fa-moon" id="themeIcon"></i> <span id="themeLabel">Tema</span>
-        </button>
-    </div>
-    <nav class="nav">
-        <a href="/" class="nav-link"><i class="fas fa-home nav-icon"></i> Dashboard</a>
-        <a href="/diagnostic.html" class="nav-link"><i class="fas fa-stethoscope nav-icon"></i> Diagnóstico</a>
-        <a href="/repositories.html" class="nav-link"><i class="fas fa-server nav-icon"></i> Repositórios</a>
-        <a href="/tasks.html" class="nav-link"><i class="fas fa-tasks nav-icon"></i> Tarefas</a>
-        <a href="/restore.html" class="nav-link"><i class="fas fa-undo nav-icon"></i> Restauração</a>
-        <a href="/replication.html" class="nav-link"><i class="fas fa-exchange-alt nav-icon"></i> Replicação</a>
-        <a href="/duplicati-native.html" class="nav-link"><i class="fas fa-plug nav-icon"></i> Duplicati Nativo</a>
-        <a href="/logs.html" class="nav-link"><i class="fas fa-file-alt nav-icon"></i> Logs</a>
-        <a href="/reports.html" class="nav-link"><i class="fas fa-chart-pie nav-icon"></i> Relatórios</a>
-        <a href="/database-backup.html" class="nav-link"><i class="fas fa-database nav-icon"></i> Backup BD</a>
-        <a href="/ransomware.html" class="nav-link"><i class="fas fa-shield-virus nav-icon"></i> Ransomware</a>
-        <a href="/compliance.html" class="nav-link"><i class="fas fa-clipboard-check nav-icon"></i> Compliance</a>
-        <a href="/alerts.html" class="nav-link"><i class="fas fa-bell nav-icon"></i> Alertas</a>
-        <a href="/users.html" class="nav-link"><i class="fas fa-user-shield nav-icon"></i> Segurança</a>
-        <a href="/integrity.html" class="nav-link"><i class="fas fa-check-double nav-icon"></i> Integridade</a>
-        <a href="/audit.html" class="nav-link"><i class="fas fa-clipboard-list nav-icon"></i> Audit Trail</a>
-        <a href="/notification-channels.html" class="nav-link"><i class="fas fa-bell nav-icon"></i> Canais de Notificação</a>
-        <a href="/changelog.html" class="nav-link"><i class="fas fa-clipboard-list nav-icon"></i> Changelog</a>
-        <a href="/settings.html" class="nav-link"><i class="fas fa-cogs nav-icon"></i> Configurações</a>
-        <a href="#" class="nav-link" id="sidebarLogoutLink" style="display:none;" onclick="gbocLogout(); return false;"><i class="fas fa-sign-out-alt nav-icon"></i> Sair</a>
-    </nav>
-    <div style="position:sticky;bottom:0;left:0;right:0;padding:10px 4px 0 4px;background:linear-gradient(180deg, rgba(0,0,0,0) 0%, var(--sidebar-bg) 40%);">
-        <div id="sidebarUserInfo" style="display:none;padding:8px 10px;margin-bottom:8px;border-radius:8px;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.2);font-size:0.8em;color:var(--text-secondary);text-align:center;">
-            <i class="fas fa-user-circle"></i> <span id="sidebarUsername"></span>
-        </div>
-        <div style="display:flex;gap:6px;justify-content:flex-end;">
-            <button onclick="gbocLogout()" id="logoutBtn" style="display:none;padding:10px 14px;border-radius:8px;border:1px solid var(--danger);background:rgba(240,107,107,.1);color:var(--danger);cursor:pointer;font-size:0.85em;transition:all 0.2s;" title="Sair">
-                <i class="fas fa-sign-out-alt"></i>
+    <nav class="nav" id="gboc-nav" style="padding-top:16px">
+        <!-- 1. Dashboard Agente -->
+        <a href="/index.html" class="nav-link" title="Dashboard Principal"><i class="fas fa-home nav-icon" style="color:#3b82f6"></i> <span>Dashboard Agente</span></a>
+
+        <!-- 2. Tarefas & Motores -->
+        <div class="nav-group" id="grp-tasks">
+            <button class="nav-group-header" onclick="toggleNavGroup('grp-tasks')" title="Tarefas & Motores">
+                <span><i class="fas fa-tasks nav-icon" style="color:#8b5cf6"></i> Tarefas & Motores</span>
+                <i class="fas fa-chevron-down nav-group-arrow" id="arrow-grp-tasks"></i>
             </button>
+            <div class="nav-group-items open" id="items-grp-tasks">
+                <a href="/tasks.html" class="nav-link nav-sub" title="Tarefas de Backup"><i class="fas fa-list-check nav-icon"></i> <span>Tarefas de Backup</span></a>
+                <a href="/repositories.html" class="nav-link nav-sub" title="Repositórios de Backup"><i class="fas fa-database nav-icon"></i> <span>Repositórios Locais</span></a>
+                <a href="/restore.html" class="nav-link nav-sub" title="Assistente de Restauração"><i class="fas fa-undo nav-icon"></i> <span>Assistente Restauração</span></a>
+                <a href="/engines.html" class="nav-link nav-sub" title="Motores Nativos de Backup"><i class="fas fa-cogs nav-icon"></i> <span>Motores Nativos (Restic/Kopia)</span></a>
+                <a href="/duplicati-native.html" class="nav-link nav-sub" title="Duplicati Nativo"><i class="fas fa-plug nav-icon"></i> <span>Duplicati Nativo</span></a>
+                <a href="/database-backup.html" class="nav-link nav-sub" title="Backup de Banco de Dados"><i class="fas fa-server nav-icon"></i> <span>Backup Banco de Dados</span></a>
+                <a href="/active-directory.html" class="nav-link nav-sub" title="Backup do Active Directory (AD DS)"><i class="fas fa-sitemap nav-icon" style="color:#38b2ac"></i> <span>Backup Active Directory (AD)</span></a>
+                <a href="/tape-backup.html" class="nav-link nav-sub" title="Backup em Fita LTO"><i class="fas fa-tape nav-icon"></i> <span>Backup em Fita (LTO)</span></a>
+                <a href="/failed-jobs.html" class="nav-link nav-sub" style="color:#ef4444" title="Central de Jobs com Falha"><i class="fas fa-exclamation-triangle nav-icon"></i> <span>Jobs com Falha</span></a>
+            </div>
         </div>
-    </div>
+
+        <!-- 3. Proteção & Defesa -->
+        <div class="nav-group" id="grp-defense">
+            <button class="nav-group-header" onclick="toggleNavGroup('grp-defense')" title="Proteção & Defesa">
+                <span><i class="fas fa-shield-alt nav-icon" style="color:#ef4444"></i> Proteção & Defesa</span>
+                <i class="fas fa-chevron-down nav-group-arrow" id="arrow-grp-defense"></i>
+            </button>
+            <div class="nav-group-items open" id="items-grp-defense">
+                <a href="/ransomware.html" class="nav-link nav-sub" title="Proteção Ransomware Guardian"><i class="fas fa-shield-virus nav-icon"></i> <span>Ransomware Guardian</span></a>
+                <a href="/compliance.html" class="nav-link nav-sub" title="Compliance & Conformidade"><i class="fas fa-clipboard-check nav-icon"></i> <span>Compliance & Conformidade</span></a>
+                <a href="/audit.html" class="nav-link nav-sub" title="Audit Trail & Trilha de Auditoria"><i class="fas fa-clipboard-list nav-icon"></i> <span>Trilha de Auditoria</span></a>
+            </div>
+        </div>
+
+        <!-- 4. Virtualização & Cloud -->
+        <div class="nav-group" id="grp-virt">
+            <button class="nav-group-header" onclick="toggleNavGroup('grp-virt')" title="Virtualização & Cloud">
+                <span><i class="fas fa-cubes nav-icon" style="color:#06b6d4"></i> Virtualização & Cloud</span>
+                <i class="fas fa-chevron-down nav-group-arrow" id="arrow-grp-virt"></i>
+            </button>
+            <div class="nav-group-items open" id="items-grp-virt">
+                <a href="/virtualization.html" class="nav-link nav-sub" title="VMs VMware / Hyper-V / Proxmox"><i class="fas fa-server nav-icon"></i> <span>VMs (VMware/Hyper-V/Proxmox)</span></a>
+                <a href="/m365-exchange.html" class="nav-link nav-sub" title="Microsoft 365 & Exchange"><i class="fas fa-mail-bulk nav-icon"></i> <span>Microsoft 365 & Exchange</span></a>
+                <a href="/disaster-recovery.html" class="nav-link nav-sub" title="Disaster Recovery & P2V"><i class="fas fa-life-ring nav-icon"></i> <span>Disaster Recovery & P2V</span></a>
+                <a href="/replication.html" class="nav-link nav-sub" title="Replicação Local"><i class="fas fa-exchange-alt nav-icon"></i> <span>Replicação Local</span></a>
+            </div>
+        </div>
+
+        <!-- 5. Diagnóstico & Logs -->
+        <div class="nav-group" id="grp-diag">
+            <button class="nav-group-header" onclick="toggleNavGroup('grp-diag')" title="Diagnóstico & Logs">
+                <span><i class="fas fa-stethoscope nav-icon" style="color:#10b981"></i> Diagnóstico & Logs</span>
+                <i class="fas fa-chevron-down nav-group-arrow" id="arrow-grp-diag"></i>
+            </button>
+            <div class="nav-group-items open" id="items-grp-diag">
+                <a href="/diagnostic.html" class="nav-link nav-sub" title="Diagnósticos do Agente"><i class="fas fa-notes-medical nav-icon"></i> <span>Diagnósticos do Agente</span></a>
+                <a href="/logs.html" class="nav-link nav-sub" title="Logs de Sistema"><i class="fas fa-file-alt nav-icon"></i> <span>Logs do Sistema</span></a>
+                <a href="/reports.html" class="nav-link nav-sub" title="Central de Relatórios"><i class="fas fa-chart-pie nav-icon"></i> <span>Central de Relatórios</span></a>
+                <a href="/alerts.html" class="nav-link nav-sub" title="Central de Alertas"><i class="fas fa-bell nav-icon"></i> <span>Central de Alertas</span></a>
+                <a href="/auth-diagnostic.html" class="nav-link nav-sub" title="Diagnóstico de Autenticação"><i class="fas fa-key nav-icon"></i> <span>Diagnóstico Autenticação</span></a>
+            </div>
+        </div>
+
+        <!-- 6. Configuração -->
+        <div class="nav-group" id="grp-config">
+            <button class="nav-group-header" onclick="toggleNavGroup('grp-config')" title="Configuração">
+                <span><i class="fas fa-sliders-h nav-icon" style="color:#f59e0b"></i> Configuração</span>
+                <i class="fas fa-chevron-down nav-group-arrow" id="arrow-grp-config"></i>
+            </button>
+            <div class="nav-group-items open" id="items-grp-config">
+                <a href="/settings.html" class="nav-link nav-sub" title="Configurações Gerais"><i class="fas fa-cog nav-icon"></i> <span>Configurações do Agente</span></a>
+                <a href="/storage-usage.html" class="nav-link nav-sub" title="Uso & Crescimento de Armazenamento"><i class="fas fa-hdd nav-icon"></i> <span>Uso de Armazenamento</span></a>
+                <a href="/users.html" class="nav-link nav-sub" title="Gestão de Usuários"><i class="fas fa-users-cog nav-icon"></i> <span>Usuários & Permissões</span></a>
+                <a href="/notification-channels.html" class="nav-link nav-sub" title="Canais de Notificação"><i class="fas fa-envelope nav-icon"></i> <span>Canais de Notificação</span></a>
+                <a href="/changelog.html" class="nav-link nav-sub" title="Changelog de Versões"><i class="fas fa-list-alt nav-icon"></i> <span>Changelog</span></a>
+                <a href="/onboarding.html" class="nav-link nav-sub" title="Assistente de Configuração Inicial"><i class="fas fa-magic nav-icon"></i> <span>Assistente Config.</span></a>
+                <a href="#" onclick="if(window.GBOC_AI_Assistant){window.GBOC_AI_Assistant.toggle();}return false;" class="nav-link nav-sub" style="color:var(--primary);font-weight:700" title="GBOC AI Copilot"><i class="fas fa-brain nav-icon"></i> <span>GBOC AI Copilot</span></a>
+            </div>
+        </div>
+    </nav>
 </aside>
+<script>
+function gbocToggleSidebarCollapse(){
+    document.body.classList.toggle('sidebar-collapsed');
+    const isCollapsed = document.body.classList.contains('sidebar-collapsed');
+    localStorage.setItem('gboc-sidebar-collapsed', isCollapsed ? 'true' : 'false');
+}
+// Restore collapsed state on load
+(function(){
+    if(localStorage.getItem('gboc-sidebar-collapsed') === 'true'){
+        document.body.classList.add('sidebar-collapsed');
+    }
+})();
+</script>
+<script src="/static/ai_assistant.js"></script>
 <script>
 function toggleTheme(){
     const current = document.documentElement.getAttribute('data-theme') || 'dark';
@@ -109,6 +212,35 @@ async function gbocLogout(){
     // Executar setup de auth imediatamente (o DOM do sidebar já está pronto quando o script executa via insertAdjacentHTML)
     // Aguardar um tick para garantir que os elementos já estão no DOM
     setTimeout(gbocSetupSidebarAuth, 0);
+    // ── Init Collapsible Nav Groups ─────────────────────────────
+    initNavGroups();
 })();
+function initNavGroups() {
+    const groups = ['grp-backup','grp-virt','grp-security','grp-monitor','grp-system'];
+    const cur = window.location.pathname;
+    groups.forEach(grpId => {
+        const items = document.getElementById('items-' + grpId);
+        const arrow = document.getElementById('arrow-' + grpId);
+        if (!items) return;
+        // Auto-open group if current page is inside it
+        const hasActive = Array.from(items.querySelectorAll('a')).some(a => cur.startsWith(a.getAttribute('href')));
+        const savedOpen = localStorage.getItem('gboc-nav-' + grpId);
+        const shouldOpen = hasActive || savedOpen === 'open';
+        if (shouldOpen) {
+            items.classList.add('open');
+            if (arrow) arrow.style.transform = 'rotate(180deg)';
+        }
+    });
+}
+function toggleNavGroup(grpId) {
+    const items = document.getElementById('items-' + grpId);
+    const arrow = document.getElementById('arrow-' + grpId);
+    if (!items) return;
+    const isOpen = items.classList.toggle('open');
+    if (arrow) arrow.style.transform = isOpen ? 'rotate(180deg)' : '';
+    localStorage.setItem('gboc-nav-' + grpId, isOpen ? 'open' : 'closed');
+}
 </script>
 
+<!-- GBOC Layout Manager: injected here so it runs after sidebar DOM is ready -->
+<script src="/static/gboc-layout-manager.js"></script>

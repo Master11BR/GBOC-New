@@ -1,0 +1,201 @@
+<!-- GBOC System v13.2.0 Enterprise Edition -->
+<!-- Module: Reports HTML Template (Server) -->
+
+<div class="panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+        <div>
+            <h3 style="margin:0;font-size:1.2em"><i class="fas fa-chart-pie" style="color:var(--primary)"></i> Central de Relatórios Executivos & Preditivos</h3>
+            <p style="font-size:0.85em;color:var(--text-muted);margin-top:4px">50 relatórios completos com extração de dados 100% reais do banco de dados PostgreSQL e Inteligência Preditiva.</p>
+        </div>
+        <div style="display:flex;gap:8px">
+            <span class="badge badge-info" style="font-size:0.8em;padding:6px 12px"><i class="fas fa-database"></i> Dados Reais Ativos</span>
+            <span class="badge badge-success" style="font-size:0.8em;padding:6px 12px"><i class="fas fa-brain"></i> IA GBOC 13.2.0</span>
+        </div>
+    </div>
+
+    <style>
+        .server-reports-layout {
+            display: grid;
+            grid-template-columns: 360px 1fr;
+            gap: 20px;
+            margin-top: 15px;
+        }
+        @media(max-width: 960px) {
+            .server-reports-layout { grid-template-columns: 1fr; }
+        }
+        .srv-catalog-panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            height: 760px;
+        }
+        .srv-search-box {
+            position: relative;
+            margin-bottom: 12px;
+        }
+        .srv-search-box input {
+            width: 100%;
+            padding: 10px 12px 10px 36px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--bg-input);
+            color: var(--text);
+            font-size: 0.88em;
+        }
+        .srv-search-box i {
+            position: absolute;
+            left: 12px;
+            top: 11px;
+            color: var(--text-muted);
+        }
+        .srv-cat-chips {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            padding-bottom: 8px;
+            margin-bottom: 12px;
+            scrollbar-width: none;
+        }
+        .srv-cat-chip {
+            padding: 5px 12px;
+            border-radius: 20px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            font-size: 0.76em;
+            color: var(--text-muted);
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all .2s;
+        }
+        .srv-cat-chip:hover, .srv-cat-chip.active {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+        }
+        .srv-reports-list {
+            flex: 1;
+            overflow-y: auto;
+            padding-right: 4px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .srv-report-card {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+            cursor: pointer;
+            transition: all .2s;
+        }
+        .srv-report-card:hover {
+            border-color: var(--primary);
+            transform: translateX(2px);
+        }
+        .srv-report-card.selected {
+            background: rgba(79, 163, 232, 0.12);
+            border-color: var(--primary);
+            box-shadow: 0 0 10px rgba(79, 163, 232, 0.2);
+        }
+        .srv-report-card .title {
+            font-weight: 600;
+            font-size: 0.9em;
+            margin-top: 4px;
+            color: var(--text);
+        }
+        .srv-viewer-panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            min-height: 760px;
+            display: flex;
+            flex-direction: column;
+        }
+        .srv-viewer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 16px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .srv-metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .srv-metric-card {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 14px;
+            text-align: center;
+        }
+        .srv-metric-card .lbl {
+            font-size: 0.75em;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+        .srv-metric-card .val {
+            font-size: 1.6em;
+            font-weight: 700;
+            color: var(--primary);
+            margin-top: 4px;
+        }
+    </style>
+
+    <div class="server-reports-layout">
+        <!-- Painel Lateral de Catálogo -->
+        <div class="srv-catalog-panel">
+            <div class="srv-search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" id="srvReportSearch" placeholder="Buscar por ID, nome ou tipo..." onkeyup="filterSrvReports()">
+            </div>
+
+            <div class="srv-cat-chips" id="srvCategoryChips">
+                <span class="srv-cat-chip active" onclick="setSrvCategoryFilter('ALL', this)">Todos (50)</span>
+                <span class="srv-cat-chip" onclick="setSrvCategoryFilter('Executive', this)">Executivos</span>
+                <span class="srv-cat-chip" onclick="setSrvCategoryFilter('Storage', this)">Storage</span>
+                <span class="srv-cat-chip" onclick="setSrvCategoryFilter('Performance', this)">Performance</span>
+                <span class="srv-cat-chip" onclick="setSrvCategoryFilter('Security', this)">Segurança</span>
+                <span class="srv-cat-chip" onclick="setSrvCategoryFilter('AI Predictive', this)">IA Preditiva</span>
+                <span class="srv-cat-chip" onclick="setSrvCategoryFilter('AI Executive', this)">IA Executiva</span>
+            </div>
+
+            <div class="srv-reports-list" id="srvReportsList">
+                <p style="color:var(--text-muted);text-align:center;padding:30px"><i class="fas fa-spinner fa-spin"></i> Carregando catálogo dos 50 relatórios...</p>
+            </div>
+        </div>
+
+        <!-- Painel Visualizador Principal -->
+        <div class="srv-viewer-panel">
+            <div class="srv-viewer-header">
+                <h3 id="srvViewerTitle" style="margin:0;font-size:1.1em;display:flex;align-items:center;gap:10px;color:var(--text)">
+                    <i class="fas fa-file-contract" style="color:var(--primary)"></i> Selecione um Relatório no Catálogo
+                </h3>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    <button class="btn btn-primary" id="btnSrvRunCurrent" onclick="runSrvSelectedReport()" disabled><i class="fas fa-play"></i> Gerar Agora</button>
+                    <button class="btn" onclick="exportSrvReport('html')" id="btnSrvPrint" disabled><i class="fas fa-print"></i> Imprimir / PDF</button>
+                    <button class="btn" onclick="exportSrvReport('csv')" id="btnSrvCsv" disabled><i class="fas fa-file-csv"></i> Exportar CSV</button>
+                    <button class="btn" onclick="exportSrvReport('json')" id="btnSrvJson" disabled><i class="fas fa-code"></i> JSON</button>
+                </div>
+            </div>
+
+            <div id="srvViewerBody" style="flex:1">
+                <div style="text-align:center;padding:80px 20px;color:var(--text-muted)">
+                    <i class="fas fa-chart-line fa-3x" style="color:var(--border);margin-bottom:16px"></i>
+                    <h3>Escolha qualquer um dos 50 relatórios da lista à esquerda</h3>
+                    <p style="max-width:480px;margin:10px auto;font-size:0.9em;line-height:1.5">Cada relatório realiza consultas SQL dinâmicas no banco PostgreSQL em tempo real e compila diagnósticos gerenciais com inteligência artificial.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-⚙️ GBOC Agent 11.7c - API SETTINGS
+⚙️ GBOC Agent 13.2.0 - API SETTINGS
 Responsável por: Rotas para configuração do sistema
 """
 
@@ -148,7 +148,7 @@ async def get_category_settings(category: str) -> Dict[str, Any]:
     try:
         core = get_shared_core()
         
-        valid_categories = ["general", "backup", "notifications", "performance", "security"]
+        valid_categories = ["general", "backup", "reports", "notifications", "performance", "security"]
         if category not in valid_categories:
             raise HTTPException(status_code=400, detail=f"Categoria inválida. Use: {', '.join(valid_categories)}")
         
@@ -565,6 +565,20 @@ def _get_default_settings() -> Dict[str, Dict[str, Any]]:
                 "max": 1440
             }
         },
+        "reports": {
+            "cloud_storage_cost_usd_per_tb": {
+                "type": "number",
+                "default": 7.99,
+                "description": "Tarifa Base Cloud Storage ($ USD / TB / mês)",
+                "min": 0.01,
+                "max": 999.0
+            },
+            "auto_currency_conversion": {
+                "type": "boolean",
+                "default": True,
+                "description": "Conversão Automática de Câmbio (USD -> BRL)"
+            }
+        },
         "notifications": {
             "enabled": {
                 "type": "boolean",
@@ -663,6 +677,7 @@ def _get_category_title(category: str) -> str:
     titles = {
         "general": "Configurações Gerais",
         "backup": "Backup e Restauração", 
+        "reports": "Relatórios",
         "notifications": "Notificações",
         "performance": "Performance",
         "security": "Segurança"

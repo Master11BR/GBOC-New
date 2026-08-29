@@ -32,10 +32,10 @@ class DatabaseManager:
                 maxconn=DB_POOL_MAX_CONN,
                 **DB_CONFIG
             )
-            logger.info(f"✓ Pool PostgreSQL inicializado ({DB_POOL_MIN_CONN}-{DB_POOL_MAX_CONN} conexões)")
+            logger.info(f"Pool PostgreSQL inicializado ({DB_POOL_MIN_CONN}-{DB_POOL_MAX_CONN} conexões)")
             return True
         except Exception as e:
-            logger.error(f"✗ Erro ao inicializar pool PostgreSQL: {e}")
+            logger.error(f"Erro ao inicializar pool PostgreSQL: {e}")
             return False
 
     def get_connection(self) -> Optional[psycopg2.extensions.connection]:
@@ -45,6 +45,8 @@ class DatabaseManager:
         Returns:
             Conexão PostgreSQL ou None se falhar
         """
+        if not self.pool:
+            self.initialize()
         if not self.pool:
             logger.error("Pool não inicializado")
             return None

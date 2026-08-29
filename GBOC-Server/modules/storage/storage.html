@@ -1,0 +1,47 @@
+<!-- GBOC Server v13.2.0 — Fragmento de Armazenamento Central -->
+<div class="panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:12px">
+        <h3><i class="fas fa-hdd" style="color:var(--primary)"></i> Uso & Crescimento de Armazenamento Central</h3>
+        <button class="btn btn-primary" onclick="rescanServerStorage()"><i class="fas fa-sync-alt"></i> Atualizar / Scan</button>
+    </div>
+
+    <div class="kpi-grid" style="margin-bottom:20px">
+        <div class="kpi-card">
+            <div class="kpi-header"><span>Capacidade Total</span><div class="kpi-icon blue"><i class="fas fa-database"></i></div></div>
+            <div class="kpi-value" id="srv-storage-total">0 GB</div>
+            <div class="kpi-sub">Servidor Host</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-header"><span>Espaço Utilizado</span><div class="kpi-icon orange"><i class="fas fa-hdd"></i></div></div>
+            <div class="kpi-value" id="srv-storage-used">0 GB</div>
+            <div class="kpi-sub" id="srv-storage-percent">0% usado</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-header"><span>Espaço Livre</span><div class="kpi-icon green"><i class="fas fa-check-circle"></i></div></div>
+            <div class="kpi-value" id="srv-storage-free">0 GB</div>
+            <div class="kpi-sub">Disponível</div>
+        </div>
+    </div>
+
+    <div class="chart-panel" style="margin-bottom:20px">
+        <h4 style="margin-bottom:12px"><i class="fas fa-chart-line" style="color:var(--primary)"></i> Tendência de Crescimento de Armazenamento</h4>
+        <canvas id="server-storage-chart" style="max-height:260px"></canvas>
+    </div>
+
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Repositório / Volume</th>
+                <th>Caminho Local</th>
+                <th>Capacidade</th>
+                <th>Utilizado</th>
+                <th>Livre</th>
+                <th>Uso (%)</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody id="table-server-storage">
+            <tr><td colspan="7" style="text-align:center;color:var(--text-muted)">Carregando dados de armazenamento...</td></tr>
+        </tbody>
+    </table>
+</div>
