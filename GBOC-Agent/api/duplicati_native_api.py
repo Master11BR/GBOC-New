@@ -62,6 +62,19 @@ async def list_backups() -> Dict[str, Any]:
     return result
 
 
+@router.get("/backups/{backup_id}/filesets")
+async def list_backup_filesets(backup_id: str) -> Dict[str, Any]:
+    """Lista snapshots / pontos de recuperação de um backup do Duplicati."""
+    service = get_duplicati_native_service()
+    snapshots = service.list_filesets(backup_id)
+    return {
+        "status": "success",
+        "backup_id": backup_id,
+        "count": len(snapshots),
+        "snapshots": snapshots
+    }
+
+
 # ── Controle de Jobs ──────────────────────────────────────────────────────────
 
 @router.get("/progress")

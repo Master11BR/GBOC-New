@@ -1,3 +1,9 @@
+-- ==============================================================================
+-- GBOC System v13.0.0 Enterprise Edition
+-- Copyright (c) 2026 Master11BR - Todos os direitos reservados.
+-- Propriedade Intelectual & Direitos Autorais Registrados.
+-- ==============================================================================
+
 -- Script de Criação do Banco de Dados GBOC
 -- Execute como superusuário do PostgreSQL (postgres)
 

@@ -1,4 +1,4 @@
-# GBOC Agent v10.0a - Dependências ULTRA Mínimas
+# GBOC Agent v13.2.0 - Dependências ULTRA Mínimas
 # Para Python 3.15+ (versões alpha sem wheels)
 # SEM pydantic (causa problemas com Rust)
 # ==========================================

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-📥 GBOC Agent 11.7c - API de Importação
+📥 GBOC Agent 13.2.0 - API de Importação
 Mantém a lógica do RealBackupImporter, adicionando apenas suporte ao botão do Dashboard.
 """
 

@@ -1,3 +1,9 @@
+-- ==============================================================================
+-- GBOC System v13.0.0 Enterprise Edition
+-- Copyright (c) 2026 Master11BR - Todos os direitos reservados.
+-- Propriedade Intelectual & Direitos Autorais Registrados.
+-- ==============================================================================
+
 -- Ajuste de permissões PostgreSQL para GBOC Server
 -- Execute como superuser (postgres ou equivalente)
 

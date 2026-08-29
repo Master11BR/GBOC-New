@@ -95,27 +95,7 @@ class DuplicatiNativeService:
         Sem senha configurada, tenta acesso direto (Duplicati sem senha).
         """
         try:
-            # ── Fluxo v2.3+: JWT via /api/v1/auth/login ──────────────────────
-            login_url_jwt = cfg.base_url + "/api/v1/auth/login"
-            resp_jwt = self._session.post(
-                login_url_jwt,
-                json={"Password": cfg.password},
-                timeout=cfg.timeout_seconds,
-                verify=cfg.verify_tls,
-            )
-            if resp_jwt.status_code == 200:
-                try:
-                    token = resp_jwt.json().get("AccessToken", "")
-                    if token:
-                        self._session.headers.update({"Authorization": f"Bearer {token}"})
-                        self._xsrf_token = token
-                        self._authenticated = True
-                        logger.info("✅ Autenticado no Duplicati v2.3+ via JWT")
-                        return True
-                except Exception:
-                    pass
-
-            # ── Fluxo legado: sessão/XSRF via /login.cgi ──────────────────────
+            # ── 1. Tentar ler XSRF token da página inicial ──────────────────────
             home = self._session.get(
                 cfg.base_url + "/",
                 timeout=cfg.timeout_seconds,
@@ -131,33 +111,61 @@ class DuplicatiNativeService:
                 self._xsrf_token = xsrf
                 self._session.headers.update({"X-XSRF-Token": xsrf})
 
-            if not cfg.password:
-                self._authenticated = True
-                return True
+            if cfg.password:
+                self._session.headers.update({"X-Duplicati-Password": cfg.password})
 
-            login_url = cfg.base_url + "/login.cgi"
-            payload = {"Password": cfg.password}
-            resp = self._session.post(
-                login_url,
-                data=payload,
-                headers={"X-XSRF-Token": self._xsrf_token or ""},
+            # ── 2. Fluxo v2.3+: JWT via /api/v1/auth/login ──────────────────────
+            login_url_jwt = cfg.base_url + "/api/v1/auth/login"
+            resp_jwt = self._session.post(
+                login_url_jwt,
+                json={"Password": cfg.password, "password": cfg.password},
                 timeout=cfg.timeout_seconds,
                 verify=cfg.verify_tls,
             )
-            if resp.status_code in (200, 302, 303):
-                new_xsrf = (
-                    resp.cookies.get("xsrf-token")
-                    or resp.cookies.get("XSRF-TOKEN")
-                    or resp.headers.get("X-XSRF-Token", "")
-                )
-                if new_xsrf:
-                    self._xsrf_token = new_xsrf
-                    self._session.headers.update({"X-XSRF-Token": new_xsrf})
+            if resp_jwt.status_code == 200:
+                try:
+                    token = resp_jwt.json().get("AccessToken", "")
+                    if token:
+                        self._session.headers.update({"Authorization": f"Bearer {token}"})
+                        self._xsrf_token = token
+                        self._authenticated = True
+                        logger.info("✅ Autenticado no Duplicati v2.3+ via JWT")
+                        return True
+                except Exception:
+                    pass
+
+            # ── 3. Fluxo v2.x legado: POST /login.cgi ou /api/v1/login ──────────────
+            if cfg.password:
+                for login_path in ["/login.cgi", "/api/v1/login"]:
+                    login_url = cfg.base_url + login_path
+                    resp = self._session.post(
+                        login_url,
+                        data={"Password": cfg.password, "password": cfg.password},
+                        headers={"X-XSRF-Token": self._xsrf_token or ""},
+                        timeout=cfg.timeout_seconds,
+                        verify=cfg.verify_tls,
+                    )
+                    if resp.status_code in (200, 302, 303):
+                        new_xsrf = (
+                            resp.cookies.get("xsrf-token")
+                            or resp.cookies.get("XSRF-TOKEN")
+                            or resp.headers.get("X-XSRF-Token", "")
+                        )
+                        if new_xsrf:
+                            self._xsrf_token = new_xsrf
+                            self._session.headers.update({"X-XSRF-Token": new_xsrf})
+                        self._authenticated = True
+                        logger.info(f"✅ Autenticado no Duplicati via {login_path}")
+                        return True
+
+            # Se a checagem básica no /api/v1/serverstate passar, a conexão está OK
+            chk = self._session.get(f"{cfg.base_url}/api/v1/serverstate", timeout=cfg.timeout_seconds, verify=cfg.verify_tls, params={"password": cfg.password} if cfg.password else None)
+            if chk.status_code == 200:
                 self._authenticated = True
-                logger.info("✅ Autenticado no Duplicati via sessão/XSRF (legado)")
+                logger.info("✅ Conexão Duplicati estabelecida com sucesso")
                 return True
 
-            logger.warning(f"Falha no login Duplicati: HTTP {resp.status_code}")
+            logger.warning("Falha no login Duplicati com as credenciais fornecidas.")
             return False
 
         except Exception as e:
@@ -282,14 +290,25 @@ class DuplicatiNativeService:
 
     def probe(self) -> Dict[str, Any]:
         cfg = self.load_config()
+
+        # 1. Testar conectividade HTTP básica no servidor Duplicati
+        server_reachable = False
+        try:
+            r = self._session.get(f"{cfg.base_url}/", timeout=cfg.timeout_seconds, verify=cfg.verify_tls)
+            if r.status_code < 500:
+                server_reachable = True
+        except Exception:
+            pass
+
         probe_paths = [
             "api/v1/serverstate",
             "api/v1/systeminfo",
             "api/v1/backups",
-            "api/v1/backup",
         ]
         results = []
         ok = False
+        auth_required = False
+
         for path in probe_paths:
             try:
                 resp = self._api_get(cfg, path)
@@ -297,17 +316,139 @@ class DuplicatiNativeService:
                 results.append({"url": self._build_url(cfg, path), "status": status})
                 if status == 200:
                     ok = True
+                elif status == 401:
+                    auth_required = True
             except Exception as e:
                 results.append({"url": self._build_url(cfg, path), "status": "error", "error": str(e)})
+
         install = self.detect_local_installation()
+        if ok:
+            status_msg = "✅ Conectado e autenticado no Duplicati!"
+        elif server_reachable or auth_required:
+            status_msg = "🟢 Instância do Duplicati detectada e rodando! (Configure a senha de acesso web se exigida)."
+        else:
+            status_msg = "❌ Servidor Duplicati não foi localizado no endereço especificado."
+
         return {
-            "ok": ok,
+            "ok": ok or server_reachable or auth_required,
+            "message": status_msg,
             "base_url": cfg.base_url,
             "authenticated": self._authenticated,
+            "auth_required": auth_required,
             "installation": install,
             "probes": results,
             "discovered": self.discover_endpoints(),
         }
+
+    def _read_duplicati_server_db(self) -> List[Dict[str, Any]]:
+        """Lê os backups e todas as métricas detalhadas do arquivo SQLite local do Duplicati."""
+        import sqlite3
+        db_paths = [
+            os.path.expandvars(r"%LOCALAPPDATA%\Duplicati\Duplicati-server.sqlite"),
+            os.path.expandvars(r"%APPDATA%\Duplicati\Duplicati-server.sqlite"),
+            r"C:\ProgramData\Duplicati\Duplicati-server.sqlite",
+            "/var/lib/duplicati/Duplicati-server.sqlite",
+            os.path.expanduser("~/.config/Duplicati/Duplicati-server.sqlite"),
+        ]
+
+        def fix_iso_date(raw_val: Any) -> Optional[str]:
+            if not raw_val:
+                return None
+            s = str(raw_val).strip()
+            if len(s) == 16 and s[8] == 'T' and s[15] == 'Z':
+                return f"{s[:4]}-{s[4:6]}-{s[6:8]}T{s[9:11]}:{s[11:13]}:{s[13:15]}Z"
+            return s
+
+        for path in db_paths:
+            if os.path.isfile(path):
+                try:
+                    conn = sqlite3.connect(path)
+                    conn.row_factory = sqlite3.Row
+                    cur = conn.cursor()
+                    cur.execute("SELECT ID, Name, Description, TargetURL FROM Backup")
+                    rows = cur.fetchall()
+                    backups = []
+
+                    for row in rows:
+                        b_id = str(row["ID"])
+                        name = row["Name"] or f"Backup #{b_id}"
+                        desc = row["Description"] or ""
+                        target_url = str(row["TargetURL"] or "")
+
+                        dest_label = "Destino Remoto"
+                        if "wasabi" in target_url.lower():
+                            dest_label = "Wasabi S3"
+                        elif "s3.amazonaws" in target_url.lower():
+                            dest_label = "Amazon S3"
+                        elif "b2" in target_url.lower():
+                            dest_label = "Backblaze B2"
+                        elif "azure" in target_url.lower():
+                            dest_label = "Azure Blob"
+                        elif "file://" in target_url.lower() or ":" in target_url:
+                            dest_label = "Disco Local / Pasta"
+
+                        metadata = {}
+                        try:
+                            cur.execute("SELECT Name, Value FROM Metadata WHERE BackupID = ?", (b_id,))
+                            for m in cur.fetchall():
+                                metadata[m["Name"]] = m["Value"]
+                        except Exception:
+                            pass
+
+                        schedule_info = {}
+                        try:
+                            cur.execute("SELECT Time, Repeat, LastRun FROM Schedule WHERE Tags LIKE ?", (f"%ID={b_id}%",))
+                            sch = cur.fetchone()
+                            if sch:
+                                schedule_info = {
+                                    "repeat": sch["Repeat"] or "Manual",
+                                    "next_run_ts": sch["Time"],
+                                    "last_run_ts": sch["LastRun"]
+                                }
+                        except Exception:
+                            pass
+
+                        last_backup_date = fix_iso_date(metadata.get("LastBackupDate"))
+                        last_result = metadata.get("LastBackupResult", "OK")
+                        source_size = metadata.get("SourceFilesSize", "0")
+                        target_size = metadata.get("TargetFilesSize", "0")
+                        versions_count = metadata.get("BackupListCount", "0")
+                        duration = metadata.get("LastBackupDuration", "")
+
+                        metadata["LastBackupDate"] = last_backup_date
+                        metadata["LastBackupStarted"] = fix_iso_date(metadata.get("LastBackupStarted"))
+                        metadata["LastBackupFinished"] = fix_iso_date(metadata.get("LastBackupFinished"))
+                        metadata["TargetURL"] = target_url
+
+                        backups.append({
+                            "id": b_id,
+                            "name": name,
+                            "description": desc,
+                            "target_label": dest_label,
+                            "last_run": last_backup_date,
+                            "last_status": last_result,
+                            "source_size": source_size,
+                            "target_size": target_size,
+                            "versions_count": versions_count,
+                            "duration": duration,
+                            "schedule": schedule_info,
+                            "source": "sqlite_database",
+                            "Backup": {
+                                "ID": b_id,
+                                "Name": name,
+                                "Description": desc,
+                                "TargetURL": target_url,
+                                "Metadata": metadata
+                            }
+                        })
+                    conn.close()
+                    if backups:
+                        logger.info(f"✅ {len(backups)} backup(s) enriquecido(s) do SQLite do Duplicati ({path})")
+                        return backups
+                except Exception as e:
+                    logger.warning(f"Erro ao ler banco do Duplicati em {path}: {e}")
+
+        return []
 
     def list_backups(self) -> Dict[str, Any]:
         cfg = self.load_config()
@@ -325,16 +466,102 @@ class DuplicatiNativeService:
                         return {"status": "success", "items": [data], "source": self._build_url(cfg, path)}
                     if isinstance(data, list):
                         return {"status": "success", "items": data, "source": self._build_url(cfg, path)}
-                    return {"status": "success", "items": [], "source": self._build_url(cfg, path)}
-                last_error = f"HTTP {resp.status_code} em {self._build_url(cfg, path)}"
             except Exception as e:
                 last_error = str(e)
+
+        # Fallback: tentar ler diretamente do SQLite local do Duplicati
+        db_items = self._read_duplicati_server_db()
+        if db_items:
+            return {
+                "status": "success",
+                "items": db_items,
+                "source": "sqlite_local_db"
+            }
+
         return {
             "status": "error",
             "message": "Não foi possível listar backups no Duplicati",
-            "error": last_error,
+            "error": last_error or "Nenhum backup encontrado no servidor HTTP nem no banco SQLite",
             "items": [],
         }
+
+    def list_filesets(self, backup_id: str) -> List[Dict[str, Any]]:
+        """Lista os filesets (snapshots / pontos no tempo) reais de um backup do Duplicati."""
+        cfg = self.load_config()
+
+        # 1. Tentar via API HTTP do Duplicati
+        try:
+            resp = self._api_get(cfg, f"api/v1/backup/{backup_id}/filesets")
+            if resp.status_code == 200:
+                data = resp.json()
+                if isinstance(data, list) and data:
+                    snapshots = []
+                    for idx, fs in enumerate(data):
+                        ver = str(fs.get("Version", idx))
+                        ts = fs.get("Time") or fs.get("Timestamp")
+                        filecount = fs.get("FileCount", 0)
+                        size = fs.get("FileSizes", 0)
+                        size_str = f"{round(size/1024/1024, 2)} MB" if size else ""
+                        snapshots.append({
+                            "id": f"v{ver}",
+                            "full_id": f"v{ver}",
+                            "short_id": f"v{ver}",
+                            "version": ver,
+                            "time": str(ts),
+                            "hostname": "Duplicati",
+                            "username": "Duplicati",
+                            "paths": [f"{filecount} arquivos {size_str}".strip()],
+                            "engine": "duplicati"
+                        })
+                    if snapshots:
+                        return snapshots
+        except Exception as e:
+            logger.warning(f"Erro ao obter filesets via HTTP: {e}")
+
+        # 2. Fallback via SQLite local do backup (DBPath)
+        try:
+            import sqlite3
+            from datetime import datetime
+            db_items = self._read_duplicati_server_db()
+            db_path = ""
+            for item in db_items:
+                b = item.get("Backup", {})
+                if str(b.get("ID")) == str(backup_id) or str(item.get("id")) == str(backup_id):
+                    db_path = b.get("DBPath") or item.get("DBPath", "")
+                    break
+
+            if db_path and os.path.exists(db_path):
+                conn = sqlite3.connect(db_path)
+                conn.row_factory = sqlite3.Row
+                cur = conn.cursor()
+                cur.execute("SELECT ID, Timestamp, OperationID FROM Fileset ORDER BY Timestamp DESC")
+                rows = cur.fetchall()
+                snapshots = []
+                for idx, r in enumerate(rows):
+                    ver = str(idx)
+                    ts = r["Timestamp"]
+                    if isinstance(ts, (int, float)):
+                        ts_str = datetime.fromtimestamp(ts).isoformat()
+                    else:
+                        ts_str = str(ts)
+                    snapshots.append({
+                        "id": f"v{ver}",
+                        "full_id": f"v{ver}",
+                        "short_id": f"v{ver}",
+                        "version": ver,
+                        "time": ts_str,
+                        "hostname": "Duplicati Native",
+                        "username": "Duplicati",
+                        "paths": ["Backup Completo Duplicati"],
+                        "engine": "duplicati"
+                    })
+                conn.close()
+                if snapshots:
+                    return snapshots
+        except Exception as e:
+            logger.warning(f"Erro ao ler filesets do SQLite do backup: {e}")
+
+        return []
 
     # ──────────────────────────────────────────────
     # Controle de Jobs (run / stop / progress)

@@ -1,0 +1,534 @@
+<!--
+==============================================================================
+GBOC System v13.2.0 Enterprise Edition
+Module: Disaster Recovery, P2V, Universal Restore & Active Directory Explorer
+Copyright (c) 2026 Master11BR - Todos os direitos reservados.
+==============================================================================
+-->
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Disaster Recovery &amp; P2V Enterprise - GBOC Agent</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/gboc-themes.css">
+    <link rel="stylesheet" href="/static/gboc-layout.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="/static/gboc-layout-manager.js"></script>
+    <script src="/static/sidebar.js"></script>
+    <script src="/static/disaster-recovery.js"></script>
+    <style>
+        .dr-nav-tabs {
+            display: flex;
+            gap: 8px;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 12px;
+            margin-bottom: 24px;
+            overflow-x: auto;
+        }
+        .dr-tab-btn {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 9px 15px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.84em;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.25s ease;
+            white-space: nowrap;
+        }
+        .dr-tab-btn:hover {
+            color: var(--text);
+            border-color: var(--primary);
+        }
+        .dr-tab-btn.active {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+        .dr-tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+        .dr-tab-content.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .dr-hud-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            position: relative;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+        }
+        .dr-console-box {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 14px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 0.82em;
+            color: var(--text-muted);
+            height: 180px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            line-height: 1.5;
+        }
+        .dr-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.84em;
+        }
+        .dr-table th {
+            background: var(--bg-input);
+            padding: 10px;
+            text-align: left;
+            border-bottom: 2px solid var(--border);
+            color: var(--text);
+        }
+        .dr-table td {
+            padding: 10px;
+            border-bottom: 1px solid var(--border);
+            color: var(--text);
+        }
+    </style>
+</head>
+<body>
+    <div class="app-layout">
+        <div id="sidebar-container"></div>
+        <main class="main-content" style="padding:24px 30px;">
+            <header class="page-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:20px;">
+                <div>
+                    <h2 style="display:flex; align-items:center; gap:10px; font-size:1.45em; margin:0;">
+                        <i class="fas fa-life-ring" style="color:var(--primary)"></i> Disaster Recovery, P2V &amp; Active Directory Enterprise
+                    </h2>
+                    <p style="font-size:0.85em; color:var(--text-muted); margin:4px 0 0 0;">
+                        Backup a quente VSS, clonagem P2V VHDX, Universal Hardware Restore, Item-Level AD Recovery e Instant VM Boot.
+                    </p>
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn btn-secondary" onclick="exportDrRunbook()">
+                        <i class="fas fa-file-download"></i> Exportar Runbook de DR
+                    </button>
+                </div>
+            </header>
+
+            <!-- Navigation Tabs -->
+            <div class="dr-nav-tabs">
+                <button class="dr-tab-btn active" id="tab-btn-hotbackup" onclick="switchDrTab('hotbackup')">
+                    <i class="fas fa-shield-alt"></i> 1. Backup a Quente &amp; AD
+                </button>
+                <button class="dr-tab-btn" id="tab-btn-p2v" onclick="switchDrTab('p2v')">
+                    <i class="fas fa-microchip"></i> 2. Clonagem P2V (VHDX)
+                </button>
+                <button class="dr-tab-btn" id="tab-btn-instantvm" onclick="switchDrTab('instantvm')">
+                    <i class="fas fa-bolt"></i> 3. Instant VM Boot
+                </button>
+                <button class="dr-tab-btn" id="tab-btn-adexplorer" onclick="switchDrTab('adexplorer')">
+                    <i class="fas fa-users-cog"></i> 4. Active Directory Explorer
+                </button>
+                <button class="dr-tab-btn" id="tab-btn-universalrestore" onclick="switchDrTab('universalrestore')">
+                    <i class="fas fa-wrench"></i> 5. Universal Restore (HAL)
+                </button>
+                <button class="dr-tab-btn" id="tab-btn-bootmedia" onclick="switchDrTab('bootmedia')">
+                    <i class="fas fa-compact-disc"></i> 6. Mídia de Boot (WinPE)
+                </button>
+                <button class="dr-tab-btn" id="tab-btn-virtuallab" onclick="switchDrTab('virtuallab')">
+                    <i class="fas fa-flask"></i> 7. Virtual Lab Sandbox
+                </button>
+                <button class="dr-tab-btn" id="tab-btn-audit" onclick="switchDrTab('audit')">
+                    <i class="fas fa-clipboard-check"></i> 8. Auditoria de DR
+                </button>
+            </div>
+
+            <!-- TAB 1: BACKUP A QUENTE & ACTIVE DIRECTORY -->
+            <div class="dr-tab-content active" id="tab-content-hotbackup">
+                <div class="two-col" style="display:grid; grid-template-columns:1fr 1fr; gap:24px;">
+                    <div class="dr-hud-card">
+                        <h3 style="font-size:1.05em; margin-top:0; display:flex; align-items:center; gap:8px;">
+                            <i class="fas fa-database" style="color:var(--primary)"></i> Status do Active Directory &amp; VSS
+                        </h3>
+                        <div style="margin:16px 0; display:flex; flex-direction:column; gap:12px;">
+                            <div style="background:var(--bg-input); padding:14px; border-radius:8px; border:1px solid var(--border);">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                                    <span style="font-size:0.85em; font-weight:700;">Active Directory Domain Controller:</span>
+                                    <span id="ad-status-badge" class="badge badge-info"><i class="fas fa-spinner fa-spin"></i> Identificando...</span>
+                                </div>
+                                <div id="ad-details-text" style="font-size:0.8em; color:var(--text-muted);">
+                                    Analisando topologia de domínio e integridade de base Jet/ESENT...
+                                </div>
+                            </div>
+                            <div style="background:var(--bg-input); padding:14px; border-radius:8px; border:1px solid var(--border);">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                    <span style="font-size:0.85em; font-weight:700;">VSS Volume Shadow Copy Subsystem:</span>
+                                    <span id="vss-status-badge" class="badge badge-success"><i class="fas fa-check-circle"></i> VSS Estável</span>
+                                </div>
+                                <div style="font-size:0.8em; color:var(--text-muted); margin-bottom:8px;">
+                                    Writers Ativos: <strong id="vss-writers-count">Detectando...</strong>
+                                </div>
+                                <div id="vss-writers-list" style="max-height:160px; overflow-y:auto;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dr-hud-card">
+                        <h3 style="font-size:1.05em; margin-top:0; display:flex; align-items:center; gap:8px;">
+                            <i class="fas fa-bolt" style="color:#ed8936"></i> Executar Backup a Quente do System State
+                        </h3>
+                        <p style="font-size:0.82em; color:var(--text-muted); margin-bottom:16px;">
+                            Extrai o System State do servidor em execução via VSS, capturando registro do Windows (`SAM`, `SECURITY`, `SYSTEM`), base NTDS.dit do Active Directory, políticas SYSVOL, certificados e zonas DNS com suporte a recuperação autoritativa e não autoritativa.
+                        </p>
+                        <div class="form-group" style="margin-bottom:14px;">
+                            <label style="font-size:0.85em; font-weight:600; display:block; margin-bottom:6px;">Diretório de Destino do Pacote .gbocdr</label>
+                            <input type="text" id="sysstate-target-path" class="form-control" placeholder="C:\GBOC-DR\SystemState_Export" style="width:100%; padding:10px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
+                        </div>
+                        <div class="form-group" style="margin-bottom:20px;">
+                            <label style="display:flex; align-items:center; gap:8px; font-size:0.85em; cursor:pointer;">
+                                <input type="checkbox" id="sysstate-include-ad" checked style="width:18px; height:18px;">
+                                <span>Garantir consistência completa do banco NTDS.dit e SYSVOL (Recomendado para DCs)</span>
+                            </label>
+                        </div>
+                        <button class="btn btn-primary" onclick="startSystemStateBackup()" style="width:100%; padding:12px; font-weight:700;">
+                            <i class="fas fa-play" style="margin-right:6px;"></i> Iniciar Backup a Quente (System State &amp; AD)
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: CLONAGEM P2V (VHDX) -->
+            <div class="dr-tab-content" id="tab-content-p2v">
+                <div class="two-col" style="display:grid; grid-template-columns:1fr 1fr; gap:24px;">
+                    <div class="dr-hud-card">
+                        <h3 style="font-size:1.05em; margin-top:0; display:flex; align-items:center; gap:8px;">
+                            <i class="fas fa-hdd" style="color:#4299e1"></i> Parâmetros da Clonagem P2V (Physical-to-Virtual)
+                        </h3>
+                        <p style="font-size:0.82em; color:var(--text-muted); margin-bottom:14px;">
+                            Converte um disco físico em um disco virtual `.vhdx` compatível com Hyper-V (Geração 1/2) e Proxmox VE (QEMU) sem interromper a execução do Windows Server.
+                        </p>
+                        <div class="form-group" style="margin-bottom:14px;">
+                            <label style="font-size:0.85em; font-weight:600; display:block; margin-bottom:6px;">Disco Físico de Origem</label>
+                            <select id="p2v-source-disk" class="form-control" style="width:100%; padding:10px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
+                                <option value="">Carregando discos reais...</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom:14px;">
+                            <label style="font-size:0.85em; font-weight:600; display:block; margin-bottom:6px;">Caminho de Destino do Arquivo VHDX</label>
+                            <input type="text" id="p2v-target-path" class="form-control" value="C:\GBOC-DR\Server_P2V_Clone.vhdx" style="width:100%; padding:10px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
+                        </div>
+                        <div style="display:flex; gap:16px; margin-bottom:20px;">
+                            <div style="flex:1;">
+                                <label style="font-size:0.85em; font-weight:600; display:block; margin-bottom:6px;">Formato de Disco</label>
+                                <select id="p2v-format-type" class="form-control" style="width:100%; padding:10px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
+                                    <option value="VHDX">VHDX (Recomendado - Hyper-V Gen2 / Proxmox)</option>
+                                    <option value="VHD">VHD Legado (Hyper-V Gen1)</option>
+                                </select>
+                            </div>
+                            <div style="display:flex; align-items:center; padding-top:20px;">
+                                <label style="display:flex; align-items:center; gap:8px; font-size:0.85em; cursor:pointer;">
+                                    <input type="checkbox" id="p2v-is-dynamic" checked style="width:18px; height:18px;">
+                                    <span>Disco Dinâmico (Thin Provisioning)</span>
+                                </label>
+                            </div>
+                        </div>
+                        <button class="btn btn-primary" onclick="startP2VConversion()" style="width:100%; padding:12px; font-weight:700;">
+                            <i class="fas fa-exchange-alt" style="margin-right:6px;"></i> Iniciar Clonagem P2V em Segundo Plano
+                        </button>
+                    </div>
+
+                    <div class="dr-hud-card">
+                        <h3 style="font-size:1.05em; margin-top:0; display:flex; align-items:center; gap:8px;">
+                            <i class="fas fa-server" style="color:#48bb78"></i> Compatibilidade de Hipervisores
+                        </h3>
+                        <div style="display:flex; flex-direction:column; gap:12px; margin-top:16px;">
+                            <div style="background:var(--bg-input); padding:14px; border-radius:8px; border:1px solid var(--border);">
+                                <div style="font-weight:700; font-size:0.9em; color:var(--text); margin-bottom:4px;">
+                                    <i class="fab fa-windows" style="color:#4299e1; margin-right:6px;"></i> Microsoft Hyper-V (Windows Server)
+                                </div>
+                                <div style="font-size:0.8em; color:var(--text-muted);">
+                                    Suporte nativo a boot UEFI seguro (Secure Boot) e particionamento GPT. Gera automaticamente arquivo `.vmconfig.json`.
+                                </div>
+                            </div>
+                            <div style="background:var(--bg-input); padding:14px; border-radius:8px; border:1px solid var(--border);">
+                                <div style="font-weight:700; font-size:0.9em; color:var(--text); margin-bottom:4px;">
+                                    <i class="fas fa-layer-group" style="color:#ed8936; margin-right:6px;"></i> Proxmox VE &amp; QEMU/KVM
+                                </div>
+                                <div style="font-size:0.8em; color:var(--text-muted);">
+                                    Importação instantânea via comando `qm importdisk <VMID> Server_P2V_Clone.vhdx local-lvm`.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: INSTANT VM BOOT -->
+            <div class="dr-tab-content" id="tab-content-instantvm">
+                <div class="dr-hud-card" style="margin-bottom:24px;">
+                    <h3 style="font-size:1.1em; margin-top:0; display:flex; align-items:center; gap:8px;">
+                        <i class="fas fa-bolt" style="color:#ed8936"></i> Inicialização Instantânea de Máquina Virtual (RTO &lt; 30 Segundos)
+                    </h3>
+                    <p style="font-size:0.82em; color:var(--text-muted); margin-bottom:16px;">
+                        Inicializa uma VM no Hyper-V ou Proxmox diretamente a partir do arquivo VHDX de backup utilizando uma camada diferencial Copy-on-Write (CoW). A VM sobe em segundos sem precisar esperar a cópia total de terabytes de disco.
+                    </p>
+                    <div style="display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:14px; margin-bottom:16px;">
+                        <div>
+                            <label style="font-size:0.82em; font-weight:600; display:block; margin-bottom:4px;">Caminho do VHDX de Origem</label>
+                            <input type="text" id="ivm-source-vhdx" class="form-control" placeholder="C:\GBOC-DR\Server_P2V_Clone.vhdx" style="width:100%; padding:9px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
+                        </div>
+                        <div>
+                            <label style="font-size:0.82em; font-weight:600; display:block; margin-bottom:4px;">Nome da VM</label>
+                            <input type="text" id="ivm-vm-name" class="form-control" placeholder="GBOC-Instant-Server" style="width:100%; padding:9px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
+                        </div>
+                        <div>
+                            <label style="font-size:0.82em; font-weight:600; display:block; margin-bottom:4px;">Memória RAM (MB)</label>
+                            <input type="number" id="ivm-ram-mb" class="form-control" value="4096" style="width:100%; padding:9px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
+                        </div>
+                        <div>
+                            <label style="font-size:0.82em; font-weight:600; display:block; margin-bottom:4px;">vCPUs</label>
+                            <input type="number" id="ivm-vcpus" class="form-control" value="2" style="width:100%; padding:9px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="startInstantVmAction()" style="font-weight:700;">
+                        <i class="fas fa-play"></i> Iniciar Instant VM Boot Agora
+                    </button>
+                </div>
+
+                <div class="dr-hud-card">
+                    <h4 style="margin:0 0 14px 0; font-size:0.95em;"><i class="fas fa-desktop"></i> Máquinas Virtuais Instantâneas em Execução</h4>
+                    <div style="overflow-x:auto;">
+                        <table class="dr-table">
+                            <thead>
+                                <tr>
+                                    <th>Nome da VM</th>
+                                    <th>Status</th>
+                                    <th>Recursos</th>
+                                    <th>Tempo de Boot</th>
+                                    <th>VHDX Base</th>
+                                    <th style="text-align:right;">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="instant-vms-table-body">
+                                <tr><td colspan="6" style="text-align:center; padding:18px; color:var(--text-muted);">Carregando instâncias...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 4: ACTIVE DIRECTORY GRANULAR EXPLORER -->
+            <div class="dr-tab-content" id="tab-content-adexplorer">
+                <div class="dr-hud-card" style="margin-bottom:20px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px; margin-bottom:16px;">
+                        <div>
+                            <h3 style="font-size:1.1em; margin:0; display:flex; align-items:center; gap:8px;">
+                                <i class="fas fa-users-cog" style="color:var(--primary)"></i> Active Directory Object Explorer (Item-Level Restore)
+                            </h3>
+                            <p style="font-size:0.82em; color:var(--text-muted); margin:4px 0 0 0;">
+                                Pesquise e restaure usuários deletados, grupos de segurança e políticas GPO diretamente do catálogo sem reiniciar o Domain Controller.
+                            </p>
+                        </div>
+                        <div style="display:flex; gap:10px;">
+                            <select id="ad-filter-type" onchange="searchAdObjects()" style="padding:8px 12px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
+                                <option value="all">Todos os Objetos</option>
+                                <option value="user">Apenas Usuários</option>
+                                <option value="group">Apenas Grupos</option>
+                                <option value="gpo">Políticas de Grupo (GPO)</option>
+                            </select>
+                            <input type="text" id="ad-search-box" placeholder="Buscar por nome / sAMAccountName..." onkeyup="if(event.key==='Enter') searchAdObjects()" style="padding:8px 12px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text); width:240px;">
+                            <button class="btn btn-primary" onclick="searchAdObjects()"><i class="fas fa-search"></i> Pesquisar</button>
+                        </div>
+                    </div>
+
+                    <div style="overflow-x:auto;">
+                        <table class="dr-table">
+                            <thead>
+                                <tr>
+                                    <th>Tipo</th>
+                                    <th>Nome de Exibição / Conta</th>
+                                    <th>DistinguishedName (DN)</th>
+                                    <th>Detalhes / Associação</th>
+                                    <th style="text-align:right;">Restauração</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ad-objects-table-body">
+                                <tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">Clique em Pesquisar para consultar os objetos do diretório.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 5: UNIVERSAL HARDWARE RESTORE -->
+            <div class="dr-tab-content" id="tab-content-universalrestore">
+                <div class="two-col" style="display:grid; grid-template-columns:1.2fr 1fr; gap:24px;">
+                    <div class="dr-hud-card">
+                        <h3 style="font-size:1.05em; margin-top:0; display:flex; align-items:center; gap:8px;">
+                            <i class="fas fa-wrench" style="color:#ed8936"></i> Assistente Universal Hardware Restore (Anti-BSOD 0x7B)
+                        </h3>
+                        <p style="font-size:0.82em; color:var(--text-muted); margin-bottom:16px;">
+                            Ao restaurar uma imagem de disco em um hardware completamente diferente (ex: origem Dell para destino HP ou VM), este assistente monta a hive de registro offline do Windows (`HKLM\SYSTEM`) e ativa os drivers de boot (`storahci`, `stornvme`, `iaStorA`, `vmbus`, `megasas`), injetando novos drivers de chipset e RAID para evitar a tela azul de <em>INACCESSIBLE_BOOT_DEVICE</em>.
+                        </p>
+                        <div class="form-group" style="margin-bottom:14px;">
+                            <label style="font-size:0.85em; font-weight:600; display:block; margin-bottom:6px;">Letra da Unidade / Volume Alvo Restaurado</label>
+                            <input type="text" id="ur-target-volume" class="form-control" placeholder="E:\ ou D:\" style="width:100%; padding:10px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
+                        </div>
+                        <div class="form-group" style="margin-bottom:20px;">
+                            <label style="font-size:0.85em; font-weight:600; display:block; margin-bottom:6px;">Pasta com Drivers da Nova Placa-Mãe/Controladora (Opcional .inf/.sys)</label>
+                            <input type="text" id="ur-drivers-path" class="form-control" placeholder="C:\GBOC-DR\Harvested_Drivers" style="width:100%; padding:10px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
+                        </div>
+                        <button class="btn btn-warning" onclick="runUniversalRestoreInjection()" style="width:100%; padding:12px; font-weight:700;">
+                            <i class="fas fa-magic"></i> Injetar Drivers &amp; Corrigir HAL de Boot
+                        </button>
+                        <div class="dr-console-box" id="ur-result-console" style="display:none; margin-top:16px;"></div>
+                    </div>
+
+                    <div class="dr-hud-card">
+                        <h4 style="margin-top:0; font-size:0.95em;"><i class="fas fa-shield-alt" style="color:var(--success)"></i> Benefícios do Universal Restore</h4>
+                        <ul style="font-size:0.82em; color:var(--text-muted); line-height:1.8; padding-left:18px;">
+                            <li><strong>Migração Físico-para-Físico (P2P):</strong> Restaure servidores Dell em máquinas HP, Lenovo ou Supermicro sem reinstalar o Windows.</li>
+                            <li><strong>Migração Virtual-para-Físico (V2P):</strong> Converta máquinas virtuais de volta para servidores físicos virgens.</li>
+                            <li><strong>Ativação Forçada de Controladoras:</strong> Habilita automaticamente drivers genéricos AHCI, NVMe e VirtIO.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 6: MÍDIA DE BOOT -->
+            <div class="dr-tab-content" id="tab-content-bootmedia">
+                <div class="two-col" style="display:grid; grid-template-columns:1fr 1fr; gap:24px;">
+                    <div class="dr-hud-card">
+                        <h3 style="font-size:1.05em; margin-top:0; display:flex; align-items:center; gap:8px;">
+                            <i class="fas fa-compact-disc" style="color:#38b2ac"></i> Compilador GBOC Recovery Environment®
+                        </h3>
+                        <p style="font-size:0.82em; color:var(--text-muted); margin-bottom:14px;">
+                            Criação de imagem ISO inicializável (WinPE 11 / Linux Bare-Metal) com injeção automática dos drivers de controladoras RAID, SAS, NVMe e interfaces de rede instaladas no servidor.
+                        </p>
+                        <div class="form-group" style="margin-bottom:14px;">
+                            <label style="font-size:0.85em; font-weight:600; display:block; margin-bottom:6px;">Arquitetura do Ambiente de Recuperação</label>
+                            <select id="iso-boot-type" class="form-control" style="width:100%; padding:10px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
+                                <option value="winpe">WinPE 11 Enterprise (Suporte completo a NTFS, BitLocker, VSS e WMI)</option>
+                                <option value="linux">Linux Bare-Metal ISO (Suporte a ZFS, EXT4, XFS e Btrfs)</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom:20px;">
+                            <label style="font-size:0.85em; font-weight:600; display:block; margin-bottom:6px;">Exportação de Drivers do Host Atual</label>
+                            <select id="iso-embed-drivers" class="form-control" style="width:100%; padding:10px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
+                                <option value="yes">Sim (Exportar drivers de RAID, NVMe e adaptadores de rede nativos)</option>
+                                <option value="no">Não (Apenas drivers genéricos da Microsoft)</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-success" onclick="buildRecoveryISO()" style="width:100%; padding:12px; font-weight:700;">
+                            <i class="fas fa-download" style="margin-right:6px;"></i> Gerar Mídia de Boot ISO (GBOC Bare-Metal)
+                        </button>
+                    </div>
+
+                    <div class="dr-hud-card">
+                        <h3 style="font-size:1.05em; margin-top:0; display:flex; align-items:center; gap:8px;">
+                            <i class="fas fa-tools" style="color:#ed8936"></i> Recursos Inclusos na Mídia de Recuperação
+                        </h3>
+                        <ul style="font-size:0.82em; color:var(--text-muted); line-height:1.8; padding-left:18px; margin:16px 0;">
+                            <li><strong>GBOC Autonomous Restore Engine:</strong> restauração de backups em rede (Wasabi S3, SMB, NFS ou USB local).</li>
+                            <li><strong>Injeção de Drivers PnP:</strong> detecção imediata de controladoras Dell PERC, HP Smart Array, Lenovo ThinkSystem e NVMe.</li>
+                            <li><strong>Ferramentas de Particionamento:</strong> `diskpart`, `bootrec`, reconstrução de BCD e alinhamento de partições SSD.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 7: VIRTUAL LAB SANDBOX -->
+            <div class="dr-tab-content" id="tab-content-virtuallab">
+                <div class="two-col" style="display:grid; grid-template-columns:1.2fr 1fr; gap:24px;">
+                    <div class="dr-hud-card">
+                        <h3 style="font-size:1.05em; margin-top:0; display:flex; align-items:center; gap:8px;">
+                            <i class="fas fa-flask" style="color:#9f7aea"></i> Teste de Boot em Virtual Lab Isolado (Anti-Colisão)
+                        </h3>
+                        <p style="font-size:0.82em; color:var(--text-muted); margin-bottom:14px;">
+                            Executa um teste automatizado de inicialização da máquina virtual em um switch virtual privado isolado, garantindo que o servidor restaurado não cause conflito de IP com a produção nem colisão de replicação no Active Directory.
+                        </p>
+                        <div class="form-group" style="margin-bottom:16px;">
+                            <label style="font-size:0.85em; font-weight:600; display:block; margin-bottom:6px;">ID do Snapshot / Backup para Validação</label>
+                            <input type="text" id="vlab-snapshot-id" class="form-control" placeholder="snap-latest" value="snap-latest" style="width:100%; padding:10px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
+                        </div>
+                        <button class="btn btn-primary" onclick="runVirtualLabSandboxTest()" style="width:100%; padding:12px; font-weight:700;">
+                            <i class="fas fa-play"></i> Executar Teste de Sandbox Isolado
+                        </button>
+                        <div class="dr-console-box" id="vlab-result-console" style="display:none; margin-top:16px;"></div>
+                    </div>
+
+                    <div class="dr-hud-card">
+                        <h4 style="margin-top:0; font-size:0.95em;"><i class="fas fa-shield-alt" style="color:var(--success)"></i> Isolamento Completo de Rede</h4>
+                        <ul style="font-size:0.82em; color:var(--text-muted); line-height:1.8; padding-left:18px;">
+                            <li><strong>Isolamento de Broadcast &amp; DHCP:</strong> O tráfego não vaza para a LAN da empresa.</li>
+                            <li><strong>Anti-Tombstone AD:</strong> O Active Directory em sandbox não sobrescreve sequências USN do DC de produção.</li>
+                            <li><strong>Pulso de OS Heartbeat:</strong> Medição precisa de tempo de boot e montagem de serviços.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 8: AUDITORIA DE PRONTIDÃO DR -->
+            <div class="dr-tab-content" id="tab-content-audit">
+                <div class="dr-hud-card" style="margin-bottom:24px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:16px;">
+                        <div>
+                            <h3 style="font-size:1.15em; margin:0; display:flex; align-items:center; gap:8px;">
+                                <i class="fas fa-tachometer-alt" style="color:var(--primary)"></i> Índice de Prontidão para Disaster Recovery
+                            </h3>
+                            <p style="font-size:0.82em; color:var(--text-muted); margin:4px 0 0 0;">
+                                Avaliação contínua de conformidade VSS, topologia de disco, integridade do Active Directory e storage.
+                            </p>
+                        </div>
+                        <div style="text-align:right;">
+                            <div style="font-size:2em; font-weight:800; color:var(--primary);" id="dr-score-val">100%</div>
+                            <div style="font-size:0.75em; color:var(--text-muted); text-transform:uppercase;">Score de Conformidade</div>
+                        </div>
+                    </div>
+                    <div style="background:var(--bg-input); height:10px; border-radius:5px; overflow:hidden; border:1px solid var(--border); margin-bottom:20px;">
+                        <div id="dr-score-fill" style="height:100%; background:linear-gradient(90deg, var(--primary), var(--success)); width:100%; transition:width 0.4s ease;"></div>
+                    </div>
+                    <div id="dr-checklist-items" style="display:flex; flex-direction:column; gap:10px;">
+                        <!-- Dinâmico via loadDrReadiness() -->
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL DE MONITORAMENTO DE DR / P2V -->
+    <div id="dr-monitor-modal" class="modal" style="display:none; position:fixed; z-index:3500; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.75); backdrop-filter:blur(4px);">
+        <div class="modal-content" style="background:var(--bg-card); margin:8vh auto; padding:24px; border-radius:12px; width:90%; max-width:760px; border:1px solid var(--border); box-shadow:0 20px 60px rgba(0,0,0,0.6);">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:12px; margin-bottom:16px;">
+                <h3 id="dr-modal-title" style="margin:0; font-size:1.15em; color:var(--text); display:flex; align-items:center; gap:8px;">
+                    <i class="fas fa-spinner fa-spin" style="color:var(--primary)"></i> Executando Operação de DR
+                </h3>
+                <button onclick="closeDrMonitorModal()" style="background:none; border:none; color:var(--text-muted); font-size:1.4em; cursor:pointer;">&times;</button>
+            </div>
+            <div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <span id="dr-modal-status-text" style="font-weight:700; font-size:0.9em; color:var(--text);">Processando tarefa...</span>
+                    <span id="dr-modal-progress-pct" style="font-weight:700; color:var(--primary);">0%</span>
+                </div>
+                <div style="background:var(--bg-input); height:12px; border-radius:6px; overflow:hidden; border:1px solid var(--border); margin-bottom:16px;">
+                    <div id="dr-modal-progress-fill" style="height:100%; background:linear-gradient(90deg, var(--primary), var(--success)); width:0%; transition:width 0.3s ease;"></div>
+                </div>
+                <div style="font-size:0.8em; font-weight:600; color:var(--text-muted); margin-bottom:6px;">LOG STREAM DO MOTOR EM TEMPO REAL:</div>
+                <div class="dr-console-box" id="dr-live-logs">Aguardando dados...</div>
+                <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:20px;">
+                    <button class="btn btn-danger" onclick="cancelCurrentDrJob()"><i class="fas fa-stop-circle"></i> Cancelar / Abortar</button>
+                    <button class="btn btn-secondary" onclick="closeDrMonitorModal()"><i class="fas fa-times"></i> Fechar Monitor</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

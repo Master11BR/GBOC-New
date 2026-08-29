@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 11.7c - Ransomware Detection API
+GBOC 13.2.0 - Ransomware Detection API
 Endpoints for scanning, canary management, and threat status.
 """
 
@@ -61,9 +61,49 @@ async def scan_history(limit: int = 20):
 
 @router.get("/status")
 async def protection_status():
-    """Get overall ransomware protection status."""
+    """Get overall ransomware protection status and integrated 7-tool stack."""
     from engines.ransomware_detector import get_protection_status
     return _clean(get_protection_status())
+
+
+@router.get("/tools")
+async def integrated_tools_status():
+    """Get status and availability of the 7 integrated open-source security tools."""
+    from engines.ransomware_detector import get_integrated_tools_status
+    return {"status": "success", "tools": _clean(get_integrated_tools_status())}
+
+
+@router.post("/tools/scan/{tool_id}")
+async def run_tool_scan(tool_id: str, body: ScanRequest):
+    """Run dedicated scan with one of the 7 tools or multi-tool integrated stack."""
+    import os
+    if not os.path.isdir(body.target_path):
+        raise HTTPException(400, f"Caminho não encontrado ou inválido: {body.target_path}")
+
+    from engines.ransomware_detector import (
+        scan_with_clamav, scan_with_armadito, scan_with_clamwin_clamtk,
+        scan_with_hypatia, scan_with_wazuh_hids, scan_with_yara, scan_with_rkhunter,
+        run_integrated_multi_tool_scan
+    )
+
+    t = tool_id.lower().strip()
+    if t == "clamav":
+        return _clean(scan_with_clamav(body.target_path))
+    elif t == "armadito":
+        return _clean(scan_with_armadito(body.target_path))
+    elif t in ("clamwin", "clamtk", "clamwin_clamtk"):
+        return _clean(scan_with_clamwin_clamtk(body.target_path))
+    elif t == "hypatia":
+        return _clean(scan_with_hypatia(body.target_path))
+    elif t in ("wazuh", "ossec", "wazuh_hids"):
+        return _clean(scan_with_wazuh_hids())
+    elif t == "yara":
+        return _clean(scan_with_yara(body.target_path))
+    elif t == "rkhunter":
+        return _clean(scan_with_rkhunter())
+    else:
+        # Executa todas as 7 ferramentas de forma integrada
+        return _clean(run_integrated_multi_tool_scan(body.target_path))
 
 
 # ─── Canary endpoints ─────────────────────────────────────────────
@@ -236,6 +276,95 @@ async def guardian_test_response():
     })
 
 
+@router.get("/guardian/ai_diagnostic")
+async def guardian_ai_diagnostic(include_llm: bool = True):
+    """Diagnóstico IA híbrido do Guardian: heurística local + LLM opcional."""
+    from engines.ransomware_guardian import get_guardian
+    from engines.ransomware_detector import get_local_protection_status
+
+    guardian = get_guardian()
+    g = _clean(guardian.get_guardian_status() or {})
+    incidents = g.get("recent_incidents") or []
+    running = bool(g.get("running"))
+    canary_count = int(g.get("canary_count") or 0)
+    local = _clean(get_local_protection_status() or {})
+
+    score = 0
+    if not running:
+        score += 30
+    if canary_count <= 0:
+        score += 30
+    if not local.get("av_installed"):
+        score += 25
+    elif not local.get("av_active"):
+        score += 15
+    score += min(len(incidents) * 10, 30)
+    score = max(0, min(score, 100))
+
+    if score <= 20:
+        status = "PROTECTED"
+    elif score <= 50:
+        status = "WARNING"
+    else:
+        status = "CRITICAL"
+
+    rec = []
+    if not running:
+        rec.append("Ativar Guardian imediatamente")
+    if canary_count <= 0:
+        rec.append("Criar canary files em caminhos críticos")
+    if not local.get("av_installed"):
+        rec.append("Instalar AV/EDR no host")
+    elif not local.get("av_active"):
+        rec.append("Ativar proteção em tempo real do AV/EDR")
+    if incidents:
+        rec.append("Investigar incidentes recentes e validar integridade dos repositórios")
+    if not rec:
+        rec.append("Manter monitoramento contínuo e sincronização com servidor")
+
+    heuristic = {
+        "status": status,
+        "threat_score": score,
+        "recommendation": "; ".join(rec),
+        "guardian_running": running,
+        "canaries_total": canary_count,
+        "recent_incidents": len(incidents),
+        "av_installed": bool(local.get("av_installed")),
+        "av_active": bool(local.get("av_active")),
+        "timestamp": datetime.now().isoformat(),
+    }
+
+    llm_analysis = None
+    if include_llm:
+        try:
+            from engines.ai_diagnostic_engine import ai_diagnostic_engine
+
+            ctx = (
+                f"Guardian status: running={running}, canaries={canary_count}, "
+                f"recent_incidents={len(incidents)}, av_installed={local.get('av_installed')}, "
+                f"av_active={local.get('av_active')}, heuristic_score={score}."
+            )
+            llm_res = await ai_diagnostic_engine.analyze_error(ctx)
+            if isinstance(llm_res, dict):
+                llm_analysis = {
+                    "cause": llm_res.get("cause"),
+                    "solution": llm_res.get("solution"),
+                    "recommended_action": llm_res.get("recommended_action"),
+                    "analysis": llm_res.get("analysis"),
+                }
+        except Exception as e:
+            llm_analysis = {"error": str(e)}
+
+    return _clean({
+        "status": status,
+        "threat_score": score,
+        "recommendation": heuristic["recommendation"],
+        "mode": "hybrid" if include_llm else "heuristic",
+        "heuristic": heuristic,
+        "llm": llm_analysis,
+    })
+
+
 # ─── Shield (Real-time Prevention) ───────────────────────────────
 
 class ShieldConfigRequest(BaseModel):
@@ -325,3 +454,9 @@ async def shield_threats(limit: int = 50):
     shield = get_shield()
     return {"threats": _clean(shield.get_recent_threats(limit))}
 
+
+@router.get("/local_protection")
+async def local_protection_status():
+    """Get local antivirus and event log protection status."""
+    from engines.ransomware_detector import get_local_protection_status
+    return _clean(get_local_protection_status())

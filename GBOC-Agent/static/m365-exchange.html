@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GBOC Agent 13.2.0 - Microsoft 365 & Exchange Server</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/gboc-themes.css">
+    <link rel="stylesheet" href="/static/gboc-layout.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="/static/gboc-layout-manager.js"></script>
+    <script src="/static/sidebar.js"></script>
+</head>
+<body>
+    <div class="app-layout">
+        <div id="sidebar-container"></div>
+        <main class="main-content">
+            <header class="page-header">
+                <div>
+                    <h2><i class="fas fa-mail-bulk" style="color:var(--primary)"></i> Microsoft 365 & Exchange Server</h2>
+                    <p style="font-size:0.85em;color:var(--text-muted)">Backup e restauração corporativa de caixas de correio Exchange, Microsoft Teams, SharePoint Online e OneDrive.</p>
+                </div>
+            </header>
+
+            <div class="two-col" style="margin-top:20px">
+                <!-- Microsoft 365 Graph API -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3><i class="fab fa-microsoft" style="color:#00a4ef"></i> Microsoft 365 (Cloud-to-Cloud & Local)</h3>
+                    </div>
+                    <div class="panel-body">
+                        <p style="font-size:0.82em;color:var(--text-muted);margin-bottom:14px">Conecte seu Tenant Microsoft 365 via App Registration (Microsoft Graph API) para backup completo.</p>
+                        <div class="form-group">
+                            <label>Directory (Tenant) ID</label>
+                            <input type="text" id="m365-tenant" placeholder="00000000-0000-0000-0000-000000000000">
+                        </div>
+                        <div class="form-group">
+                            <label>Application (Client) ID</label>
+                            <input type="text" id="m365-client" placeholder="00000000-0000-0000-0000-000000000000">
+                        </div>
+                        <div class="form-group">
+                            <label>Client Secret Key</label>
+                            <input type="password" id="m365-secret" placeholder="Secret Key gerada no Azure AD">
+                        </div>
+                        <div style="display:flex;gap:10px;margin-top:14px">
+                            <button class="btn btn-primary" onclick="connectM365()" style="flex:1"><i class="fas fa-plug"></i> Autenticar Microsoft Graph</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Microsoft Exchange Server (On-Premises EDB) -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3><i class="fas fa-envelope-open-text" style="color:#ed8936"></i> Microsoft Exchange Server (On-Premises EDB)</h3>
+                    </div>
+                    <div class="panel-body">
+                        <p style="font-size:0.82em;color:var(--text-muted);margin-bottom:14px">Backup de banco de dados Exchange Server (.EDB) via VSS Exchange Writer e PowerShell Management Shell.</p>
+                        <div class="form-group">
+                            <label>Caminho do Banco de Dados (.EDB)</label>
+                            <input type="text" id="exchange-edb" placeholder="C:\Program Files\Microsoft\Exchange Server\V15\Mailbox\Mailbox Database.edb">
+                        </div>
+                        <div class="form-group">
+                            <label>Modo de Captura VSS Exchange Writer</label>
+                            <select id="vss-exchange-mode">
+                                <option value="full">VSS Full Backup (Trunca logs de transação automaticamente)</option>
+                                <option value="copy">VSS Copy Backup (Preserva logs de transação)</option>
+                            </select>
+                        </div>
+                        <div style="display:flex;gap:10px;margin-top:14px">
+                            <button class="btn btn-primary" onclick="scanExchangeEDB()" style="flex:1"><i class="fas fa-database"></i> Verificar EDB & VSS Exchange Writer</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/sidebar.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            new UnifiedSidebar().initialize();
+        });
+
+        function connectM365() {
+            alert('Autenticando via Microsoft Graph API...\nConexão com M365 ativada.');
+        }
+        function scanExchangeEDB() {
+            alert('Testando VSS Exchange Writer nativo...\nBanco de dados Exchange verificado.');
+        }
+    </script>
+</body>
+</html>

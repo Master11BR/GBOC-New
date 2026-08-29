@@ -1,0 +1,13 @@
+<!-- GBOC System v13.2.0 Enterprise Edition -->
+<!-- Module: Backups HTML Template -->
+
+<div class="panel">
+    <h3><i class="fas fa-hard-drive" style="color:var(--primary)"></i> Histórico de Backups</h3>
+    <div style="margin-bottom:12px">
+        <button class="btn btn-primary" onclick="loadBackupsTab()"><i class="fas fa-sync"></i> Recarregar Histórico</button>
+    </div>
+    <table class="data-table">
+        <thead><tr><th>Status</th><th>Agente</th><th>Job</th><th>Duração</th><th>Tamanho</th><th>Data</th></tr></thead>
+        <tbody id="table-backups"><tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Carregando...</td></tr></tbody>
+    </table>
+</div>

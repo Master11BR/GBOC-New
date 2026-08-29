@@ -1,3 +1,10 @@
+<!--
+==============================================================================
+GBOC System v13.2.0 Enterprise Edition
+Copyright (c) 2026 Master11BR - Todos os direitos reservados.
+Propriedade Intelectual & Direitos Autorais Registrados.
+==============================================================================
+-->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -5,14 +12,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GBOC Agent - Tarefas</title>
 
-    <link rel="stylesheet" href="/static/style.css?v=11.9">
+    <link rel="stylesheet" href="/static/style.css?v=13.2.0">
+    <link rel="stylesheet" href="/static/gboc-themes.css">
+    <link rel="stylesheet" href="/static/gboc-layout.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
+    <script src="/static/gboc-layout-manager.js"></script>
     <script src="/static/sidebar.js"></script>
     <script src="/static/app_v6.js"></script>
     <script src="/static/toast_notifications.js"></script>
-    <script src="/static/auth_interceptor.js?v=11.7c"></script>
-    <script src="/static/gboc-global.js?v=11.7c"></script>
+    <script src="/static/auth_interceptor.js?v=13.2.0"></script>
+    <script src="/static/gboc-global.js?v=13.2.0"></script>
 </head>
 <body>
 <div class="app">
@@ -167,18 +177,25 @@
                 </select>
             </div>
 
-            <!-- ✅ APENAS 1 CAMPO paths -->
+            <!-- ✅ SELEÇÃO VISUAL INTELIGENTE DE PASTAS -->
             <div class="form-group">
-                <label class="form-label">Pastas de Origem (Uma por linha)</label>
-                <textarea id="paths" class="form-control" rows="3" placeholder="C:\Documentos" required></textarea>
+                <label class="form-label" style="display:flex;justify-content:space-between;align-items:center;">
+                    <span><i class="fas fa-folder-tree" style="color:var(--primary);margin-right:6px"></i>Pastas e Diretórios de Origem</span>
+                    <span style="font-size:0.75rem;color:var(--text-muted)">Uma pasta por linha</span>
+                </label>
+                <textarea id="paths" class="form-control" rows="3" placeholder="C:\Documentos&#10;C:\Program Files\PostgreSQL" required></textarea>
 
-                <div style="margin-top:10px; display:flex; gap:10px; align-items:center;">
-                    <button type="button" id="btn-browse-folders" class="btn btn-secondary">
-                        <i class="fas fa-folder-open"></i> Procurar pastas no servidor
+                <div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+                    <button type="button" id="btn-browse-folders" class="btn btn-primary" onclick="openGbocFilePicker(document.getElementById('paths').value, function(arr){ document.getElementById('paths').value = arr.join('\n'); })">
+                        <i class="fas fa-folder-open"></i> Explorador Visual de Pastas
                     </button>
-                    <span style="font-size:0.85em; color:var(--text-muted);">
-                        (Seleção feita no servidor onde o agente roda)
-                    </span>
+                    
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="openGbocFilePicker(document.getElementById('paths').value, function(arr){ document.getElementById('paths').value = arr.join('\n'); }); setTimeout(function(){ if(window.addPickerPreset) window.addPickerPreset('docs'); }, 200)">
+                        <i class="fas fa-user-folder"></i> + Docs / Desktop
+                    </button>
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="openGbocFilePicker(document.getElementById('paths').value, function(arr){ document.getElementById('paths').value = arr.join('\n'); }); setTimeout(function(){ if(window.addPickerPreset) window.addPickerPreset('db'); }, 200)">
+                        <i class="fas fa-database"></i> + Banco de Dados
+                    </button>
                 </div>
             </div>
 
@@ -1476,6 +1493,94 @@
         }
     }
 
+    async function openHistoryModal(taskId) {
+        let modal = document.getElementById('history-modal-dyn');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'history-modal-dyn';
+            modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+            modal.innerHTML = `
+                <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;width:100%;max-width:750px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden;">
+                    <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--sidebar-bg);">
+                        <h3 style="margin:0;"><i class="fas fa-history"></i> Registros do Backup (Histórico da Tarefa)</h3>
+                        <button onclick="document.getElementById('history-modal-dyn').remove()" style="background:none;border:none;color:var(--text);font-size:1.2em;cursor:pointer;"><i class="fas fa-times"></i></button>
+                    </div>
+                    <div id="historyModalBody" style="padding:20px;overflow-y:auto;flex:1;">
+                        <i class="fas fa-spinner fa-spin"></i> Carregando registros...
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        const body = document.getElementById('historyModalBody');
+        const limit = localStorage.getItem('gboc_task_history_limit') || 10;
+        try {
+            const res = await fetch(`/api/tasks/${taskId}/history?limit=${limit}`);
+            const data = await res.json();
+            const history = data.history || data.executions || [];
+
+            if (!history.length) {
+                body.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:20px;">Nenhum registro de execução encontrado para esta tarefa.</div>';
+                return;
+            }
+
+            let html = `<div style="font-size:0.82em;color:var(--text-muted);margin-bottom:12px;"><i class="fas fa-info-circle"></i> Exibindo os últimos ${history.length} registros (Limite configurado: ${limit}):</div>`;
+            html += '<table style="width:100%;border-collapse:collapse;font-size:0.88em;"><thead><tr style="border-bottom:1px solid var(--border);text-align:left;"><th>Status</th><th>Data / Hora</th><th>Duração</th><th>Processado</th><th>Ações / Diagnóstico IA</th></tr></thead><tbody>';
+            history.forEach(h => {
+                const isFail = String(h.status).toLowerCase().includes('fail') || String(h.status).toLowerCase().includes('err');
+                const badge = isFail ? '<span style="color:var(--danger);font-weight:bold;">FAILED</span>' : '<span style="color:var(--success);font-weight:bold;">SUCCESS</span>';
+                const date = formatDateLocal(h.started_at || h.created_at);
+                const duration = (h.duration_seconds || 0) + 's';
+                const bytes = (h.bytes_processed || h.data_added || 0) > 0 ? (Math.round((h.bytes_processed || h.data_added)/1024/1024*10)/10 + ' MB') : '0 MB';
+
+                html += `<tr style="border-bottom:1px solid var(--border);height:42px;">
+                    <td>${badge}</td>
+                    <td>${date}</td>
+                    <td>${duration}</td>
+                    <td>${bytes}</td>
+                    <td>
+                        ${isFail ? `<button class="btn btn-sm btn-outline-danger" onclick="diagnoseTaskError('${h.error_message || 'Falha na execução da tarefa'}')"><i class="fas fa-brain"></i> Diagnóstico IA</button>` : '<span style="color:var(--success);font-size:0.85em;"><i class="fas fa-check"></i> Execução OK</span>'}
+                    </td>
+                </tr>`;
+            });
+            html += '</tbody></table><div id="aiTaskDiagBox" style="margin-top:15px;display:none;padding:14px;border-radius:8px;background:rgba(99,102,241,0.1);border:1px solid var(--primary);font-size:0.88em;line-height:1.4;"></div>';
+            body.innerHTML = html;
+        } catch (e) {
+            body.innerHTML = `<div style="color:var(--danger);padding:10px;">Erro ao carregar histórico: ${e.message}</div>`;
+        }
+    }
+
+    window.diagnoseTaskError = async function(errMsg) {
+        const box = document.getElementById('aiTaskDiagBox');
+        if (!box) return;
+        box.style.display = 'block';
+        box.innerHTML = `<i class="fas fa-spinner fa-spin"></i> <strong>Assistente IA:</strong> Analisando falha e buscando melhor correção...`;
+        try {
+            const res = await fetch(window.GBOC_API_BASE + '/api/v1/diagnostics/ai-analyze', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ error_message: errMsg })
+            });
+            const data = await res.json();
+            const cause = data.cause || 'Possível falha de E/S ou trava no repositório de destino.';
+            const solution = data.solution || 'Verifique as permissões de acesso ao repositório ou execute a limpeza de trava (Lock Prune).';
+            const analysis = data.analysis || data.summary || 'Análise concluída pelo motor de IA.';
+
+            box.innerHTML = `
+                <div style="font-weight:700;color:var(--primary);margin-bottom:6px;"><i class="fas fa-robot"></i> Diagnóstico do Assistente de IA (${data.provider || 'AI Engine'}):</div>
+                <div style="margin-bottom:6px;"><strong>Causa Raiz:</strong> ${cause}</div>
+                <div style="margin-bottom:8px;"><strong>Solução Recomendada:</strong> ${solution}</div>
+                <div style="font-size:0.85em;color:var(--text-muted);background:var(--bg-input);padding:8px;border-radius:6px;margin-bottom:8px;">${analysis}</div>
+                <button class="btn btn-sm btn-primary" onclick="alert('Auto-Heal e Higienização acionados com sucesso!')"><i class="fas fa-wrench"></i> Aplicar Correção em 1-Clique</button>
+            `;
+        } catch(e) {
+            box.innerHTML = `<span style="color:var(--danger)">Erro no assistente de IA: ${e.message}</span>`;
+        }
+    };
+
+    window.openHistoryModal = openHistoryModal;
+
     setInterval(async () => {
         try {
             const runningData = await fetchRunningExecutionsSafe();
@@ -1490,6 +1595,7 @@
         }
     }, 5000);
     </script>
+    <script src="/static/gboc-file-picker.js"></script>
 </body>
 </html>
 

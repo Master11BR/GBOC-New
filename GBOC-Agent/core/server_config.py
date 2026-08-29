@@ -53,6 +53,7 @@ class ServerConfigManager:
         return {
             "server_url": "https://localhost:8000",
             "api_key": "gboc-local-server-key",
+            "tenant_id": None,  # MSP Tenant ID
             "enabled": True,  # Habilitado por padrão
             "heartbeat_interval_minutes": 2,
             "sync_interval_minutes": 10,
@@ -106,6 +107,14 @@ class ServerConfigManager:
     def get_api_key(self) -> str:
         """Retorna chave da API"""
         return self.get('api_key', 'gboc-local-server-key')
+
+    def get_tenant_id(self) -> Optional[str]:
+        """Retorna o tenant_id configurado"""
+        return self.get('tenant_id', None)
+
+    def set_tenant_id(self, tenant_id: Optional[str]):
+        """Define o tenant_id configurado"""
+        self.set('tenant_id', tenant_id)
 
     def get_heartbeat_interval(self) -> int:
         """Retorna intervalo do heartbeat em minutos"""

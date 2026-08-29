@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 11.7c - API de Diagnóstico Preemptivo
+GBOC 13.2.0 - API de Diagnóstico Preemptivo
 Consulta PostgreSQL via SharedCore
 """
 
@@ -37,20 +37,33 @@ def _run_check():
             """, ((datetime.now() - timedelta(hours=24)).isoformat(),))
             recent_failures = cursor.fetchone()[0] or 0
 
-            if recent_failures >= 5:
-                alerts.append({
-                    "type": "high_failure_rate",
-                    "message": f"{recent_failures} falhas nas últimas 24h",
-                    "severity": "critical"
-                })
-                risk_level = "high"
-            elif recent_failures >= 2:
-                warnings.append({
-                    "type": "moderate_failures",
-                    "message": f"{recent_failures} falhas nas últimas 24h",
-                    "severity": "warning"
-                })
-                risk_level = "moderate"
+            if recent_failures > 0:
+                # Buscar detalhes reais dos erros recentes no banco
+                try:
+                    cursor.execute("""
+                        SELECT te.id, te.task_id, t.name, t.engine, te.error_message, te.started_at
+                        FROM task_executions te
+                        JOIN tasks t ON te.task_id = t.id
+                        WHERE te.status = 'failed' AND te.started_at >= %s
+                        ORDER BY te.started_at DESC
+                        LIMIT 5
+                    """, ((datetime.now() - timedelta(hours=72)).isoformat(),))
+                    for f_row in cursor.fetchall():
+                        f_id, f_task_id, f_task_name, f_engine, f_error, f_started = f_row
+                        alerts.append({
+                            "type": "task_execution_failed",
+                            "message": f"Falha na execução da tarefa '{f_task_name}'",
+                            "detail": f"Erro reportado pela engine {f_engine}: {f_error or 'Execução finalizada com erro não-zero'}",
+                            "severity": "critical",
+                            "task_name": f_task_name,
+                            "engine": f_engine,
+                            "last_error": f_error or 'Desconhecido',
+                            "timestamp": str(f_started)
+                        })
+                    if recent_failures >= 2:
+                        risk_level = "high" if recent_failures >= 5 else "moderate"
+                except Exception as _fe:
+                    logger.warning(f"Erro ao buscar detalhes de falhas: {_fe}")
 
             # Verificar se há tarefas sem backup recente
             cursor.execute("""

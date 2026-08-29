@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics & Métricas - GBOC Server</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/gboc-themes.css">
+    <link rel="stylesheet" href="/static/gboc-layout.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="/static/gboc-layout-manager.js"></script>
+    <script src="/modules/analytics/analytics.js"></script>
+</head>
+<body class="layout-vertical">
+    <main class="main-content" style="padding:24px">
+        <h2 style="font-size:1.4em;margin-bottom:20px;display:flex;align-items:center;gap:10px">
+            <i class="fas fa-chart-bar" style="color:var(--primary)"></i> Analytics &amp; Métricas Avançadas
+        </h2>
+        <div class="panel" style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px">
+            <p style="font-size:.9em;color:var(--text-muted);margin-bottom:20px">
+                Análise preditiva de crescimento de armazenamento, tendência de falhas e histórico de SLA.
+            </p>
+            <div id="analytics-content">Carregando métricas avançadas...</div>
+        </div>
+    </main>
+</body>
+</html>

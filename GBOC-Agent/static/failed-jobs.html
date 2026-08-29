@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GBOC Agent 13.2.0 - Jobs com Falha & Retry Automático</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/gboc-themes.css">
+    <link rel="stylesheet" href="/static/gboc-layout.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="/static/gboc-layout-manager.js"></script>
+    <script src="/static/sidebar.js"></script>
+    <style>
+        .failure-card { background:rgba(245,101,101,0.07); border:1px solid rgba(245,101,101,0.3); border-radius:10px; padding:14px; margin-bottom:12px; }
+        .failure-card.escalated { background:rgba(237,137,54,0.1); border-color:rgba(237,137,54,0.4); }
+        .failure-card.resolved { background:rgba(72,187,120,0.07); border-color:rgba(72,187,120,0.3); }
+        .retry-badge { padding:2px 8px; border-radius:4px; font-size:0.72em; font-weight:700; }
+        .retry-ok { background:rgba(72,187,120,0.15); color:#48bb78; }
+        .retry-warn { background:rgba(237,137,54,0.15); color:#ed8936; }
+        .retry-crit { background:rgba(245,101,101,0.15); color:#f56565; }
+        .channel-pill { display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:20px; font-size:0.73em; border:1px solid var(--border); background:var(--bg-input); margin-right:6px; }
+        .channel-active { border-color:rgba(72,187,120,0.4); color:#48bb78; background:rgba(72,187,120,0.1); }
+        .pulse { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+    </style>
+</head>
+<body>
+<div class="app-layout">
+    <div id="sidebar-container"></div>
+    <main class="main-content">
+        <header class="page-header">
+            <div>
+                <h2><i class="fas fa-exclamation-triangle" style="color:#f56565"></i> Jobs com Falha & Retry Automático</h2>
+                <p style="font-size:0.85em;color:var(--text-muted)">Monitor proativo de falhas em tempo real. Alertas automáticos via Email, Telegram e Webhook. Retry configurável por número de tentativas.</p>
+            </div>
+            <div style="display:flex;gap:10px">
+                <button class="btn btn-secondary" onclick="loadFailedJobs()"><i class="fas fa-sync"></i> Atualizar</button>
+                <button class="btn btn-primary" onclick="openAlertConfig()"><i class="fas fa-bell"></i> Configurar Canais</button>
+            </div>
+        </header>
+
+        <!-- Stats Row -->
+        <div class="stats-row">
+            <div class="stat-card">
+                <div class="val" id="stat-active-failures" style="color:#f56565">0</div>
+                <div class="lbl">Falhas Ativas</div>
+            </div>
+            <div class="stat-card">
+                <div class="val" id="stat-escalated" style="color:#ed8936">0</div>
+                <div class="lbl">Escalonadas</div>
+            </div>
+            <div class="stat-card">
+                <div class="val" id="stat-resolved" style="color:#48bb78">0</div>
+                <div class="lbl">Resolvidas Hoje</div>
+            </div>
+            <div class="stat-card">
+                <div class="val" id="stat-alert-channels">-</div>
+                <div class="lbl">Canais Ativos</div>
+            </div>
+        </div>
+
+        <!-- Active Channels Status -->
+        <div class="panel" style="margin-top:20px">
+            <div class="panel-header">
+                <h3><i class="fas fa-satellite-dish" style="color:var(--primary)"></i> Canais de Alerta Configurados</h3>
+                <button class="btn btn-sm btn-secondary" onclick="sendTestAlert()"><i class="fas fa-paper-plane"></i> Enviar Alerta de Teste</button>
+            </div>
+            <div class="panel-body" id="alert-channels-status" style="display:flex;flex-wrap:wrap;gap:10px">
+                <span style="color:var(--text-muted);font-size:0.85em">Carregando canais...</span>
+            </div>
+        </div>
+
+        <!-- Failed Jobs List -->
+        <div class="panel" style="margin-top:20px">
+            <div class="panel-header">
+                <h3><i class="fas fa-fire" style="color:#f56565"></i> Falhas em Monitoramento</h3>
+            </div>
+            <div class="panel-body" id="failed-jobs-container">
+                <div style="text-align:center;padding:40px;color:var(--text-muted)">
+                    <i class="fas fa-spinner fa-spin" style="font-size:2em;margin-bottom:12px;display:block"></i>
+                    Carregando falhas...
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- Alert Config Modal -->
+<div id="alert-config-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.65);z-index:9999;align-items:center;justify-content:center">
+    <div style="background:var(--bg-input);width:520px;max-height:85vh;overflow-y:auto;border-radius:16px;border:1px solid var(--border);padding:22px;color:var(--text)">
+        <h3 style="margin-top:0;display:flex;align-items:center;gap:8px"><i class="fas fa-bell" style="color:var(--primary)"></i> Configurar Canais de Alerta</h3>
+
+        <div class="form-group">
+            <label>Máximo de Tentativas (Retry)</label>
+            <input type="number" id="cfg-max-retries" min="1" max="10" value="3">
+        </div>
+        <div class="form-group">
+            <label>Intervalo entre Retries (segundos)</label>
+            <input type="number" id="cfg-retry-interval" min="60" max="3600" value="300">
+        </div>
+        <div class="form-group">
+            <label>Escalonar após N falhas</label>
+            <input type="number" id="cfg-escalation" min="1" max="10" value="2">
+        </div>
+
+        <hr style="border-color:var(--border);margin:16px 0">
+        <h4 style="margin:0 0 10px;font-size:0.92em"><i class="fas fa-envelope"></i> Email SMTP</h4>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div class="form-group"><label style="font-size:0.78em">Servidor SMTP</label><input type="text" id="cfg-smtp-host" placeholder="smtp.gmail.com"></div>
+            <div class="form-group"><label style="font-size:0.78em">Porta</label><input type="number" id="cfg-smtp-port" value="587"></div>
+            <div class="form-group"><label style="font-size:0.78em">Usuário</label><input type="text" id="cfg-smtp-user" placeholder="backup@empresa.com"></div>
+            <div class="form-group"><label style="font-size:0.78em">Senha/App Key</label><input type="password" id="cfg-smtp-pass"></div>
+        </div>
+        <div class="form-group"><label style="font-size:0.78em">Destinatários (separados por vírgula)</label><input type="text" id="cfg-smtp-recipients" placeholder="admin@empresa.com, ti@empresa.com"></div>
+
+        <hr style="border-color:var(--border);margin:16px 0">
+        <h4 style="margin:0 0 10px;font-size:0.92em"><i class="fab fa-telegram"></i> Telegram Bot</h4>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div class="form-group"><label style="font-size:0.78em">Bot Token</label><input type="password" id="cfg-tg-token" placeholder="1234567890:AAE..."></div>
+            <div class="form-group"><label style="font-size:0.78em">Chat ID</label><input type="text" id="cfg-tg-chatid" placeholder="-1001234567890"></div>
+        </div>
+
+        <hr style="border-color:var(--border);margin:16px 0">
+        <h4 style="margin:0 0 10px;font-size:0.92em"><i class="fas fa-globe"></i> Webhook HTTP</h4>
+        <div class="form-group"><label style="font-size:0.78em">URL do Webhook</label><input type="text" id="cfg-webhook-url" placeholder="https://hooks.slack.com/services/T.../B.../xxx"></div>
+
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px">
+            <button class="btn btn-secondary" onclick="closeAlertConfig()">Cancelar</button>
+            <button class="btn btn-primary" onclick="saveAlertConfig()"><i class="fas fa-save"></i> Salvar Configuração</button>
+        </div>
+    </div>
+</div>
+
+<script src="/static/sidebar.js"></script>
+<script>
+    const API = '/api/v1/jobs';
+
+    document.addEventListener('DOMContentLoaded', () => {
+        new UnifiedSidebar().initialize();
+        loadFailedJobs();
+        loadAlertConfig();
+        // Auto-refresh every 30 seconds
+        setInterval(loadFailedJobs, 30000);
+    });
+
+    async function loadFailedJobs() {
+        try {
+            const r = await fetch(`${API}/failed`);
+            const d = await r.json();
+            const failures = d.failures || [];
+
+            const active = failures.filter(f => f.status === 'failed');
+            const escalated = failures.filter(f => f.escalated);
+            const resolved = failures.filter(f => f.status === 'resolved');
+
+            document.getElementById('stat-active-failures').textContent = active.length;
+            document.getElementById('stat-escalated').textContent = escalated.length;
+            document.getElementById('stat-resolved').textContent = resolved.length;
+
+            const container = document.getElementById('failed-jobs-container');
+            if (!failures.length) {
+                container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text-muted)"><i class="fas fa-check-circle" style="font-size:2.5em;color:#48bb78;display:block;margin-bottom:10px"></i><strong style="color:#48bb78">Sem falhas ativas!</strong><br><span style="font-size:0.85em">Todos os jobs estão executando normalmente.</span></div>`;
+                return;
+            }
+
+            container.innerHTML = failures.map(f => {
+                const isActive = f.status === 'failed';
+                const isEscalated = f.escalated;
+                const retryPct = Math.min((f.retry_count / Math.max(f.max_retries, 1)) * 100, 100);
+                const badgeClass = f.retry_count === 0 ? 'retry-ok' : (isEscalated ? 'retry-crit' : 'retry-warn');
+                const cardClass = !isActive ? 'resolved' : (isEscalated ? 'escalated' : '');
+
+                return `<div class="failure-card ${cardClass}">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+                        <div>
+                            <div style="font-weight:700;font-size:0.95em;display:flex;align-items:center;gap:8px">
+                                <i class="fas fa-${isActive ? 'times-circle' : 'check-circle'}" style="color:${isActive ? '#f56565' : '#48bb78'}"></i>
+                                ${f.task_name || f.task_id}
+                                ${isEscalated ? '<span class="retry-badge retry-crit pulse"><i class="fas fa-arrow-up"></i> ESCALONADO</span>' : ''}
+                            </div>
+                            <div style="font-size:0.78em;color:var(--text-muted);margin-top:4px">${f.failure_reason || 'Erro não especificado'}</div>
+                        </div>
+                        <span class="retry-badge ${badgeClass}">${f.retry_count}/${f.max_retries} tentativas</span>
+                    </div>
+                    <div style="margin:10px 0 6px;background:var(--sidebar-bg);border-radius:4px;height:4px;overflow:hidden">
+                        <div style="width:${retryPct}%;height:100%;background:${retryPct >= 100 ? '#f56565' : retryPct >= 50 ? '#ed8936' : '#48bb78'};border-radius:4px;transition:width 0.4s"></div>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+                        <div style="font-size:0.73em;color:var(--text-muted)">
+                            <i class="fas fa-clock"></i> ${f.first_failed_at ? new Date(f.first_failed_at).toLocaleString('pt-BR') : '-'}
+                        </div>
+                        ${isActive ? `<button class="btn btn-sm btn-success" onclick="resolveJob('${f.task_id}')"><i class="fas fa-check"></i> Marcar Resolvido</button>` : `<span style="font-size:0.75em;color:#48bb78"><i class="fas fa-check-circle"></i> Resolvido</span>`}
+                    </div>
+                </div>`;
+            }).join('');
+        } catch(e) {
+            console.error('loadFailedJobs:', e);
+        }
+    }
+
+    async function resolveJob(taskId) {
+        if (!confirm(`Marcar o job "${taskId}" como resolvido?`)) return;
+        await fetch(`${API}/resolve/${taskId}`, {method:'POST'});
+        loadFailedJobs();
+    }
+
+    async function sendTestAlert() {
+        const btn = event.target;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+        try {
+            const r = await fetch(`${API}/test-alert`, {method:'POST'});
+            const d = await r.json();
+            alert(d.message || 'Alerta de teste enviado!');
+        } catch(e) {
+            alert('Erro ao enviar teste: ' + e.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar Alerta de Teste';
+        }
+    }
+
+    async function loadAlertConfig() {
+        try {
+            const r = await fetch(`${API}/alert-config`);
+            const d = await r.json();
+            const cfg = d.config || {};
+            const ch = cfg.alert_channels || {};
+            let activeCount = 0;
+            const channelsHtml = [
+                {key:'email', label:'Email SMTP', icon:'fa-envelope'},
+                {key:'telegram', label:'Telegram Bot', icon:'fa-telegram'},
+                {key:'webhook', label:'Webhook HTTP', icon:'fa-globe'}
+            ].map(c => {
+                const active = ch[c.key]?.enabled;
+                if (active) activeCount++;
+                return `<span class="channel-pill ${active ? 'channel-active' : ''}">
+                    <i class="fas ${c.icon}"></i> ${c.label}
+                    ${active ? '<i class="fas fa-check" style="font-size:0.7em"></i>' : '<i class="fas fa-times" style="opacity:0.4;font-size:0.7em"></i>'}
+                </span>`;
+            }).join('');
+            document.getElementById('alert-channels-status').innerHTML = channelsHtml + `<button class="btn btn-sm btn-secondary" onclick="openAlertConfig()" style="margin-left:auto"><i class="fas fa-cog"></i> Configurar</button>`;
+            document.getElementById('stat-alert-channels').textContent = activeCount + '/3';
+        } catch(e) {}
+    }
+
+    function openAlertConfig() { document.getElementById('alert-config-modal').style.display = 'flex'; }
+    function closeAlertConfig() { document.getElementById('alert-config-modal').style.display = 'none'; }
+
+    async function saveAlertConfig() {
+        const cfg = {
+            max_retries: parseInt(document.getElementById('cfg-max-retries').value),
+            retry_interval_seconds: parseInt(document.getElementById('cfg-retry-interval').value),
+            escalation_after_failures: parseInt(document.getElementById('cfg-escalation').value),
+            alert_channels: {
+                email: {
+                    enabled: !!document.getElementById('cfg-smtp-host').value,
+                    smtp_host: document.getElementById('cfg-smtp-host').value,
+                    smtp_port: parseInt(document.getElementById('cfg-smtp-port').value),
+                    smtp_user: document.getElementById('cfg-smtp-user').value,
+                    smtp_pass: document.getElementById('cfg-smtp-pass').value,
+                    recipients: document.getElementById('cfg-smtp-recipients').value.split(',').map(s=>s.trim()).filter(Boolean)
+                },
+                telegram: {
+                    enabled: !!document.getElementById('cfg-tg-token').value,
+                    bot_token: document.getElementById('cfg-tg-token').value,
+                    chat_id: document.getElementById('cfg-tg-chatid').value
+                },
+                webhook: {
+                    enabled: !!document.getElementById('cfg-webhook-url').value,
+                    url: document.getElementById('cfg-webhook-url').value
+                }
+            }
+        };
+        try {
+            await fetch(`${API}/alert-config`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(cfg)});
+            closeAlertConfig();
+            loadAlertConfig();
+            alert('Configuração de alertas salva com sucesso!');
+        } catch(e) {
+            alert('Erro ao salvar: ' + e.message);
+        }
+    }
+</script>
+</body>
+</html>

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-🔄 GBOC Agent 11.7c - API de Restauração REAL
+🔄 GBOC Agent 13.2.0 - API de Restauração REAL
 Gerencia restauração de arquivos de snapshots reais
 """
 
 from fastapi import APIRouter, HTTPException
-from typing import List, Optional
+from typing import List, Optional, Any
 from pydantic import BaseModel
 import logging
 import psycopg2.extras
@@ -16,7 +16,7 @@ router = APIRouter(prefix="/api/restore", tags=["restore"])
 
 class RestoreRequest(BaseModel):
     """Schema para requisição de restauração"""
-    repository_id: int
+    repository_id: Any
     snapshot_id: str
     files: List[str]
     target_path: str
@@ -24,12 +24,12 @@ class RestoreRequest(BaseModel):
 
 
 @router.get("/snapshots/{repo_id}")
-async def get_snapshots(repo_id: int):
+async def get_snapshots(repo_id: str):
     """
-    Lista snapshots REAIS de um repositório
+    Lista snapshots REAIS de um repositório ou backup do Duplicati
     
     Args:
-        repo_id: ID do repositório
+        repo_id: ID do repositório (ex: 36 ou dup_native_2)
         
     Returns:
         Lista de snapshots com metadata real
@@ -181,6 +181,51 @@ async def get_restore_status(restore_id: int):
         raise
     except Exception as e:
         logger.error(f"❌ Erro ao obter status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/active")
+async def get_active_restore_api():
+    """Retorna lista de processos de restauração atualmente em execução paralela no agente."""
+    try:
+        from shared_core import get_shared_core
+        core = get_shared_core()
+        if not hasattr(core, 'restore_manager') or not core.restore_manager:
+            return {"status": "none", "active_count": 0, "active_restores": [], "active": None}
+
+        active_list = core.restore_manager.get_active_restores()
+        if active_list:
+            return {
+                "status": "running",
+                "active_count": len(active_list),
+                "active_restores": active_list,
+                "active": active_list[0]
+            }
+        return {"status": "none", "active_count": 0, "active_restores": [], "active": None}
+    except Exception as e:
+        logger.error(f"❌ Erro ao consultar restores ativos: {e}")
+        return {"status": "error", "error": str(e), "active_count": 0, "active_restores": [], "active": None}
+
+
+@router.post("/cancel/{restore_id}")
+@router.post("/abort/{restore_id}")
+async def cancel_restore_endpoint(restore_id: int):
+    """Cancela um processo de restauração ativo ou travado no agente."""
+    try:
+        from shared_core import get_shared_core
+        core = get_shared_core()
+        if not hasattr(core, 'restore_manager') or not core.restore_manager:
+            raise HTTPException(status_code=503, detail="RestoreManager não está disponível")
+
+        success = core.restore_manager.cancel_restore(restore_id)
+        if success:
+            return {"status": "success", "message": f"Restauração #{restore_id} cancelada com sucesso", "restore_id": restore_id}
+        else:
+            raise HTTPException(status_code=400, detail=f"Não foi possível cancelar a restauração #{restore_id}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Erro ao cancelar restauração {restore_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

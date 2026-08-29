@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-🛡️ GBOC Agent 11.7c - Backup Verifier
+🛡️ GBOC Agent 13.2.0 - Backup Verifier
 Diagnóstico profundo de integridade e recuperabilidade de backups (Restic & Kopia)
 Verifica se as cópias estão sendo feitas e se são recuperáveis.
 """

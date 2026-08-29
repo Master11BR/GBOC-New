@@ -1,11 +1,21 @@
+<!--
+==============================================================================
+GBOC System v13.2.0 Enterprise Edition
+Copyright (c) 2026 Master11BR - Todos os direitos reservados.
+Propriedade Intelectual & Direitos Autorais Registrados.
+==============================================================================
+-->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GBOC Agent 11.7c - Backup de Banco de Dados</title>
-    <link rel="stylesheet" href="/static/style.css?v=11.9">
+    <title>GBOC Agent 13.2.0 - Backup de Banco de Dados</title>
+    <link rel="stylesheet" href="/static/style.css?v=13.2.0">
+    <link rel="stylesheet" href="/static/gboc-themes.css">
+    <link rel="stylesheet" href="/static/gboc-layout.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="/static/gboc-layout-manager.js"></script>
     <style>
         .stats-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:16px; margin-bottom:28px; }
         .stat-card { background:var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:18px; text-align:center; }
@@ -119,6 +129,13 @@
                     <option value="mysql">MySQL</option>
                     <option value="sqlite">SQLite</option>
                 </select>
+            </div>
+            <div style="margin-bottom:14px; padding:10px; background:var(--bg-input); border-radius:8px; border:1px solid var(--border);">
+                <span style="font-size:0.8em; color:var(--text-muted); display:block; margin-bottom:6px; font-weight:600;"><i class="fas fa-magic"></i> Presets de Teste Rápido:</span>
+                <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                    <button class="btn btn-secondary" style="padding:4px 8px; font-size:0.75em;" type="button" onclick="setPreset('agent')"><i class="fas fa-file-database"></i> Banco do Agente</button>
+                    <button class="btn btn-secondary" style="padding:4px 8px; font-size:0.75em;" type="button" onclick="setPreset('duplicati')"><i class="fas fa-plug"></i> Banco do Duplicati</button>
+                </div>
             </div>
             <div class="form-group" id="grpHost"><label>Host</label><input type="text" id="cHost" value="localhost"></div>
             <div class="form-group" id="grpPort"><label>Porta</label><input type="number" id="cPort" value="5432"></div>
@@ -282,6 +299,18 @@
         el('grpPass').style.display = show ? '' : 'none';
         if(t === 'mysql') el('cPort').value = 3306;
         else if(t === 'postgresql') el('cPort').value = 5432;
+    }
+
+    function setPreset(presetType) {
+        el('cType').value = 'sqlite';
+        updatePortDefault();
+        if (presetType === 'agent') {
+            el('cName').value = 'GBOC Agent SQLite DB (Teste)';
+            el('cDb').value = 'data/agent_data.db';
+        } else if (presetType === 'duplicati') {
+            el('cName').value = 'Duplicati Server DB (Teste)';
+            el('cDb').value = 'Duplicati-server.sqlite';
+        }
     }
 
     async function saveConn() {

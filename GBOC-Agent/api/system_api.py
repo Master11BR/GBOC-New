@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 11.7c - API de Sistema Completo
+GBOC 13.2.0 - API de Sistema Completo
 Endpoint para diagnóstico completo do sistema
 """
 
@@ -43,7 +43,7 @@ async def scan_orphan_files():
 
 @router.post("/version/unify")
 async def unify_versions():
-    """Unifica versões do sistema para 10.0a"""
+    """Unifica versões do sistema para 13.2.0"""
     try:
         from utils.version_unifier import VersionUnifier
         

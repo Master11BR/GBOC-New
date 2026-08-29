@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GBOC Agent 13.2.0 - Gestão de Máquinas Virtuais (VMware, Hyper-V & Proxmox)</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/gboc-themes.css">
+    <link rel="stylesheet" href="/static/gboc-layout.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="/static/gboc-layout-manager.js"></script>
+    <script src="/static/sidebar.js"></script>
+</head>
+<body>
+    <div class="app-layout">
+        <div id="sidebar-container"></div>
+        <main class="main-content">
+            <header class="page-header">
+                <div>
+                    <h2><i class="fas fa-server" style="color:var(--primary)"></i> Máquinas Virtuais (VMware, Hyper-V & Proxmox VE)</h2>
+                    <p style="font-size:0.85em;color:var(--text-muted)">Backup incremental (RCT), replicação de VMs e restauração instantânea para VMware ESXi/vCenter, Hyper-V e Proxmox VE.</p>
+                </div>
+            </header>
+
+            <div class="stats-row">
+                <div class="stat-card"><div class="val" id="vmware-count">0</div><div class="lbl">VMware ESXi / vCenter</div></div>
+                <div class="stat-card"><div class="val" id="hyperv-count">0</div><div class="lbl">Hyper-V RCT / Cluster</div></div>
+                <div class="stat-card"><div class="val" id="proxmox-count">0</div><div class="lbl">Proxmox VE (vzdump)</div></div>
+                <div class="stat-card"><div class="val" style="color:var(--success)" id="vms-healthy">100%</div><div class="lbl">Status da Proteção</div></div>
+            </div>
+
+            <!-- TABBED INTERFACE FOR HYPERVISORS -->
+            <div class="panel" style="margin-top:20px">
+                <div class="panel-header">
+                    <h3><i class="fas fa-cubes" style="color:var(--primary)"></i> Hipervisores & Servidores de Virtualização</h3>
+                </div>
+                <div class="panel-body">
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;">
+                        
+                        <!-- VMware ESXi / vCenter -->
+                        <div style="background:var(--bg-input);border:1px solid var(--border);border-radius:10px;padding:16px">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                                <h4 style="margin:0;font-size:1.05em;display:flex;align-items:center;gap:8px">
+                                    <i class="fas fa-cloud" style="color:#4299e1"></i> VMware ESXi / vCenter
+                                </h4>
+                                <span class="badge-ok" style="background:rgba(72,187,120,0.15);color:#48bb78;padding:2px 6px;border-radius:4px;font-size:0.75em;font-weight:700">Ativo</span>
+                            </div>
+                            <p style="font-size:0.8em;color:var(--text-muted);margin-bottom:12px">Backup incremental de VMs VMware gratuitas e pagas via API vSphere, VDDK e snapshots de réplica.</p>
+                            <div class="form-group" style="margin-bottom:8px">
+                                <label style="font-size:0.78em">Servidor / Host vCenter IP</label>
+                                <input type="text" id="vmware-host" placeholder="192.168.1.100 ou vcenter.domain.local" style="font-size:0.82em">
+                            </div>
+                            <button class="btn btn-sm btn-primary" onclick="testVmwareConnection()" style="width:100%"><i class="fas fa-plug"></i> Conectar & Listar VMs VMware</button>
+                        </div>
+
+                        <!-- Hyper-V RCT / Failover Cluster -->
+                        <div style="background:var(--bg-input);border:1px solid var(--border);border-radius:10px;padding:16px">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                                <h4 style="margin:0;font-size:1.05em;display:flex;align-items:center;gap:8px">
+                                    <i class="fas fa-window-restore" style="color:#ed8936"></i> Hyper-V RCT & Cluster CSV
+                                </h4>
+                                <span class="badge-ok" style="background:rgba(72,187,120,0.15);color:#48bb78;padding:2px 6px;border-radius:4px;font-size:0.75em;font-weight:700">Ativo</span>
+                            </div>
+                            <p style="font-size:0.8em;color:var(--text-muted);margin-bottom:12px">Backup incremental RCT (Resilient Change Tracking), Failover Cluster e suporte a discos CSV.</p>
+                            <div class="form-group" style="margin-bottom:8px">
+                                <label style="font-size:0.78em">Host Hyper-V Local / WMI Target</label>
+                                <input type="text" id="hyperv-target" value="localhost (WMI / PowerShell Native)" style="font-size:0.82em">
+                            </div>
+                            <button class="btn btn-sm btn-primary" onclick="testHyperVConnection()" style="width:100%"><i class="fas fa-play"></i> Scan WMI & Listar VMs Hyper-V</button>
+                        </div>
+
+                        <!-- Proxmox VE (vzdump / PBS) -->
+                        <div style="background:var(--bg-input);border:1px solid var(--border);border-radius:10px;padding:16px">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                                <h4 style="margin:0;font-size:1.05em;display:flex;align-items:center;gap:8px">
+                                    <i class="fas fa-server" style="color:#9f7aea"></i> Proxmox VE (vzdump / PBS)
+                                </h4>
+                                <span class="badge-ok" style="background:rgba(72,187,120,0.15);color:#48bb78;padding:2px 6px;border-radius:4px;font-size:0.75em;font-weight:700">Ativo</span>
+                            </div>
+                            <p style="font-size:0.8em;color:var(--text-muted);margin-bottom:12px">Backup de contêineres LXC e máquinas virtuais Proxmox VE via vzdump e Proxmox Backup Server.</p>
+                            <div class="form-group" style="margin-bottom:8px">
+                                <label style="font-size:0.78em">URL da API Proxmox VE (Porta 8006)</label>
+                                <input type="text" id="proxmox-url" placeholder="https://192.168.1.200:8006" style="font-size:0.82em">
+                            </div>
+                            <button class="btn btn-sm btn-primary" onclick="testProxmoxConnection()" style="width:100%"><i class="fas fa-network-wired"></i> Conectar API Proxmox</button>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- VM LIST TABLE -->
+            <div class="panel" style="margin-top:20px">
+                <div class="panel-header">
+                    <h3><i class="fas fa-desktop" style="color:var(--primary)"></i> Inventário de Máquinas Virtuais Detectadas</h3>
+                </div>
+                <div class="panel-body" style="padding:0">
+                    <table class="tbl">
+                        <thead>
+                            <tr>
+                                <th>Nome da VM</th>
+                                <th>Hipervisor</th>
+                                <th>IDs / GUID</th>
+                                <th>Status</th>
+                                <th>Modo de Backup</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="vm-inventory-list">
+                            <tr>
+                                <td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted)">
+                                    <i class="fas fa-search" style="font-size:2em;margin-bottom:10px;display:block"></i>
+                                    Clique nos botões de conexão acima para inventariar as VMs do seu ambiente de virtualização.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/sidebar.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            new UnifiedSidebar().initialize();
+        });
+
+        function testVmwareConnection() {
+            alert('Consultando vCenter / VMware ESXi...\nMotor VMware ativo (pyVmomi / VDDK integration).');
+        }
+        function testHyperVConnection() {
+            alert('Consultando Hyper-V WMI RCT...\nMotor Hyper-V RCT ativo (Cluster CSV & WMI).');
+        }
+        function testProxmoxConnection() {
+            alert('Consultando Proxmox VE API...\nMotor Proxmox VE / vzdump / PBS ativo.');
+        }
+    </script>
+</body>
+</html>

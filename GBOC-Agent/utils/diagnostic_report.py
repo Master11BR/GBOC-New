@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 11.7c - Sistema de Diagnóstico Completo
+GBOC 13.2.0 - Sistema de Diagnóstico Completo
 Diagnóstico unificado de servidor e agente com correção automática
 """
 
@@ -18,7 +18,7 @@ from typing import Dict, Any, List, Tuple
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-VERSION = "11.7c"
+VERSION = "13.2.0"
 
 class SystemDiagnostic:
     """Diagnóstico completo do sistema GBOC"""

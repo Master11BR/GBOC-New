@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 11.7c - Audit Trail API
+GBOC 13.2.0 - Audit Trail API
 Records all significant actions: who, what, when, where, result.
 Immutable audit entries for compliance (SOX, HIPAA, ISO 27001).
 Decorator for automatic audit logging on API endpoints.

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Overview - GBOC Server</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/gboc-themes.css">
+    <link rel="stylesheet" href="/static/gboc-layout.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="/static/gboc-layout-manager.js"></script>
+    <script src="/modules/overview/overview.js"></script>
+</head>
+<body class="layout-vertical">
+    <main class="main-content" style="padding:24px">
+        <h2 style="font-size:1.4em;margin-bottom:20px;display:flex;align-items:center;gap:10px">
+            <i class="fas fa-chart-line" style="color:var(--primary)"></i> Visão Geral &amp; Status do Servidor Central
+        </h2>
+        <div class="kpi-grid" style="margin-bottom:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px">
+            <div class="kpi-card" style="background:var(--bg-card);padding:18px;border-radius:12px;border:1px solid var(--border)">
+                <div style="font-size:.85em;color:var(--text-muted)">Agentes Online</div>
+                <div style="font-size:1.8em;font-weight:700;color:var(--success)" id="ov-agents-online">—</div>
+            </div>
+            <div class="kpi-card" style="background:var(--bg-card);padding:18px;border-radius:12px;border:1px solid var(--border)">
+                <div style="font-size:.85em;color:var(--text-muted)">Jobs Executados (24h)</div>
+                <div style="font-size:1.8em;font-weight:700;color:var(--primary)" id="ov-jobs-24h">—</div>
+            </div>
+            <div class="kpi-card" style="background:var(--bg-card);padding:18px;border-radius:12px;border:1px solid var(--border)">
+                <div style="font-size:.85em;color:var(--text-muted)">Alertas Pendentes</div>
+                <div style="font-size:1.8em;font-weight:700;color:var(--warning)" id="ov-alerts">—</div>
+            </div>
+            <div class="kpi-card" style="background:var(--bg-card);padding:18px;border-radius:12px;border:1px solid var(--border)">
+                <div style="font-size:.85em;color:var(--text-muted)">Taxa de Sucesso</div>
+                <div style="font-size:1.8em;font-weight:700;color:var(--success)" id="ov-success-rate">—</div>
+            </div>
+        </div>
+    </main>
+</body>
+</html>

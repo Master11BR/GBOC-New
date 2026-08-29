@@ -1,5 +1,12 @@
+/*
+==============================================================================
+GBOC System v13.2.0 Enterprise Edition
+Copyright (c) 2026 Master11BR - Todos os direitos reservados.
+Propriedade Intelectual & Direitos Autorais Registrados.
+==============================================================================
+*/
 /**
- * GBOC v10.0a - Dashboard Widget Framework
+ * GBOC v13.2.0 - Dashboard Widget Framework
  * Draggable, resizable, collapsible widget system.
  */
 class DashboardWidgets {

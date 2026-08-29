@@ -1,0 +1,133 @@
+/* ============================================================================
+   GBOC System v13.2.0 — Multi-Theme CSS Variables
+   Inspired by Tresto Admin (Vertical) & AdminVoice Admin (Horizontal)
+   Themes: dark (default) | light | purple (AdminVoice) | ocean (Tresto)
+   Applied via: <html data-color-theme="X">
+   This file is ADDITIVE — it does not override style.css defaults.
+   ============================================================================ */
+
+/* ── 1. Dark Theme (Standard Deep Slate Navy) ─────────────────────────────── */
+[data-color-theme="dark"], :root {
+    --primary:         #6366f1;
+    --primary-hover:   #4f46e5;
+    --primary-soft:    rgba(99, 102, 241, 0.14);
+    --success:         #10b981;
+    --danger:          #ef4444;
+    --warning:         #f59e0b;
+    --info:            #06b6d4;
+
+    --bg:              #0f172a; /* Deep Slate Navy (Tresto style) */
+    --bg-card:         #1e293b;
+    --bg-input:        #0f172a;
+    --sidebar-bg:      #0b1329;
+    --topbar-bg:       #0b1329;
+    --topbar-text:     #f8fafc;
+    --topbar-border:   rgba(255, 255, 255, 0.08);
+    --hero-bg:         linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%);
+    --border:          rgba(255, 255, 255, 0.08);
+    --text:            #f8fafc;
+    --text-secondary:  #94a3b8;
+    --text-muted:      #64748b;
+    --shadow:          0 10px 30px rgba(0, 0, 0, 0.35);
+    --shadow-card:     0 4px 16px rgba(0, 0, 0, 0.25);
+    --radius:          14px;
+    --scrollbar-thumb: #334155;
+}
+
+/* ── 2. Light Theme (Clean Minimalist Tresto Style) ────────────────────────── */
+[data-color-theme="light"] {
+    --primary:         #6366f1;
+    --primary-hover:   #4f46e5;
+    --primary-soft:    rgba(99, 102, 241, 0.10);
+    --success:         #10b981;
+    --danger:          #ef4444;
+    --warning:         #f59e0b;
+    --info:            #0284c7;
+
+    --bg:              #f4f6fb; /* Tresto light gray background */
+    --bg-card:         #ffffff;
+    --bg-input:        #f8fafc;
+    --sidebar-bg:      #ffffff;
+    --topbar-bg:       #ffffff;
+    --topbar-text:     #1e293b;
+    --topbar-border:   rgba(0, 0, 0, 0.06);
+    --hero-bg:         linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+    --border:          rgba(0, 0, 0, 0.07);
+    --text:            #0f172a;
+    --text-secondary:  #475569;
+    --text-muted:      #94a3b8;
+    --shadow:          0 10px 30px rgba(0, 0, 0, 0.08);
+    --shadow-card:     0 4px 16px rgba(0, 0, 0, 0.05);
+    --scrollbar-thumb: #cbd5e1;
+}
+
+/* ── 3. Purple Theme (AdminVoice Gradient Banner Style) ───────────────────── */
+[data-color-theme="purple"] {
+    --primary:         #a855f7;
+    --primary-hover:   #9333ea;
+    --primary-soft:    rgba(168, 85, 247, 0.16);
+    --success:         #34d399;
+    --danger:          #f87171;
+    --warning:         #fbbf24;
+    --info:            #38bdf8;
+
+    --bg:              #0b0719;
+    --bg-card:         #160f33;
+    --bg-input:        #100a26;
+    --sidebar-bg:      #0e0824;
+    --topbar-bg:       linear-gradient(135deg, #3730a3 0%, #581c87 50%, #701a75 100%);
+    --topbar-text:     #ffffff;
+    --topbar-border:   rgba(255, 255, 255, 0.14);
+    --hero-bg:         linear-gradient(135deg, #4338ca 0%, #6b21a8 50%, #86198f 100%);
+    --border:          rgba(168, 85, 247, 0.18);
+    --text:            #f5f3ff;
+    --text-secondary:  #ddd6fe;
+    --text-muted:      #a78bfa;
+    --shadow:          0 12px 36px rgba(88, 28, 135, 0.45);
+    --shadow-card:     0 4px 20px rgba(88, 28, 135, 0.28);
+    --scrollbar-thumb: #581c87;
+}
+
+/* ── 4. Ocean Theme (AdminVoice Cyan/Teal Hero Style) ────────────────────── */
+[data-color-theme="ocean"] {
+    --primary:         #0284c7;
+    --primary-hover:   #0369a1;
+    --primary-soft:    rgba(2, 132, 199, 0.14);
+    --success:         #10b981;
+    --danger:          #f43f5e;
+    --warning:         #f59e0b;
+    --info:            #06b6d4;
+
+    --bg:              #f0f9ff;
+    --bg-card:         #ffffff;
+    --bg-input:        #f8fafc;
+    --sidebar-bg:      #ffffff;
+    --topbar-bg:       linear-gradient(135deg, #0369a1 0%, #0d9488 100%);
+    --topbar-text:     #ffffff;
+    --topbar-border:   rgba(255, 255, 255, 0.15);
+    --hero-bg:         linear-gradient(135deg, #0284c7 0%, #0f766e 100%);
+    --border:          rgba(2, 132, 199, 0.12);
+    --text:            #0f172a;
+    --text-secondary:  #334155;
+    --text-muted:      #64748b;
+    --shadow:          0 10px 30px rgba(2, 132, 199, 0.12);
+    --shadow-card:     0 4px 16px rgba(2, 132, 199, 0.07);
+    --scrollbar-thumb: #93c5fd;
+}
+
+/* ── Theme Global Body Background Overrides ──────────────────────────────── */
+body {
+    background-color: var(--bg) !important;
+    color: var(--text) !important;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Apply light card styles when light or ocean theme selected */
+[data-color-theme="light"] .panel,
+[data-color-theme="light"] .stat-card,
+[data-color-theme="ocean"] .panel,
+[data-color-theme="ocean"] .stat-card {
+    background: var(--bg-card) !important;
+    border-color: var(--border) !important;
+    box-shadow: var(--shadow-card) !important;
+}

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-⚠️ GBOC Agent 11.7c - API ALERTS
+⚠️ GBOC Agent 13.2.0 - API ALERTS
 Responsável por: Rotas para sistema de alertas e notificações
 """
 

@@ -1,11 +1,24 @@
+<!--
+==============================================================================
+GBOC System v13.2.0 Enterprise Edition
+Copyright (c) 2026 Master11BR - Todos os direitos reservados.
+Propriedade Intelectual & Direitos Autorais Registrados.
+==============================================================================
+-->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GBOC Agent 11.7c - Detecção de Ransomware</title>
-    <link rel="stylesheet" href="/static/style.css?v=11.9">
+    <title>GBOC Agent 13.2.0 - Detecção de Ransomware</title>
+    <link rel="stylesheet" href="/static/style.css?v=13.2.0">
+    <link rel="stylesheet" href="/static/gboc-themes.css">
+    <link rel="stylesheet" href="/static/gboc-layout.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        window.GBOC_API_BASE = (window.location.protocol === 'https:' || window.location.port === '8081' ? 'https:' : window.location.protocol) + '//' + window.location.hostname + ':' + (window.location.port === '8081' ? '9200' : (window.location.port || '9200'));
+    </script>
+    <script src="/static/gboc-layout-manager.js"></script>
     <style>
         .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:28px}
         .stat-card{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:18px;text-align:center}
@@ -117,6 +130,34 @@
                 </div>
             </div>
 
+            <!-- STATUS DA PROTEÇÃO LOCAL -->
+            <div class="panel" style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:24px">
+                <h3 style="margin-bottom:16px;font-size:1.05em;display:flex;align-items:center;gap:8px">
+                    <i class="fas fa-shield-alt" style="color:var(--primary)"></i> Status da Proteção Integrada (Host Local)
+                </h3>
+                <div id="local-protection-card" class="stat-card" style="text-align:left; display:flex; justify-content:space-between; align-items:center; transition: all 0.3s ease;">
+                    <div>
+                        <h4 style="margin:0; font-size:1.1em" id="av-name">Carregando...</h4>
+                        <p style="margin:4px 0 0; font-size:0.85em; color:var(--text-muted)" id="av-status-text">Verificando serviço de antivírus...</p>
+                    </div>
+                    <i class="fas fa-circle-notch fa-spin" id="av-icon" style="font-size:2em; color:var(--text-muted)"></i>
+                </div>
+                
+                <h4 style="margin-top:20px; font-size:0.95em; margin-bottom:10px"><i class="fas fa-clipboard-list"></i> Últimos Eventos de Segurança (Log do Sistema)</h4>
+                <table class="tbl" style="width:100%">
+                    <thead>
+                        <tr>
+                            <th style="width:200px">Data / Hora</th>
+                            <th style="width:100px">Event ID</th>
+                            <th>Mensagem (Security Log)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="local-events-table">
+                        <tr><td colspan="3" style="text-align:center;color:var(--text-muted)">Carregando eventos de segurança local...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
             <!-- KPIs -->
             <div class="stats-row" id="kpi-row">
                 <div class="stat-card"><div class="val" id="kpi-canaries">0</div><div class="lbl">Canary Files</div></div>
@@ -124,6 +165,22 @@
                 <div class="stat-card"><div class="val" id="kpi-scans">0</div><div class="lbl">Varreduras</div></div>
                 <div class="stat-card"><div class="val" id="kpi-last-threat">—</div><div class="lbl">Último Nível</div></div>
                 <div class="stat-card"><div class="val" id="kpi-incidents" style="color:var(--warning)">0</div><div class="lbl">Incidentes</div></div>
+            </div>
+
+            <!-- STACK DE SEGURANÇA OPEN SOURCE (7 FERRAMENTAS INTEGRADAS) -->
+            <div class="panel" style="margin-bottom:24px;border:2px solid rgba(0,240,255,0.2)">
+                <div class="panel-header">
+                    <div>
+                        <h3><i class="fas fa-shield-alt" style="color:var(--primary)"></i> Stack de Segurança Open Source (7 Ferramentas Integradas)</h3>
+                        <p style="font-size:0.82em;color:var(--text-muted);margin:4px 0 0 0">ClamAV, Armadito, ClamWin/ClamTk, Hypatia, Wazuh HIDS, YARA e Rkhunter integrados diretamente no motor de backup GBOC.</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="runMultiToolScan()"><i class="fas fa-play-circle"></i> Varredura Integrada (7 Ferramentas)</button>
+                </div>
+                <div class="panel-body" style="padding:16px">
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;" id="tools-grid-container">
+                        <div class="empty-msg">Carregando ferramentas de segurança...</div>
+                    </div>
+                </div>
             </div>
 
             <div class="two-col">
@@ -208,11 +265,155 @@
 
     <script src="/static/sidebar.js"></script>
     <script>
-    document.addEventListener('DOMContentLoaded',()=>{new UnifiedSidebar().initialize();loadAll()});
+    document.addEventListener('DOMContentLoaded', () => {
+        try {
+            if (window.unifiedSidebar && typeof window.unifiedSidebar.initialize === 'function') {
+                window.unifiedSidebar.initialize();
+            } else if (typeof UnifiedSidebar !== 'undefined') {
+                new UnifiedSidebar().initialize();
+            }
+        } catch (e) {
+            console.error('Falha ao inicializar sidebar:', e);
+        }
+        loadAll();
+    });
     const API='/api/ransomware';
 
     async function loadAll(){
-        await Promise.allSettled([loadStatus(), loadCanaries(), loadHistory(), loadGuardian(), loadIncidents()]);
+        await Promise.allSettled([loadStatus(), loadSecurityTools(), loadCanaries(), loadHistory(), loadGuardian(), loadIncidents(), loadLocalProtection()]);
+    }
+
+    async function loadLocalProtection(){
+        const avName = document.getElementById('av-name');
+        const avText = document.getElementById('av-status-text');
+        const avIcon = document.getElementById('av-icon');
+        const card = document.getElementById('local-protection-card');
+        const tbody = document.getElementById('local-events-table');
+
+        try {
+            const r = await fetch(API + '/local_protection');
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            const data = await r.json();
+
+            if (avName) {
+                if(data.av_installed) {
+                    avName.innerText = data.av_name || 'Antivírus / EDR detectado';
+                    if(data.av_active) {
+                        avText.innerText = "Proteção local ATIVA e operante.";
+                        avIcon.className = "fas fa-check-circle";
+                        avIcon.style.color = "var(--success)";
+                        card.style.borderLeft = "4px solid var(--success)";
+                    } else {
+                        avText.innerText = "Proteção local instalada, mas INATIVA.";
+                        avIcon.className = "fas fa-exclamation-triangle";
+                        avIcon.style.color = "var(--warning)";
+                        card.style.borderLeft = "4px solid var(--warning)";
+                    }
+                } else {
+                    avName.innerText = data.av_name || "Nenhum Antivírus / EDR detectado";
+                    avText.innerText = "O host está VULNERÁVEL.";
+                    avIcon.className = "fas fa-times-circle";
+                    avIcon.style.color = "var(--danger)";
+                    card.style.borderLeft = "4px solid var(--danger)";
+                    card.style.backgroundColor = "rgba(240,107,107,0.05)";
+                }
+            }
+
+            if (tbody) {
+                if(data.recent_security_events && data.recent_security_events.length > 0) {
+                    tbody.innerHTML = data.recent_security_events.map(ev => {
+                        return `<tr>
+                            <td style="white-space:nowrap">${ev.time ? new Date(ev.time).toLocaleString() : '—'}</td>
+                            <td><span class="badge-warn">${ev.id ?? '—'}</span></td>
+                            <td>${ev.message || '—'}</td>
+                        </tr>`;
+                    }).join('');
+                } else {
+                    tbody.innerHTML = `<tr><td colspan="3" class="empty-msg">Nenhum evento de segurança recente encontrado.</td></tr>`;
+                }
+            }
+        } catch(e) {
+            console.error("Falha ao carregar proteção local:", e);
+            if (avName) avName.innerText = "Validação local indisponível";
+            if (avText) avText.innerText = "Não foi possível consultar o status real do antivírus/EDR.";
+            if (avIcon) {
+                avIcon.className = "fas fa-exclamation-circle";
+                avIcon.style.color = "var(--warning)";
+            }
+            if (card) {
+                card.style.borderLeft = "4px solid var(--warning)";
+                card.style.backgroundColor = "rgba(240,169,64,0.05)";
+            }
+            if (tbody) {
+                tbody.innerHTML = `<tr><td colspan="3" class="empty-msg" style="color:var(--warning)">Falha ao validar proteção local: ${String(e.message || e)}</td></tr>`;
+            }
+        }
+    }
+
+    async function loadSecurityTools(){
+        try{
+            const r=await fetch(API+'/tools');
+            const d=await r.json();
+            const tools=d.tools||{};
+            const container=document.getElementById('tools-grid-container');
+            if(!container) return;
+
+            const toolList=[
+                {id:'clamav', name:'ClamAV Engine', icon:'fa-virus-slash', color:'#4299e1'},
+                {id:'armadito', name:'Armadito Antivirus', icon:'fa-shield-virus', color:'#ed8936'},
+                {id:'clamwin_clamtk', name:'ClamWin / ClamTk GUI', icon:'fa-desktop', color:'#38b2ac'},
+                {id:'hypatia', name:'Hypatia Mobile Guard', icon:'fa-mobile-alt', color:'#9f7aea'},
+                {id:'wazuh_hids', name:'Wazuh / OSSEC HIDS', icon:'fa-user-shield', color:'#48bb78'},
+                {id:'yara', name:'YARA Engine', icon:'fa-code-branch', color:'#f56565'},
+                {id:'rkhunter', name:'Rkhunter (Rootkit Hunter)', icon:'fa-user-ninja', color:'#ecc94b'}
+            ];
+
+            container.innerHTML=toolList.map(t=>{
+                const info=tools[t.id]||{};
+                const installed=Boolean(info.installed || info.available);
+                const statusBadge=installed
+                    ?'<span style="background:rgba(72,187,120,0.15);color:#48bb78;border:1px solid rgba(72,187,120,0.3);padding:2px 7px;border-radius:4px;font-size:0.72em;font-weight:700"><i class="fas fa-check-circle"></i> Instalado</span>'
+                    :'<span style="background:rgba(245,101,101,0.15);color:#f56565;border:1px solid rgba(245,101,101,0.3);padding:2px 7px;border-radius:4px;font-size:0.72em;font-weight:700"><i class="fas fa-times-circle"></i> Não Instalado</span>';
+                
+                const actionBtn=installed
+                    ?`<button class="btn btn-sm btn-primary" onclick="scanSingleTool('${t.id}')" style="width:100%;margin-top:10px;font-size:0.78em"><i class="fas fa-search"></i> Varrer com ${t.name.split(' ')[0]}</button>`
+                    :`<button class="btn btn-sm btn-secondary" disabled style="width:100%;margin-top:10px;font-size:0.78em;opacity:0.45;cursor:not-allowed"><i class="fas fa-ban"></i> Ausente no SO</button>`;
+
+                const binaryText = installed ? (info.binary || 'Caminho verificado no SO') : 'Não encontrado no PATH do SO';
+
+                return `<div style="background:var(--bg-input);border:1px solid ${installed?'var(--border)':'rgba(245,101,101,0.3)'};border-radius:10px;padding:14px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                        <div style="font-weight:700;font-size:0.9em;display:flex;align-items:center;gap:6px">
+                            <i class="fas ${t.icon}" style="color:${t.color}"></i> ${info.name||t.name}
+                        </div>
+                        ${statusBadge}
+                    </div>
+                    <div style="font-size:0.78em;color:var(--text-muted);margin-bottom:6px">${info.type||'Motor de Segurança'}</div>
+                    <div style="font-size:0.75em;color:${installed?'var(--text-secondary)':'#f56565'};font-family:monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${binaryText}">${info.status || binaryText}</div>
+                    ${actionBtn}
+                </div>`;
+            }).join('');
+        }catch(e){console.error('loadSecurityTools:',e)}
+    }
+
+    async function scanSingleTool(toolId){
+        const path=prompt('Digite o diretório ou caminho para a varredura dedicada:', 'C:\\') || 'C:\\';
+        try{
+            const r=await fetch(API+'/tools/scan/'+toolId,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target_path:path})});
+            const d=await r.json();
+            alert(`Varredura com ${toolId.toUpperCase()} Concluída!\nStatus: ${d.status||'OK'}\nAmeaças identificadas: ${d.threats_found||d.threats_matched||d.rootkits_found||0}`);
+            loadAll();
+        }catch(e){alert('Erro ao executar ferramenta: '+e.message)}
+    }
+
+    async function runMultiToolScan(){
+        const path=prompt('Digite o diretório alvo para a varredura integrada com as 7 Ferramentas:', 'C:\\') || 'C:\\';
+        try{
+            const r=await fetch(API+'/tools/scan/integrated',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target_path:path})});
+            const d=await r.json();
+            alert(`Varredura Integrada Multi-Tool Concluída!\nNível de Risco: ${(d.threat_level||'none').toUpperCase()}\nTotal de Ameaças: ${d.total_threats_detected||0}\nFerramentas Executadas: ${d.tools_executed||7}`);
+            loadAll();
+        }catch(e){alert('Erro ao executar varredura integrada: '+e.message)}
     }
 
     // ─── Guardian Auto-Response ──────────────────────────────────
@@ -245,7 +446,19 @@
             btn.className='btn btn-sm '+(running?'btn-danger':'btn-success');
             btn.innerHTML=running?'<i class="fas fa-stop"></i> Parar':'<i class="fas fa-play"></i> Ativar';
             interval.value=d.check_interval_minutes||5;
-        }catch(e){console.error('loadGuardian:',e)}
+        }catch(e){
+            console.error('loadGuardian:',e);
+            const banner=document.getElementById('guardian-banner');
+            const pulse=document.getElementById('guardian-pulse');
+            const icon=document.getElementById('guardian-icon');
+            const title=document.getElementById('guardian-title');
+            const sub=document.getElementById('guardian-sub');
+            if (banner) banner.className='guardian-banner stopped';
+            if (pulse) pulse.className='pulse off';
+            if (icon) icon.style.color='var(--warning)';
+            if (title) title.textContent='Guardian — Status indisponível';
+            if (sub) sub.textContent='Falha ao consultar o Guardian. Verifique o backend do agente.';
+        }
     }
 
     async function toggleGuardian(){
@@ -334,7 +547,20 @@
                 document.getElementById('threat-title').textContent='⚠ Atenção — Possível Ameaça Detectada';
                 document.getElementById('threat-sub').textContent=`${c.compromised} canary(s) comprometido(s) · Nível: ${tl}`;
             }
-        }catch(e){console.error('loadStatus:',e)}
+        }catch(e){
+            console.error('loadStatus:',e);
+            const banner=document.getElementById('threat-banner');
+            const icon=banner?.querySelector('.icon i');
+            if (banner) banner.className='threat-banner medium';
+            if (icon) {
+                icon.className='fas fa-exclamation-circle';
+                icon.style.color='var(--warning)';
+            }
+            const t=document.getElementById('threat-title');
+            const s=document.getElementById('threat-sub');
+            if (t) t.textContent='Status indisponível';
+            if (s) s.textContent='Não foi possível carregar o status de ransomware.';
+        }
     }
 
     async function loadCanaries(){

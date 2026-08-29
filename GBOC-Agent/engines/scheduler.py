@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-🔄 GBOC Agent 11.7c - Task Scheduler
+🔄 GBOC Agent 13.2.0 - Task Scheduler
 Agendador de tarefas para execução automática
 """
 

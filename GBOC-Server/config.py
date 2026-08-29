@@ -8,7 +8,10 @@ from datetime import timedelta
 # ===========================
 # INFORMAÇÕES DO SERVIDOR
 # ===========================
-SERVER_VERSION = "11.7c"
+try:
+    from version_control import __version__ as SERVER_VERSION, get_version_info
+except Exception:
+    SERVER_VERSION = "13.2.0"
 API_VERSION = "v1"
 SERVER_NAME = os.getenv("SERVER_NAME", "GBOC Server")
 SERVER_ENVIRONMENT = os.getenv("SERVER_ENV", "development")

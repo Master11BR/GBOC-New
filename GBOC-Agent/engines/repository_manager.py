@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC Agent 11.7c - Repository Manager
+GBOC Agent 13.2.0 - Repository Manager
 Refatorado para usar backends de armazenamento modulares.
 """
 
@@ -32,6 +32,16 @@ class RepositoryManager:
         self.core = core
         logger.info("✅ RepositoryManager (v2) inicializado")
 
+    def initialize_repository(self, repo_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Inicializa um novo repositório ou valida sua criação."""
+        return self.create_repository(repo_data)
+
+    def test_connection(self, repo_id_or_data: Any) -> Dict[str, Any]:
+        """Testa conexão com um repositório por ID ou dicionário de configuração."""
+        if isinstance(repo_id_or_data, dict):
+            return self.validate_connection(repo_id_or_data)
+        return self.validate_connection({"id": repo_id_or_data})
+
     def _get_conn(self):
         """Obtém uma conexão de banco de dados do pool do core."""
         return self.core.get_db_connection()
@@ -52,6 +62,24 @@ class RepositoryManager:
                             normalized[key] = value
             except Exception:
                 pass
+
+        # Uniformizar todos os campos de senha possíveis para evitar falha de recuperação
+        p = (
+            normalized.get('motor_password') or 
+            normalized.get('encryption_password') or 
+            normalized.get('password') or 
+            normalized.get('cloud_password') or 
+            ''
+        )
+        if p:
+            if 'motor_password' not in normalized or not normalized.get('motor_password'):
+                normalized['motor_password'] = p
+            if 'cloud_password' not in normalized or not normalized.get('cloud_password'):
+                normalized['cloud_password'] = p
+            if 'encryption_password' not in normalized or not normalized.get('encryption_password'):
+                normalized['encryption_password'] = p
+            if 'password' not in normalized or not normalized.get('password'):
+                normalized['password'] = p
 
         return normalized
 
@@ -98,7 +126,8 @@ class RepositoryManager:
             with self._get_conn() as conn:
                 cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
                 cursor.execute("SELECT * FROM repositories ORDER BY name ASC")
-                return cursor.fetchall()
+                rows = cursor.fetchall()
+                return [self._normalize_repository_config(row) for row in rows]
         except Exception as e:
             logger.error(f"Erro ao listar repositórios: {e}")
             return []
@@ -925,9 +954,69 @@ class RepositoryManager:
             return {"valid": False, "message": f"Erro no teste Restic: {str(e)}", "error": "restic_exception", "error_source": "engine"}
 
     def validate_repository_connection(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Testa conexão com repositório a partir de dados de configuração (sem salvar)."""
+        """Testa conexão com repositório a partir de dados de configuração (sem salvar). Se a senha for deixada em branco, recupera do repositório correspondente salvo no sistema."""
         try:
-            return self._build_connection_diagnostics(data)
+            cfg = dict(data or {})
+            engine = str(cfg.get("engine", "restic")).lower()
+            repo_type = str(cfg.get("type") or cfg.get("repo_type") or "local").lower()
+
+            # Se repo_id foi fornecido ou campos essenciais estão faltando, busca no repositório salvo
+            repo_id = cfg.get("repo_id") or cfg.get("id")
+            has_password = bool(cfg.get("motor_password") or cfg.get("password") or cfg.get("encryption_password"))
+            has_path_or_bucket = bool(cfg.get("path") or cfg.get("bucket"))
+            has_access_key = bool(cfg.get("access_key") or cfg.get("aws_access_key") or cfg.get("b2_account_id"))
+
+            if repo_id or not has_password or not has_path_or_bucket or (repo_type != 'local' and not has_access_key):
+                matched_repo = None
+                if repo_id:
+                    try:
+                        matched_repo = self.get_repository(int(repo_id))
+                    except Exception:
+                        pass
+                if not matched_repo:
+                    saved_repos = self.list_repositories() or []
+                    for r in saved_repos:
+                        if str(r.get("engine", "")).lower() == engine:
+                            if repo_type == 'local' and str(r.get("type", "local")).lower() == 'local':
+                                matched_repo = r
+                                break
+                            elif repo_type != 'local' and str(r.get("type", "")).lower() == repo_type:
+                                b_cfg = cfg.get("bucket") or cfg.get("path")
+                                b_r = r.get("bucket") or r.get("path")
+                                if not b_cfg or b_cfg == b_r:
+                                    matched_repo = r
+                                    break
+                    if not matched_repo and saved_repos:
+                        for r in saved_repos:
+                            if str(r.get("engine", "")).lower() == engine:
+                                matched_repo = r
+                                break
+
+                if matched_repo:
+                    norm_matched = self._normalize_repository_config(matched_repo)
+                    if not cfg.get("repo_id") and matched_repo.get("id"):
+                        cfg["repo_id"] = matched_repo.get("id")
+                    if not has_password:
+                        saved_pw = norm_matched.get("motor_password") or norm_matched.get("encryption_password") or norm_matched.get("password")
+                        if saved_pw:
+                            cfg["motor_password"] = saved_pw
+                            cfg["password"] = saved_pw
+                    if not cfg.get("path") and (norm_matched.get("path") or norm_matched.get("bucket")):
+                        cfg["path"] = norm_matched.get("path") or norm_matched.get("bucket")
+                    if not cfg.get("bucket") and (norm_matched.get("bucket") or norm_matched.get("path")):
+                        cfg["bucket"] = norm_matched.get("bucket") or norm_matched.get("path")
+                    if not cfg.get("access_key") and norm_matched.get("access_key"):
+                        cfg["access_key"] = norm_matched.get("access_key")
+                    if not cfg.get("secret_key") and norm_matched.get("secret_key"):
+                        cfg["secret_key"] = norm_matched.get("secret_key")
+                    if not cfg.get("region") and norm_matched.get("region"):
+                        cfg["region"] = norm_matched.get("region")
+                    if not cfg.get("endpoint") and norm_matched.get("endpoint"):
+                        cfg["endpoint"] = norm_matched.get("endpoint")
+                    if not cfg.get("prefix") and norm_matched.get("prefix"):
+                        cfg["prefix"] = norm_matched.get("prefix")
+
+            return self._build_connection_diagnostics(cfg)
         except Exception as e:
             engine = str(data.get("engine", "restic")).lower()
             repo_type = str(data.get("type") or data.get("repo_type") or "local").lower()
@@ -1168,4 +1257,10 @@ class RepositoryManager:
             "path": path,
             "error": None if installed else f"Motor '{engine_name}' não encontrado",
         }
+
+    def get_engine_validation_report(self) -> str:
+        """Gera relatório completo de validação de motores usando o EngineValidator."""
+        from engines.engine_validator import EngineValidator
+        validator = EngineValidator()
+        return validator.get_validation_report()
 

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compliance & Políticas - GBOC Server</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/gboc-themes.css">
+    <link rel="stylesheet" href="/static/gboc-layout.css">
+    <script src="/static/gboc-layout-manager.js"></script>
+    <script src="/modules/compliance/compliance.js"></script>
+    <style>
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; text-align: center; }
+        .stat-card .val { font-size: 1.8em; font-weight: 700; }
+        .stat-card .lbl { font-size: .82em; color: var(--text-muted); margin-top: 4px; }
+    </style>
+</head>
+<body class="layout-vertical">
+    <main class="main-content" style="padding:24px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+            <div>
+                <h2 style="font-size:1.4em;margin:0;display:flex;align-items:center;gap:10px">
+                    <i class="fas fa-clipboard-check" style="color:var(--primary)"></i> Compliance &amp; Governança do Ecossistema (Servidor + Agentes)
+                </h2>
+                <div style="font-size:.85em;color:var(--text-muted);margin-top:2px">Auditoria contínua de conformidade LGPD/GDPR, criptografia e segurança de nós.</div>
+            </div>
+            <button class="btn btn-primary" onclick="loadComplianceData()"><i class="fas fa-sync-alt"></i> Recalcular Compliance</button>
+        </div>
+
+        <!-- KPIs DO ECOSSISTEMA -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="val" id="cp-kpi-score" style="color:var(--success)">0.0%</div>
+                <div class="lbl">Score Global do Ecossistema</div>
+            </div>
+            <div class="stat-card">
+                <div class="val" id="cp-kpi-lgpd" style="color:var(--primary)">COMPLIANT</div>
+                <div class="lbl">Status LGPD / GDPR</div>
+            </div>
+            <div class="stat-card">
+                <div class="val" id="cp-kpi-nodes">0</div>
+                <div class="lbl">Nós Auditados (Server + Agentes)</div>
+            </div>
+            <div class="stat-card">
+                <div class="val" id="cp-kpi-cipher" style="font-size:1.1em;line-height:2em;color:var(--warning)">AES-256-GCM</div>
+                <div class="lbl">Padrão Criptográfico</div>
+            </div>
+        </div>
+
+        <!-- TABELA DO ECOSSISTEMA -->
+        <div class="panel" style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px">
+            <h3 style="margin-bottom:16px;font-size:1.05em;display:flex;align-items:center;gap:8px">
+                <i class="fas fa-network-wired" style="color:var(--primary)"></i> Matriz de Conformidade do Ecossistema
+            </h3>
+            <table class="data-table" style="width:100%">
+                <thead>
+                    <tr>
+                        <th>Nó / Hostname</th>
+                        <th>Papel no Ecossistema</th>
+                        <th>Score de Conformidade</th>
+                        <th>Políticas Conformes</th>
+                        <th>Violações / Gaps</th>
+                        <th>Status Geral</th>
+                    </tr>
+                </thead>
+                <tbody id="cp-agents-table">
+                    <tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Carregando dados de compliance do ecossistema...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+</body>
+</html>

@@ -1,12 +1,22 @@
+<!--
+==============================================================================
+GBOC System v13.2.0 Enterprise Edition
+Copyright (c) 2026 Master11BR - Todos os direitos reservados.
+Propriedade Intelectual & Direitos Autorais Registrados.
+==============================================================================
+-->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Configurações - GBOC Agent</title>
-    <link rel="stylesheet" href="/static/style.css?v=11.9">
+    <link rel="stylesheet" href="/static/style.css?v=13.2.0">
+    <link rel="stylesheet" href="/static/gboc-themes.css">
+    <link rel="stylesheet" href="/static/gboc-layout.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="/static/auth_interceptor.js"></script>
+    <script src="/static/gboc-layout-manager.js"></script>
 </head>
 <body>
     <div class="app">
@@ -27,8 +37,14 @@
                 <button class="gboc-tab" data-tab="backup">
                     <i class="fas fa-database"></i> Backup
                 </button>
+                <button class="gboc-tab" data-tab="reports">
+                    <i class="fas fa-file-invoice-dollar"></i> Relatórios
+                </button>
                 <button class="gboc-tab" data-tab="engines">
                     <i class="fas fa-cogs"></i> Motores
+                </button>
+                <button class="gboc-tab" data-tab="ai">
+                    <i class="fas fa-brain"></i> IA & LLMs
                 </button>
                 <button class="gboc-tab" data-tab="server">
                     <i class="fas fa-cloud"></i> Servidor Central
@@ -45,6 +61,41 @@
             </div>
 
             <div class="settings-content">
+                <!-- ABA: RELATÓRIOS -->
+                <div id="reports" class="gboc-tab-pane">
+                    <div class="settings-grid">
+                        <div class="settings-card">
+                            <h2><i class="fas fa-cloud"></i> Custo de Armazenamento Cloud</h2>
+                            
+                            <div class="setting-item">
+                                <label for="setting-cloud-storage-cost-usd-per-tb">Tarifa Base Cloud Storage ($ USD / TB / mês)</label>
+                                <div class="setting-description">Valor em Dólares por Terabyte utilizado por mês nos relatórios de custo de nuvem.</div>
+                                <input type="number" step="0.01" id="setting-cloud-storage-cost-usd-per-tb" class="form-control" value="7.99" min="0.01" max="999.00">
+                            </div>
+
+                            <div class="setting-row">
+                                <label for="setting-auto-currency-conversion">
+                                    <i class="fas fa-exchange-alt"></i> Conversão Automática de Câmbio (USD -> BRL)
+                                </label>
+                                <input type="checkbox" id="setting-auto-currency-conversion" checked>
+                            </div>
+                            
+                            <div style="background:rgba(0,240,255,0.06);padding:14px;border-radius:8px;border:1px solid rgba(0,240,255,0.2);margin-top:16px">
+                                <p style="margin:0;font-size:0.9em;color:var(--primary)">
+                                    <i class="fas fa-info-circle"></i> <strong>Câmbio Comercial do Dia:</strong> Atualizado automaticamente via API pública com fallback de segurança.
+                                </p>
+                                <div id="exchange-rate-display-box" style="font-size:0.88em;color:var(--text-muted);margin-top:6px">
+                                    Cotação comercial atual: <strong>USD 1.00 = R$ 5.50 BRL</strong> | Tarifa convertida: <strong style="color:var(--success)">R$ 43.95 / TB / mês</strong>
+                                </div>
+                            </div>
+
+                            <button class="btn btn-primary" id="btn-save-reports" style="margin-top:16px;">
+                                <i class="fas fa-save"></i> Salvar Configurações de Relatórios
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- ABA: GERAL -->
                 <div id="general" class="gboc-tab-pane active">
                     <div class="settings-grid">
@@ -169,6 +220,50 @@
                                 <input type="number" id="engine-kopia-maintenance" class="form-control" value="24">
                             </div>
                         </div>
+
+                        <!-- DUPLICATI NATIVE CONNECTION CONFIGURATION CARD -->
+                        <div class="settings-card" style="grid-column: 1 / -1;">
+                            <h2><i class="fas fa-plug" style="color:var(--primary);"></i> Configuração de Conexão do Duplicati Native</h2>
+                            <p style="color:var(--text-muted);font-size:0.85em;margin-bottom:14px;">Gerencie a URL Base HTTP, porta e credenciais de acesso web da instância do Duplicati Native.</p>
+                            
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                                <div class="setting-item" style="grid-column: 1 / -1;">
+                                    <label for="dupBaseUrl">URL Base do Duplicati</label>
+                                    <input type="url" id="dupBaseUrl" class="form-control" placeholder="http://localhost:8200" value="http://localhost:8200">
+                                </div>
+                                <div class="setting-item">
+                                    <label for="dupUsername">Usuário Web (Opcional)</label>
+                                    <input type="text" id="dupUsername" class="form-control" placeholder="Opcional">
+                                </div>
+                                <div class="setting-item">
+                                    <label for="dupPassword">Senha Web (Opcional)</label>
+                                    <input type="password" id="dupPassword" class="form-control" placeholder="Opcional">
+                                </div>
+                                <div class="setting-item">
+                                    <label for="dupTimeout">Timeout (segundos)</label>
+                                    <input type="number" id="dupTimeout" class="form-control" value="8" min="2" max="60">
+                                </div>
+                                <div class="setting-row" style="margin-top:24px">
+                                    <label for="dupVerifyTls">
+                                        <i class="fas fa-shield-alt"></i> Validar TLS
+                                    </label>
+                                    <input type="checkbox" id="dupVerifyTls">
+                                </div>
+                            </div>
+
+                            <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
+                                <button class="btn btn-primary" onclick="saveDuplicatiNativeConfig()">
+                                    <i class="fas fa-save"></i> Salvar
+                                </button>
+                                <button class="btn btn-secondary" onclick="testDuplicatiNativeConnection()">
+                                    <i class="fas fa-heartbeat"></i> Testar Conexão
+                                </button>
+                                <button class="btn btn-secondary" onclick="discoverDuplicatiNativeEndpoints()">
+                                    <i class="fas fa-search"></i> Descobrir Endpoints
+                                </button>
+                            </div>
+                            <div id="dupNativeFeedback" style="margin-top:12px;font-size:0.88em;"></div>
+                        </div>
                     </div>
                     
                     <div class="settings-actions">
@@ -178,6 +273,74 @@
                         <button id="btn-rescan-engines" class="btn btn-secondary">
                             <i class="fas fa-search"></i> Rescan de Motores
                         </button>
+                    </div>
+                </div>
+
+                <!-- ABA: IA & LLM -->
+                <div id="ai" class="gboc-tab-pane">
+                    <div class="settings-card" style="max-width: 700px; margin: 0 auto;">
+                        <h2><i class="fas fa-robot"></i> Configuração do Assistente de IA & LLM</h2>
+                        <p style="color:var(--text-muted); font-size:0.88em; margin-bottom: 15px;">Configure o modelo de Inteligência Artificial usado para análise de logs, diagnósticos e resolução de erros.</p>
+                        
+                        <div class="setting-item">
+                            <label for="ai-provider"><i class="fas fa-microchip"></i> Provedor de IA</label>
+                            <select id="ai-provider" class="form-control" onchange="toggleAiFields()">
+                                <option value="ollama" selected>Ollama (IA Local - Llama / Mistral)</option>
+                                <option value="kimi">Kimi AI / Moonshot (Nuvem)</option>
+                                <option value="grok">Grok xAI (Nuvem)</option>
+                                <option value="openai">OpenAI (GPT-4o / GPT-4o-mini)</option>
+                                <option value="gemini">Google Gemini (Gemini 1.5 / 2.0)</option>
+                                <option value="deepseek">DeepSeek (V3 / R1 Nuvem)</option>
+                                <option value="claude">Anthropic Claude (3.5 Sonnet)</option>
+                                <option value="qwen">Qwen 2.5 (Alibaba / Ollama)</option>
+                                <option value="mistral">Mistral AI (Codestral / Le Chat)</option>
+                                <option value="llama3">Meta Llama 3.3 (70B Local/Cloud)</option>
+                                <option value="cohere">Cohere (Command R+)</option>
+                            </select>
+                        </div>
+
+                        <div class="setting-item" id="group-ollama-host">
+                            <label for="ai-ollama-host"><i class="fas fa-network-wired"></i> Host Ollama Local</label>
+                            <div style="display:flex;gap:8px">
+                                <input type="text" id="ai-ollama-host" class="form-control" value="http://localhost:11434" placeholder="http://localhost:11434">
+                                <button type="button" class="btn btn-primary" style="white-space:nowrap" onclick="detectOllamaModels()">
+                                    <i class="fas fa-search"></i> Detectar IA Local
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="setting-item">
+                            <label for="ai-model"><i class="fas fa-brain"></i> Modelo LLM de IA (Ollama / Cloud)</label>
+                            <div style="display:flex;gap:8px;flex-direction:column">
+                                <select id="ai-model-select" class="form-control" onchange="onModelSelectChanged(this.value)">
+                                    <option value="llama3">🟢 llama3:latest (Instalado / Padrão)</option>
+                                </select>
+                                <div id="model-status-badge" style="font-size:0.83em;padding:6px 10px;border-radius:6px;background:rgba(255,255,255,0.05);color:var(--text-muted)">
+                                    <i class="fas fa-info-circle"></i> Selecione um modelo da lista acima.
+                                </div>
+                                <input type="text" id="ai-model" class="form-control" value="llama3" placeholder="Ex: llama3, mistral, llama3.2:latest, deepseek-r1" style="margin-top:4px">
+                            </div>
+                        </div>
+
+                        <div class="setting-item" id="group-api-key">
+                            <label for="ai-api-key"><i class="fas fa-key"></i> Chave de API (Nuvem)</label>
+                            <input type="password" id="ai-api-key" class="form-control" placeholder="sk-...">
+                        </div>
+
+                        <div class="setting-item">
+                            <label for="task-history-limit"><i class="fas fa-list-ol"></i> Limite de Registros de Histórico de Backup</label>
+                            <div class="setting-description">Quantidade de execuções exibidas no histórico do módulo de tarefas.</div>
+                            <input type="number" id="task-history-limit" class="form-control" value="10" min="1" max="100">
+                        </div>
+                        
+                        <div class="settings-actions" style="background: transparent; border: none; padding: 0; margin-top:15px;">
+                            <button id="btn-test-ai" class="btn btn-secondary" onclick="testAiConnection()">
+                                <i class="fas fa-plug"></i> Testar IA
+                            </button>
+                            <button id="btn-save-ai" class="btn btn-primary" onclick="saveAiSettings()">
+                                <i class="fas fa-save"></i> Salvar Configuração de IA
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -603,6 +766,7 @@
 
         document.getElementById('btn-save-general').addEventListener('click', () => saveSettings('general'));
         document.getElementById('btn-save-backup').addEventListener('click', () => saveSettings('backup'));
+        document.getElementById('btn-save-reports').addEventListener('click', () => saveSettings('reports'));
         document.getElementById('btn-save-engines').addEventListener('click', () => saveSettings('engines'));
         document.getElementById('btn-reset-splash-session').addEventListener('click', () => {
             sessionStorage.removeItem('gboc_startup_splash_done');
@@ -1115,10 +1279,329 @@
             }
         }
 
+        function toggleAiFields() {
+            const provider = document.getElementById('ai-provider').value;
+            const ollamaGroup = document.getElementById('group-ollama-host');
+            const apiKeyGroup = document.getElementById('group-api-key');
+            const modelInput = document.getElementById('ai-model');
+
+            const defaultModels = {
+                ollama: 'llama3',
+                kimi: 'moonshot-v1-8k',
+                grok: 'grok-2',
+                openai: 'gpt-4o-mini',
+                gemini: 'gemini-1.5-flash',
+                deepseek: 'deepseek-chat',
+                claude: 'claude-3-5-sonnet-20241022',
+                qwen: 'qwen2.5',
+                mistral: 'mistral-large-latest',
+                llama3: 'llama3.3:70b',
+                cohere: 'command-r-plus'
+            };
+
+            if (modelInput && defaultModels[provider]) {
+                modelInput.placeholder = `Ex: ${defaultModels[provider]}`;
+            }
+
+            if (provider === 'ollama' || provider === 'qwen' || provider === 'llama3') {
+                if (ollamaGroup) ollamaGroup.style.display = 'block';
+                if (apiKeyGroup) apiKeyGroup.style.display = 'none';
+            } else {
+                if (ollamaGroup) ollamaGroup.style.display = 'none';
+                if (apiKeyGroup) apiKeyGroup.style.display = 'block';
+            }
+        }
+
+        let gInstalledModels = [];
+        let gRecommendedModels = [
+            "llama3:latest", "llama3.2:latest", "llama3.3:70b", "mistral:latest",
+            "deepseek-r1:latest", "deepseek-r1:1.5b", "qwen2.5:latest", "gemma2:latest",
+            "codellama:latest", "phi3:latest"
+        ];
+
+        function updateModelDropdownUI(installed, recommended, currentVal) {
+            const select = document.getElementById('ai-model-select');
+            if (!select) return;
+            gInstalledModels = installed || [];
+            const recs = recommended || gRecommendedModels;
+
+            let html = '';
+
+            if (gInstalledModels.length > 0) {
+                html += `<optgroup label="🟢 Modelos Instalados Localmente (Prontos para Diagnóstico)">`;
+                gInstalledModels.forEach(m => {
+                    html += `<option value="${m}">🟢 ${m} (Instalado - Pronto)</option>`;
+                });
+                html += `</optgroup>`;
+            }
+
+            const availableNotInstalled = recs.filter(m => !gInstalledModels.includes(m));
+            if (availableNotInstalled.length > 0) {
+                html += `<optgroup label="⚪ Modelos Disponíveis na Nuvem / Library (Requer 'ollama pull')">`;
+                availableNotInstalled.forEach(m => {
+                    html += `<option value="${m}">⚪ ${m} (Não Instalado - Requer 'ollama pull')</option>`;
+                });
+                html += `</optgroup>`;
+            }
+
+            select.innerHTML = html;
+
+            const valToSet = currentVal || (gInstalledModels.length > 0 ? gInstalledModels[0] : recs[0]);
+            select.value = valToSet;
+            document.getElementById('ai-model').value = valToSet;
+            onModelSelectChanged(valToSet);
+        }
+
+        function onModelSelectChanged(val) {
+            document.getElementById('ai-model').value = val;
+            const badge = document.getElementById('model-status-badge');
+            if (!badge) return;
+
+            if (gInstalledModels.includes(val)) {
+                badge.style.cssText = 'font-size:0.83em;padding:6px 10px;border-radius:6px;background:rgba(72,187,120,0.15);color:#48bb78;border:1px solid rgba(72,187,120,0.3);margin-top:4px';
+                badge.innerHTML = `<i class="fas fa-check-circle"></i> Modelo <strong>${val}</strong> está INSTALADO no Ollama e pronto para uso imediato!`;
+            } else {
+                badge.style.cssText = 'font-size:0.83em;padding:6px 10px;border-radius:6px;background:rgba(237,137,54,0.15);color:#ed8936;border:1px solid rgba(237,137,54,0.3);margin-top:4px';
+                badge.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Modelo <strong>${val}</strong> não está instalado localmente.<br>` +
+                    `<button type="button" class="btn btn-sm btn-primary" style="margin-top:6px;padding:4px 8px;font-size:0.85em" onclick="pullOllamaModel('${val}')"><i class="fas fa-download"></i> Instalar Modelo Automaticamente</button>`;
+            }
+        }
+
+        async function pullOllamaModel(modelName) {
+            const host = document.getElementById('ai-ollama-host').value || 'http://localhost:11434';
+            if(!confirm(`Deseja iniciar o download do modelo "${modelName}" no Ollama?\nIsso será feito em segundo plano pelo agente.`)) return;
+            
+            const btn = document.querySelector(`button[onclick="pullOllamaModel('${modelName}')"]`);
+            if(btn) {
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Iniciando Instalação...';
+                btn.disabled = true;
+            }
+            
+            try {
+                const res = await fetch(window.GBOC_API_BASE + '/api/v1/diagnostics/ollama-models/pull', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({host: host, model: modelName})
+                });
+                const data = await res.json();
+                if(data.status === 'downloading' || data.status === 'success') {
+                    alert(`✅ Instalação iniciada em segundo plano!\n\nVocê pode clicar em "Detectar IA Local" em alguns instantes para conferir se o download terminou.`);
+                } else {
+                    alert(`❌ Erro ao solicitar download: ${data.message || 'Erro desconhecido'}`);
+                }
+            } catch(e) {
+                alert(`❌ Falha na comunicação com a API: ${e.message}`);
+            } finally {
+                if(btn) {
+                    btn.innerHTML = '<i class="fas fa-download"></i> Instalar Modelo Automaticamente';
+                    btn.disabled = false;
+                }
+            }
+        }
+
+        async function detectOllamaModels() {
+            const host = document.getElementById('ai-ollama-host').value;
+            const input = document.getElementById('ai-model');
+            const btn = document.querySelector('button[onclick="detectOllamaModels()"]');
+            if (btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Conectando...';
+
+            try {
+                const res = await fetch(window.GBOC_API_BASE + `/api/v1/diagnostics/ollama-models?host=${encodeURIComponent(host)}`);
+                const data = await res.json();
+                
+                const installed = data.installed_models || data.models || [];
+                const recommended = data.recommended_models || gRecommendedModels;
+
+                updateModelDropdownUI(installed, recommended, input.value);
+
+                if (data.ollama_host) {
+                    document.getElementById('ai-ollama-host').value = data.ollama_host;
+                }
+
+                if (data.connected && installed.length > 0) {
+                    alert(`✅ Conectado ao Ollama Local (${data.ollama_host})!\n\n${installed.length} modelo(s) instalado(s) detectado(s):\n• ` + installed.join('\n• '));
+                } else if (data.connected) {
+                    alert(`✅ Conectado ao Ollama Local (${data.ollama_host}), mas nenhum modelo foi baixado ainda.\n\nEscolha um modelo da lista abaixo e execute 'ollama pull <modelo>' no terminal.`);
+                } else {
+                    alert(`⚠️ Serviço Ollama local não respondeu em ${host}.\n\nSe o app Ollama estiver aberto, você pode selecionar o modelo desejado da lista abaixo.`);
+                }
+            } catch(e) {
+                updateModelDropdownUI([], gRecommendedModels, input.value);
+                alert(`❌ Falha ao comunicar com a API do agente: ${e.message}`);
+            } finally {
+                if (btn) btn.innerHTML = '<i class="fas fa-search"></i> Detectar IA Local';
+            }
+        }
+
+        async function loadAiSettings() {
+            try {
+                const res = await fetch(window.GBOC_API_BASE + '/api/v1/diagnostics/ai-config');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.provider) document.getElementById('ai-provider').value = data.provider;
+                    if (data.ollama_host) document.getElementById('ai-ollama-host').value = data.ollama_host;
+                    if (data.model) document.getElementById('ai-model').value = data.model;
+                    if (data.api_key) document.getElementById('ai-api-key').value = data.api_key;
+                    if (data.task_history_limit) document.getElementById('task-history-limit').value = data.task_history_limit;
+                    toggleAiFields();
+                    if (data.provider === 'ollama' || !data.provider) {
+                        detectOllamaModels();
+                    }
+                }
+            } catch(e) {
+                console.warn('Erro ao carregar configs de IA:', e);
+            }
+        }
+
+        async function saveAiSettings() {
+            const payload = {
+                provider: document.getElementById('ai-provider').value,
+                ollama_host: document.getElementById('ai-ollama-host').value,
+                model: document.getElementById('ai-model').value,
+                api_key: document.getElementById('ai-api-key').value,
+                task_history_limit: parseInt(document.getElementById('task-history-limit').value, 10) || 10
+            };
+            try {
+                const res = await fetch(window.GBOC_API_BASE + '/api/v1/diagnostics/ai-config', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (res.ok && data.status === 'success') {
+                    alert('✅ Configurações de IA salvas com sucesso!');
+                    localStorage.setItem('gboc_task_history_limit', payload.task_history_limit);
+                } else {
+                    alert('Erro ao salvar IA: ' + (data.message || data.detail || 'Falha desconhecida.'));
+                }
+            } catch(e) {
+                alert('Erro ao conectar ao servidor: ' + e.message);
+            }
+        }
+
+        async function testAiConnection() {
+            const btn = document.getElementById('btn-test-ai');
+            const origText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testando...';
+            btn.disabled = true;
+
+            const provider = document.getElementById('ai-provider').value;
+            const prompt = "Teste de conexao GBOC System. Responda OK se operacional.";
+            try {
+                const res = await fetch(window.GBOC_API_BASE + '/api/v1/diagnostics/ai-analyze', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ context: 'teste_conexao', prompt: prompt })
+                });
+                const data = await res.json();
+                if (res.ok && data.analysis) {
+                    alert('✅ IA Respondeu com sucesso!\n\nProvedor: ' + (data.provider || provider) + '\nModelo: ' + (data.model || 'Padrão') + '\n\nResposta:\n' + data.analysis);
+                } else {
+                    alert('⚠️ Falha ao testar IA: ' + (data.detail || data.error || 'Sem resposta do modelo.'));
+                }
+            } catch(e) {
+                alert('Erro de conexão com o módulo de IA: ' + e.message);
+            } finally {
+                btn.innerHTML = origText;
+                btn.disabled = false;
+            }
+        }
+
+        async function loadDuplicatiNativeConfig() {
+            try {
+                const res = await fetch('/api/duplicati-native/config');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.base_url) document.getElementById('dupBaseUrl').value = data.base_url;
+                    if (data.username) document.getElementById('dupUsername').value = data.username;
+                    if (data.timeout_seconds) document.getElementById('dupTimeout').value = data.timeout_seconds;
+                    if (data.verify_tls !== undefined) document.getElementById('dupVerifyTls').checked = data.verify_tls;
+                }
+            } catch(e) {
+                console.warn('Falha ao carregar config Duplicati Native:', e);
+            }
+        }
+
+        async function saveDuplicatiNativeConfig() {
+            const payload = {
+                base_url: document.getElementById('dupBaseUrl').value,
+                username: document.getElementById('dupUsername').value,
+                password: document.getElementById('dupPassword').value,
+                timeout_seconds: parseInt(document.getElementById('dupTimeout').value, 10) || 8,
+                verify_tls: document.getElementById('dupVerifyTls').checked
+            };
+            const fb = document.getElementById('dupNativeFeedback');
+            fb.style.cssText = "margin-top:12px;padding:8px 12px;border-radius:6px;background:rgba(66,153,225,0.1);color:#4299e1;";
+            fb.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando configuração do Duplicati Native...';
+            try {
+                const res = await fetch('/api/duplicati-native/config', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    fb.style.cssText = "margin-top:12px;padding:8px 12px;border-radius:6px;background:rgba(72,187,120,0.15);color:#48bb78;border:1px solid rgba(72,187,120,0.3);";
+                    fb.innerHTML = '✅ Configuração do Duplicati Native salva com sucesso!';
+                } else {
+                    fb.style.cssText = "margin-top:12px;padding:8px 12px;border-radius:6px;background:rgba(245,101,101,0.15);color:#f56565;border:1px solid rgba(245,101,101,0.3);";
+                    fb.innerHTML = '❌ Erro ao salvar: ' + (data.detail || 'Falha no servidor');
+                }
+            } catch(e) {
+                fb.style.cssText = "margin-top:12px;padding:8px 12px;border-radius:6px;background:rgba(245,101,101,0.15);color:#f56565;border:1px solid rgba(245,101,101,0.3);";
+                fb.innerHTML = '❌ Erro de comunicação: ' + e.message;
+            }
+        }
+
+        async function testDuplicatiNativeConnection() {
+            const fb = document.getElementById('dupNativeFeedback');
+            fb.style.cssText = "margin-top:12px;padding:8px 12px;border-radius:6px;background:rgba(66,153,225,0.1);color:#4299e1;";
+            fb.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testando conectividade com a instância do Duplicati Native...';
+            try {
+                const res = await fetch('/api/duplicati-native/status');
+                const data = await res.json();
+                const probe = data.probe || {};
+                if (probe.ok) {
+                    fb.style.cssText = "margin-top:12px;padding:8px 12px;border-radius:6px;background:rgba(72,187,120,0.15);color:#48bb78;border:1px solid rgba(72,187,120,0.3);";
+                    fb.innerHTML = `<strong>${probe.message || '✅ Instância do Duplicati detectada e operacional!'}</strong><br><span style="font-size:0.85em;">URL: ${probe.base_url || 'http://localhost:8200'}</span>`;
+                } else {
+                    fb.style.cssText = "margin-top:12px;padding:8px 12px;border-radius:6px;background:rgba(245,101,101,0.15);color:#f56565;border:1px solid rgba(245,101,101,0.3);";
+                    fb.innerHTML = `<strong>${probe.message || '❌ Não foi possível conectar ao Duplicati'}</strong>`;
+                }
+            } catch(e) {
+                fb.style.cssText = "margin-top:12px;padding:8px 12px;border-radius:6px;background:rgba(245,101,101,0.15);color:#f56565;border:1px solid rgba(245,101,101,0.3);";
+                fb.innerHTML = '❌ Falha ao testar conexão: ' + e.message;
+            }
+        }
+
+        async function discoverDuplicatiNativeEndpoints() {
+            const fb = document.getElementById('dupNativeFeedback');
+            fb.style.cssText = "margin-top:12px;padding:8px 12px;border-radius:6px;background:rgba(66,153,225,0.1);color:#4299e1;";
+            fb.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Buscando portas locais ativas do Duplicati...';
+            try {
+                const res = await fetch('/api/duplicati-native/discover');
+                const data = await res.json();
+                const eps = data.endpoints || [];
+                if (eps.length > 0) {
+                    fb.style.cssText = "margin-top:12px;padding:8px 12px;border-radius:6px;background:rgba(72,187,120,0.15);color:#48bb78;border:1px solid rgba(72,187,120,0.3);";
+                    fb.innerHTML = `✅ Endpoints locais do Duplicati encontrados:<br><strong>` + eps.join('<br>') + `</strong>`;
+                    document.getElementById('dupBaseUrl').value = eps[0];
+                } else {
+                    fb.style.cssText = "margin-top:12px;padding:8px 12px;border-radius:6px;background:rgba(237,137,54,0.15);color:#ed8936;border:1px solid rgba(237,137,54,0.3);";
+                    fb.innerHTML = '⚠️ Nenhum endpoint adicional do Duplicati foi encontrado na busca padrão.';
+                }
+            } catch(e) {
+                fb.style.cssText = "margin-top:12px;padding:8px 12px;border-radius:6px;background:rgba(245,101,101,0.15);color:#f56565;border:1px solid rgba(245,101,101,0.3);";
+                fb.innerHTML = '❌ Erro de busca: ' + e.message;
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             loadSettings();
             loadAuthInfo();
             loadUsers();
+            loadAiSettings();
+            loadDuplicatiNativeConfig();
         });
     </script>
 </body>

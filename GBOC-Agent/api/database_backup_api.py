@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 11.7c - Database Backup API
+GBOC 13.2.0 - Database Backup API
 CRUD for database connections, trigger backup/restore, test-restore sandbox, replication.
 """
 

@@ -1,0 +1,206 @@
+<!--
+==============================================================================
+GBOC System v13.2.0 Enterprise Edition — Servidor Central
+Horizontal Topbar Navigation — injected by gboc-layout-manager.js
+==============================================================================
+-->
+<header class="gboc-topbar" id="gboc-topbar">
+    <button class="vheader-toggle" id="gboc-vheader-toggle" title="Expandir / Recolher Menu Lateral" onclick="document.body.classList.toggle('sidebar-collapsed')">
+        <i class="fas fa-bars"></i>
+    </button>
+    <!-- Logo Servidor Central -->
+    <a href="/" onclick="if(typeof switchTab==='function'){switchTab('overview');return false;}" class="tb-logo">
+        <i class="fas fa-shield-alt tb-logo-icon"></i>
+        <span>GBOC Server <span id="serverVersionBadge" style="opacity:0.85;font-weight:600;font-size:0.85em;background:rgba(255,255,255,0.12);padding:1px 6px;border-radius:4px;border:1px solid rgba(255,255,255,0.15)">v13.2.0</span></span>
+    </a>
+
+    <div class="tb-divider" style="margin:0 6px 0 2px"></div>
+
+    <!-- Search -->
+    <div class="tb-search" style="margin-right:10px">
+        <i class="fas fa-search"></i>
+        <input type="text" placeholder="Buscar agentes, jobs, tarefas..." id="tb-global-search">
+    </div>
+
+    <!-- Navigation Groups — GBOC SERVER CENTRAL (100% FIEL ÀS 17 ABAS DO SERVIDOR) -->
+    <nav class="tb-nav" id="tb-main-nav">
+
+        <!-- 1. Dashboard Central -->
+        <a href="/" onclick="if(typeof switchTab==='function'){switchTab('overview');return false;}" class="tb-nav-link" id="tblink-dashboard">
+            <i class="fas fa-home"></i> Dashboard
+        </a>
+
+        <!-- 2. Agentes & MSP -->
+        <div class="tb-dropdown">
+            <button class="tb-nav-link" id="tblink-agents">
+                <i class="fas fa-network-wired"></i> Agentes & MSP
+                <i class="fas fa-chevron-down tb-arrow"></i>
+            </button>
+            <div class="tb-dropdown-menu">
+                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('agents');}" class="tb-dropdown-item"><i class="fas fa-server"></i> Agentes Remotos</a>
+                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('rmm');}" class="tb-dropdown-item"><i class="fas fa-terminal"></i> RMM & Terminal Remoto</a>
+                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('multitenant');}" class="tb-dropdown-item"><i class="fas fa-building"></i> Multi-Tenant MSP</a>
+            </div>
+        </div>
+
+        <!-- 3. Backup & Orquestração -->
+        <div class="tb-dropdown">
+            <button class="tb-nav-link" id="tblink-backup">
+                <i class="fas fa-box-open"></i> Backup & Orquestração
+                <i class="fas fa-chevron-down tb-arrow"></i>
+            </button>
+            <div class="tb-dropdown-menu">
+                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('backups');}" class="tb-dropdown-item"><i class="fas fa-database"></i> Repositórios & Backups</a>
+                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('surerestore');}" class="tb-dropdown-item"><i class="fas fa-microscope"></i> SureRestore Sandbox</a>
+                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('replication');}" class="tb-dropdown-item"><i class="fas fa-exchange-alt"></i> Replicação Off-Site</a>
+                <div class="tb-dropdown-divider"></div>
+                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('job-alert');}" class="tb-dropdown-item" style="color:var(--danger)"><i class="fas fa-exclamation-triangle"></i> Jobs com Falha</a>
+            </div>
+        </div>
+
+        <!-- 4. Segurança & Proteção -->
+        <div class="tb-dropdown">
+            <button class="tb-nav-link" id="tblink-security">
+                <i class="fas fa-shield-alt"></i> Segurança
+                <i class="fas fa-chevron-down tb-arrow"></i>
+            </button>
+            <div class="tb-dropdown-menu">
+                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('ransomware');}" class="tb-dropdown-item"><i class="fas fa-shield-virus"></i> Ransomware Guardian</a>
+                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('compliance');}" class="tb-dropdown-item"><i class="fas fa-clipboard-check"></i> Compliance LGPD / GDPR</a>
+            </div>
+        </div>
+
+        <!-- 5. Analytics & Monitoramento -->
+        <div class="tb-dropdown">
+            <button class="tb-nav-link" id="tblink-monitor">
+                <i class="fas fa-chart-line"></i> Analytics & Monitoramento
+                <i class="fas fa-chevron-down tb-arrow"></i>
+            </button>
+            <div class="tb-dropdown-menu">
+                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('analytics');}" class="tb-dropdown-item"><i class="fas fa-chart-bar"></i> Analytics & Diagnóstico</a>
+                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('alerts');}" class="tb-dropdown-item"><i class="fas fa-bell"></i> Central de Alertas</a>
+                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('logs');}" class="tb-dropdown-item"><i class="fas fa-file-alt"></i> Logs do Servidor</a>
+                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('reports');}" class="tb-dropdown-item"><i class="fas fa-chart-pie"></i> Relatórios Executivos</a>
+                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('storage');}" class="tb-dropdown-item"><i class="fas fa-hdd"></i> Uso de Armazenamento</a>
+            </div>
+        </div>
+
+        <!-- 6. Sistema & Administração -->
+        <div class="tb-dropdown">
+            <button class="tb-nav-link" id="tblink-system">
+                <i class="fas fa-cogs"></i> Sistema
+                <i class="fas fa-chevron-down tb-arrow"></i>
+            </button>
+            <div class="tb-dropdown-menu">
+                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('users');}" class="tb-dropdown-item"><i class="fas fa-users-cog"></i> Usuários & Permissões</a>
+                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('config');}" class="tb-dropdown-item"><i class="fas fa-cog"></i> Configurações do Servidor</a>
+            </div>
+        </div>
+
+    </nav>
+
+    <!-- Right Section (Botões de Ação — Ordenação Correta) -->
+    <div class="tb-right">
+        <!-- Connection Status -->
+        <div style="display:flex;align-items:center;gap:5px;font-size:0.72em;margin-right:6px">
+            <span id="wsDot" style="width:7px;height:7px;border-radius:50%;background:var(--success);display:inline-block"></span>
+            <span id="wsLabel" style="color:var(--success);font-weight:600">Server Online</span>
+        </div>
+
+        <!-- 1. Tema (Moon/Sun) -->
+        <button class="tbr-icon" title="Alternar Tema (Dark/Light)" onclick="if(typeof toggleTheme==='function'){toggleTheme();}else{window.GBOCLayout.setTheme(window.GBOCLayout.getTheme()==='dark'?'light':'dark');}">
+            <i class="fas fa-moon" id="tbThemeIcon"></i>
+        </button>
+
+        <!-- 2. Alertas & Jobs com Falha (Bell) -->
+        <button class="tbr-icon" title="Central de Alertas & Jobs com Falha" onclick="if(typeof switchTab==='function'){switchTab('job-alert');}">
+            <i class="fas fa-bell"></i>
+            <span class="tbr-badge" id="tb-notif-badge" style="display:none">0</span>
+        </button>
+
+        <!-- 3. Assistente de IA Copilot (Brain) -->
+        <button class="tbr-icon" title="GBOC AI Copilot Assistant" onclick="if(window.GBOC_AI_Assistant){window.GBOC_AI_Assistant.toggle();}">
+            <i class="fas fa-brain" style="color:var(--primary)"></i>
+        </button>
+
+        <!-- 4. Armazenamento (Database) -->
+        <button class="tbr-icon" title="Uso de Armazenamento" onclick="if(typeof switchTab==='function'){switchTab('storage');}">
+            <i class="fas fa-database" style="color:#ed8936"></i>
+        </button>
+
+        <!-- 4.1. Hardware & SMART Monitor HUD -->
+        <button class="tbr-icon" title="Hardware & S.M.A.R.T. Monitor (CPU, Discos, Temperatura)" onclick="typeof toggleHardwareHUD==='function'?toggleHardwareHUD():window.location.reload()">
+            <i class="fas fa-microchip" style="color:#38bdf8"></i>
+        </button>
+
+        <!-- 5. Sliders Layout Customizer -->
+        <button class="tbr-icon" title="Personalizar Layout & Estilos" onclick="window.GBOCLayout && window.GBOCLayout.togglePanel()">
+            <i class="fas fa-sliders-h"></i>
+        </button>
+
+        <!-- 6. Modo Tela Cheia -->
+        <button class="tbr-icon" title="Modo Tela Cheia" onclick="gbocToggleFullscreen()" id="tb-fullscreen-btn">
+            <i class="fas fa-expand" id="tb-fullscreen-icon"></i>
+        </button>
+
+        <div class="tb-divider"></div>
+
+        <!-- 7. Avatar de Usuário & Dropdown de Opções (ÚLTIMO BOTÃO DA DIREITA) -->
+        <div class="tb-dropdown tb-user-dropdown" id="tb-user-dropdown-container">
+            <div class="tb-avatar" id="tb-user-avatar" title="Perfil de Usuário / Conta">
+                <i class="fas fa-user-circle"></i>
+            </div>
+            <div class="tb-dropdown-menu tb-user-menu" style="right:0;left:auto;min-width:240px">
+                <div style="padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+                    <div style="width:38px;height:38px;border-radius:50%;background:var(--primary-soft);color:var(--primary);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.1em" id="tb-menu-avatar-icon">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div>
+                        <div style="font-weight:700;font-size:0.9em;color:var(--text)" id="tb-user-name">Administrador</div>
+                        <div style="font-size:0.75em;color:var(--text-muted)" id="tb-user-role">Super Admin (Server)</div>
+                    </div>
+                </div>
+                <div style="padding:4px 0">
+                    <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('users');}" class="tb-dropdown-item"><i class="fas fa-id-card"></i> Meu Perfil & Usuários</a>
+                    <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('config');}" class="tb-dropdown-item"><i class="fas fa-cogs"></i> Configurações do Servidor</a>
+                    <a href="javascript:void(0)" onclick="window.GBOCLayout && window.GBOCLayout.togglePanel()" class="tb-dropdown-item"><i class="fas fa-palette"></i> Personalizar Interface</a>
+                    <div class="tb-dropdown-divider"></div>
+                    <a href="javascript:void(0)" onclick="typeof gbocLogout==='function' ? gbocLogout() : window.location.href='/login.html'" class="tb-dropdown-item" style="color:var(--danger)">
+                        <i class="fas fa-sign-out-alt"></i> Sair do Sistema
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+<script>
+function gbocToggleFullscreen(){
+    const icon = document.getElementById('tb-fullscreen-icon');
+    if(!document.fullscreenElement && !document.mozFullScreenElement && !document.webkitFullscreenElement && !document.msFullscreenElement){
+        const el = document.documentElement;
+        const req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+        if(req){
+            req.call(el).then(()=>{
+                if(icon){ icon.classList.remove('fa-expand'); icon.classList.add('fa-compress'); }
+            }).catch(e=>{ console.warn('Fullscreen error:', e); });
+        }
+    }else{
+        const exit = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
+        if(exit){
+            exit.call(document).then(()=>{
+                if(icon){ icon.classList.remove('fa-compress'); icon.classList.add('fa-expand'); }
+            }).catch(e=>{ console.warn('Exit Fullscreen error:', e); });
+        }
+    }
+}
+document.addEventListener('fullscreenchange', ()=>{
+    const icon = document.getElementById('tb-fullscreen-icon');
+    if(icon){
+        if(document.fullscreenElement){
+            icon.classList.remove('fa-expand'); icon.classList.add('fa-compress');
+        }else{
+            icon.classList.remove('fa-compress'); icon.classList.add('fa-expand');
+        }
+    }
+});
+</script>

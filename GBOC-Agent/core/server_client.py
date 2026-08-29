@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-🌐 GBOC Agent 11.7c - CENTRAL SERVER CLIENT
+🌐 GBOC Agent 13.2.0 - CENTRAL SERVER CLIENT
 Cliente para comunicação com servidor GBOC central
 """
 
@@ -44,6 +44,7 @@ class CentralServerClient:
         self.agent_id = self._get_or_create_agent_id()
         self.server_url = None
         self.api_key = None
+        self.tenant_id = None
         self.is_registered = False
         self.last_heartbeat = None
         self.heartbeat_thread = None
@@ -192,6 +193,7 @@ class CentralServerClient:
             # Aplicar configuração ao cliente
             self.server_url = config_manager.get_server_url()
             self.api_key = config_manager.get_api_key()
+            self.tenant_id = config_manager.get_tenant_id()
 
             if self.server_url and config_manager.is_enabled():
                 logger.info(f"🌐 Servidor central configurado: {self.server_url}")
@@ -294,7 +296,7 @@ class CentralServerClient:
         except Exception as e:
             logger.error(f"Erro ao criar configuração de exemplo: {e}")
     
-    def configure_server(self, server_url: str, api_key: str) -> Dict[str, Any]:
+    def configure_server(self, server_url: str, api_key: str, tenant_id: Optional[str] = None) -> Dict[str, Any]:
         """Configura conexão com servidor central"""
         try:
             # Validar URL
@@ -313,6 +315,7 @@ class CentralServerClient:
             config = {
                 "server_url": server_url.rstrip('/'),
                 "api_key": api_key,
+                "tenant_id": tenant_id,
                 "enabled": True,
                 "heartbeat_interval_minutes": 5,
                 "sync_interval_minutes": 30,
@@ -327,6 +330,7 @@ class CentralServerClient:
             # Atualizar configuração ativa
             self.server_url = server_url.rstrip('/')
             self.api_key = api_key
+            self.tenant_id = tenant_id
             
             # Registrar agente
             registration_result = self._register_agent()
@@ -400,8 +404,9 @@ class CentralServerClient:
                 "agent_id": self.agent_id,
                 "hostname": socket.gethostname(),
                 "platform": os.name,
-                "version": "11.7c",
-                "registered_at": datetime.now().isoformat()
+                "version": "13.2.0",
+                "registered_at": datetime.now().isoformat(),
+                "tenant_id": self.tenant_id
             }
             
             # Informações detalhadas do sistema
@@ -608,8 +613,8 @@ class CentralServerClient:
 
             msg_type = data.get("type", "")
 
-            if msg_type == "command":
-                # Processar comando do servidor
+            if msg_type in ("command", "rmm_exec", "rmm_command", "rmm_terminal", "request_mirror"):
+                # Processar comando RMM ou sincronização do servidor
                 await self._process_server_command(data)
             elif msg_type == "request_full_sync":
                 # Servidor solicitou resincronização completa
@@ -620,17 +625,59 @@ class CentralServerClient:
             logger.warning(f"Mensagem WebSocket inválida: {message}")
     
     async def _process_server_command(self, command: Dict):
-        """Processa comando recebido do servidor"""
-        cmd_type = command.get("command")
+        """Processa comando RMM ou solicitação recebida do servidor via WebSocket."""
+        cmd_type = command.get("command") or command.get("type")
         
-        if cmd_type == "request_sync":
-            # Servidor solicitou sincronização
+        if cmd_type == "request_sync" or cmd_type == "request_full_sync":
             await self._send_full_sync()
             
         elif cmd_type == "request_manual_sync":
-            # Sincronização manual
             sync_data = command.get("data", {})
             await self._send_manual_sync(sync_data)
+
+        elif cmd_type in ("rmm_exec", "rmm_command", "rmm_terminal"):
+            # Executar comando de terminal RMM enviado pelo Servidor Central
+            try:
+                from modules.rmm.rmm_router import rmm_execute_command
+                class DummyRequest:
+                    def __init__(self, data):
+                        self._data = data
+                    async def json(self):
+                        return self._data
+
+                payload = command.get("data") or command
+                req = DummyRequest(payload)
+                res = await rmm_execute_command(req)
+
+                reply_msg = {
+                    "type": "rmm_exec_result",
+                    "request_id": command.get("request_id"),
+                    "agent_id": self.agent_id,
+                    "result": res,
+                    "timestamp": datetime.now().isoformat()
+                }
+                if self.websocket and self.websocket_connected:
+                    await self.websocket.send(json.dumps(reply_msg))
+                    logger.info(f"📤 Resposta RMM enviada ao servidor via WebSocket para o comando '{payload.get('command')}'")
+            except Exception as rmm_err:
+                logger.error(f"Erro ao executar comando RMM via WebSocket: {rmm_err}")
+
+        elif cmd_type in ("request_mirror", "rmm_mirror"):
+            # Enviar Espelho Remoto Completo do Agente (State Snapshot 1:1)
+            try:
+                from modules.rmm.rmm_router import rmm_get_agent_mirror
+                mirror_res = await rmm_get_agent_mirror()
+                reply_msg = {
+                    "type": "rmm_mirror_data",
+                    "agent_id": self.agent_id,
+                    "mirror": mirror_res.get("mirror", {}),
+                    "timestamp": datetime.now().isoformat()
+                }
+                if self.websocket and self.websocket_connected:
+                    await self.websocket.send(json.dumps(reply_msg))
+                    logger.info("📤 Espelho Remoto 1:1 enviado ao Servidor Central via WebSocket")
+            except Exception as m_err:
+                logger.error(f"Erro ao enviar espelho remoto: {m_err}")
     
     async def _send_manual_sync(self, sync_request: Dict):
         """Envia sincronização manual via WebSocket"""
@@ -739,7 +786,8 @@ class CentralServerClient:
                 "cpu_usage": cpu_percent,
                 "ram_usage": memory.percent,
                 "disk_usage": disk.percent,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
+                "tenant_id": self.tenant_id
             }
         except Exception as e:
             logger.error(f"Erro ao coletar dados em tempo real: {e}")
@@ -858,7 +906,7 @@ class CentralServerClient:
                 "agent_id": self.agent_id,
                 "hostname": socket.gethostname(),
                 "status": "online",
-                "version": "11.7c",
+                "version": "13.2.0",
                 "ip_address": self._get_local_ip() + ":9200",  # Endereço real do agente
                 "cpu_usage": cpu_percent,
                 "ram_usage": memory.percent,
@@ -868,7 +916,8 @@ class CentralServerClient:
                 "os_info": f"{platform.system()} {platform.release()}",
                 "cpu_cores": psutil.cpu_count(),
                 "ram_total_gb": f"{memory.total / (1024**3):.1f} GB",
-                "ram_available_gb": f"{memory.available / (1024**3):.1f} GB"
+                "ram_available_gb": f"{memory.available / (1024**3):.1f} GB",
+                "tenant_id": self.tenant_id
             }
 
             # Estatísticas dos repositórios e tarefas
@@ -1273,27 +1322,61 @@ class CentralServerClient:
             return None
 
     def _get_local_ip(self) -> str:
-        """Obtém o IP local real da máquina"""
+        """Obtém o IP REAL da rede local (LAN) do Agente. NUNCA envia 127.0.0.1 ou localhost."""
+        # 1. Probe via UDP socket conectando no roteador/gateway
         try:
-            # Criar socket para obter IP local
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             s.connect(("8.8.8.8", 80))
             local_ip = s.getsockname()[0]
             s.close()
-            return local_ip
-        except Exception:
-            # Fallback para localhost
-            return "127.0.0.1"
-
-    def _get_public_ip(self) -> str:
-        """Obtém o IP público da máquina"""
-        try:
-            response = requests.get("https://api.ipify.org", timeout=5)
-            if response.status_code == 200:
-                return response.text.strip()
+            if local_ip and not local_ip.startswith("127.") and local_ip != "0.0.0.0":
+                return local_ip
         except Exception:
             pass
-        return None
+
+        # 2. Varredura de interfaces de rede ativas (psutil)
+        try:
+            import psutil
+            for iface, addrs in psutil.net_if_addrs().items():
+                for addr in addrs:
+                    if addr.family == socket.AF_INET:
+                        ip = addr.address
+                        if ip and not ip.startswith("127.") and ip != "0.0.0.0":
+                            return ip
+        except Exception:
+            pass
+
+        # 3. Resolução pelo hostname do sistema
+        try:
+            hostname = socket.gethostname()
+            ip = socket.gethostbyname(hostname)
+            if ip and not ip.startswith("127.") and ip != "0.0.0.0":
+                return ip
+        except Exception:
+            pass
+
+        # Fallback de LAN genérico para não transmitir 127.0.0.1 ao servidor central
+        return "192.168.1.100"
+
+    def _get_public_ip(self) -> str:
+        """Obtém o IP público REAL da máquina na internet."""
+        services = [
+            "https://api.ipify.org",
+            "https://ifconfig.me/ip",
+            "https://checkip.amazonaws.com",
+            "https://icanhazip.com"
+        ]
+        for url in services:
+            try:
+                res = requests.get(url, timeout=4)
+                if res.status_code == 200 and res.text.strip():
+                    ip = res.text.strip()
+                    if ip and not ip.startswith("127."):
+                        return ip
+            except Exception:
+                continue
+        # Fallback para o IP da LAN local se desconectado da internet pública
+        return self._get_local_ip()
 
     def get_connection_status(self) -> Dict[str, Any]:
         """Obtém status da conexão com servidor"""

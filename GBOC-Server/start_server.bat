@@ -1,8 +1,14 @@
+@REM ==============================================================================
+@REM GBOC System v13.2.0 Enterprise Edition
+@REM Copyright (c) 2026 Master11BR - Todos os direitos reservados.
+@REM Propriedade Intelectual & Direitos Autorais Registrados.
+@REM ==============================================================================
+
 @echo off
 setlocal enabledelayedexpansion
 CLS
 REM ========================================
-REM GBOC Server v10.0a - Inicializacao
+REM GBOC Server v13.2.0 - Inicializacao
 REM ========================================
 
 REM Garantir execução na pasta do script
@@ -10,7 +16,7 @@ cd /d "%~dp0"
 
 echo.
 echo ========================================
-echo   GBOC Server v10.0a - Iniciando...
+echo   GBOC Server v13.2.0 - Iniciando...
 echo ========================================
 echo.
 
@@ -115,16 +121,16 @@ exit /b 1
 :pg_ready
 echo.
 
-echo [OK] Iniciando GBOC Server v10.0a...
+echo [OK] Iniciando GBOC Server...
 echo Comando Python: %PYTHON_CMD%
-for %%I in (gboc_server.py) do echo Script: %%~fI
+for %%I in (server_gboc.py) do echo Script: %%~fI
 echo.
 
 REM Validar sintaxe do script alvo antes de subir
-%PYTHON_CMD% -m py_compile gboc_server.py >nul 2>&1
+%PYTHON_CMD% -m py_compile server_gboc.py >nul 2>&1
 if errorlevel 1 (
-    echo [ERRO] Erro de sintaxe detectado em gboc_server.py
-    %PYTHON_CMD% -m py_compile gboc_server.py
+    echo [ERRO] Erro de sintaxe detectado em server_gboc.py
+    %PYTHON_CMD% -m py_compile server_gboc.py
     echo.
     pause
     exit /b 1
@@ -145,7 +151,7 @@ echo.
 
 REM Iniciar o servidor (PYTHONIOENCODING=utf-8 evita crash do Hypercorn com caracteres Unicode no Windows)
 set PYTHONIOENCODING=utf-8
-%PYTHON_CMD% -u gboc_server.py
+%PYTHON_CMD% -u server_gboc.py
 
 echo.
 echo Servidor encerrado.

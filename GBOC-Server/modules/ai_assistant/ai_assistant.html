@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GBOC AI Copilot - GBOC Server</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/gboc-themes.css">
+    <link rel="stylesheet" href="/static/gboc-layout.css">
+    <script src="/static/gboc-layout-manager.js"></script>
+    <script src="/modules/ai_assistant/ai_assistant.js"></script>
+</head>
+<body class="layout-vertical">
+    <main class="main-content" style="padding:24px">
+        <h2 style="font-size:1.4em;margin-bottom:20px;display:flex;align-items:center;gap:10px">
+            <i class="fas fa-brain" style="color:var(--primary)"></i> GBOC Server AI Copilot (IA Generativa)
+        </h2>
+        <div class="panel" style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px">
+            <div id="ai-chat-output" style="background:var(--bg-input);padding:16px;border-radius:8px;min-height:250px;max-height:450px;overflow:auto;margin-bottom:16px">
+                <div style="color:var(--text-muted)">🤖 <strong>GBOC AI Copilot:</strong> Olá! Como posso auxiliar na gestão de backups, diagnósticos e orquestração do Servidor Central hoje?</div>
+            </div>
+            <div style="display:flex;gap:10px">
+                <input type="text" id="ai-chat-input" placeholder="Pergunte ao GBOC Copilot..." style="flex:1;padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text)">
+                <button class="btn btn-primary" onclick="sendAIChatQuery()"><i class="fas fa-paper-plane"></i> Enviar</button>
+            </div>
+        </div>
+    </main>
+</body>
+</html>

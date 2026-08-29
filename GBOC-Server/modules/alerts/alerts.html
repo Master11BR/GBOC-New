@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Central de Alertas - GBOC Server</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/gboc-themes.css">
+    <link rel="stylesheet" href="/static/gboc-layout.css">
+    <script src="/static/gboc-layout-manager.js"></script>
+    <script src="/modules/alerts/alerts.js"></script>
+</head>
+<body class="layout-vertical">
+    <main class="main-content" style="padding:24px">
+        <h2 style="font-size:1.4em;margin-bottom:20px;display:flex;align-items:center;gap:10px">
+            <i class="fas fa-bell" style="color:var(--warning)"></i> Central de Alertas &amp; Notificações Globais
+        </h2>
+        <div class="panel" style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px">
+            <table class="data-table" style="width:100%">
+                <thead>
+                    <tr>
+                        <th>Severidade</th>
+                        <th>Agente</th>
+                        <th>Título</th>
+                        <th>Mensagem</th>
+                    </tr>
+                </thead>
+                <tbody id="srv-alerts-table">
+                    <tr><td colspan="4" style="text-align:center;color:var(--text-muted)">Carregando alertas...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+</body>
+</html>

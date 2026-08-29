@@ -1,6 +1,12 @@
+@REM ==============================================================================
+@REM GBOC System v13.2.0 Enterprise Edition
+@REM Copyright (c) 2026 Master11BR - Todos os direitos reservados.
+@REM Propriedade Intelectual & Direitos Autorais Registrados.
+@REM ==============================================================================
+
 @echo off
 REM ============================================================
-REM GBOC Server - Desinstalador v1.0
+REM GBOC Server - Desinstalador v13.2.0
 REM ============================================================
 
 echo.

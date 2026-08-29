@@ -1,3 +1,10 @@
+/*
+==============================================================================
+GBOC System v13.2.0 Enterprise Edition
+Copyright (c) 2026 Master11BR - Todos os direitos reservados.
+Propriedade Intelectual & Direitos Autorais Registrados.
+==============================================================================
+*/
 /**
  * GBOC Agent - Auth Interceptor
  * Intercepts all fetch calls and redirects to login on 401

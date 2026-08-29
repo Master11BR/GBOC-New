@@ -33,6 +33,31 @@ class RestoreManager:
             self.core = None
             self.db = core_or_db
         self.active_restores = {}
+        self._cleanup_stale_restores()
+
+    def _cleanup_stale_restores(self):
+        """Marca processos órfãos que ficaram com status 'running' de execuções anteriores como interrompidos."""
+        try:
+            db = self._get_db()
+            if not db:
+                return
+            sql = """
+                UPDATE restore_history 
+                SET status = 'interrupted', error_message = 'Processo interrompido ou reiniciado antes da conclusão'
+                WHERE status IN ('running', 'preparing')
+            """
+            if hasattr(db, '__enter__'):
+                with db as conn:
+                    cursor = conn.cursor()
+                    cursor.execute(sql)
+                    conn.commit()
+            else:
+                cursor = db.cursor()
+                cursor.execute(sql)
+                db.commit()
+            logger.info("🧹 Limpeza de restaurações órfãs concluída.")
+        except Exception as e:
+            logger.debug(f"Erro ao limpar restaurações órfãs na inicialização: {e}")
 
     def _append_restore_log(self, restore_id: int, message: str):
         """Acumula logs em memória para exibição no monitor de restauração."""
@@ -200,6 +225,7 @@ class RestoreManager:
                 args=(restore_id, repository_id, snapshot_id, files, target_path, options),
                 daemon=True
             )
+            self.active_restores[restore_id]["thread"] = thread
             thread.start()
 
             logger.info(f"🚀 Restauração iniciada (ID: {restore_id}) para {len(files)} arquivos")
@@ -213,6 +239,97 @@ class RestoreManager:
         except Exception as e:
             logger.error(f"❌ Falha ao iniciar restauração: {e}")
             raise
+
+    def cancel_restore(self, restore_id: int) -> bool:
+        """Cancela ou interrompe um processo de restauração ativo."""
+        try:
+            if restore_id in self.active_restores:
+                active = self.active_restores[restore_id]
+                active['status'] = 'cancelled'
+                active['error_message'] = 'Processo cancelado pelo operador'
+                self._append_restore_log(restore_id, "⚠️ Restauração cancelada pelo operador.")
+            
+            db = self._get_db()
+            if db:
+                sql = "UPDATE restore_history SET status = 'cancelled', error_message = 'Cancelado pelo operador', completed_at = %s WHERE id = %s"
+                params = (datetime.now().isoformat(), restore_id)
+                if hasattr(db, '__enter__'):
+                    with db as conn:
+                        cursor = conn.cursor()
+                        cursor.execute(sql, params)
+                        conn.commit()
+                else:
+                    cursor = db.cursor()
+                    cursor.execute(sql, params)
+                    db.commit()
+            logger.info(f"🛑 Restauração #{restore_id} cancelada com sucesso.")
+            return True
+        except Exception as e:
+            logger.error(f"Erro ao cancelar restore {restore_id}: {e}")
+            return False
+
+    def get_active_restores(self) -> List[Dict[str, Any]]:
+        """Retorna todos os processos de restauração verdadeiramente ativos (em execução paralela)."""
+        active_list = []
+        active_mem_ids = set()
+
+        for r_id, info in list(self.active_restores.items()):
+            thread = info.get('thread')
+            # Se a thread não existe ou não está mais viva e o status ainda está running/preparing
+            if thread and not thread.is_alive() and info.get('status') in ('running', 'preparing'):
+                final_status = 'completed' if info.get('progress', 0) >= 100 else 'failed'
+                info['status'] = final_status
+                if final_status == 'failed' and not info.get('error_message'):
+                    info['error_message'] = 'Thread de restauração finalizada inesperadamente'
+
+            if info.get('status') in ('running', 'preparing'):
+                st = self.get_restore_status(r_id)
+                if st and st.get('status') in ('running', 'preparing'):
+                    active_list.append(st)
+                    active_mem_ids.add(r_id)
+
+        # Se houver registros no banco com status 'running' que NÃO estão na memória ativa,
+        # são processos órfãos de sessões passadas ou que morreram silenciosamente.
+        # Vamos marcá-los como 'interrupted' no banco para não congelar a UI do usuário!
+        try:
+            db = self._get_db()
+            if db:
+                sql_check = "SELECT id FROM restore_history WHERE status IN ('running', 'preparing')"
+                rows = []
+                if hasattr(db, '__enter__'):
+                    with db as conn:
+                        cursor = conn.cursor()
+                        cursor.execute(sql_check)
+                        rows = cursor.fetchall()
+                else:
+                    cursor = db.cursor()
+                    cursor.execute(sql_check)
+                    rows = cursor.fetchall()
+
+                orphan_ids = [r[0] for r in rows if r[0] not in active_mem_ids]
+                if orphan_ids:
+                    logger.info(f"Limpando {len(orphan_ids)} restore(s) órfão(s) no banco: {orphan_ids}")
+                    sql_fix = "UPDATE restore_history SET status = 'interrupted', error_message = 'Processo de restauração finalizado ou interrompido' WHERE id = %s"
+                    if hasattr(db, '__enter__'):
+                        with db as conn:
+                            cursor = conn.cursor()
+                            for oid in orphan_ids:
+                                cursor.execute(sql_fix, (oid,))
+                            conn.commit()
+                    else:
+                        cursor = db.cursor()
+                        for oid in orphan_ids:
+                            cursor.execute(sql_fix, (oid,))
+                        db.commit()
+        except Exception as e:
+            logger.debug(f"Erro ao verificar restores órfãos no banco: {e}")
+
+        return active_list
+
+    def get_active_restore(self) -> Optional[Dict[str, Any]]:
+        """Retorna o processo de restauração ativo mais recente."""
+        actives = self.get_active_restores()
+        return actives[0] if actives else None
 
     def _create_restore_entry(self, repo_id: int, snapshot_id: str, target_path: str, total_files: int) -> int:
         """Cria registro inicial na tabela restore_history"""
@@ -298,6 +415,22 @@ class RestoreManager:
                 cursor = db.cursor()
                 cursor.execute(sql, params)
                 db.commit()
+
+            # Disparar alerta do sistema se alert_manager estiver disponível
+            try:
+                if self.core and hasattr(self.core, 'alert_manager') and self.core.alert_manager:
+                    alert_sev = 'info' if status in ('success', 'completed') else 'danger'
+                    alert_title = f"Restauração #{restore_id} {'Concluída com Sucesso' if status in ('success', 'completed') else 'Falhou'}"
+                    alert_msg = f"Processo #{restore_id} finalizado em {duration:.1f}s. {error_message or ''}"
+                    self.core.alert_manager.create_alert(
+                        title=alert_title,
+                        message=alert_msg,
+                        severity=alert_sev,
+                        source="restore_manager",
+                        metadata={"restore_id": restore_id, "status": status, "duration": duration}
+                    )
+            except Exception as ex_alert:
+                logger.debug(f"Não foi possível registrar alerta de restore: {ex_alert}")
         except Exception as e:
             logger.error(f"Erro ao finalizar restore {restore_id}: {e}")
 
@@ -555,7 +688,20 @@ class RestoreManager:
                 shutil.rmtree(os.path.dirname(config_path), ignore_errors=True)
     
     def _list_duplicati_snapshots(self, repo: Dict) -> List[Dict]:
-        """Lista snapshots REAIS do Duplicati (local e cloud)"""
+        """Lista snapshots REAIS do Duplicati (local, cloud ou nativo)"""
+        # 1. Se for backup nativo do Duplicati ou tiver duplicati_id
+        if repo.get('is_duplicati_native') or str(repo.get('id', '')).startswith('dup_native_') or repo.get('duplicati_id'):
+            dup_id = str(repo.get('duplicati_id') or str(repo.get('id')).replace('dup_native_', ''))
+            try:
+                from core.integrations.duplicati_native import get_duplicati_native_service
+                service = get_duplicati_native_service()
+                snaps = service.list_filesets(dup_id)
+                if snaps:
+                    logger.info(f"✅ {len(snaps)} snapshots Duplicati Native encontrados para #{dup_id}")
+                    return snaps
+            except Exception as e:
+                logger.warning(f"Erro ao listar snapshots via DuplicatiNativeService: {e}")
+
         repo_type = repo.get('type', 'local').lower()
 
         if repo_type == 'local':
@@ -1507,30 +1653,66 @@ class RestoreManager:
         """Restaura arquivos REAIS com Duplicati"""
         try:
             import subprocess
+            import re
 
             dup_exe = self._get_duplicati_exe()
 
             # Configurar diretório de DB local
-            db_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "duplicati_dbs")
-            os.makedirs(db_dir, exist_ok=True)
-            local_db = os.path.join(db_dir, f"repo_{repo['id']}.sqlite")
+            if repo.get('db_path') and os.path.exists(repo['db_path']):
+                local_db = repo['db_path']
+            else:
+                db_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "duplicati_dbs")
+                os.makedirs(db_dir, exist_ok=True)
+                local_db = os.path.join(db_dir, f"repo_{repo['id']}.sqlite")
 
-            target_url = self._build_duplicati_url(repo)
-            cli_args = self._build_duplicati_cli_args(repo)
+            if repo.get('target_url'):
+                target_url = repo['target_url']
+                cli_args = []
+            else:
+                target_url = self._build_duplicati_url(repo)
+                cli_args = self._build_duplicati_cli_args(repo)
+
+            os.makedirs(target_path, exist_ok=True)
+
+            # Extrair índice de versão da snapshot_id (ex: "v0" -> "0", "version_1" -> "1", "0" -> "0")
+            raw_snap = str(snapshot_id or '0').strip()
+            version_match = re.search(r'(\d+)', raw_snap)
+            version_str = version_match.group(1) if version_match else "0"
 
             cmd = [
                 dup_exe,
                 "restore",
                 target_url,
-                f"--dbpath={local_db}",
                 f"--restore-path={target_path}",
+                f"--version={version_str}",
+                f"--dbpath={local_db}",
                 "--disable-module=console-log-output",
-                "--log-level=information",
-                *cli_args,
-                *files
+                "--log-level=information"
             ]
 
-            logger.info(f"Executando restore Duplicati: {' '.join(cmd[:3])}...")
+            if options.get('overwrite'):
+                cmd.append("--overwrite=true")
+            if not options.get('preserve_permissions', True):
+                cmd.append("--dont-read-manifests=false")
+            if options.get('file_filter'):
+                cmd.append(f"--include={options.get('file_filter')}")
+
+            cmd.extend(cli_args)
+
+            # Arquivos a restaurar: se for ["/"], ["*"] ou vazio, restaurar tudo com "*"
+            clean_files = []
+            if files and isinstance(files, list):
+                for f in files:
+                    f_str = str(f).strip()
+                    if f_str and f_str != '/' and f_str != '*':
+                        clean_files.append(f_str)
+
+            if clean_files:
+                cmd.extend(clean_files)
+            else:
+                cmd.append("*")
+
+            logger.info(f"Executando restore Duplicati versão {version_str}: {' '.join(cmd[:4])} -> {target_path}")
 
             process = subprocess.Popen(
                 cmd,
@@ -1549,52 +1731,58 @@ class RestoreManager:
                     'status': 'failed',
                     'engine': 'duplicati',
                     'snapshot_id': snapshot_id,
-                    'error_message': 'Timeout: Duplicati restore process took too long and was terminated.',
+                    'error_message': 'Timeout: O processo de restauração do Duplicati excedeu o limite e foi terminado.',
                     'target_path': target_path,
                     'timestamp': datetime.now().isoformat()
                 }
 
-            logger.info(f"Duplicati stdout: {stdout}")
+            logger.info(f"Duplicati restore stdout: {stdout}")
             if stderr:
-                logger.warning(f"Duplicati stderr: {stderr}")
+                logger.warning(f"Duplicati restore stderr: {stderr}")
 
             if process.returncode == 0:
-                # Contar arquivos restaurados
-                files_restored = len(files)
+                # Contar arquivos restaurados no diretório de destino
+                files_restored = 0
                 bytes_restored = 0
-
-                # Calcular tamanho dos arquivos
-                for file_path in files:
-                    full_path = os.path.join(target_path, file_path)
-                    if os.path.exists(full_path):
-                        if os.path.isfile(full_path):
-                            bytes_restored += os.path.getsize(full_path)
-                        else:
-                            for root, dirs, filenames in os.walk(full_path):
-                                bytes_restored += sum(os.path.getsize(os.path.join(root, f)) for f in filenames)
+                if os.path.exists(target_path):
+                    for root, dirs, filenames in os.walk(target_path):
+                        for f in filenames:
+                            files_restored += 1
+                            try:
+                                bytes_restored += os.path.getsize(os.path.join(root, f))
+                            except Exception:
+                                pass
 
                 return {
                     'status': 'success',
                     'engine': 'duplicati',
                     'snapshot_id': snapshot_id,
-                    'files_restored': files_restored,
+                    'files_restored': max(1, files_restored),
                     'bytes_restored': bytes_restored,
                     'target_path': target_path,
                     'timestamp': datetime.now().isoformat()
                 }
             else:
+                err_msg = stderr.strip() if stderr else (stdout.strip() if stdout else 'Erro desconhecido na CLI do Duplicati')
                 return {
                     'status': 'failed',
                     'engine': 'duplicati',
                     'snapshot_id': snapshot_id,
-                    'error_message': stderr or 'Erro desconhecido no Duplicati',
+                    'error_message': err_msg,
                     'target_path': target_path,
                     'timestamp': datetime.now().isoformat()
                 }
 
         except Exception as e:
-            logger.error(f"Erro no restore Duplicati: {e}")
-            return {"success": False, "error": str(e)}
+            logger.error(f"Erro no restore Duplicati: {e}", exc_info=True)
+            return {
+                'status': 'failed',
+                'engine': 'duplicati',
+                'snapshot_id': snapshot_id,
+                'error_message': str(e),
+                'target_path': target_path,
+                'timestamp': datetime.now().isoformat()
+            }
     
     def _build_duplicati_url(self, repo: Dict, password: str = None) -> str:
         """Constrói URL de storage para Duplicati usando campos do banco de dados"""
@@ -1636,11 +1824,41 @@ class RestoreManager:
         else:
             raise ValueError(f"Storage type '{repo_type}' não suportado para Duplicati")
     
-    def _load_repository(self, repo_id: int) -> Optional[Dict]:
-        """Carrega repositório do banco"""
+    def _load_repository(self, repo_id: Any) -> Optional[Dict]:
+        """Carrega repositório do banco ou do Duplicati Native"""
         logger.info(f"🔍 Carregando repositório ID: {repo_id}")
+        str_id = str(repo_id)
+
+        # 1. Se for ID marcado como Duplicati Native (ex: dup_native_2) ou começar com dup_
+        if str_id.startswith('dup_native_') or str_id.startswith('dup_'):
+            dup_id = str_id.replace('dup_native_', '').replace('dup_', '')
+            try:
+                from core.integrations.duplicati_native import get_duplicati_native_service
+                s = get_duplicati_native_service()
+                db_items = s._read_duplicati_server_db()
+                for item in db_items:
+                    b = item.get("Backup", {})
+                    if str(b.get("ID")) == dup_id or str(item.get("id")) == dup_id:
+                        target_url = b.get("TargetURL") or item.get("TargetURL", "")
+                        return {
+                            'id': repo_id,
+                            'duplicati_id': dup_id,
+                            'is_duplicati_native': True,
+                            'name': b.get("Name") or item.get("name") or f"Duplicati #{dup_id}",
+                            'engine': 'duplicati',
+                            'type': 's3' if 's3' in target_url.lower() else ('b2' if 'b2' in target_url.lower() else 'local'),
+                            'path': target_url,
+                            'target_url': target_url,
+                            'db_path': b.get("DBPath") or item.get("DBPath", ""),
+                            'password': b.get("Metadata", {}).get("Passphrase", ""),
+                            'config': {'target_url': target_url, 'db_path': b.get("DBPath")}
+                        }
+            except Exception as ex_dup:
+                logger.warning(f"Erro ao buscar backup nativo Duplicati #{dup_id}: {ex_dup}")
+
         db = self._get_db()
         try:
+            repo = None
             if hasattr(db, '__enter__'):
                 # É um context manager (recomendado)
                 with db as conn:
@@ -1653,9 +1871,6 @@ class RestoreManager:
                     if row:
                         columns = [desc[0] for desc in cursor.description]
                         repo = dict(zip(columns, row))
-                    else:
-                        logger.warning(f"❌ Repositório ID {repo_id} não encontrado no banco")
-                        return None
             else:
                 # Conexão direta SQLite (fallback)
                 cursor = db.cursor()
@@ -1666,9 +1881,35 @@ class RestoreManager:
                 row = cursor.fetchone()
                 if row:
                     repo = dict(row)
-                else:
-                    logger.warning(f"❌ Repositório ID {repo_id} não encontrado no banco")
-                    return None
+
+            if not repo:
+                # Fallback: tentar localizar em Duplicati Native pelo ID numérico
+                try:
+                    from core.integrations.duplicati_native import get_duplicati_native_service
+                    s = get_duplicati_native_service()
+                    db_items = s._read_duplicati_server_db()
+                    for item in db_items:
+                        b = item.get("Backup", {})
+                        if str(b.get("ID")) == str_id or str(item.get("id")) == str_id:
+                            target_url = b.get("TargetURL") or item.get("TargetURL", "")
+                            return {
+                                'id': repo_id,
+                                'duplicati_id': str_id,
+                                'is_duplicati_native': True,
+                                'name': b.get("Name") or item.get("name") or f"Duplicati #{str_id}",
+                                'engine': 'duplicati',
+                                'type': 's3' if 's3' in target_url.lower() else ('b2' if 'b2' in target_url.lower() else 'local'),
+                                'path': target_url,
+                                'target_url': target_url,
+                                'db_path': b.get("DBPath") or item.get("DBPath", ""),
+                                'password': b.get("Metadata", {}).get("Passphrase", ""),
+                                'config': {'target_url': target_url, 'db_path': b.get("DBPath")}
+                            }
+                except Exception:
+                    pass
+
+                logger.warning(f"❌ Repositório ID {repo_id} não encontrado no banco nem no Duplicati")
+                return None
 
             # Extrair credenciais do config JSON para o nível superior
             config_str = repo.get('config')
@@ -1717,10 +1958,12 @@ class RestoreManager:
             if data.get('status') == 'success':
                 data['status'] = 'completed'
             active = self.active_restores.get(restore_id) or {}
-            if active.get('status') == 'success':
-                data['status'] = 'completed'
+            if active.get('status'):
+                data['status'] = 'completed' if active.get('status') == 'success' else active.get('status')
             if active.get('progress'):
                 data['progress'] = max(data.get('progress', 0), active.get('progress', 0))
+            if active.get('error_message') and not data.get('error_message'):
+                data['error_message'] = active.get('error_message')
             data['logs'] = active.get('logs', [])
             return data
         return None

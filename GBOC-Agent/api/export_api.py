@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 11.7c - API de Exportação de Relatórios
+GBOC 13.2.0 - API de Exportação de Relatórios
 Gera relatórios em CSV e JSON (PDF via frontend)
 """
 
