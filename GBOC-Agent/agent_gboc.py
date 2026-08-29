@@ -261,6 +261,31 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"[SHIELD] ⚠️ Falha ao carregar Shield: {e}")
 
+    # Iniciar Hermes Agent — Agente de Borda Autônomo (4 Pilares)
+    try:
+        from engines.hermes_self_heal_engine import hermes_self_heal_engine
+        hermes_self_heal_engine.start_watchdog()
+        logger.info("[HERMES] ✅ Self-Healing Watchdog ativo (VSS + Disk + Serviços a cada 120s)")
+    except Exception as _he:
+        logger.warning(f"[HERMES] ⚠️ Falha ao iniciar Self-Heal Watchdog: {_he}")
+
+    try:
+        from engines.hermes_bandwidth_engine import hermes_bandwidth_engine
+        hermes_bandwidth_engine.start()
+        logger.info("[HERMES] ✅ Edge AI Bandwidth Engine ativo (aprendizado adaptativo de largura de banda)")
+    except Exception as _he:
+        logger.warning(f"[HERMES] ⚠️ Falha ao iniciar Bandwidth Engine: {_he}")
+
+    try:
+        from engines.hermes_mesh_engine import hermes_mesh_engine
+        import socket as _sock
+        import os as _os
+        _agent_id = _os.environ.get("GBOC_AGENT_ID", _sock.gethostname())
+        hermes_mesh_engine.start(_agent_id)
+        logger.info(f"[HERMES] ✅ P2P LAN Mesh ativo (mDNS/UDP broadcast — agente: {_agent_id})")
+    except Exception as _he:
+        logger.warning(f"[HERMES] ⚠️ Falha ao iniciar LAN Mesh: {_he}")
+
     logger.info("[ACCESS] http://localhost:9200")
     logger.info("=" * 50)
     yield
@@ -1004,6 +1029,10 @@ try:
     app.include_router(ad_backup_router)
     from modules.enterprise_connectors.enterprise_connectors_router import router as enterprise_connectors_router
     app.include_router(enterprise_connectors_router)
+    from modules.saas_cloud.saas_cloud_router import router as saas_cloud_router
+    app.include_router(saas_cloud_router)
+    from modules.freemium_power_tools.power_tools_router import router as power_tools_router
+    app.include_router(power_tools_router)
     from modules.security.security_router import router as agent_security_router
     app.include_router(agent_security_router)
     from modules.logs.logs_router import router as agent_logs_router
@@ -1017,6 +1046,9 @@ try:
     app.include_router(job_alert_router)
     from modules.storage.storage_router import router as storage_router
     app.include_router(storage_router)
+    # Hermes Agent — Agente de Borda Autônomo
+    from modules.hermes.hermes_router import router as hermes_agent_router
+    app.include_router(hermes_agent_router)
 except Exception as _e:
     logger.warning(f"Falha ao carregar módulos do Agente: {_e}")
 

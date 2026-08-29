@@ -431,8 +431,50 @@ def init_database():
                     VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING
                 """, (cat, key, val, typ, desc))
 
+        # ── Hermes Agent Stats (fila offline, mesh, bandwidth por agente) ──────
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS hermes_agent_stats (
+                agent_id          VARCHAR(100) PRIMARY KEY REFERENCES agents(agent_id) ON DELETE CASCADE,
+                pending_messages  INTEGER DEFAULT 0,
+                mesh_peers_online INTEGER DEFAULT 0,
+                throttle_mbps     REAL DEFAULT 0,
+                heal_events_count INTEGER DEFAULT 0,
+                last_burst_sync_at TIMESTAMP,
+                burst_sync_count  INTEGER DEFAULT 0,
+                updated_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        # ── Hermes Burst Sync Log (mensagens da fila offline persistidas) ────
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS hermes_burst_sync_log (
+                id              SERIAL PRIMARY KEY,
+                agent_id        VARCHAR(100) REFERENCES agents(agent_id) ON DELETE CASCADE,
+                sequence_number INTEGER,
+                event_type      TEXT,
+                payload_json    TEXT,
+                synced_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (agent_id, sequence_number)
+            )
+        ''')
+
+        # ── Power Tools Agent Stats (bitrot, RDR) ────────────────────────────
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS power_tools_agent_stats (
+                agent_id                VARCHAR(100) PRIMARY KEY REFERENCES agents(agent_id) ON DELETE CASCADE,
+                last_scrub_at           TIMESTAMP,
+                integrity_health_pct    REAL DEFAULT 100.0,
+                corrupted_blocks        INTEGER DEFAULT 0,
+                repaired_blocks         INTEGER DEFAULT 0,
+                last_rdr_at             TIMESTAMP,
+                last_rdr_time_saved_pct REAL DEFAULT 0,
+                last_rdr_sectors_written BIGINT DEFAULT 0,
+                updated_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
         conn.commit()
-        logger.info("✓ Banco de dados PostgreSQL inicializado com todas as tabelas.")
+        logger.info("✓ Banco de dados PostgreSQL inicializado com todas as tabelas (incluindo Hermes + Power Tools).")
     except Exception as e:
         if conn:
             conn.rollback()
@@ -663,7 +705,7 @@ modules_dir = os.path.join(os.path.dirname(__file__), "modules")
 if os.path.exists(modules_dir):
     app.mount("/modules", StaticFiles(directory=modules_dir), name="modules")
 
-# Modulos do GBOC Server (Estrito)
+# Módulos do GBOC Server (Estrito)
 try:
     from modules.storage.storage_router import router as server_storage_router
     app.include_router(server_storage_router)
@@ -673,6 +715,21 @@ try:
     app.include_router(hardware_router)
     from modules.v2.v2_router import v2_router
     app.include_router(v2_router)
+    # ======================================================================
+    # GBOC SERVER ENTERPRISE & HERMES MODULES
+    # ======================================================================
+    from modules.hermes.hermes_server_router import router as hermes_server_router
+    app.include_router(hermes_server_router)
+    from modules.compliance.compliance_server_router import router as compliance_server_router
+    app.include_router(compliance_server_router)
+    from modules.cdp.cdp_server_router import router as cdp_server_router
+    app.include_router(cdp_server_router)
+    from modules.saas_cloud.saas_cloud_server_router import router as saas_cloud_server_router
+    app.include_router(saas_cloud_server_router)
+    from modules.cyber.cyber_server_router import router as cyber_server_router
+    app.include_router(cyber_server_router)
+    from modules.power_tools.power_tools_server_router import router as power_tools_server_router
+    app.include_router(power_tools_server_router)
 except Exception as _e:
     logger.warning(f"Falha ao incluir roteadores de módulos no Servidor Central: {_e}")
 
