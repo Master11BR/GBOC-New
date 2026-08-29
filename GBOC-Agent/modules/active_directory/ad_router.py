@@ -24,6 +24,13 @@ class AdBackupStartRequest(BaseModel):
     include_dns: bool = True
 
 
+class AdRestoreStartRequest(BaseModel):
+    snapshot_name: str
+    restore_mode: str = "non-authoritative"
+    restore_sysvol: bool = True
+    restore_registry: bool = True
+
+
 class AdGranularRestoreRequest(BaseModel):
     object_dn: str
     object_type: str = "User"
@@ -72,12 +79,29 @@ async def start_ad_backup(req: AdBackupStartRequest):
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
+@router.post("/restore/start")
+async def start_ad_restore(req: AdRestoreStartRequest):
+    """Inicia processo de restauração do Active Directory (Não-Autoritativa ou DSRM Staging)."""
+    try:
+        res = ad_backup_engine.start_ad_restore(
+            snapshot_name=req.snapshot_name,
+            restore_mode=req.restore_mode,
+            restore_sysvol=req.restore_sysvol,
+            restore_registry=req.restore_registry
+        )
+        return JSONResponse(res)
+    except Exception as e:
+        logger.error(f"Erro ao iniciar restauração do AD: {e}", exc_info=True)
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+
+
 @router.get("/backup/status/{job_id}")
-async def get_ad_backup_status(job_id: str):
-    """Retorna status e progresso em tempo real de uma tarefa de backup do AD."""
+@router.get("/restore/status/{job_id}")
+async def get_ad_job_status(job_id: str):
+    """Retorna status e progresso em tempo real de uma tarefa de backup ou restore do AD."""
     status = ad_backup_engine.get_job_status(job_id)
     if not status:
-        raise HTTPException(status_code=404, detail="Tarefa de backup do AD não encontrada")
+        raise HTTPException(status_code=404, detail="Tarefa do Active Directory não encontrada")
     return JSONResponse({"status": "success", "job": status})
 
 
@@ -90,6 +114,15 @@ async def list_ad_backup_history():
     except Exception as e:
         logger.error(f"Erro ao listar histórico de backups do AD: {e}", exc_info=True)
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e), "history": []})
+
+
+@router.delete("/backup/snapshot/{snapshot_name}")
+async def delete_ad_snapshot(snapshot_name: str):
+    """Exclui um snapshot de backup do Active Directory."""
+    success = ad_backup_engine.delete_ad_snapshot(snapshot_name)
+    if success:
+        return JSONResponse({"status": "success", "message": f"Snapshot '{snapshot_name}' excluído com sucesso."})
+    return JSONResponse(status_code=404, content={"status": "error", "message": "Snapshot não encontrado."})
 
 
 @router.get("/objects")
