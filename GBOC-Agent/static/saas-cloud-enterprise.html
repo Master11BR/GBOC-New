@@ -1,0 +1,346 @@
+<!--
+==============================================================================
+GBOC System v13.2.0 Enterprise Edition
+Module: SaaS, Kubernetes, Storage Arrays, Cleanroom, Cloud Failover & ITIL
+Copyright (c) 2026 Master11BR - Todos os direitos reservados.
+==============================================================================
+-->
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SaaS, Kubernetes &amp; Cloud Failover - GBOC Agent</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/gboc-themes.css">
+    <link rel="stylesheet" href="/static/gboc-layout.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="/static/gboc-layout-manager.js"></script>
+    <script src="/static/sidebar.js"></script>
+    <script src="/static/saas-cloud-enterprise.js"></script>
+    <style>
+        .saas-nav-tabs {
+            display: flex;
+            gap: 10px;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 12px;
+            margin-bottom: 24px;
+            overflow-x: auto;
+        }
+        .saas-tab-btn {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.84em;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.25s ease;
+            white-space: nowrap;
+        }
+        .saas-tab-btn:hover {
+            color: var(--text);
+            border-color: var(--primary);
+        }
+        .saas-tab-btn.active {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+        .saas-tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+        .saas-tab-content.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .saas-hud-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            position: relative;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+        }
+        .saas-console-box {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 14px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 0.82em;
+            color: var(--text-muted);
+            height: 180px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-layout">
+        <div id="sidebar-container"></div>
+        <main class="main-content" style="padding:24px 30px;">
+            <header class="page-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:20px;">
+                <div>
+                    <h2 style="display:flex; align-items:center; gap:10px; font-size:1.45em; margin:0;">
+                        <i class="fas fa-cloud-arrow-up" style="color:var(--primary)"></i> SaaS, Kubernetes &amp; Multi-Cloud Direct Failover
+                    </h2>
+                    <p style="font-size:0.85em; color:var(--text-muted); margin:4px 0 0 0;">
+                        Proteção de Microsoft 365, Google Workspace, Kubernetes (PVCs), Storage Arrays, Cyber Cleanroom e Failover AWS/Azure.
+                    </p>
+                </div>
+            </header>
+
+            <!-- Navigation Tabs -->
+            <div class="saas-nav-tabs">
+                <button class="saas-tab-btn active" id="tab-btn-saas" onclick="switchSaasTab('saas')">
+                    <i class="fas fa-cloud"></i> 1. SaaS (M365 &amp; Google)
+                </button>
+                <button class="saas-tab-btn" id="tab-btn-k8s" onclick="switchSaasTab('k8s')">
+                    <i class="fas fa-dharmachakra"></i> 2. Kubernetes &amp; PVCs
+                </button>
+                <button class="saas-tab-btn" id="tab-btn-storagearrays" onclick="switchSaasTab('storagearrays')">
+                    <i class="fas fa-server"></i> 3. Storage Arrays (Hardware)
+                </button>
+                <button class="saas-tab-btn" id="tab-btn-cleanroom" onclick="switchSaasTab('cleanroom')">
+                    <i class="fas fa-shield-virus"></i> 4. Cyber Cleanroom (AI)
+                </button>
+                <button class="saas-tab-btn" id="tab-btn-cloudfailover" onclick="switchSaasTab('cloudfailover')">
+                    <i class="fas fa-bolt"></i> 5. 1-Click Cloud Failover
+                </button>
+                <button class="saas-tab-btn" id="tab-btn-itil" onclick="switchSaasTab('itil')">
+                    <i class="fas fa-ticket-alt"></i> 6. ITIL &amp; SSO
+                </button>
+            </div>
+
+            <!-- TAB 1: SAAS PROTECTION -->
+            <div class="saas-tab-content active" id="tab-content-saas">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px;">
+                    <div class="saas-hud-card">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                            <h3 style="font-size:1.1em; margin:0; display:flex; align-items:center; gap:8px;">
+                                <i class="fab fa-microsoft" style="color:#00a4ef"></i> Microsoft 365 &amp; Entra ID
+                            </h3>
+                            <span class="badge badge-success"><i class="fas fa-check-circle"></i> Conectado (Graph API)</span>
+                        </div>
+                        <div style="background:var(--bg-input); padding:12px; border-radius:8px; border:1px solid var(--border); font-size:0.85em; margin-bottom:16px;">
+                            Tenant: <strong id="m365-tenant-name" style="color:var(--text);">Contoso Corp</strong>
+                        </div>
+                        <div style="font-size:0.82em; color:var(--text-muted); line-height:1.6; margin-bottom:18px;">
+                            • 142 Caixas Exchange Online &amp; Arquivamento<br>
+                            • 28 Coleções de Sites SharePoint Online &amp; OneDrive<br>
+                            • 16 Equipes do Microsoft Teams (Canais e Conversas)<br>
+                            • Entra ID: 158 Usuários e Políticas de Acesso Condicional
+                        </div>
+                        <button class="btn btn-primary" onclick="startSaasBackupAction('microsoft_365')" style="width:100%; padding:10px; font-weight:700;">
+                            <i class="fas fa-play"></i> Disparar Backup Completo Microsoft 365
+                        </button>
+                    </div>
+
+                    <div class="saas-hud-card">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                            <h3 style="font-size:1.1em; margin:0; display:flex; align-items:center; gap:8px;">
+                                <i class="fab fa-google" style="color:#ea4335"></i> Google Workspace
+                            </h3>
+                            <span class="badge badge-success"><i class="fas fa-check-circle"></i> Conectado (Google API)</span>
+                        </div>
+                        <div style="background:var(--bg-input); padding:12px; border-radius:8px; border:1px solid var(--border); font-size:0.85em; margin-bottom:16px;">
+                            Domínio: <strong id="gws-domain-name" style="color:var(--text);">empresa-global.com</strong>
+                        </div>
+                        <div style="font-size:0.82em; color:var(--text-muted); line-height:1.6; margin-bottom:18px;">
+                            • 84 Contas Gmail Empresariais<br>
+                            • 14 Drives Compartilhados (Shared Drives)<br>
+                            • Google Calendar &amp; Contatos Corporativos
+                        </div>
+                        <button class="btn btn-success" onclick="startSaasBackupAction('google_workspace')" style="width:100%; padding:10px; font-weight:700; margin-top:28px;">
+                            <i class="fas fa-play"></i> Disparar Backup Google Workspace
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: KUBERNETES & CONTAINERS -->
+            <div class="saas-tab-content" id="tab-content-k8s">
+                <div class="saas-hud-card">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                        <div>
+                            <h3 style="font-size:1.15em; margin:0; display:flex; align-items:center; gap:8px;">
+                                <i class="fas fa-dharmachakra" style="color:#326ce5"></i> Kubernetes &amp; Cloud-Native Container Backup
+                            </h3>
+                            <p style="font-size:0.82em; color:var(--text-muted); margin:4px 0 0 0;">
+                                Backup de recursos YAML (Deployments, Secrets, ConfigMaps) e snapshots de volumes persistentes via CSI Volume Snapshotter.
+                            </p>
+                        </div>
+                        <span class="badge badge-info" id="k8s-cluster-name">k8s-prod-cluster-01</span>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-top:16px;">
+                        <div>
+                            <label style="font-weight:700; font-size:0.85em; display:block; margin-bottom:6px;">Namespace Alvo</label>
+                            <select id="k8s-namespace-select" class="form-control" style="width:100%; padding:9px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
+                                <option value="production-apps">production-apps (24 Pods • 6 PVCs)</option>
+                                <option value="databases-stateful">databases-stateful (6 Pods • 6 PVCs)</option>
+                                <option value="default">default (8 Pods • 2 PVCs)</option>
+                            </select>
+                        </div>
+                        <div style="display:flex; flex-direction:column; justify-content:flex-end;">
+                            <label style="display:flex; align-items:center; gap:8px; font-size:0.85em; cursor:pointer; margin-bottom:10px;">
+                                <input type="checkbox" id="k8s-include-pvcs" checked> Incluir CSI Volume Snapshots para PVCs
+                            </label>
+                            <button class="btn btn-primary" onclick="startK8sBackupAction()" style="padding:10px; font-weight:700;">
+                                <i class="fas fa-play"></i> Iniciar Backup de Namespace Kubernetes
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: STORAGE ARRAYS -->
+            <div class="saas-tab-content" id="tab-content-storagearrays">
+                <div class="saas-hud-card">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                        <div>
+                            <h3 style="font-size:1.15em; margin:0; display:flex; align-items:center; gap:8px;">
+                                <i class="fas fa-server" style="color:var(--primary)"></i> Integração Direta com Arrays de Storage SAN/NAS
+                            </h3>
+                            <p style="font-size:0.82em; color:var(--text-muted); margin:4px 0 0 0;">
+                                Acionamento de snapshots instantâneos em nível de hardware (&lt; 2s) sem sobrecarga de CPU no host.
+                            </p>
+                        </div>
+                    </div>
+                    <div id="storage-arrays-grid">Carregando arrays...</div>
+                </div>
+            </div>
+
+            <!-- TAB 4: CYBER CLEANROOM -->
+            <div class="saas-tab-content" id="tab-content-cleanroom">
+                <div class="saas-hud-card">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                        <div>
+                            <h3 style="font-size:1.15em; margin:0; display:flex; align-items:center; gap:8px;">
+                                <i class="fas fa-shield-virus" style="color:#e53e3e"></i> AI Cyber Cleanroom &amp; Scanner de Entropia de Shannon
+                            </h3>
+                            <p style="font-size:0.82em; color:var(--text-muted); margin:4px 0 0 0;">
+                                Detecção de ransomware de dia zero via análise de aleatoriedade de blocos e threat hunting com Regras YARA antes da restauração.
+                            </p>
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:12px; margin-bottom:16px;">
+                        <input type="text" id="cleanroom-snap-input" class="form-control" value="SNAP_SQL_PROD_20260829" style="flex:1; padding:9px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
+                        <button class="btn btn-primary" onclick="runCleanroomScanAction()" style="font-weight:700;">
+                            <i class="fas fa-search"></i> Executar Varredura Forense Cleanroom
+                        </button>
+                    </div>
+                    <div class="saas-console-box" id="cleanroom-scan-console">Aguardando comando de varredura forense...</div>
+                </div>
+            </div>
+
+            <!-- TAB 5: 1-CLICK CLOUD FAILOVER -->
+            <div class="saas-tab-content" id="tab-content-cloudfailover">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px;">
+                    <div class="saas-hud-card">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                            <h3 style="font-size:1.1em; margin:0; display:flex; align-items:center; gap:8px;">
+                                <i class="fab fa-aws" style="color:#ff9900"></i> Failover Direto para AWS EC2
+                            </h3>
+                            <span class="badge badge-warning">DR Standby</span>
+                        </div>
+                        <p style="font-size:0.82em; color:var(--text-muted); margin-bottom:16px;">
+                            Converte snapshot VHDX e provisiona instância EC2 (t3.xlarge) na região us-east-1 com Security Groups e IP Elástico em minutos.
+                        </p>
+                        <button class="btn btn-primary" onclick="launchCloudFailoverAction('AWS')" style="width:100%; padding:10px; font-weight:700;">
+                            <i class="fas fa-bolt"></i> Disparar 1-Click Failover para AWS
+                        </button>
+                    </div>
+
+                    <div class="saas-hud-card">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                            <h3 style="font-size:1.1em; margin:0; display:flex; align-items:center; gap:8px;">
+                                <i class="fab fa-microsoft" style="color:#0089d6"></i> Failover Direto para Azure VM
+                            </h3>
+                            <span class="badge badge-warning">DR Standby</span>
+                        </div>
+                        <p style="font-size:0.82em; color:var(--text-muted); margin-bottom:16px;">
+                            Upload delta para Azure Managed Disk e inicialização de VM Standard_D4s_v5 na região Brazil South vinculada à VNet corporativa.
+                        </p>
+                        <button class="btn btn-success" onclick="launchCloudFailoverAction('Azure')" style="width:100%; padding:10px; font-weight:700;">
+                            <i class="fas fa-bolt"></i> Disparar 1-Click Failover para Azure
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 6: ITIL & SSO -->
+            <div class="saas-tab-content" id="tab-content-itil">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px;">
+                    <div class="saas-hud-card">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                            <h3 style="font-size:1.1em; margin:0; display:flex; align-items:center; gap:8px;">
+                                <i class="fas fa-ticket-alt" style="color:var(--primary)"></i> ServiceNow ITSM
+                            </h3>
+                            <div id="itil-snow-status">Verificando...</div>
+                        </div>
+                        <p style="font-size:0.82em; color:var(--text-muted); margin-bottom:16px;">
+                            Abertura automática de incidentes (P1/P2) e sincronização com a CMDB corporativa em caso de falha de backup ou corrupção de snapshot.
+                        </p>
+                        <button class="btn btn-secondary" onclick="testItilWebhookAction('servicenow')" style="width:100%; padding:9px; font-weight:700;">
+                            <i class="fas fa-paper-plane"></i> Testar Webhook ServiceNow
+                        </button>
+                    </div>
+
+                    <div class="saas-hud-card">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                            <h3 style="font-size:1.1em; margin:0; display:flex; align-items:center; gap:8px;">
+                                <i class="fab fa-jira" style="color:#0052cc"></i> Jira Service Management
+                            </h3>
+                            <div id="itil-jira-status">Verificando...</div>
+                        </div>
+                        <p style="font-size:0.82em; color:var(--text-muted); margin-bottom:16px;">
+                            Criação de tickets de suporte ágil com trilha de auditoria e resolução automática após sucesso de execução de restore.
+                        </p>
+                        <button class="btn btn-secondary" onclick="testItilWebhookAction('jira')" style="width:100%; padding:9px; font-weight:700;">
+                            <i class="fas fa-paper-plane"></i> Testar Webhook Jira
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL DE MONITORAMENTO -->
+    <div id="saas-monitor-modal" class="modal" style="display:none; position:fixed; z-index:3500; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.75); backdrop-filter:blur(4px);">
+        <div class="modal-content" style="background:var(--bg-card); margin:8vh auto; padding:24px; border-radius:12px; width:90%; max-width:760px; border:1px solid var(--border); box-shadow:0 20px 60px rgba(0,0,0,0.6);">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:12px; margin-bottom:16px;">
+                <h3 id="saas-modal-title" style="margin:0; font-size:1.15em; color:var(--text); display:flex; align-items:center; gap:8px;">
+                    <i class="fas fa-spinner fa-spin" style="color:var(--primary)"></i> Operação de Nuvem
+                </h3>
+                <button onclick="closeSaasMonitorModal()" style="background:none; border:none; color:var(--text-muted); font-size:1.4em; cursor:pointer;">&times;</button>
+            </div>
+            <div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <span style="font-weight:700; font-size:0.9em; color:var(--text);">Sincronizando com serviços de nuvem...</span>
+                    <span id="saas-modal-progress-pct" style="font-weight:700; color:var(--primary);">0%</span>
+                </div>
+                <div style="background:var(--bg-input); height:12px; border-radius:6px; overflow:hidden; border:1px solid var(--border); margin-bottom:16px;">
+                    <div id="saas-modal-progress-fill" style="height:100%; background:linear-gradient(90deg, var(--primary), var(--success)); width:0%; transition:width 0.3s ease;"></div>
+                </div>
+                <div style="font-size:0.8em; font-weight:600; color:var(--text-muted); margin-bottom:6px;">LOG STREAM DE NUVEM:</div>
+                <div class="saas-console-box" id="saas-live-logs">Aguardando dados...</div>
+                <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:20px;">
+                    <button class="btn btn-secondary" onclick="closeSaasMonitorModal()"><i class="fas fa-times"></i> Fechar Monitor</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

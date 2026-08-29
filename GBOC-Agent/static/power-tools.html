@@ -1,0 +1,304 @@
+<!--
+==============================================================================
+GBOC System v13.2.0 Enterprise Edition
+Module: Freemium & Open-Source Power Tools Suite
+Copyright (c) 2026 Master11BR - Todos os direitos reservados.
+==============================================================================
+-->
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Power Tools &amp; Ferramentas Avançadas - GBOC Agent</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/gboc-themes.css">
+    <link rel="stylesheet" href="/static/gboc-layout.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="/static/gboc-layout-manager.js"></script>
+    <script src="/static/sidebar.js"></script>
+    <script src="/static/power-tools.js"></script>
+    <style>
+        .pow-nav-tabs {
+            display: flex;
+            gap: 10px;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 12px;
+            margin-bottom: 24px;
+            overflow-x: auto;
+        }
+        .pow-tab-btn {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.84em;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.25s ease;
+            white-space: nowrap;
+        }
+        .pow-tab-btn:hover {
+            color: var(--text);
+            border-color: var(--primary);
+        }
+        .pow-tab-btn.active {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+        .pow-tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+        .pow-tab-content.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .pow-hud-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            position: relative;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+        }
+        .pow-console-box {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 14px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 0.82em;
+            color: var(--text-muted);
+            height: 180px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            line-height: 1.5;
+        }
+        .pow-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.84em;
+        }
+        .pow-table th {
+            background: var(--bg-input);
+            padding: 10px;
+            text-align: left;
+            border-bottom: 2px solid var(--border);
+            color: var(--text);
+        }
+        .pow-table td {
+            padding: 10px;
+            border-bottom: 1px solid var(--border);
+            color: var(--text);
+        }
+    </style>
+</head>
+<body>
+    <div class="app-layout">
+        <div id="sidebar-container"></div>
+        <main class="main-content" style="padding:24px 30px;">
+            <header class="page-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:20px;">
+                <div>
+                    <h2 style="display:flex; align-items:center; gap:10px; font-size:1.45em; margin:0;">
+                        <i class="fas fa-toolbox" style="color:var(--primary)"></i> Power Tools &amp; Ferramentas de Produtividade
+                    </h2>
+                    <p style="font-size:0.85em; color:var(--text-muted); margin:4px 0 0 0;">
+                        Visual Diff, Sincronização em Tempo Real, Auto-Cura Bitrot (Reed-Solomon), Drive Virtual Z:\, Rapid Delta e Boot USB 1-Click.
+                    </p>
+                </div>
+            </header>
+
+            <!-- Navigation Tabs -->
+            <div class="pow-nav-tabs">
+                <button class="pow-tab-btn active" id="tab-btn-visualsync" onclick="switchPowerTab('visualsync')">
+                    <i class="fas fa-columns"></i> 1. Visual Diff &amp; Sincronização
+                </button>
+                <button class="pow-tab-btn" id="tab-btn-bitrot" onclick="switchPowerTab('bitrot')">
+                    <i class="fas fa-heartbeat"></i> 2. Auto-Cura Bitrot (Reed-Solomon)
+                </button>
+                <button class="pow-tab-btn" id="tab-btn-vfs" onclick="switchPowerTab('vfs')">
+                    <i class="fas fa-cloud-arrow-down"></i> 3. Montagem Nuvem (Drive Z:\)
+                </button>
+                <button class="pow-tab-btn" id="tab-btn-rapiddelta" onclick="switchPowerTab('rapiddelta')">
+                    <i class="fas fa-bolt"></i> 4. Rapid Delta Restore (RDR)
+                </button>
+                <button class="pow-tab-btn" id="tab-btn-linuxsnaps" onclick="switchPowerTab('linuxsnaps')">
+                    <i class="fab fa-linux"></i> 5. Snapshots Linux (ZFS/BTRFS)
+                </button>
+                <button class="pow-tab-btn" id="tab-btn-usbrescue" onclick="switchPowerTab('usbrescue')">
+                    <i class="fas fa-usb"></i> 6. Gravador de Boot USB
+                </button>
+            </div>
+
+            <!-- TAB 1: VISUAL DIFF & SYNC -->
+            <div class="pow-tab-content active" id="tab-content-visualsync">
+                <div class="pow-hud-card" style="margin-bottom:20px;">
+                    <div style="display:grid; grid-template-columns:1fr 1fr auto; gap:16px; align-items:flex-end;">
+                        <div>
+                            <label style="font-weight:700; font-size:0.85em; display:block; margin-bottom:4px;">Pasta de Origem (Left)</label>
+                            <input type="text" id="diff-left-path" class="form-control" value="C:\Dados\Producao" style="width:100%; padding:9px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
+                        </div>
+                        <div>
+                            <label style="font-weight:700; font-size:0.85em; display:block; margin-bottom:4px;">Pasta de Destino (Right)</label>
+                            <input type="text" id="diff-right-path" class="form-control" value="D:\Backup\Mirror" style="width:100%; padding:9px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
+                        </div>
+                        <div style="display:flex; gap:8px;">
+                            <button class="btn btn-secondary" onclick="runVisualDiffComparison()"><i class="fas fa-search"></i> Comparar</button>
+                            <button class="btn btn-primary" onclick="executeSyncAction()"><i class="fas fa-sync"></i> Sincronizar Espelho</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pow-hud-card">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                        <h4 style="margin:0; font-size:0.95em;"><i class="fas fa-stream"></i> Árvore Visual de Diferenças (Side-by-Side Diff)</h4>
+                        <div id="diff-summary-badges">...</div>
+                    </div>
+                    <div style="overflow-x:auto;">
+                        <table class="pow-table">
+                            <thead>
+                                <tr>
+                                    <th>Arquivo Relativo</th>
+                                    <th>Origem (Left)</th>
+                                    <th style="text-align:center;">Ação</th>
+                                    <th>Destino (Right)</th>
+                                    <th>Status de Paridade</th>
+                                </tr>
+                            </thead>
+                            <tbody id="visual-diff-table-body">
+                                <tr><td colspan="5" style="text-align:center; padding:16px;">Clique em "Comparar" para gerar o Visual Diff.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: BITROT SCRUB -->
+            <div class="pow-tab-content" id="tab-content-bitrot">
+                <div class="pow-hud-card">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                        <div>
+                            <h3 style="font-size:1.15em; margin:0; display:flex; align-items:center; gap:8px;">
+                                <i class="fas fa-heartbeat" style="color:#48bb78"></i> Auto-Cura de Corrupção Silenciosa (Anti-Bitrot &amp; Reed-Solomon)
+                            </h3>
+                            <p style="font-size:0.82em; color:var(--text-muted); margin:4px 0 0 0;">
+                                Validação profunda de somas de verificação SHA-256 e reparo automático de bits degradados usando matrizes de paridade locais.
+                            </p>
+                        </div>
+                        <button class="btn btn-success" onclick="runBitrotScrubAction()"><i class="fas fa-play"></i> Iniciar Varredura de Auto-Cura</button>
+                    </div>
+                    <div class="pow-console-box" id="bitrot-console">Aguardando comando de varredura...</div>
+                </div>
+            </div>
+
+            <!-- TAB 3: VFS CLOUD MOUNT -->
+            <div class="pow-tab-content" id="tab-content-vfs">
+                <div class="pow-hud-card" style="margin-bottom:20px;">
+                    <h3 style="font-size:1.1em; margin:0 0 12px 0;"><i class="fas fa-cloud-arrow-down" style="color:var(--primary)"></i> Montar Repositório S3/Wasabi como Drive Local (Windows Explorer)</h3>
+                    <div style="display:grid; grid-template-columns:1fr auto auto; gap:14px; align-items:flex-end;">
+                        <div>
+                            <label style="font-weight:700; font-size:0.85em; display:block; margin-bottom:4px;">URL do Repositório de Nuvem</label>
+                            <input type="text" id="vfs-repo-url" class="form-control" value="s3://wasabi/gboc-prod-backups" style="width:100%; padding:9px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
+                        </div>
+                        <div>
+                            <label style="font-weight:700; font-size:0.85em; display:block; margin-bottom:4px;">Letra da Unidade</label>
+                            <select id="vfs-drive-letter" class="form-control" style="padding:9px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
+                                <option value="Z:">Z:</option>
+                                <option value="Y:">Y:</option>
+                                <option value="X:">X:</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary" onclick="mountVfsAction()"><i class="fas fa-plug"></i> Montar Drive Z:\</button>
+                    </div>
+                </div>
+                <div class="pow-hud-card">
+                    <h4 style="margin:0 0 12px 0; font-size:0.95em;"><i class="fas fa-hdd"></i> Drives Virtuais Montados</h4>
+                    <div id="vfs-drives-box">Carregando drives montados...</div>
+                </div>
+            </div>
+
+            <!-- TAB 4: RAPID DELTA RESTORE -->
+            <div class="pow-tab-content" id="tab-content-rapiddelta">
+                <div class="pow-hud-card">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                        <div>
+                            <h3 style="font-size:1.15em; margin:0; display:flex; align-items:center; gap:8px;">
+                                <i class="fas fa-bolt" style="color:#ecc94b"></i> Rapid Delta Restore (RDR via NTFS $Bitmap)
+                            </h3>
+                            <p style="font-size:0.82em; color:var(--text-muted); margin:4px 0 0 0;">
+                                Restauração de disco em menos de 2 minutos gravando apenas os setores que foram alterados desde o backup.
+                            </p>
+                        </div>
+                        <button class="btn btn-primary" onclick="runRapidDeltaAction()"><i class="fas fa-undo"></i> Executar Rapid Delta Restore</button>
+                    </div>
+                    <div class="pow-console-box" id="rapid-delta-console">Aguardando comando de restauração rápida...</div>
+                </div>
+            </div>
+
+            <!-- TAB 5: LINUX SNAPSHOTS -->
+            <div class="pow-tab-content" id="tab-content-linuxsnaps">
+                <div class="pow-hud-card">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                        <div>
+                            <h3 style="font-size:1.15em; margin:0; display:flex; align-items:center; gap:8px;">
+                                <i class="fab fa-linux" style="color:#38b2ac"></i> Snapshots de Subvolumes ZFS / BTRFS (Linux &amp; Proxmox)
+                            </h3>
+                            <p style="font-size:0.82em; color:var(--text-muted); margin:4px 0 0 0;">
+                                Pontos de restauração instantâneos criados em 0.04 segundos com consumo zero de espaço inicial.
+                            </p>
+                        </div>
+                        <button class="btn btn-secondary" onclick="createLinuxSnapshotAction()"><i class="fas fa-camera"></i> Criar Snapshot Instantâneo</button>
+                    </div>
+                    <table class="pow-table">
+                        <thead>
+                            <tr>
+                                <th>ID do Snapshot</th>
+                                <th>Dataset / Subvolume</th>
+                                <th>Criado Em</th>
+                                <th>Espaço Delta</th>
+                            </tr>
+                        </thead>
+                        <tbody id="linux-snapshots-tbody">
+                            <tr><td colspan="4" style="text-align:center; padding:16px;">Carregando subvolumes ZFS/BTRFS...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- TAB 6: USB RESCUE MEDIA -->
+            <div class="pow-tab-content" id="tab-content-usbrescue">
+                <div class="pow-hud-card">
+                    <h3 style="font-size:1.15em; margin:0 0 14px 0; display:flex; align-items:center; gap:8px;">
+                        <i class="fas fa-usb" style="color:var(--primary)"></i> Gravador de Mídia de Boot USB 1-Click (WinPE &amp; UEFI Secure Boot)
+                    </h3>
+                    <p style="font-size:0.82em; color:var(--text-muted); margin-bottom:18px;">
+                        Grava o ambiente de recuperação de emergência GBOC WinPE diretamente no pendrive USB com drivers de controladoras RAID e rede embutidos.
+                    </p>
+                    <div style="display:grid; grid-template-columns:1fr auto; gap:16px; align-items:flex-end; margin-bottom:16px;">
+                        <div>
+                            <label style="font-weight:700; font-size:0.85em; display:block; margin-bottom:4px;">Selecione a Unidade USB</label>
+                            <select id="usb-drives-select" class="form-control" style="width:100%; padding:9px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
+                                <option value="E:">E: [SANDISK_32G] - SanDisk Ultra USB 3.0 (29.8 GB)</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-danger" onclick="createUsbRescueAction()" style="font-weight:700;">
+                            <i class="fas fa-burn"></i> Gravar Pendrive de Boot de Emergência
+                        </button>
+                    </div>
+                    <div class="pow-console-box" id="usb-creator-console">Selecione o pendrive e clique em Gravar.</div>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>
