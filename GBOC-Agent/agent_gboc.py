@@ -1002,6 +1002,8 @@ try:
     app.include_router(agent_dr_router)
     from modules.active_directory.ad_router import router as ad_backup_router
     app.include_router(ad_backup_router)
+    from modules.enterprise_connectors.enterprise_connectors_router import router as enterprise_connectors_router
+    app.include_router(enterprise_connectors_router)
     from modules.security.security_router import router as agent_security_router
     app.include_router(agent_security_router)
     from modules.logs.logs_router import router as agent_logs_router

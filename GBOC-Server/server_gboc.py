@@ -2836,6 +2836,11 @@ try:
     app.include_router(server_overview_router)
 except Exception as _e: logger.warning(f"Overview router: {_e}")
 
+try:
+    from modules.active_directory.ad_server_router import router as server_ad_router
+    app.include_router(server_ad_router)
+except Exception as _e: logger.warning(f"Active Directory router: {_e}")
+
 
 
 # --- USER MANAGEMENT API ---
