@@ -1,5 +1,5 @@
 // ==============================================================================
-// GBOC System v13.2.0 Enterprise Edition
+// GBOC System v14.0.0 Enterprise Edition
 // Module: Hermes Agent UI Controller
 // Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 // ==============================================================================
@@ -50,7 +50,8 @@ const HermesUI = (() => {
   // ─── API Calls ─────────────────────────────────────────────────────────────
 
   async function apiFetch(path, opts = {}) {
-    const res = await fetch(API + path, {
+    const baseUrl = (window.GBOC_API_BASE || '').replace(/\/+$/, '');
+    const res = await fetch(baseUrl + '/api/v1/hermes' + path, {
       headers: { 'Content-Type': 'application/json' },
       ...opts
     });

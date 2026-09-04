@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 13.2.0 - Backup Replicator Engine
+GBOC 14.0.0 - Backup Replicator Engine
 Copies backups from one repository to another (3-2-1 rule enforcement).
 Supports cross-engine replication, integrity verification after copy, scheduling.
 """
@@ -65,7 +65,12 @@ def ensure_tables():
                 id SERIAL PRIMARY KEY,
                 name TEXT NOT NULL,
                 source_repo_id INTEGER NOT NULL,
-                target_repo_id INTEGER NOT NULL,
+                target_repo_id INTEGER DEFAULT 0,
+                dest_type TEXT DEFAULT 'local',
+                dest_path TEXT DEFAULT '',
+                mode TEXT DEFAULT 'full',
+                status TEXT DEFAULT 'idle',
+                total_bytes BIGINT DEFAULT 0,
                 enabled BOOLEAN DEFAULT TRUE,
                 schedule_cron TEXT DEFAULT '0 2 * * *',
                 verify_after_copy BOOLEAN DEFAULT TRUE,
@@ -75,6 +80,20 @@ def ensure_tables():
                 updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
             );
         """)
+        # Migrações defensivas
+        for alter_sql in [
+            "ALTER TABLE replication_policies ALTER COLUMN target_repo_id DROP NOT NULL;",
+            "ALTER TABLE replication_policies ADD COLUMN IF NOT EXISTS dest_type TEXT DEFAULT 'local';",
+            "ALTER TABLE replication_policies ADD COLUMN IF NOT EXISTS dest_path TEXT DEFAULT '';",
+            "ALTER TABLE replication_policies ADD COLUMN IF NOT EXISTS mode TEXT DEFAULT 'full';",
+            "ALTER TABLE replication_policies ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'idle';",
+            "ALTER TABLE replication_policies ADD COLUMN IF NOT EXISTS total_bytes BIGINT DEFAULT 0;",
+        ]:
+            try:
+                cur.execute(alter_sql)
+            except Exception:
+                pass
+
         cur.execute("""
             CREATE TABLE IF NOT EXISTS replication_history (
                 id SERIAL PRIMARY KEY,
@@ -124,22 +143,26 @@ def get_policy(policy_id: int) -> Optional[Dict]:
 
 def create_policy(data: Dict) -> Dict:
     ensure_tables()
-    # Validate repos exist
-    source = _query_one("SELECT id FROM repositories WHERE id = %s", (data['source_repo_id'],))
-    target = _query_one("SELECT id FROM repositories WHERE id = %s", (data['target_repo_id'],))
-    if not source:
-        raise ValueError(f"Source repository {data['source_repo_id']} not found")
-    if not target:
-        raise ValueError(f"Target repository {data['target_repo_id']} not found")
-    if data['source_repo_id'] == data['target_repo_id']:
-        raise ValueError("Source and target repositories must be different")
+    source_id = data.get('source_repo_id') or data.get('source_repo') or 0
+    target_id = data.get('target_repo_id') or 0
+    
+    # Validar que repositório origem existe (se informado ID > 0)
+    if source_id > 0:
+        source = _query_one("SELECT id FROM repositories WHERE id = %s", (source_id,))
+        if not source:
+            raise ValueError(f"Source repository {source_id} not found")
+
+    dest_type = data.get('dest_type', 'local')
+    dest_path = data.get('dest_path', '')
+    mode = data.get('mode', 'full')
+    name = data.get('name', 'Nova Regra de Replicação')
+    cron = data.get('schedule_cron') or data.get('frequency') or '0 2 * * *'
 
     pid = _execute_returning("""
-        INSERT INTO replication_policies (name, source_repo_id, target_repo_id, enabled, schedule_cron, verify_after_copy)
-        VALUES (%s, %s, %s, %s, %s, %s) RETURNING id
-    """, (data['name'], data['source_repo_id'], data['target_repo_id'],
-          data.get('enabled', True), data.get('schedule_cron', '0 2 * * *'),
-          data.get('verify_after_copy', True)))
+        INSERT INTO replication_policies (name, source_repo_id, target_repo_id, dest_type, dest_path, mode, enabled, schedule_cron, verify_after_copy)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
+    """, (name, source_id, target_id, dest_type, dest_path, mode,
+          data.get('enabled', True), cron, data.get('verify_after_copy', True)))
     return get_policy(pid)
 
 

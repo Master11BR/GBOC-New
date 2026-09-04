@@ -1,0 +1,20 @@
+{
+  "system": "GBOC System Enterprise",
+  "version": "14.0.0",
+  "strict_modularization": true,
+  "rules": [
+    {
+      "name": "One Module One Directory",
+      "pattern": "GBOC-Server/modules/*/",
+      "required_files": ["*_router.py", "*.js", "*.html"]
+    },
+    {
+      "name": "Zero Mock Policy",
+      "forbidden_tokens": ["mock_data", "fake_status", "simulated_cpu"]
+    },
+    {
+      "name": "Motion Principles Required",
+      "required_css_tokens": ["--motion-ease-out", ".skeleton", ".lazy-load"]
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 @REM ==============================================================================
-@REM GBOC System v13.2.0 Enterprise Edition
+@REM GBOC System v14.0.0 Enterprise Edition
 @REM Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 @REM Propriedade Intelectual & Direitos Autorais Registrados.
 @REM ==============================================================================
@@ -8,12 +8,12 @@
 setlocal enabledelayedexpansion
 CLS
 REM ========================================
-REM GBOC Agent v13.2.0 - Inicializacao
+REM GBOC Agent v14.0.0 - Inicializacao
 REM ========================================
 
 echo.
 echo ========================================
-echo   GBOC Agent v13.2.0 - Iniciando...
+echo   GBOC Agent v14.0.0 - Iniciando...
 echo ========================================
 echo.
 
@@ -118,7 +118,7 @@ exit /b 1
 :pg_ready
 echo.
 
-echo [OK] Iniciando GBOC Agent v13.2.0...
+echo [OK] Iniciando GBOC Agent v14.0.0...
 echo Comando Python: %PYTHON_CMD%
 echo.
 echo Servidor disponivel em:

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 ==============================================================================
-GBOC System v13.2.0 Enterprise Edition
+GBOC System v14.0.0 Enterprise Edition
 Autonomous Scheduler Agent & Background Task Runner
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 ==============================================================================
@@ -53,7 +53,7 @@ def _handle_signal(signum, frame):
 def print_banner():
     banner = r"""
 ======================================================================
-  GBOC System v13.2.0 - Agente de Inicializacao do Scheduler
+  GBOC System v14.0.0 - Agente de Inicializacao do Scheduler
   Servico Autonomo de Backup & Restore Agendados (Zero-Mock)
 ======================================================================
     """

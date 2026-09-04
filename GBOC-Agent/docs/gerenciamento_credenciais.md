@@ -1,4 +1,4 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v13.2.0 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.0.0 Enterprise. Todos os direitos reservados. -->
 
 # Gerenciamento de Credenciais - GBOC Agent
 

@@ -1,5 +1,5 @@
 """
-GBOC Server 13.2.0
+GBOC Server 14.0.0
 Servidor Central — Real-time Agent Communication + Complete Data Sync + Advanced Analytics
 Banco de dados: PostgreSQL (oficial)
 """
@@ -37,7 +37,7 @@ try:
     from version_control import __version__ as SERVER_VERSION, get_version_info, auto_increment_build
     auto_increment_build()
 except Exception:
-    SERVER_VERSION = "13.2.0"
+    SERVER_VERSION = "14.0.0"
     def get_version_info():
         return {"raw_version": SERVER_VERSION, "semver": SERVER_VERSION}
 
@@ -730,6 +730,8 @@ try:
     app.include_router(cyber_server_router)
     from modules.power_tools.power_tools_server_router import router as power_tools_server_router
     app.include_router(power_tools_server_router)
+    from modules.engine_migration.engine_migration_router import router as engine_migration_router
+    app.include_router(engine_migration_router)
 except Exception as _e:
     logger.warning(f"Falha ao incluir roteadores de módulos no Servidor Central: {_e}")
 
@@ -764,9 +766,16 @@ async def get_themes_css():
 # ==============================================================================
 @app.get("/api/v1/version", tags=["System"])
 @app.get("/api/v1/system/version", tags=["System"])
+@app.get("/api/system/info", tags=["System"])
+@app.get("/api/system/version", tags=["System"])
 async def get_server_version_endpoint():
     """Retorna informações detalhadas do versionamento semântico 2.0."""
-    return get_version_info()
+    info = get_version_info()
+    if isinstance(info, dict):
+        info["gboc_version"] = info.get("semver") or SERVER_VERSION
+        info["version"] = info.get("semver") or SERVER_VERSION
+        info["status"] = "success"
+    return info
 
 # Rota estática universal para recursos da pasta /static/
 @app.get("/static/{filename:path}", include_in_schema=False)

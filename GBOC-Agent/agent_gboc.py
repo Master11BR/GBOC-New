@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-🚀 GBOC Agent 13.2.0 - Servidor Principal
+🚀 GBOC Agent 14.0.0 - Servidor Principal
 Servidor FastAPI com arquitetura modular limpa
 """
 
@@ -29,7 +29,7 @@ try:
     from version_control import __version__ as AGENT_VERSION, get_version_info, auto_increment_build
     auto_increment_build()
 except Exception:
-    AGENT_VERSION = "13.2.0"
+    AGENT_VERSION = "14.0.0"
     def get_version_info():
         return {"raw_version": AGENT_VERSION, "semver": AGENT_VERSION}
 
@@ -57,6 +57,32 @@ os.makedirs(LOGS_DIR, exist_ok=True)
 from logging.handlers import RotatingFileHandler
 import io
 
+class SafeRotatingFileHandler(RotatingFileHandler):
+    """RotatingFileHandler imune a PermissionError no Windows durante rotação de logs."""
+    def shouldRollover(self, record):
+        try:
+            return super().shouldRollover(record)
+        except PermissionError:
+            return False
+        except Exception:
+            return False
+
+    def doRollover(self):
+        try:
+            super().doRollover()
+        except PermissionError:
+            pass
+        except Exception:
+            pass
+
+    def emit(self, record):
+        try:
+            super().emit(record)
+        except PermissionError:
+            pass
+        except Exception:
+            pass
+
 class LocalTimeFormatter(logging.Formatter):
     converter = time.localtime
 
@@ -65,8 +91,8 @@ _log_formatter = LocalTimeFormatter(
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 
-# RotatingFileHandler: máx 10 MB por arquivo, mantém 5 backups
-_file_handler = RotatingFileHandler(
+# SafeRotatingFileHandler: máx 10 MB por arquivo, mantém 5 backups
+_file_handler = SafeRotatingFileHandler(
     os.path.join(LOGS_DIR, 'gboc_agent.log'),
     maxBytes=10 * 1024 * 1024,  # 10 MB
     backupCount=5,
@@ -80,7 +106,7 @@ _stream_handler = logging.StreamHandler(_safe_stdout)
 _stream_handler.setFormatter(_log_formatter)
 
 # Handler para stderr — captura erros de subprocessos e exceções não tratadas
-_stderr_handler = RotatingFileHandler(
+_stderr_handler = SafeRotatingFileHandler(
     os.path.join(LOGS_DIR, 'gboc_agent_errors.log'),
     maxBytes=5 * 1024 * 1024,  # 5 MB
     backupCount=3,
@@ -116,12 +142,15 @@ class _StderrToLogger:
     def write(self, msg):
         if not msg or not msg.strip():
             return
-        # Ignorar erros de close-notify do SSL que poluem o console/log (ruido inofensivo)
+        # Ignorar erros de close-notify do SSL e erros de rotação de log do Windows
         if (
             "APPLICATION_DATA_AFTER_CLOSE_NOTIFY" in msg
             or "application data after close notify" in msg
             or "TLSV1_ALERT_UNKNOWN_CA" in msg
             or "tlsv1 alert unknown ca" in msg
+            or "Logging error" in msg
+            or "PermissionError" in msg
+            or "shouldRollover" in msg
         ):
             return
         # Evitar recursão: se o logger falhar ao escrever, o erro volta aqui
@@ -177,12 +206,12 @@ except ImportError as e:
 async def lifespan(app: FastAPI):
     """Gerenciamento do ciclo de vida da aplicação"""
     logger.info("=" * 50)
-    logger.info("[STARTUP] GBOC Agent 13.2.0 - Servidor Iniciado")
+    logger.info("[STARTUP] GBOC Agent 14.0.0 - Servidor Iniciado")
     logger.info(f"[DATA] {DATA_DIR}")
     logger.info(f"[LOGS] {LOGS_DIR}")
     
     # Validar arquivos estáticos
-    static_files = ["index.html", "tasks.html", "repositories.html", "overview.html", "logs.html", "restore.html", "statistics.html", "settings.html", "diagnostic.html", "login.html", "ransomware.html", "compliance.html", "alerts.html", "replication.html", "users.html", "config-manager.html", "integrity.html", "audit.html", "notification-channels.html", "duplicati-native.html", "schema-check.html", "auth-diagnostic.html"]
+    static_files = ["index.html", "tasks.html", "repositories.html", "overview.html", "logs.html", "restore.html", "statistics.html", "settings.html", "diagnostic.html", "login.html", "ransomware.html", "compliance.html", "alerts.html", "replication.html", "users.html", "config-manager.html", "integrity.html", "audit.html", "notification-channels.html", "duplicati-native.html", "schema-check.html", "auth-diagnostic.html", "failed-jobs.html", "storage-usage.html", "import.html"]
     for f in static_files:
         path = os.path.join(BASE_DIR, "static", f)
         status = "[OK]" if os.path.exists(path) else "[WARN]"
@@ -543,9 +572,9 @@ API_MODULES = [
     ("api.fs", "router"),
     ("api.tasks_ops", "router"),
     ("api.smtp", "router"),  # ✅ Configuração SMTP
-    ("api.advanced_stats_api", "router"),  # ✅ Estatísticas avançadas 13.2.0
-    ("api.preemptive_api", "router"),  # ✅ Diagnóstico preemptivo 13.2.0
-    ("api.system_api", "router"),  # ✅ Sistema completo 13.2.0
+    ("api.advanced_stats_api", "router"),  # ✅ Estatísticas avançadas 14.0.0
+    ("api.preemptive_api", "router"),  # ✅ Diagnóstico preemptivo 14.0.0
+    ("api.system_api", "router"),  # ✅ Sistema completo 14.0.0
     ("api.auth", "router"),  # ✅ Autenticação
     ("api.export_api", "router"),  # ✅ Exportação de relatórios
     ("api.integrity_api", "router"),  # ✅ Verificação de integridade
@@ -1120,7 +1149,13 @@ async def serve_any_html_page(page_name: str):
 
 @app.get("/{file:path}.js", include_in_schema=False)
 async def serve_any_js_page(file: str):
-    fname = f"{file}.js" if not file.endswith(".js") else file
+    clean_p = (file or '').lstrip("/\\")
+    if clean_p.startswith("static/") or clean_p.startswith("static\\"):
+        clean_p = clean_p[7:]
+    fname = f"{clean_p}.js" if not clean_p.endswith(".js") else clean_p
+    static_file = os.path.join(os.path.dirname(__file__), "static", fname)
+    if os.path.isfile(static_file):
+        return FileResponse(static_file, media_type="application/javascript")
     srv_file = os.path.join(os.path.dirname(__file__), fname)
     if os.path.isfile(srv_file):
         return FileResponse(srv_file, media_type="application/javascript")
@@ -1128,7 +1163,13 @@ async def serve_any_js_page(file: str):
 
 @app.get("/{file:path}.css", include_in_schema=False)
 async def serve_any_css_page(file: str):
-    fname = f"{file}.css" if not file.endswith(".css") else file
+    clean_p = (file or '').lstrip("/\\")
+    if clean_p.startswith("static/") or clean_p.startswith("static\\"):
+        clean_p = clean_p[7:]
+    fname = f"{clean_p}.css" if not clean_p.endswith(".css") else clean_p
+    static_file = os.path.join(os.path.dirname(__file__), "static", fname)
+    if os.path.isfile(static_file):
+        return FileResponse(static_file, media_type="text/css")
     srv_file = os.path.join(os.path.dirname(__file__), fname)
     if os.path.isfile(srv_file):
         return FileResponse(srv_file, media_type="text/css")

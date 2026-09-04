@@ -1,4 +1,4 @@
-# GBOC System v13.2.0 Enterprise Edition
+# GBOC System v14.0.0 Enterprise Edition
 # Module: Server Settings Router
 
 import logging
@@ -30,7 +30,7 @@ def get_usd_to_brl_rate() -> float:
     try:
         req = urllib.request.Request(
             "https://economia.awesomeapi.com.br/json/last/USD-BRL",
-            headers={"User-Agent": "GBOC-System/13.2.0"}
+            headers={"User-Agent": "GBOC-System/14.0.0"}
         )
         with urllib.request.urlopen(req, timeout=3) as resp:
             if resp.status == 200:
@@ -61,7 +61,7 @@ async def get_server_settings():
     return JSONResponse({
         "status": "success",
         "settings": {
-            "server_title": "GBOC Operations Center v13.2.0 Enterprise",
+            "server_title": "GBOC Operations Center v14.0.0 Enterprise",
             "http_port": int(os.getenv("SERVER_PORT", "8000")),
             "ai_provider": os.getenv("GBOC_AI_PROVIDER", "ollama"),
             "ai_model": os.getenv("GBOC_AI_MODEL", "llama3"),

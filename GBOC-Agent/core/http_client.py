@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC Agent 13.2.0 - HTTP Client Singleton
+GBOC Agent 14.0.0 - HTTP Client Singleton
 """
 import httpx
 import logging

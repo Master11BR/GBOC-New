@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v13.2.0 Enterprise Edition
+# GBOC System v14.0.0 Enterprise Edition
 # Module: Disaster Recovery, P2V & Boot Media Engine
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================
@@ -502,7 +502,7 @@ attach vdisk
 
             # 4. Criação do Pacote .gbocdr e Manifesto
             manifest = {
-                "gboc_version": "13.2.0 Enterprise",
+                "gboc_version": "14.0.0 Enterprise",
                 "backup_type": "HOT_SYSTEM_STATE_AND_AD",
                 "hostname": sys_info.get("hostname"),
                 "domain": sys_info.get("domain_name"),
@@ -597,7 +597,7 @@ attach vdisk
 
             # Gerar arquivo ISO / Script descriptor
             with open(target_iso, "wb") as f:
-                f.write(b"GBOC_RECOVERY_ENVIRONMENT_BOOT_IMAGE_HEADER_v13.2.0\n" + b"\x00" * 4096)
+                f.write(b"GBOC_RECOVERY_ENVIRONMENT_BOOT_IMAGE_HEADER_v14.0.0\n" + b"\x00" * 4096)
 
             self._append_log(job_id, f"✅ Mídia de Boot ISO compilada com sucesso: {target_iso}")
             self._append_log(job_id, "🎉 Mídia pronta para gravação em Pendrive USB inicializável ou montagem em VM.")

@@ -1,4 +1,4 @@
-/* GBOC 13.2.0 Enterprise Edition — Interactive GBOC Copilot AI Chatbot Floating Widget */
+/* GBOC 14.0.0 Enterprise Edition — Interactive GBOC Copilot AI Chatbot Floating Widget */
 (function() {
     'use strict';
 
@@ -65,6 +65,7 @@
                     <div style="margin-bottom:14px">
                         <label style="font-size:0.8em;color:var(--text-muted,#7ea8cc);display:block;margin-bottom:6px">Provedor Ativo</label>
                         <select id="ai-provider-select" onchange="window.GBOC_AI_Assistant.onProviderChange()" style="width:100%;padding:10px;background:var(--bg-input,#111928);border:1px solid var(--border,#2a3f5f);color:var(--text,#dce8f5);border-radius:10px;font-size:0.88em">
+                            <option value="deepseek">DeepSeek (V3 / R1 Nuvem)</option>
                             <option value="ollama_local">Ollama Local (On-Premises / Off-line - Sem limite de tokens)</option>
                             <option value="groq_free">Groq Cloud (Llama 3.3 70B Versatile)</option>
                             <option value="gemini_free">Google Gemini API (Free / Enterprise)</option>
@@ -100,6 +101,7 @@
             const d = await r.json();
             if (d.config) {
                 const providerNames = {
+                    'deepseek': 'DeepSeek (V3 / R1 Nuvem)',
                     'ollama_local': 'Ollama Local (On-Premises)',
                     'groq_free': 'Groq (Llama 3.3 70B)',
                     'gemini_free': 'Google Gemini',
@@ -109,7 +111,7 @@
                 const badge = document.getElementById('ai-active-provider');
                 if (badge) badge.textContent = label;
                 const sel = document.getElementById('ai-provider-select');
-                if (sel) sel.value = d.config.provider || 'ollama_local';
+                if (sel) sel.value = d.config.provider || 'deepseek';
             }
         } catch(e) {}
     }
@@ -192,19 +194,25 @@
             const val = document.getElementById('ai-provider-select')?.value;
             const fields = document.getElementById('ai-provider-fields');
             if (!fields) return;
-            if (val === 'groq_free') {
-                fields.innerHTML = `<div style="margin-top:10px"><label style="font-size:0.8em;color:var(--text-muted);display:block;margin-bottom:4px">Groq API Key (Gratuito)</label><input type="password" id="cfg-groq-key" placeholder="gsk_..." style="width:100%;padding:8px;background:var(--bg-input);border:1px solid var(--border);color:var(--text);border-radius:8px"></div>`;
+            if (val === 'deepseek') {
+                fields.innerHTML = `<div style="margin-top:10px"><label style="font-size:0.8em;color:var(--text-muted);display:block;margin-bottom:4px">DeepSeek API Key (Nuvem)</label><input type="password" id="cfg-deepseek-key" placeholder="sk-..." style="width:100%;padding:8px;background:var(--bg-input);border:1px solid var(--border);color:var(--text);border-radius:8px"><div style="margin-top:6px;font-size:0.78em"><a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener noreferrer" style="color:var(--primary,#4fa3e8);text-decoration:none;font-weight:600"><i class="fas fa-external-link-alt"></i> Obter API Key oficial do DeepSeek (platform.deepseek.com)</a></div></div>`;
+            } else if (val === 'groq_free') {
+                fields.innerHTML = `<div style="margin-top:10px"><label style="font-size:0.8em;color:var(--text-muted);display:block;margin-bottom:4px">Groq API Key (Gratuito)</label><input type="password" id="cfg-groq-key" placeholder="gsk_..." style="width:100%;padding:8px;background:var(--bg-input);border:1px solid var(--border);color:var(--text);border-radius:8px"><div style="margin-top:6px;font-size:0.78em"><a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer" style="color:var(--primary,#4fa3e8);text-decoration:none;font-weight:600"><i class="fas fa-external-link-alt"></i> Obter API Key gratuita no Groq Cloud (console.groq.com)</a></div></div>`;
             } else if (val === 'gemini_free') {
-                fields.innerHTML = `<div style="margin-top:10px"><label style="font-size:0.8em;color:var(--text-muted);display:block;margin-bottom:4px">Google Gemini API Key</label><input type="password" id="cfg-gemini-key" placeholder="AIzaSy..." style="width:100%;padding:8px;background:var(--bg-input);border:1px solid var(--border);color:var(--text);border-radius:8px"></div>`;
+                fields.innerHTML = `<div style="margin-top:10px"><label style="font-size:0.8em;color:var(--text-muted);display:block;margin-bottom:4px">Google Gemini API Key</label><input type="password" id="cfg-gemini-key" placeholder="AIzaSy..." style="width:100%;padding:8px;background:var(--bg-input);border:1px solid var(--border);color:var(--text);border-radius:8px"><div style="margin-top:6px;font-size:0.78em"><a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" style="color:var(--primary,#4fa3e8);text-decoration:none;font-weight:600"><i class="fas fa-external-link-alt"></i> Obter API Key gratuita no Google AI Studio (aistudio.google.com)</a></div></div>`;
             } else if (val === 'openai') {
-                fields.innerHTML = `<div style="margin-top:10px"><label style="font-size:0.8em;color:var(--text-muted);display:block;margin-bottom:4px">OpenAI API Key</label><input type="password" id="cfg-openai-key" placeholder="sk-..." style="width:100%;padding:8px;background:var(--bg-input);border:1px solid var(--border);color:var(--text);border-radius:8px"></div>`;
+                fields.innerHTML = `<div style="margin-top:10px"><label style="font-size:0.8em;color:var(--text-muted);display:block;margin-bottom:4px">OpenAI API Key</label><input type="password" id="cfg-openai-key" placeholder="sk-..." style="width:100%;padding:8px;background:var(--bg-input);border:1px solid var(--border);color:var(--text);border-radius:8px"><div style="margin-top:6px;font-size:0.78em"><a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" style="color:var(--primary,#4fa3e8);text-decoration:none;font-weight:600"><i class="fas fa-external-link-alt"></i> Obter API Key na OpenAI (platform.openai.com)</a></div></div>`;
             } else {
-                fields.innerHTML = `<div style="margin-top:10px"><label style="font-size:0.8em;color:var(--text-muted);display:block;margin-bottom:4px">URL Ollama Local</label><input type="text" id="cfg-ollama-url" value="http://localhost:11434" style="width:100%;padding:8px;background:var(--bg-input);border:1px solid var(--border);color:var(--text);border-radius:8px"></div>`;
+                fields.innerHTML = `<div style="margin-top:10px"><label style="font-size:0.8em;color:var(--text-muted);display:block;margin-bottom:4px">URL Ollama Local</label><input type="text" id="cfg-ollama-url" value="http://localhost:11434" style="width:100%;padding:8px;background:var(--bg-input);border:1px solid var(--border);color:var(--text);border-radius:8px"><div style="margin-top:6px;font-size:0.78em"><a href="https://ollama.com/download" target="_blank" rel="noopener noreferrer" style="color:var(--primary,#4fa3e8);text-decoration:none;font-weight:600"><i class="fas fa-external-link-alt"></i> Baixar / Gerenciar Ollama Local (ollama.com)</a></div></div>`;
             }
         },
         async saveConfig() {
             const val = document.getElementById('ai-provider-select')?.value;
             const body = {provider: val};
+            if (val === 'deepseek') {
+                body.deepseek_api_key = document.getElementById('cfg-deepseek-key')?.value || '';
+                body.api_key = body.deepseek_api_key;
+            }
             if (val === 'groq_free') body.groq_api_key = document.getElementById('cfg-groq-key')?.value || '';
             if (val === 'gemini_free') body.gemini_api_key = document.getElementById('cfg-gemini-key')?.value || '';
             if (val === 'openai') body.openai_api_key = document.getElementById('cfg-openai-key')?.value || '';

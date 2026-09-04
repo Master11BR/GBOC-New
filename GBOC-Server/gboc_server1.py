@@ -1,5 +1,5 @@
 """
-GBOC Server 13.2.0
+GBOC Server 14.0.0
 Servidor Central — Real-time Agent Communication + Complete Data Sync + Advanced Analytics
 Banco de dados: PostgreSQL (oficial)
 """
@@ -32,7 +32,7 @@ import uvicorn
 # CONFIGURAÇÃO
 # ===========================
 
-SERVER_VERSION = "13.2.0"
+SERVER_VERSION = "14.0.0"
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 os.makedirs(DATA_DIR, exist_ok=True)

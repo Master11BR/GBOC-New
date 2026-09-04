@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC Server v13.2.0 — Job Alert Monitor APIRouter
+GBOC Server v14.0.0 — Job Alert Monitor APIRouter
 Módulo estrito para gerenciamento e consolidação de alertas de falhas de jobs.
 """
 

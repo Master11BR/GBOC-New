@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v13.2.0 Enterprise Edition
+# GBOC System v14.0.0 Enterprise Edition
 # PowerShell Launcher: GBOC Scheduler Agent & Background Task Runner
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================
@@ -13,7 +13,7 @@ $AgentDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location -Path $AgentDir
 
 Write-Host "======================================================================" -ForegroundColor Cyan
-Write-Host "  GBOC System v13.2.0 - Agente Autonomo de Backup e Restore Agendado  " -ForegroundColor Cyan
+Write-Host "  GBOC System v14.0.0 - Agente Autonomo de Backup e Restore Agendado  " -ForegroundColor Cyan
 Write-Host "======================================================================" -ForegroundColor Cyan
 Write-Host ""
 

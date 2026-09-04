@@ -1,8 +1,8 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v13.2.0 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.0.0 Enterprise. Todos os direitos reservados. -->
 
-# 📘 GBOC System v13.2.0 — Guia Master de Configurações, Parâmetros e Controle de IA
+# 📘 GBOC System v14.0.0 — Guia Master de Configurações, Parâmetros e Controle de IA
 
-[![GBOC Version](https://img.shields.io/badge/GBOC%20Version-13.2.0-blue.svg)](file:///d:/GBOC-New/GBOC-New/README.md)
+[![GBOC Version](https://img.shields.io/badge/GBOC%20Version-14.0.0-blue.svg)](file:///d:/GBOC-New/GBOC-New/README.md)
 [![Status](https://img.shields.io/badge/status-active-brightgreen.svg)]()
 
 > **Manual Técnico Central de Configuração, Parâmetros e Diretrizes de IA do GBOC (Gestão & Backup Operations Center)**. Este documento serve como o guia oficial e autoritativo de parâmetros para administradores de sistemas, engenheiros de DevOps e agentes de IA.
@@ -127,7 +127,7 @@ As configurações do servidor são gerenciadas pela API REST `/api/v1/server/se
 O `SharedCore` é o orquestrador nativo do Agente.
 
 ### Recursos Configuráveis:
-1. **Ransomware Shield v13.2.0**:
+1. **Ransomware Shield v14.0.0**:
    - Cria arquivos canário estratégicos (`.gboc_canary_repos`).
    - Bloqueia automaticamente processos suspeitos que tentem modificar canários em massa.
 2. **Duplicati Native Engine**:
@@ -179,4 +179,4 @@ cd d:\GBOC-New\GBOC-New\GBOC-Server
 
 ---
 
-**GBOC System v13.2.0** — Guia Oficial de Parâmetros e Configuração.
+**GBOC System v14.0.0** — Guia Oficial de Parâmetros e Configuração.

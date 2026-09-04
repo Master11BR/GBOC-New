@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v13.2.0 Enterprise Edition
+# GBOC System v14.0.0 Full Stable Enterprise Edition
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # Propriedade Intelectual & Direitos Autorais Registrados.
 # A cópia, distribuição ou modificação não autorizada é estritamente proibida.
@@ -21,10 +21,10 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 VERSION_FILE = os.path.join(BASE_DIR, "data", "version_info.json")
 
 # Configuração Base SemVer
-MAJOR = 13
-MINOR = 1
-PATCH = 2
-PRERELEASE = "enterprise"
+MAJOR = 14
+MINOR = 0
+PATCH = 0
+PRERELEASE = "full-stable"
 
 def _get_git_info() -> Dict[str, str]:
     """Obtém informações em tempo real do repositório Git."""
@@ -142,7 +142,7 @@ def get_version_info() -> Dict[str, Any]:
         "last_updated": meta.get("last_updated"),
         "release_channel": "Enterprise Stable",
         "compatibility": {
-            "min_server_version": "13.2.0",
+            "min_server_version": "14.0.0",
             "recommended_server_version": raw_version,
             "protocol_version": "2.1"
         }

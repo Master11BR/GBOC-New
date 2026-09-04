@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v13.2.0 Enterprise Edition
+# GBOC System v14.0.0 Enterprise Edition
 # Module: Agent Disaster Recovery Router
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================
@@ -271,7 +271,7 @@ async def export_dr_plan(request: Request):
         "status": "success",
         "message": "Plano de DR exportado com sucesso.",
         "dr_plan": {
-            "version": "13.2.0 Enterprise",
+            "version": "14.0.0 Enterprise",
             "system": sys_info,
             "disks": disks,
             "readiness": readiness,

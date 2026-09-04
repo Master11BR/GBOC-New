@@ -1,17 +1,17 @@
 <#
 ==============================================================================
-GBOC System v13.2.0 Enterprise Edition
+GBOC System v14.0.0 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
 #>
 
 # ========================================
-# GBOC Server v13.2.0 - Inicializacao
+# GBOC Server v14.0.0 - Inicializacao
 # ========================================
 
 Write-Host "`n========================================" -ForegroundColor Cyan
-Write-Host "  GBOC Server v13.2.0 - Iniciando..." -ForegroundColor Cyan
+Write-Host "  GBOC Server v14.0.0 - Iniciando..." -ForegroundColor Cyan
 Write-Host "========================================`n" -ForegroundColor Cyan
 
 $PythonExe = $null
@@ -47,7 +47,7 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-Write-Host "[OK] Iniciando GBOC Server v13.2.0..." -ForegroundColor Green
+Write-Host "[OK] Iniciando GBOC Server v14.0.0..." -ForegroundColor Green
 Write-Host "Comando Python: $PythonExe $($PythonBaseArgs -join ' ')`n" -ForegroundColor Gray
 
 Write-Host "Servidor disponivel em:" -ForegroundColor Yellow

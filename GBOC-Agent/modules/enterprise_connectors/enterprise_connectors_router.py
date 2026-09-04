@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v13.2.0 Enterprise Edition
+# GBOC System v14.0.0 Enterprise Edition
 # Module: Enterprise Connectors, CDP, Tape Robotics & Compliance Router
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================

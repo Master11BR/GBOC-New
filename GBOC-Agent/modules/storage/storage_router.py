@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""GBOC 13.2.0 - Storage Usage & Growth Monitor API Router (Módulo Estrito)"""
+"""GBOC 14.0.0 - Storage Usage & Growth Monitor API Router (Módulo Estrito)"""
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
@@ -9,10 +9,10 @@ router = APIRouter(prefix="/api/v1/storage", tags=["Storage Monitor"])
 
 @router.get("/usage")
 async def get_current_usage():
-    """Retorna o uso atual de todos os repositórios ativos com dados reais do sistema de arquivos."""
-    from engines.storage_monitor import collect_repository_sizes
-    data = collect_repository_sizes()
-    return JSONResponse({"status": "success", "repositories": data})
+    """Retorna o uso atual de todos os repositórios ativos e agregados por motor (Local e Destino)."""
+    from engines.storage_monitor import get_storage_summary_by_engine
+    summary = get_storage_summary_by_engine()
+    return JSONResponse({"status": "success", "repositories": summary["repositories"], "by_engine": summary["by_engine"], "totals": summary["totals"]})
 
 @router.get("/history")
 async def get_history(days: int = 30, repository_id: Optional[str] = None):

@@ -40,6 +40,32 @@ class TextFormatter(logging.Formatter):
             f"{record.message} - {record.module}:{record.lineno}"
         )
 
+class SafeRotatingFileHandler(RotatingFileHandler):
+    """RotatingFileHandler imune a PermissionError no Windows durante rotação de logs."""
+    def shouldRollover(self, record):
+        try:
+            return super().shouldRollover(record)
+        except PermissionError:
+            return False
+        except Exception:
+            return False
+
+    def doRollover(self):
+        try:
+            super().doRollover()
+        except PermissionError:
+            pass
+        except Exception:
+            pass
+
+    def emit(self, record):
+        try:
+            super().emit(record)
+        except PermissionError:
+            pass
+        except Exception:
+            pass
+
 def setup_logger(name: str) -> logging.Logger:
     """
     Configura um logger com suporte a arquivo e console
@@ -72,7 +98,7 @@ def setup_logger(name: str) -> logging.Logger:
     try:
         os.makedirs(LOG_DIR, exist_ok=True)
         os.makedirs(os.path.dirname(os.path.abspath(LOG_FILE)), exist_ok=True)
-        file_handler = RotatingFileHandler(
+        file_handler = SafeRotatingFileHandler(
             LOG_FILE,
             maxBytes=LOG_MAX_SIZE_MB * 1024 * 1024,
             backupCount=LOG_BACKUP_COUNT,

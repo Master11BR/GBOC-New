@@ -1,8 +1,8 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v13.2.0 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.0.0 Enterprise. Todos os direitos reservados. -->
 
-# TODO: Consolidação do Sistema GBOC (v13.2.0)
+# TODO: Consolidação do Sistema GBOC (v14.0.0)
 
-## Status: ✅ Concluído (Release v13.2.0)
+## Status: ✅ Concluído (Release v14.0.0)
 
 ### 1. Migração do Modelo de Repositório ✅ COMPLETED
 - [x] Criar modelos separados LocalRepository e CloudRepository em models.py
@@ -31,12 +31,12 @@
 - [x] Integração completa com `TaskManager` e `SharedCore`
 
 ### 5. Unificação de Versão e Suíte de Testes ✅ COMPLETED
-- [x] Sincronização global da versão **13.2.0** via `version_unifier.py`
+- [x] Sincronização global da versão **14.0.0** via `version_unifier.py`
 - [x] Suíte de testes do servidor `GBOC-Server/tests.py` 100% aprovada
 - [x] Compatibilidade com Pydantic v2 e suporte a codificação UTF-8 no Windows
 
 ### 6. Documentação ✅ COMPLETED
 - [x] Reformulação do `README.md` principal na raiz
-- [x] Atualização do `INSTALADORES_README.md` para v13.2.0 (Agosto/2026)
+- [x] Atualização do `INSTALADORES_README.md` para v14.0.0 (Agosto/2026)
 - [x] Registro detalhado das melhorias no `CHANGELOG.md`
 

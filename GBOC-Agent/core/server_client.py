@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-🌐 GBOC Agent 13.2.0 - CENTRAL SERVER CLIENT
+🌐 GBOC Agent 14.0.0 - CENTRAL SERVER CLIENT
 Cliente para comunicação com servidor GBOC central
 """
 
@@ -404,7 +404,7 @@ class CentralServerClient:
                 "agent_id": self.agent_id,
                 "hostname": socket.gethostname(),
                 "platform": os.name,
-                "version": "13.2.0",
+                "version": "14.0.0",
                 "registered_at": datetime.now().isoformat(),
                 "tenant_id": self.tenant_id
             }
@@ -906,7 +906,7 @@ class CentralServerClient:
                 "agent_id": self.agent_id,
                 "hostname": socket.gethostname(),
                 "status": "online",
-                "version": "13.2.0",
+                "version": "14.0.0",
                 "ip_address": self._get_local_ip() + ":9200",  # Endereço real do agente
                 "cpu_usage": cpu_percent,
                 "ram_usage": memory.percent,

@@ -771,6 +771,91 @@ class DuplicatiNativeService:
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
+    # ──────────────────────────────────────────────
+    # Gerenciamento Completo de Backups (Create, Delete, Repair, Verify, Compact)
+    # ──────────────────────────────────────────────
+
+    def create_backup(self, backup_payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Cria ou atualiza uma configuração completa de backup no Duplicati."""
+        cfg = self.load_config()
+        try:
+            name = backup_payload.get("name", "Novo Backup Duplicati")
+            sources = backup_payload.get("sources", ["C:\\Backups"])
+            target_url = backup_payload.get("target_url", "file://C:\\Backups")
+            passphrase = backup_payload.get("passphrase", "")
+
+            # Formatar payload padrão do Duplicati
+            backup_obj = {
+                "Name": name,
+                "Description": backup_payload.get("description", "Criado via GBOC Interface"),
+                "TargetURL": target_url,
+                "Settings": [
+                    {"Name": "encryption-module", "Value": "aes" if passphrase else "none"},
+                    {"Name": "passphrase", "Value": passphrase} if passphrase else {}
+                ],
+                "Sources": sources
+            }
+            schedule_obj = {
+                "Time": backup_payload.get("schedule_time", "1970-01-01T02:00:00"),
+                "Repeat": backup_payload.get("schedule_repeat", "1D"),
+                "AllowedDays": backup_payload.get("allowed_days", [])
+            }
+
+            payload = {"Backup": backup_obj, "Schedule": schedule_obj}
+            resp = self._api_post(cfg, "api/v1/backups", json_body=payload)
+            if resp.status_code in (200, 201):
+                return {"status": "success", "message": f"Backup '{name}' criado com sucesso!", "data": resp.json() if resp.text else {}}
+            return {"status": "error", "message": f"HTTP {resp.status_code}", "detail": resp.text[:300]}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    def delete_backup(self, backup_id: str, delete_remote_files: bool = False) -> Dict[str, Any]:
+        """Exclui um job de backup do Duplicati."""
+        cfg = self.load_config()
+        try:
+            url_path = f"api/v1/backup/{backup_id}?delete-remote-files={'true' if delete_remote_files else 'false'}"
+            self._ensure_authenticated(cfg)
+            headers = {"X-XSRF-Token": self._xsrf_token or ""}
+            resp = self._session.delete(self._build_url(cfg, url_path), headers=headers, timeout=cfg.timeout_seconds, verify=cfg.verify_tls)
+            if resp.status_code in (200, 204):
+                return {"status": "success", "message": f"Backup {backup_id} excluído com sucesso."}
+            return {"status": "error", "message": f"HTTP {resp.status_code}", "detail": resp.text[:300]}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    def repair_backup(self, backup_id: str) -> Dict[str, Any]:
+        """Executa a reconstrução/reparo do banco local do backup."""
+        cfg = self.load_config()
+        try:
+            resp = self._api_post(cfg, f"api/v1/backup/{backup_id}/repair")
+            if resp.status_code == 200:
+                return {"status": "success", "message": f"Reparo do banco de dados do backup {backup_id} iniciado."}
+            return {"status": "error", "message": f"HTTP {resp.status_code}", "detail": resp.text[:300]}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    def verify_backup(self, backup_id: str) -> Dict[str, Any]:
+        """Verifica a integridade e a conexão com o destino remoto."""
+        cfg = self.load_config()
+        try:
+            resp = self._api_post(cfg, f"api/v1/backup/{backup_id}/verify")
+            if resp.status_code == 200:
+                return {"status": "success", "message": f"Verificação do destino do backup {backup_id} disparada com sucesso!"}
+            return {"status": "error", "message": f"HTTP {resp.status_code}", "detail": resp.text[:300]}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    def compact_backup(self, backup_id: str) -> Dict[str, Any]:
+        """Compacta e limpa blocos órfãos no destino do backup."""
+        cfg = self.load_config()
+        try:
+            resp = self._api_post(cfg, f"api/v1/backup/{backup_id}/compact")
+            if resp.status_code == 200:
+                return {"status": "success", "message": f"Compactação do backup {backup_id} iniciada."}
+            return {"status": "error", "message": f"HTTP {resp.status_code}", "detail": resp.text[:300]}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
 
 _service: Optional[DuplicatiNativeService] = None
 

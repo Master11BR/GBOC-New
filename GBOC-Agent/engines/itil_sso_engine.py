@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v13.2.0 Enterprise Edition
+# GBOC System v14.0.0 Enterprise Edition
 # Module: ITIL ITSM Webhooks (ServiceNow, Jira) & Enterprise SAML/OIDC SSO
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================

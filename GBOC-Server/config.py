@@ -11,7 +11,7 @@ from datetime import timedelta
 try:
     from version_control import __version__ as SERVER_VERSION, get_version_info
 except Exception:
-    SERVER_VERSION = "13.2.0"
+    SERVER_VERSION = "14.0.0"
 API_VERSION = "v1"
 SERVER_NAME = os.getenv("SERVER_NAME", "GBOC Server")
 SERVER_ENVIRONMENT = os.getenv("SERVER_ENV", "development")

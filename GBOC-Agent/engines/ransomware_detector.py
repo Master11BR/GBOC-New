@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 13.2.0 - Ransomware Detector Engine (Multi-Engine Integrated Stack)
+GBOC 14.0.0 - Ransomware Detector Engine (Multi-Engine Integrated Stack)
 Integrates 7 Security Tools with REAL System Detection (NO Mocked / Simulated Data):
   1. ClamAV (Signature Antivirus Engine)
   2. Armadito Antivirus (Endpoint Heuristic Analyzer)

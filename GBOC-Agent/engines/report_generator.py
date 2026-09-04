@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 13.2.0 - Report Generator Engine
+GBOC 14.0.0 - Report Generator Engine
 Generates HTML/PDF reports for backup operations, SLA, capacity, executive summary.
 """
 
@@ -388,7 +388,7 @@ def generate_executive_summary(days: int = 30) -> str:
 
     html += f"""
 <div class="footer">
-  GBOC Agent 13.2.0 — Relatório gerado automaticamente em {now.strftime('%d/%m/%Y %H:%M:%S')}
+  GBOC Agent 14.0.0 — Relatório gerado automaticamente em {now.strftime('%d/%m/%Y %H:%M:%S')}
 </div>
 </div></body></html>"""
     return html
@@ -425,7 +425,7 @@ def generate_sla_report(days: int = 30) -> str:
         <td>{_fmt_date(s.get('last_success'))}</td><td>{_fmt_date(s.get('last_failure'))}</td></tr>"""
 
     html += f"""</tbody></table></div>
-<div class="footer">GBOC Agent 13.2.0 — Relatório SLA gerado em {now.strftime('%d/%m/%Y %H:%M:%S')}</div>
+<div class="footer">GBOC Agent 14.0.0 — Relatório SLA gerado em {now.strftime('%d/%m/%Y %H:%M:%S')}</div>
 </div></body></html>"""
     return html
 
@@ -480,7 +480,7 @@ def generate_capacity_report() -> str:
         <td><span class="badge {st}">{r['status']}</span></td><td>{r.get('task_count',0)}</td></tr>"""
 
     html += f"""</tbody></table></div>
-<div class="footer">GBOC Agent 13.2.0 — Relatório de Capacidade gerado em {now.strftime('%d/%m/%Y %H:%M:%S')}</div>
+<div class="footer">GBOC Agent 14.0.0 — Relatório de Capacidade gerado em {now.strftime('%d/%m/%Y %H:%M:%S')}</div>
 </div></body></html>"""
     return html
 
@@ -522,7 +522,7 @@ def generate_error_report(days: int = 30) -> str:
             </div>"""
         html += "</div>"
 
-    html += f"""<div class="footer">GBOC Agent 13.2.0 — Relatório de Erros gerado em {now.strftime('%d/%m/%Y %H:%M:%S')}</div>
+    html += f"""<div class="footer">GBOC Agent 14.0.0 — Relatório de Erros gerado em {now.strftime('%d/%m/%Y %H:%M:%S')}</div>
 </div></body></html>"""
     return html
 

@@ -1,11 +1,11 @@
 # ==============================================================================
-# GBOC System v13.2.0 Enterprise Edition
+# GBOC System v14.0.0 Enterprise Edition
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # Propriedade Intelectual & Direitos Autorais Registrados.
 # ==============================================================================
 
 """
-GBOC Server Real AI Diagnostic Engine v13.2.0 Enterprise
+GBOC Server Real AI Diagnostic Engine v14.0.0 Enterprise
 Integração de Inteligência Preditiva no Servidor Central para Diagnósticos de Agentes, Backups, SLA e Segurança.
 Suporta: Ollama Local, Grok 70B, Google Gemini, OpenAI GPT-4o, DeepSeek, Kimi, Mistral e Motor Heurístico Server.
 """
@@ -109,7 +109,7 @@ class ServerAIDiagnosticEngine:
         is_test = "teste" in error_context.lower()
 
         # Prompt estruturado para o Servidor Central
-        prompt = f"""Você é o Assistente Especialista de Inteligência Artificial do GBOC Server Central v13.2.0 Enterprise.
+        prompt = f"""Você é o Assistente Especialista de Inteligência Artificial do GBOC Server Central v14.0.0 Enterprise.
 Analise a seguinte falha de backup/sistema/agente e forneça o diagnóstico exato da causa raiz e a solução em 1 clique.
 
 ERRO REGISTRADO NO SERVIDOR CENTRAL:

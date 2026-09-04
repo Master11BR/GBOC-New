@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 13.2.0 - GBOC Copilot AI Assistant API
+GBOC 14.0.0 - GBOC Copilot AI Assistant API
 Endpoints for multi-provider AI chat, provider configuration, and node diagnostics.
 """
 

@@ -1,6 +1,6 @@
 /*
 ==============================================================================
-GBOC System v13.2.0 Enterprise Edition
+GBOC System v14.0.0 Enterprise Edition
 Layout & Navigation Manager — Controls Dual Layout Engine (Vertical/Horizontal)
 and Color Themes across all resolutions (1024px, 720p HD, 1080p FHD, 4K UHD).
 Zero-Overflow & Smart Sidebar Presence Detection.
@@ -11,14 +11,22 @@ Zero-Overflow & Smart Sidebar Presence Detection.
     'use strict';
 
     if (typeof window.GBOC_API_BASE === 'undefined') {
-        const isAgent = window.location.pathname.includes('/settings.html') ||
+        const isAgent = window.location.port === '9200' ||
+                        window.location.port === '8081' ||
+                        window.location.pathname.includes('/replication.html') ||
+                        window.location.pathname.includes('/failed-jobs.html') ||
+                        window.location.pathname.includes('/storage-usage.html') ||
+                        window.location.pathname.includes('/settings.html') ||
                         window.location.pathname.includes('/tasks.html') ||
                         window.location.pathname.includes('/diagnostic.html') ||
                         window.location.pathname.includes('/reports.html') ||
                         window.location.pathname.includes('/repositories.html') ||
                         window.location.pathname.includes('/restore.html') ||
-                        window.location.pathname.includes('/index.html') ||
-                        window.location.port === '8081';
+                        window.location.pathname.includes('/alerts.html') ||
+                        window.location.pathname.includes('/ransomware.html') ||
+                        window.location.pathname.includes('/compliance.html') ||
+                        window.location.pathname.includes('/audit.html') ||
+                        window.location.pathname.includes('/index.html');
 
         if (isAgent) {
             window.GBOC_API_BASE = (window.location.protocol === 'https:' || window.location.port === '8081' ? 'https:' : window.location.protocol) + '//' + window.location.hostname + ':' + (window.location.port === '8081' ? '9200' : (window.location.port || '9200'));
@@ -88,6 +96,34 @@ Zero-Overflow & Smart Sidebar Presence Detection.
         _updatePanelActiveStates();
     }
 
+    let _sidebarHtml = null;
+    const SIDEBAR_URL = '/static/_sidebar.html';
+
+    async function _injectSidebar() {
+        if (_currentLayout !== 'vertical') return;
+        if (!document.querySelector('.sidebar, aside.sidebar')) {
+            try {
+                if (!_sidebarHtml) {
+                    const r = await fetch(SIDEBAR_URL);
+                    if (r.ok) {
+                        _sidebarHtml = await r.text();
+                    }
+                }
+                if (_sidebarHtml) {
+                    const topbar = document.getElementById('gboc-topbar');
+                    if (topbar) {
+                        topbar.insertAdjacentHTML('afterend', _sidebarHtml);
+                    } else {
+                        document.body.insertAdjacentHTML('afterbegin', _sidebarHtml);
+                    }
+                    _checkSidebarPresence();
+                }
+            } catch (e) {
+                console.warn('[GBOCLayout] Falha ao injetar sidebar:', e);
+            }
+        }
+    }
+
     // ── Fetch & inject topbar & hero backdrop ─────────────────────────────────
     async function _injectTopbar() {
         if (!document.getElementById('gboc-hero-bg')) {
@@ -113,6 +149,7 @@ Zero-Overflow & Smart Sidebar Presence Detection.
             }
         }
 
+        await _injectSidebar();
         _checkSidebarPresence();
         _markActiveTopbarLink();
         _setupTopbarAuth();

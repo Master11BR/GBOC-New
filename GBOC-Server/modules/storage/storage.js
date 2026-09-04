@@ -1,5 +1,5 @@
 /**
- * GBOC Server v13.2.0 — Storage Module UI Script
+ * GBOC Server v14.0.0 — Storage Module UI Script
  */
 
 let serverStorageChartInstance = null;
@@ -16,6 +16,37 @@ async function loadServerStorageData() {
             document.getElementById('srv-storage-used').textContent = (summary.total_used_gb || 0) + ' GB';
             document.getElementById('srv-storage-free').textContent = (summary.total_free_gb || 0) + ' GB';
             document.getElementById('srv-storage-percent').textContent = (summary.used_percent || 0) + '% utilizado';
+
+            // Renderizar consumo por motor
+            const engineGrid = document.getElementById('srv-engine-storage-grid');
+            if (engineGrid && data.by_engine) {
+                if (data.by_engine.length === 0) {
+                    engineGrid.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);grid-column:1/-1">Nenhum motor registrado.</div>';
+                } else {
+                    engineGrid.innerHTML = data.by_engine.map(eng => `
+                        <div style="background:var(--bg-input);border:1px solid var(--border);border-radius:10px;padding:14px">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                                <strong style="font-size:0.95em"><i class="fas fa-microchip" style="color:var(--primary)"></i> ${eng.display_name}</strong>
+                                <span class="badge badge-info">${eng.repo_count} Repo(s)</span>
+                            </div>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.85em;background:var(--bg-card);padding:10px;border-radius:6px;border:1px solid var(--border)">
+                                <div>
+                                    <div style="color:var(--text-muted);font-size:0.75em"><i class="fas fa-folder"></i> Disco Local</div>
+                                    <div style="font-weight:700;color:var(--text);font-size:1.1em">${(eng.local_gb || 0).toFixed(2)} GB</div>
+                                </div>
+                                <div>
+                                    <div style="color:var(--text-muted);font-size:0.75em"><i class="fas fa-cloud" style="color:var(--accent)"></i> Gasto Nuvem</div>
+                                    <div style="font-weight:700;color:var(--accent);font-size:1.1em">${(eng.cloud_gb || 0).toFixed(2)} GB</div>
+                                </div>
+                                <div style="grid-column:1/-1;border-top:1px solid var(--border);padding-top:4px;display:flex;justify-content:space-between">
+                                    <span style="font-size:0.75em;color:var(--text-muted)">Repo Local: ${(eng.local_repo_gb || 0).toFixed(2)} GB</span>
+                                    <span style="font-size:0.75em;color:var(--primary);font-weight:600">Total: ${(eng.destination_gb || 0).toFixed(2)} GB</span>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            }
 
             const tbody = document.getElementById('table-server-storage');
             if (tbody) {

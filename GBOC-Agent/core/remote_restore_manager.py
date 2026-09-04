@@ -1,13 +1,13 @@
 """
 # ==============================================================================
-# GBOC System v13.2.0 Enterprise Edition
+# GBOC System v14.0.0 Enterprise Edition
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # Propriedade Intelectual & Direitos Autorais Registrados.
 # A cópia, distribuição ou modificação não autorizada é estritamente proibida.
 # ==============================================================================
 
 """
-GBOC Remote Restore Manager v13.2.0 Enterprise
+GBOC Remote Restore Manager v14.0.0 Enterprise
 Orquestração de Monitoramento e Restauração Remota de Arquivos entre Agentes na Rede.
 """
 

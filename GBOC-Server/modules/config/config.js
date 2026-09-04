@@ -1,5 +1,5 @@
 // ==============================================================================
-// GBOC System v13.2.0 Enterprise Edition
+// GBOC System v14.0.0 Enterprise Edition
 // Module: Config & IA & LLMs Controller (config.js)
 // ==============================================================================
 
@@ -41,6 +41,7 @@ function toggleAiFields() {
     const ollamaGroup = document.getElementById('group-ollama-host');
     const apiKeyGroup = document.getElementById('group-api-key');
     const modelInput = document.getElementById('ai-model');
+    const apiKeyLinkDiv = document.getElementById('ai-api-key-link');
 
     const defaultModels = {
         ollama: 'llama3',
@@ -56,8 +57,29 @@ function toggleAiFields() {
         cohere: 'command-r-plus'
     };
 
+    const providerKeyLinks = {
+        deepseek: { url: 'https://platform.deepseek.com/api_keys', label: '🔗 Clique aqui para gerar sua API Key no portal DeepSeek (platform.deepseek.com/api_keys)' },
+        openai: { url: 'https://platform.openai.com/api-keys', label: '🔗 Clique aqui para gerar sua API Key na OpenAI (platform.openai.com/api-keys)' },
+        gemini: { url: 'https://aistudio.google.com/app/apikey', label: '🔗 Clique aqui para gerar sua API Key gratuita no Google AI Studio (aistudio.google.com)' },
+        groq_free: { url: 'https://console.groq.com/keys', label: '🔗 Clique aqui para gerar sua API Key gratuita no Groq Cloud (console.groq.com/keys)' },
+        claude: { url: 'https://console.anthropic.com/settings/keys', label: '🔗 Clique aqui para gerar sua API Key no Anthropic Claude (console.anthropic.com)' },
+        kimi: { url: 'https://platform.moonshot.cn/console/api-keys', label: '🔗 Clique aqui para gerar sua API Key no Kimi Moonshot (platform.moonshot.cn)' },
+        grok: { url: 'https://console.x.ai/', label: '🔗 Clique aqui para gerar sua API Key no Grok xAI (console.x.ai)' },
+        mistral: { url: 'https://console.mistral.ai/api-keys/', label: '🔗 Clique aqui para gerar sua API Key no Mistral AI (console.mistral.ai)' },
+        cohere: { url: 'https://dashboard.cohere.com/api-keys', label: '🔗 Clique aqui para gerar sua API Key no Cohere (dashboard.cohere.com)' }
+    };
+
     if (modelInput && defaultModels[provider]) {
         modelInput.placeholder = `Ex: ${defaultModels[provider]}`;
+    }
+
+    if (apiKeyLinkDiv) {
+        const linkInfo = providerKeyLinks[provider];
+        if (linkInfo) {
+            apiKeyLinkDiv.innerHTML = `<a href="${linkInfo.url}" target="_blank" rel="noopener noreferrer" style="color:var(--primary,#4fa3e8);text-decoration:none;font-weight:600"><i class="fas fa-external-link-alt" style="margin-right:4px"></i> ${linkInfo.label}</a>`;
+        } else {
+            apiKeyLinkDiv.innerHTML = '';
+        }
     }
 
     if (provider === 'ollama' || provider === 'qwen' || provider === 'llama3') {
@@ -247,6 +269,7 @@ async function saveAiSettings(silent=false) {
         model: document.getElementById('ai-model').value,
         ollama_model: document.getElementById('ai-model').value,
         api_key: document.getElementById('ai-api-key').value,
+        deepseek_api_key: document.getElementById('ai-api-key').value,
         groq_api_key: document.getElementById('ai-api-key').value,
         openai_api_key: document.getElementById('ai-api-key').value,
         gemini_api_key: document.getElementById('ai-api-key').value,

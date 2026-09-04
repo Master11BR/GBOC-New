@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v13.2.0 Enterprise Edition
+# GBOC System v14.0.0 Enterprise Edition
 # Module: Hermes Agent Router — REST API for the Hermes Edge Agent
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================
@@ -55,7 +55,7 @@ async def hermes_status():
     try:
         return {
             "status": "operational",
-            "agent": "Hermes Edge Agent v13.2.0",
+            "agent": "Hermes Edge Agent v14.0.0",
             "pillars": {
                 "store_and_forward_queue": hermes_queue_engine.get_status(),
                 "self_healing_watchdog": hermes_self_heal_engine.get_status(),

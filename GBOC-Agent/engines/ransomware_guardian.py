@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 13.2.0 - Ransomware Guardian (Watchdog Automatico)
+GBOC 14.0.0 - Ransomware Guardian (Watchdog Automatico)
 
 Modulo de protecao ATIVA contra ransomware.
 Roda em background como thread daemon e executa:
@@ -564,7 +564,7 @@ class RansomwareGuardian:
             f"  2. Isole a maquina da rede se possivel\n"
             f"  3. Acesse o painel GBOC para revisar o incidente\n"
             f"  4. NAO restaure backups antes de confirmar que o ataque foi contido\n\n"
-            f"--- GBOC Ransomware Guardian 13.2.0 ---"
+            f"--- GBOC Ransomware Guardian 14.0.0 ---"
         )
 
         # 6a. SMTP (e-mail)

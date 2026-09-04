@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v13.2.0 Enterprise Edition
+# GBOC System v14.0.0 Enterprise Edition
 # Module: 1-Click Bootable USB Rescue Media Creator Engine
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================
@@ -37,7 +37,7 @@ class UsbRescueCreatorEngine:
             f"Iniciando gravação de Mídia de Boot USB de Emergência na unidade {target_drive_letter}...",
             "Formatando partição de boot com suporte a UEFI (FAT32) e Partição de Dados (NTFS)...",
             "Gravando Bootloader EFI (bootx64.efi) com suporte a Secure Boot...",
-            "Injetando imagem GBOC WinPE Offline Recovery Environment v13.2.0...",
+            "Injetando imagem GBOC WinPE Offline Recovery Environment v14.0.0...",
             "Integrando drivers de controladoras RAID (Dell PERC, HP SmartArray, MegaRAID, NVMe)...",
             "Integrando drivers de rede Gigabit/10GbE (Intel, Realtek, Broadcom)...",
             f"✅ Pendrive de Boot de Emergência criado com sucesso em {round(time.time() - start_time + 3.2, 2)}s!"

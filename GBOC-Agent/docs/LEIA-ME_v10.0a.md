@@ -1,6 +1,6 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v13.2.0 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.0.0 Enterprise. Todos os direitos reservados. -->
 
-# 🎉 BEM-VINDO AO GBOC v13.2.0
+# 🎉 BEM-VINDO AO GBOC v14.0.0
 
 ## ✅ TUDO PRONTO!
 
@@ -52,30 +52,30 @@ Acesse: http://localhost:8000
 
 ### Documentos Disponíveis (em ordem de leitura recomendada)
 
-1. **LEIA-ME_v13.2.0.md** (este arquivo)
+1. **LEIA-ME_v14.0.0.md** (este arquivo)
    - Início rápido
    - Como usar o sistema
 
-2. **README_v13.2.0.md**
+2. **README_v14.0.0.md**
    - Guia completo (50+ páginas)
    - Todas as funcionalidades
    - Referência de APIs
 
-3. **SUMARIO_EXECUTIVO_v13.2.0.md**
+3. **SUMARIO_EXECUTIVO_v14.0.0.md**
    - Resumo executivo
    - Problemas resolvidos
    - Melhorias implementadas
 
-4. **IMPROVEMENTS_v13.2.0.md**
+4. **IMPROVEMENTS_v14.0.0.md**
    - Detalhes técnicos
    - Métricas de qualidade
    - Lições aprendidas
 
-5. **INDICE_ARQUIVOS_v13.2.0.md**
+5. **INDICE_ARQUIVOS_v14.0.0.md**
    - Lista de todos os arquivos
    - Estrutura do projeto
 
-6. **CONCLUSAO_v13.2.0.md**
+6. **CONCLUSAO_v14.0.0.md**
    - Resumo final
    - Checklist de entregas
 
@@ -91,7 +91,7 @@ Acesse: http://localhost:8000
 - Performance analisada
 
 ### ✅ Correções Implementadas
-- ✅ Versões unificadas (Agente + Servidor = 13.2.0)
+- ✅ Versões unificadas (Agente + Servidor = 14.0.0)
 - ✅ Sistema de diagnóstico criado
 - ✅ Estatísticas avançadas implementadas
 - ✅ Diagnóstico preemptivo funcionando
@@ -285,10 +285,10 @@ python gboc_v8/run_complete_diagnostic.py
 ### Imediato (Agora)
 1. ✅ Execute `run_diagnostic.bat` ou `run_diagnostic.sh`
 2. ✅ Revise relatórios em `logs/`
-3. ✅ Leia `SUMARIO_EXECUTIVO_v13.2.0.md`
+3. ✅ Leia `SUMARIO_EXECUTIVO_v14.0.0.md`
 
 ### Curto Prazo (Esta Semana)
-1. 📖 Leia `README_v13.2.0.md` completo
+1. 📖 Leia `README_v14.0.0.md` completo
 2. 🔍 Revise arquivos órfãos detectados
 3. 🔧 Implemente sugestões de integração
 4. 📊 Configure monitoramento do Health Score
@@ -305,12 +305,12 @@ python gboc_v8/run_complete_diagnostic.py
 
 ```
 gboc_v8/
-├── 📄 LEIA-ME_v13.2.0.md (este arquivo)
-├── 📄 README_v13.2.0.md (guia completo)
-├── 📄 SUMARIO_EXECUTIVO_v13.2.0.md
-├── 📄 IMPROVEMENTS_v13.2.0.md
-├── 📄 INDICE_ARQUIVOS_v13.2.0.md
-├── 📄 CONCLUSAO_v13.2.0.md
+├── 📄 LEIA-ME_v14.0.0.md (este arquivo)
+├── 📄 README_v14.0.0.md (guia completo)
+├── 📄 SUMARIO_EXECUTIVO_v14.0.0.md
+├── 📄 IMPROVEMENTS_v14.0.0.md
+├── 📄 INDICE_ARQUIVOS_v14.0.0.md
+├── 📄 CONCLUSAO_v14.0.0.md
 │
 ├── 🔧 run_diagnostic.bat (Windows)
 ├── 🔧 run_diagnostic.sh (Linux/Mac)
@@ -355,7 +355,7 @@ Para executar diagnóstico:
 
 ## 🎊 TUDO PRONTO!
 
-O GBOC v13.2.0 está **completamente implementado** e **pronto para uso**!
+O GBOC v14.0.0 está **completamente implementado** e **pronto para uso**!
 
 ### O que você tem agora:
 
@@ -366,7 +366,7 @@ O GBOC v13.2.0 está **completamente implementado** e **pronto para uso**!
 ✅ 13 novas APIs funcionais  
 ✅ Documentação completa (2000+ linhas)  
 ✅ Scripts de automação  
-✅ Versões unificadas (13.2.0)  
+✅ Versões unificadas (14.0.0)  
 
 ### Para começar:
 
@@ -381,18 +381,18 @@ O GBOC v13.2.0 está **completamente implementado** e **pronto para uso**!
 
 **Precisa de ajuda?**
 
-1. 📖 Consulte `README_v13.2.0.md` - Guia completo
-2. 📋 Veja `SUMARIO_EXECUTIVO_v13.2.0.md` - Resumo executivo
+1. 📖 Consulte `README_v14.0.0.md` - Guia completo
+2. 📋 Veja `SUMARIO_EXECUTIVO_v14.0.0.md` - Resumo executivo
 3. 🔧 Revise a seção Troubleshooting acima
 4. 🤖 Execute diagnóstico para análise automática
 
 ---
 
-**GBOC v13.2.0** - Sistema Completo de Backup e Monitoramento  
+**GBOC v14.0.0** - Sistema Completo de Backup e Monitoramento  
 Desenvolvido com ❤️ inspirado no Duplicati
 
 ✅ **Status:** Pronto para Produção  
-✅ **Versão:** 13.2.0 (Unificada)  
+✅ **Versão:** 14.0.0 (Unificada)  
 ✅ **Última Atualização:** 2024
 
 **Bom uso! 🚀**

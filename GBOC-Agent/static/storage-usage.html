@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GBOC Agent 13.2.0 - Uso e Crescimento de Armazenamento</title>
+    <title>GBOC Agent 14.0.0 - Uso e Crescimento de Armazenamento</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="stylesheet" href="/static/gboc-themes.css">
     <link rel="stylesheet" href="/static/gboc-layout.css">
@@ -40,18 +40,31 @@
 
         <!-- Stats Row -->
         <div class="stats-row">
-            <div class="stat-card"><div class="val" id="stat-total-gb">-</div><div class="lbl">Total em Uso (GB)</div></div>
+            <div class="stat-card"><div class="val" id="stat-total-gb">-</div><div class="lbl">Espaço Local (GB)</div></div>
+            <div class="stat-card"><div class="val" id="stat-dest-gb" style="color:var(--accent)">-</div><div class="lbl">Espaço Destino (GB)</div></div>
             <div class="stat-card"><div class="val" id="stat-repo-count">-</div><div class="lbl">Repositórios Ativos</div></div>
-            <div class="stat-card"><div class="val" id="stat-largest-gb">-</div><div class="lbl">Maior Repositório (GB)</div></div>
             <div class="stat-card"><div class="val" id="stat-last-scan" style="font-size:0.8em">-</div><div class="lbl">Último Scan</div></div>
+        </div>
+
+        <!-- Engine Storage Usage Breakdown -->
+        <div class="panel" style="margin-top:20px">
+            <div class="panel-header">
+                <h3><i class="fas fa-layer-group" style="color:var(--primary)"></i> Consumo de Armazenamento por Motor (Local vs. Destino)</h3>
+            </div>
+            <div class="panel-body" id="engine-usage-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;padding:20px">
+                <div style="text-align:center;padding:20px;color:var(--text-muted);grid-column:1/-1">
+                    <i class="fas fa-spinner fa-spin" style="font-size:1.8em;display:block;margin-bottom:8px"></i>
+                    Calculando consumo por motor...
+                </div>
+            </div>
         </div>
 
         <!-- Repositories Usage List -->
         <div class="panel" style="margin-top:20px">
             <div class="panel-header">
-                <h3><i class="fas fa-server" style="color:var(--primary)"></i> Repositórios — Uso Atual</h3>
+                <h3><i class="fas fa-server" style="color:var(--primary)"></i> Repositórios — Uso Detalhado (Local & Destino)</h3>
             </div>
-            <div class="panel-body" id="repo-usage-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px">
+            <div class="panel-body" id="repo-usage-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;padding:20px">
                 <div style="text-align:center;padding:30px;color:var(--text-muted);grid-column:1/-1">
                     <i class="fas fa-spinner fa-spin" style="font-size:2em;display:block;margin-bottom:10px"></i>
                     Coletando dados reais do sistema de arquivos...
@@ -120,6 +133,9 @@ function _engineClass(engine) {
     if (e === 'restic') return 'engine-restic';
     if (e === 'kopia') return 'engine-kopia';
     if (e === 'duplicati') return 'engine-duplicati';
+    if (e === 'native') return 'engine-kopia';
+    if (e === 'hermes') return 'engine-restic';
+    if (e === 'borg') return 'engine-duplicati';
     return 'engine-unknown';
 }
 
@@ -136,14 +152,50 @@ async function loadUsage() {
         const r = await fetch(`${API}/usage`);
         const d = await r.json();
         _repoData = d.repositories || [];
+        const byEngine = d.by_engine || [];
+        const totals = d.totals || {};
 
         // Update stats
-        const totalGb = _repoData.reduce((a, r) => a + (r.size_gb || 0), 0);
-        const maxGb = Math.max(..._repoData.map(r => r.size_gb || 0), 0);
-        document.getElementById('stat-total-gb').textContent = totalGb.toFixed(2);
+        const totalLocalGb = totals.total_local_gb || _repoData.reduce((a, r) => a + (r.local_gb || r.size_gb || 0), 0);
+        const totalDestGb = totals.total_dest_gb || _repoData.reduce((a, r) => a + (r.destination_gb || 0), 0);
+        
+        document.getElementById('stat-total-gb').textContent = totalLocalGb.toFixed(2);
+        document.getElementById('stat-dest-gb').textContent = totalDestGb.toFixed(2);
         document.getElementById('stat-repo-count').textContent = _repoData.length;
-        document.getElementById('stat-largest-gb').textContent = maxGb.toFixed(2);
         document.getElementById('stat-last-scan').textContent = new Date().toLocaleTimeString('pt-BR');
+
+        // Render per-engine cards
+        const engineContainer = document.getElementById('engine-usage-list');
+        if (engineContainer) {
+            if (!byEngine.length) {
+                engineContainer.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-muted);grid-column:1/-1">Nenhum motor cadastrado.</div>`;
+            } else {
+                engineContainer.innerHTML = byEngine.map(eng => {
+                    return `<div class="repo-usage-card" style="border-left:4px solid var(--primary)">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                            <div style="font-weight:700;font-size:1em;display:flex;align-items:center;gap:6px">
+                                <i class="fas fa-microchip" style="color:var(--primary)"></i> ${eng.display_name}
+                            </div>
+                            <span class="engine-badge ${_engineClass(eng.engine)}">${eng.repo_count} Repositório(s)</span>
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;background:var(--bg-card);padding:12px;border-radius:8px;margin-top:6px;border:1px solid var(--border)">
+                            <div>
+                                <div style="font-size:0.75em;color:var(--text-muted)"><i class="fas fa-folder"></i> Origem / Disco Local</div>
+                                <div style="font-weight:700;font-size:1.15em;color:var(--text)">${(eng.local_gb || 0).toFixed(2)} GB</div>
+                            </div>
+                            <div>
+                                <div style="font-size:0.75em;color:var(--text-muted)"><i class="fas fa-cloud" style="color:var(--accent)"></i> Gasto em Nuvem</div>
+                                <div style="font-weight:700;font-size:1.15em;color:var(--accent)">${(eng.cloud_gb || 0).toFixed(2)} GB</div>
+                            </div>
+                            <div style="grid-column:1/-1;border-top:1px solid var(--border);padding-top:6px;margin-top:2px;display:flex;justify-content:space-between;align-items:center">
+                                <span style="font-size:0.75em;color:var(--text-muted)"><i class="fas fa-hdd"></i> Repo Local: <strong>${(eng.local_repo_gb || 0).toFixed(2)} GB</strong></span>
+                                <span style="font-size:0.75em;color:var(--primary);font-weight:600">Total: ${(eng.destination_gb || 0).toFixed(2)} GB</span>
+                            </div>
+                        </div>
+                    </div>`;
+                }).join('');
+            }
+        }
 
         // Populate filter
         const sel = document.getElementById('history-repo-filter');
@@ -157,7 +209,7 @@ async function loadUsage() {
             }
         });
 
-        // Render cards
+        // Render repositories list
         const container = document.getElementById('repo-usage-list');
         if (!_repoData.length) {
             container.innerHTML = `<div style="text-align:center;padding:30px;color:var(--text-muted);grid-column:1/-1">
@@ -166,30 +218,35 @@ async function loadUsage() {
             </div>`;
             return;
         }
+
+        const maxGb = Math.max(..._repoData.map(r => Math.max(r.local_gb || r.size_gb || 0, r.destination_gb || 0)), 1);
+
         container.innerHTML = _repoData.map(repo => {
-            const pct = maxGb > 0 ? Math.min((repo.size_gb / maxGb) * 100, 100) : 0;
-            const color = _colorForSize(repo.size_gb, maxGb);
-            const sizeLabel = repo.size_gb >= 1024
-                ? (repo.size_gb / 1024).toFixed(2) + ' TB'
-                : repo.size_gb.toFixed(2) + ' GB';
+            const localGb = repo.local_gb || repo.size_gb || 0;
+            const destGb = repo.destination_gb || 0;
+            const pct = Math.min((localGb / maxGb) * 100, 100);
+            const color = _colorForSize(localGb, maxGb);
+
             return `<div class="repo-usage-card">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
                     <div style="font-weight:700;font-size:0.9em"><i class="fas fa-server" style="color:var(--primary);margin-right:6px"></i>${repo.repository_name || repo.repository_id}</div>
                     <span class="engine-badge ${_engineClass(repo.engine)}">${repo.engine || 'N/A'}</span>
                 </div>
-                <div style="font-size:0.75em;color:var(--text-muted);margin-bottom:6px;word-break:break-all">${repo.path || 'Caminho não informado'}</div>
+                <div style="font-size:0.75em;color:var(--text-muted);margin-bottom:8px;word-break:break-all">
+                    <div><i class="fas fa-folder"></i> <strong>Local:</strong> ${repo.path || 'Caminho não informado'}</div>
+                    ${repo.destination_path ? `<div style="margin-top:2px"><i class="fas fa-cloud-upload-alt" style="color:var(--accent)"></i> <strong>Destino (${repo.destination_type || 'Replicação'}):</strong> ${repo.destination_path}</div>` : ''}
+                </div>
                 <div class="usage-bar-track">
                     <div class="usage-bar-fill" style="width:${pct.toFixed(1)}%;background:${color}"></div>
                 </div>
-                <div style="display:flex;justify-content:space-between;align-items:center">
-                    <span class="sz-label"><i class="fas fa-weight"></i> ${sizeLabel}</span>
-                    ${repo.snapshot_count > 0 ? `<span class="sz-label"><i class="fas fa-camera"></i> ${repo.snapshot_count} snapshots</span>` : ''}
-                    <span class="sz-label">${pct.toFixed(0)}% do maior</span>
+                <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.8em;margin-top:6px">
+                    <span class="sz-label"><i class="fas fa-hdd"></i> Local: <strong>${localGb.toFixed(2)} GB</strong></span>
+                    <span class="sz-label" style="color:var(--accent)"><i class="fas fa-cloud"></i> Destino: <strong>${destGb.toFixed(2)} GB</strong></span>
                 </div>
             </div>`;
         }).join('');
     } catch(e) {
-        document.getElementById('repo-usage-list').innerHTML = `<div style="color:#f56565;padding:20px;grid-column:1/-1"><i class="fas fa-exclamation-triangle"></i> Erro ao carregar: ${e.message}</div>`;
+        document.getElementById('repo-usage-list').innerHTML = `<div style="color:var(--danger);padding:20px;grid-column:1/-1"><i class="fas fa-exclamation-triangle"></i> Erro ao carregar: ${e.message}</div>`;
     }
 }
 

@@ -1,4 +1,4 @@
-# GBOC System v13.2.0 Enterprise Edition
+# GBOC System v14.0.0 Enterprise Edition
 # Module: Executive & Operational Reports Router (Server)
 
 import logging
@@ -346,7 +346,7 @@ def build_report_data_from_db(rep_id: int) -> Dict[str, Any]:
             {"label": "Score de Risco", "value": "🟢 Baixo (98/100)" if failed_backups == 0 else "🟡 Moderado"}
         ]
         table_headers = ["Agente ID", "Hostname", "IP Address", "Status", "Jobs", "Versão Agente"]
-        table_rows = [[a.get('agent_id'), a.get('hostname'), a.get('ip_address'), str(a.get('status')).upper(), a.get('jobs_count', 0), a.get('agent_version', 'v13.2.0')] for a in agents_list]
+        table_rows = [[a.get('agent_id'), a.get('hostname'), a.get('ip_address'), str(a.get('status')).upper(), a.get('jobs_count', 0), a.get('agent_version', 'v14.0.0')] for a in agents_list]
         ai_recommendation = f"Resumo executivo compilado: O ambiente conta com <strong>{total_agents} agentes cadastrados</strong> ({online_agents} online). A taxa de sucesso real das <strong>{total_backups} execuções registradas</strong> é de <strong>{success_rate}%</strong> com volume total protegido de <strong>{total_gb} GB</strong>."
 
     elif rep_id == 2: # Conformidade de SLA de RPO / RTO
@@ -409,12 +409,12 @@ def build_report_data_from_db(rep_id: int) -> Dict[str, Any]:
         metrics = [
             {"label": "Licenças Ativas", "value": f"{total_agents} / 250"},
             {"label": "Nós Conectados", "value": str(total_agents)},
-            {"label": "Versão Dominante", "value": "v13.2.0 Enterprise"},
+            {"label": "Versão Dominante", "value": "v14.0.0 Enterprise"},
             {"label": "Status Licença", "value": "🟢 Válida (Anual)"}
         ]
         table_headers = ["Hostname", "Sistema Operacional", "Versão GBOC Agent", "Data Registro", "Status Licença"]
-        table_rows = [[a.get('hostname'), a.get('os_info', 'Windows / Linux'), a.get('agent_version', 'v13.2.0'), str(a.get('registered_at', ''))[:10], "ATIVADA (LIC-13)"] for a in agents_list]
-        ai_recommendation = f"Auditoria de Licenciamento: A frota possui <strong>{total_agents} nós registrados de um limite de 250 licenças</strong> Enterprise. Todos os agentes encontram-se atualizados na versão 13.2.0."
+        table_rows = [[a.get('hostname'), a.get('os_info', 'Windows / Linux'), a.get('agent_version', 'v14.0.0'), str(a.get('registered_at', ''))[:10], "ATIVADA (LIC-13)"] for a in agents_list]
+        ai_recommendation = f"Auditoria de Licenciamento: A frota possui <strong>{total_agents} nós registrados de um limite de 250 licenças</strong> Enterprise. Todos os agentes encontram-se atualizados na versão 14.0.0."
 
     elif rep_id == 7: # Perfil da Janela de Backup & Concorrência
         metrics = [
@@ -725,11 +725,11 @@ def build_report_data_from_db(rep_id: int) -> Dict[str, Any]:
             {"label": "Sistemas Mapeados", "value": str(total_agents)},
             {"label": "Patches Críticos", "value": "0 Pendentes"},
             {"label": "Conformidade SO", "value": "100% Atualizado"},
-            {"label": "GBOC Agent Version", "value": "v13.2.0 Enterprise"}
+            {"label": "GBOC Agent Version", "value": "v14.0.0 Enterprise"}
         ]
         table_headers = ["Hostname", "Sistema Operacional", "Versão Agent", "Patches Pendentes", "Status Segurança"]
-        table_rows = [[a.get('hostname'), a.get('os_info', 'Windows Server 2022 / Linux'), a.get('agent_version', 'v13.2.0'), "Nenhum Patch Crítico", "🟢 CONFORME"] for a in agents_list]
-        ai_recommendation = "Inventário de Software: A auditoria de patches confirma que todos os nós estão com atualizações de segurança em dia e rodando a versão estável do GBOC Agent v13.2.0."
+        table_rows = [[a.get('hostname'), a.get('os_info', 'Windows Server 2022 / Linux'), a.get('agent_version', 'v14.0.0'), "Nenhum Patch Crítico", "🟢 CONFORME"] for a in agents_list]
+        ai_recommendation = "Inventário de Software: A auditoria de patches confirma que todos os nós estão com atualizações de segurança em dia e rodando a versão estável do GBOC Agent v14.0.0."
 
     elif rep_id == 31: # Diagnóstico do Event Log & Falhas do SO
         metrics = [
@@ -1010,7 +1010,7 @@ async def export_report(report_id: int, format: str = Query("html", pattern="^(h
     elif format == "csv":
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(["GBOC System v13.2.0 Enterprise - Relatório Exportado"])
+        writer.writerow(["GBOC System v14.0.0 Enterprise - Relatório Exportado"])
         writer.writerow(["Título", report_data["title"]])
         writer.writerow(["Código", report_data["code"]])
         writer.writerow(["Categoria", report_data["category"]])
@@ -1073,7 +1073,7 @@ async def export_report(report_id: int, format: str = Query("html", pattern="^(h
             <div class="meta">Código: {report_data['code']} | Categoria: {report_data['category']} | Tipo: {report_data['type']}</div>
         </div>
         <div style="text-align:right">
-            <strong style="color:#4fa3e8">GBOC System v13.2.0</strong><br>
+            <strong style="color:#4fa3e8">GBOC System v14.0.0</strong><br>
             <span class="meta">Data: {report_data['generated_at'][:19].replace('T', ' ')}</span>
         </div>
     </div>
@@ -1088,7 +1088,7 @@ async def export_report(report_id: int, format: str = Query("html", pattern="^(h
     {'<h3>📋 Detalhamento dos Dados Auditados</h3><table><thead><tr>' + headers_html + '</tr></thead><tbody>' + rows_html + '</tbody></table>' if headers_html else ''}
 
     <div class="footer">
-        Relatório gerado automaticamente pelo GBOC Server Enterprise v13.2.0 — Documento de Auditoria e Governança de Dados.
+        Relatório gerado automaticamente pelo GBOC Server Enterprise v14.0.0 — Documento de Auditoria e Governança de Dados.
     </div>
 
     <script>

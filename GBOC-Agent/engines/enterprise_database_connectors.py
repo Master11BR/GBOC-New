@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v13.2.0 Enterprise Edition
+# GBOC System v14.0.0 Enterprise Edition
 # Module: Enterprise Database Connectors (Oracle RMAN, SAP HANA, IBM DB2)
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================
@@ -178,9 +178,9 @@ EXIT;
 
             # Criar arquivos de backup para simulação/execução
             with open(os.path.join(target_dir, f"df_{oracle_sid}_01_1.bkp"), "wb") as f:
-                f.write(b"GBOC_ORACLE_RMAN_LEVEL0_DATABASE_STREAM_HEADER_v13.2.0\n" + b"\x00" * 8192)
+                f.write(b"GBOC_ORACLE_RMAN_LEVEL0_DATABASE_STREAM_HEADER_v14.0.0\n" + b"\x00" * 8192)
             with open(os.path.join(target_dir, f"cf_{oracle_sid}_controlfile.bkp"), "wb") as f:
-                f.write(b"GBOC_ORACLE_RMAN_AUTOBACKUP_CONTROLFILE_HEADER_v13.2.0\n" + b"\x00" * 4096)
+                f.write(b"GBOC_ORACLE_RMAN_AUTOBACKUP_CONTROLFILE_HEADER_v14.0.0\n" + b"\x00" * 4096)
 
             self._append_log(job_id, "Arquivando Redo Logs e Controlfiles com consistência SCN...")
             time.sleep(1.0)
@@ -338,7 +338,7 @@ EXIT;
             self.active_jobs[job_id]["progress"] = 50
 
             with open(os.path.join(target_dir, f"{db_name}.0.DB2.NODE0000.CATN0000.bkp"), "wb") as f:
-                f.write(b"GBOC_IBM_DB2_ONLINE_BACKUP_STREAM_v13.2.0\n" + b"\x00" * 4096)
+                f.write(b"GBOC_IBM_DB2_ONLINE_BACKUP_STREAM_v14.0.0\n" + b"\x00" * 4096)
 
             time.sleep(1.0)
             self.active_jobs[job_id]["progress"] = 90

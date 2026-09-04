@@ -1,4 +1,4 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v13.2.0 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.0.0 Enterprise. Todos os direitos reservados. -->
 
 # GBOC — Changelog de Atualizações
 
@@ -6,7 +6,41 @@
 
 ---
 
-## 13.2.0 — 2026-08-08 (Patch Release — Hotfixes de Navegação, Validação e Ransomware)
+## 14.0.0 — 2026-09-02 (Major Release — Layout Engine, Storage Breakdown, Logging Resilience & Local Replication Fix)
+
+### 💾 Consumo de Armazenamento por Motor (Local vs. Destino)
+- **Detalhamento de Armazenamento por Motor (`storage_monitor.py` & `storage_router.py`)**:
+  - Implementada agregação de dados por motor de backup (`by_engine`: Restic, Kopia, Duplicati, Borg, Nativo, Hermes).
+  - Cálculo empírico e exposição de consumo físico no disco local (`local_gb`) e consumo no destino remoto de armazenamento (`destination_gb`), além de métricas gerais e contagem de repositórios.
+- **Painel Visual na GUI (`storage-usage.html` & `storage.html`)**:
+  - Adicionado painel visual **"Consumo de Armazenamento por Motor (Local vs. Destino)"** com cards comparativos por motor.
+  - Atualização dos cards de repositórios individuais exibindo localização local e destino de replicação.
+
+### ⚡ Replicação Local (Estabilização e Correção de Travamento)
+- **Resolução de Porta e Roteamento (`gboc-layout-manager.js`)**:
+  - Corrigida a identificação `isAgent` para cobrir a porta `9200` e as páginas `/replication.html`, `/failed-jobs.html` e `/storage-usage.html`. Isso impede que a página tente carregar a API da porta 8000 do Servidor quando executada no Agente.
+- **Flexibilização do Banco de Dados (`backup_replicator.py` & `replication_api.py`)**:
+  - Atualizado o schema da tabela `replication_policies` para aceitar `target_repo_id DEFAULT 0`, adicionando suporte nativo às colunas `dest_type`, `dest_path`, `mode`, `status` e `total_bytes` com migrações defensivas `ALTER TABLE IF NOT EXISTS`.
+
+### 📌 Jobs com Falha (Reposicionamento de Menu & Standard Layout)
+- **Reorganização de Menu (`_sidebar.html`)**:
+  - Transferência do módulo **Jobs com Falha** da área de *Tarefas & Motores* para a seção **Diagnóstico & Logs**, abaixo de *Central de Alertas*.
+- **Padronização Visual (`failed-jobs.html`)**:
+  - Refatoração da página `failed-jobs.html` para o layout standard com suporte a temas CSS (`var(--bg-card)`, `var(--border)`), KPIs responsivos e modal overlay centralizado.
+
+### 🛡️ Resiliência e Logs Imunes no Windows (`SafeRotatingFileHandler`)
+- **Imunidade a PermissionError**:
+  - Implementada a subclasse `SafeRotatingFileHandler` em `agent_gboc.py`, `logger.py` e `task_manager.py` para ignorar travamentos de arquivo de log no Windows.
+- **Filtro Anti-Recursão**:
+  - Adicionado filtro de supressão no redirecionador `sys.stderr` contra erros de rotação de log para prevenir tempestades de exceção no console.
+
+### 🚀 Otimização do Hermes Engine
+- **Cache em Memória (TTL 60s)**:
+  - Adicionada camada de cache para a checagem de VSS Writers (`vssadmin`), reduzindo drasticamente o tempo de resposta do endpoint `/api/v1/hermes/status`.
+
+---
+
+## 14.0.0 — 2026-08-08 (Patch Release — Hotfixes de Navegação, Validação e Ransomware)
 
 ### 🛠️ Correções de UX, Roteamento e UI
 - **Roteamento Estático no Agente (`agent_server.py`)**:
@@ -25,11 +59,11 @@
 
 ### 📈 Versionamento
 - **Versionamento Semântico (SemVer)**:
-  - Incremento global de versão para **13.2.0** em todos os arquivos de configuração de versão e templates usando `version_unifier.py` e atualização do `BUILD_DATE` para **2026-08-08**.
+  - Incremento global de versão para **14.0.0** em todos os arquivos de configuração de versão e templates usando `version_unifier.py` e atualização do `BUILD_DATE` para **2026-08-08**.
 
 ---
 
-## 13.2.0 — 2026-08-05 (Minor Release — Módulos GUI Storage & Job Alert)
+## 14.0.0 — 2026-08-05 (Minor Release — Módulos GUI Storage & Job Alert)
 
 ### 🚀 Novos Módulos e Funcionalidades
 - **Módulo GUI Storage Usage & Growth (`modules/storage`)**:
@@ -45,15 +79,15 @@
 - **Conformidade Estrita com AGENTS.md / ARCHITECTURE_POLICIES.md**:
   - Reorganização dos roteadores de `api/` para `modules/storage/storage_router.py` e `modules/job_alert/job_alert_router.py` (`1 Módulo = 1 Diretório`).
 - **Versionamento Semântico (SemVer)**:
-  - Incremento global para **13.2.0** via `version_control.py` e `version_unifier.py`.
+  - Incremento global para **14.0.0** via `version_control.py` e `version_unifier.py`.
 
 ---
 
-## 13.2.0 — 2026-08 (Versão Consolidada Pós-Recuperação)
+## 14.0.0 — 2026-08 (Versão Consolidada Pós-Recuperação)
 
 ### 🚀 Destaques da Release
 
-- **Unificação Geral de Versão (13.2.0)**: Sincronização completa de todos os módulos (`GBOC-Server`, `GBOC-Agent`, `SharedCore`, `Ransomware Shield`, `Diagnostic System` e `version_unifier.py`).
+- **Unificação Geral de Versão (14.0.0)**: Sincronização completa de todos os módulos (`GBOC-Server`, `GBOC-Agent`, `SharedCore`, `Ransomware Shield`, `Diagnostic System` e `version_unifier.py`).
 - **Recuperação e Consolidação de Código**: Restauração da base de código (recuperada após perda por falha de disco), consolidando todas as melhorias até Agosto de 2026.
 - **Suporte Pydantic v2**: Atualização dos validadores de modelos Pydantic no `GBOC-Server`.
 - **Estabilidade nos Testes**: Correção de codificação UTF-8 no Windows e ajuste de asserções assíncronas na Dead Letter Queue (`tests.py`).
@@ -61,7 +95,7 @@
 
 ---
 
-## 13.2.0 — 2026-04
+## 14.0.0 — 2026-04
 
 ### 🧩 UI e Navegação
 
@@ -72,7 +106,7 @@
   - download/visualização/exclusão de snapshots
   - diff entre snapshots e diff snapshot vs config atual
 - **Sidebar atualizada**:
-  - versão visual `GBOC 13.2.0`
+  - versão visual `GBOC 14.0.0`
   - novo item **Config Manager** no menu
 - **Unificação de páginas legadas**:
   - `overview.html` agora redireciona para `/`
@@ -136,8 +170,8 @@
   - script de limpeza forçada agora suporta `-ForceKill` para encerrar processos `kopia/restic/duplicati` antes da remoção
 
 - **Versionamento de scripts (.bat/.ps1) atualizado**:
-  - `start_agent.bat` e `start_agent.ps1`: v13.2.0 → **13.2.0**
-  - scripts de instalação/diagnóstico em `scripts/`: padronizados para **13.2.0**
+  - `start_agent.bat` e `start_agent.ps1`: v14.0.0 → **14.0.0**
+  - scripts de instalação/diagnóstico em `scripts/`: padronizados para **14.0.0**
 
 - **Server Dashboard Analytics (correções)**:
   - corrigido erro JS `ReferenceError: rjson is not defined` em `loadLogAgentFilter()`
@@ -239,7 +273,7 @@
 - **Tabela `server_settings`** criada com 33 configurações padrão em 7 categorias: Geral, Sincronização, Segurança, Database, Retenção, Notificações, Interface
 - **10 endpoints REST**: GET/PUT settings, GET/PUT category, bulk update, reset, export, import, server info, maintenance cleanup, test notification
 - **Dashboard `tab-config`** reescrito: cards de informação (versão, DB, conexões), formulário editável com 7 abas, export/import JSON, manutenção, reset
-- **Versão Server**: 13.2.0 → **13.2.0**
+- **Versão Server**: 14.0.0 → **14.0.0**
 
 ### 🐛 Correções
 
@@ -249,7 +283,7 @@
 
 ### 📈 Métricas
 
-| Métrica | 13.2.0 | 13.2.0 |
+| Métrica | 14.0.0 | 14.0.0 |
 |---------|--------|--------|
 | APIs registradas (agente) | 25 | **27** |
 | Endpoints REST (agente) | ~150 | **~175** |
@@ -258,7 +292,7 @@
 
 ---
 
-## 13.2.0 — 2025-03
+## 14.0.0 — 2025-03
 
 ### 🏗️ Reorganização de Projeto
 
@@ -298,7 +332,7 @@
 
 ---
 
-## v13.2.0 — 2025-02
+## v14.0.0 — 2025-02
 
 ### 🔧 Motores de Backup
 
@@ -323,7 +357,7 @@
 
 ---
 
-## v13.2.0 — 2024-12
+## v14.0.0 — 2024-12
 
 ### 📈 Estatísticas Avançadas
 
@@ -366,7 +400,7 @@
 
 ---
 
-## v9.0 → v13.2.0 — Migração
+## v9.0 → v14.0.0 — Migração
 
 ### 🗃️ Banco de Dados
 

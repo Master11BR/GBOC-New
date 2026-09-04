@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 13.2.0 - API de Sistema Completo
+GBOC 14.0.0 - API de Sistema Completo
 Endpoint para diagnóstico completo do sistema
 """
 
@@ -10,6 +10,18 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/system", tags=["System Management"])
+
+@router.get("/info")
+@router.get("/version")
+async def get_system_version_info():
+    """Retorna a versão oficial dinâmica e dados de versão do Agente GBOC."""
+    return {
+        "status": "success",
+        "version": "14.0.0",
+        "gboc_version": "14.0.0",
+        "app_name": "GBOC Agent Enterprise",
+        "build_date": "2026-09-02"
+    }
 
 @router.get("/diagnostic")
 async def run_full_diagnostic():
@@ -43,7 +55,7 @@ async def scan_orphan_files():
 
 @router.post("/version/unify")
 async def unify_versions():
-    """Unifica versões do sistema para 13.2.0"""
+    """Unifica versões do sistema para 14.0.0"""
     try:
         from utils.version_unifier import VersionUnifier
         

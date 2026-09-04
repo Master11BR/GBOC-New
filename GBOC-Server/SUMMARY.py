@@ -1,5 +1,5 @@
 """
-GBOC Server v13.2.0 - SUMÁRIO DAS IMPLEMENTAÇÕES
+GBOC Server v14.0.0 - SUMÁRIO DAS IMPLEMENTAÇÕES
 
 Este arquivo documenta todas as melhorias implementadas e os arquivos criados.
 """
@@ -404,7 +404,7 @@ PRÓXIMOS_PASSOS = """
 
 if __name__ == "__main__":
     print("\n" + "="*70)
-    print("GBOC SERVER v13.2.0 - SUMÁRIO EXECUTIVO")
+    print("GBOC SERVER v14.0.0 - SUMÁRIO EXECUTIVO")
     print("="*70 + "\n")
 
     print("📦 ARQUIVOS CRIADOS:\n")

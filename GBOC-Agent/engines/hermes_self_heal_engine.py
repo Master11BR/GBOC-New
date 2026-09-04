@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v13.2.0 Enterprise Edition
+# GBOC System v14.0.0 Enterprise Edition
 # Module: Hermes Self-Healing Engine — VSS Repair, Disk Guard, Service Watchdog
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================
@@ -411,8 +411,16 @@ class HermesSelfHealEngine:
             return list(reversed(self._heal_log[-limit:]))
 
     def get_status(self) -> Dict[str, Any]:
-        """Retorna o status atual do engine de auto-cura."""
-        vss_writers = self._get_vss_writers_status()
+        """Retorna o status atual do engine de auto-cura de forma não-bloqueante com cache."""
+        now_ts = time.time()
+        if not hasattr(self, '_vss_cache') or (now_ts - getattr(self, '_vss_cache_time', 0)) > 60:
+            try:
+                self._vss_cache = self._get_vss_writers_status()
+                self._vss_cache_time = now_ts
+            except Exception:
+                self._vss_cache = getattr(self, '_vss_cache', [])
+        
+        vss_writers = getattr(self, '_vss_cache', [])
         failed_vss = [w for w in vss_writers if w.get("state") in ("Failed", "Waiting for completion")]
 
         try:

@@ -1,4 +1,4 @@
-# GBOC System v13.2.0 Enterprise Edition
+# GBOC System v14.0.0 Enterprise Edition
 # Module: Ransomware Shield Router (Server Central & Agents Unified Protection)
 
 import json

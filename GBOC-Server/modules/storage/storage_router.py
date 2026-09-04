@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC Server v13.2.0 — Storage Usage & Growth Monitor APIRouter
+GBOC Server v14.0.0 — Storage Usage & Growth Monitor APIRouter
 Módulo estrito para gerenciamento de armazenamento centralizado.
 """
 
@@ -45,11 +45,48 @@ def _get_server_storage_stats():
 
 @router.get("/overview")
 async def get_storage_overview():
-    """Retorna o uso atual de armazenamento nos discos do servidor central."""
+    """Retorna o uso atual de armazenamento no servidor e nos motores (Local vs. Nuvem)."""
     stats = _get_server_storage_stats()
     total_capacity = sum(s["total_gb"] for s in stats)
     total_used = sum(s["used_gb"] for s in stats)
     total_free = sum(s["free_gb"] for s in stats)
+
+    # Coletar estatísticas agregadas por motor se o módulo de monitoramento do agente estiver disponível
+    by_engine = []
+    try:
+        from engines.storage_monitor import get_storage_summary_by_engine
+        summary = get_storage_summary_by_engine()
+        by_engine = summary.get("by_engine", [])
+        if summary.get("repositories"):
+            for r in summary["repositories"]:
+                stats.append({
+                    "repository_id": r.get("repository_id"),
+                    "name": r.get("repository_name"),
+                    "engine": r.get("engine", "native"),
+                    "path": r.get("path"),
+                    "total_gb": r.get("destination_gb") or r.get("local_gb") or 0,
+                    "used_gb": r.get("local_gb") or 0,
+                    "free_gb": 0,
+                    "used_percent": 100 if r.get("local_gb") else 0,
+                    "destination_type": r.get("destination_type"),
+                    "destination_path": r.get("destination_path"),
+                    "destination_gb": r.get("destination_gb", 0),
+                    "status": "healthy"
+                })
+    except Exception:
+        by_engine = [{
+            "engine": "native",
+            "display_name": "Motor Nativo GBOC",
+            "repo_count": len(stats),
+            "local_bytes": int(total_used * (1024**3)),
+            "local_gb": round(total_used, 2),
+            "cloud_bytes": 0,
+            "cloud_gb": 0.0,
+            "local_repo_bytes": int(total_used * (1024**3)),
+            "local_repo_gb": round(total_used, 2),
+            "destination_bytes": int(total_used * (1024**3)),
+            "destination_gb": round(total_used, 2)
+        }]
 
     return JSONResponse({
         "status": "success",
@@ -59,25 +96,43 @@ async def get_storage_overview():
             "total_free_gb": round(total_free, 2),
             "used_percent": round((total_used / total_capacity) * 100, 2) if total_capacity > 0 else 0
         },
+        "by_engine": by_engine,
         "repositories": stats
     })
 
 @router.get("/history")
 async def get_storage_history(days: int = 30):
-    """Retorna histórico de crescimento de dados."""
-    stats = _get_server_storage_stats()
-    base_used = sum(s["used_gb"] for s in stats)
-
-    # Gerar pontos históricos baseados nos dados reais de uso
-    history = []
+    """Retorna histórico real de crescimento de dados coletado pelo sistema."""
     days_limit = min(days, 90)
-    for i in range(days_limit, -1, -5):
-        simulated_growth = max(0, base_used - (i * 0.5))
-        history.append({
-            "day_offset": i,
-            "used_gb": round(simulated_growth, 2),
-            "timestamp": f"-{i}d"
-        })
+    history = []
+    try:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("""
+            SELECT recorded_at, size_bytes, repository_name
+            FROM storage_usage_history
+            WHERE recorded_at >= NOW() - INTERVAL '%s days'
+            ORDER BY recorded_at ASC
+        """, (days_limit,))
+        rows = cur.fetchall()
+        for r in rows:
+            history.append({
+                "timestamp": r["recorded_at"].isoformat() if hasattr(r["recorded_at"], 'isoformat') else str(r["recorded_at"]),
+                "used_gb": round((r["size_bytes"] or 0) / (1024**3), 2),
+                "repository_name": r["repository_name"]
+            })
+        cur.close()
+        release_db(conn)
+    except Exception as e:
+        logger.warning(f"Histórico DB indisponível, usando leitura de volumes locais: {e}")
+        # Fallback 100% Real Data: Leitura empírica atual dos discos do host
+        stats = _get_server_storage_stats()
+        base_used = sum(s["used_gb"] for s in stats)
+        history = [{
+            "timestamp": datetime.now().isoformat(),
+            "used_gb": round(base_used, 2),
+            "repository_name": "Volumes Locais"
+        }]
 
     return JSONResponse({
         "status": "success",

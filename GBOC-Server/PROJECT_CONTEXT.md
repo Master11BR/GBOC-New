@@ -1,4 +1,4 @@
-# PROJECT_CONTEXT - GBOC System v13.2.0 Enterprise
+# PROJECT_CONTEXT - GBOC System v14.0.0 Enterprise
 
 ## 🎯 OBJETIVO
 Sistema corporativo de gerenciamento de backups, monitoramento e diagnóstico preemptivo. O projeto garante alta performance utilizando sempre as tecnologias em suas últimas versões.

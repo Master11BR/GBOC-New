@@ -1,6 +1,6 @@
 <!--
 ==============================================================================
-GBOC System v13.2.0 Enterprise Edition — Agente Local
+GBOC System v14.0.0 Enterprise Edition — Agente Local
 Horizontal Topbar Navigation — injected by gboc-layout-manager.js
 ==============================================================================
 -->
@@ -11,7 +11,7 @@ Horizontal Topbar Navigation — injected by gboc-layout-manager.js
     <!-- Logo Agente Local -->
     <a href="/index.html" class="tb-logo">
         <i class="fas fa-shield-alt tb-logo-icon"></i>
-        <span>GBOC Agent <span style="opacity:0.6;font-weight:500;font-size:0.85em">13.2.0</span></span>
+        <span>GBOC Agent <span style="opacity:0.85;font-weight:600;font-size:0.85em;background:rgba(255,255,255,0.12);padding:1px 6px;border-radius:4px;border:1px solid rgba(255,255,255,0.15)">v14.0.0</span></span>
     </a>
 
     <div class="tb-divider" style="margin:0 6px 0 2px"></div>
@@ -64,6 +64,7 @@ Horizontal Topbar Navigation — injected by gboc-layout-manager.js
                 <a href="/ransomware.html" class="tb-dropdown-item"><i class="fas fa-shield-virus"></i> Ransomware Shield & Guardian</a>
                 <a href="/compliance.html" class="tb-dropdown-item"><i class="fas fa-clipboard-check"></i> Compliance LGPD / GDPR</a>
                 <a href="/audit.html" class="tb-dropdown-item"><i class="fas fa-clipboard-list"></i> Audit Trail Local</a>
+                <a href="/modules/hermes/hermes.html" class="tb-dropdown-item" style="color:#a78bfa"><i class="fas fa-paper-plane"></i> Hermes Edge Agent Local</a>
             </div>
         </div>
 
@@ -114,12 +115,12 @@ Horizontal Topbar Navigation — injected by gboc-layout-manager.js
 
     </nav>
 
-    <!-- Right Section (Botões de Ação — Ordenação Correta) -->
+    <!-- Right Section (Botões de Ação — Isolamento Rígido com Divisória) -->
     <div class="tb-right">
-        <!-- Connection Status -->
-        <div style="display:flex;align-items:center;gap:5px;font-size:0.72em;margin-right:6px">
-            <span id="wsDot" style="width:7px;height:7px;border-radius:50%;background:var(--success);display:inline-block"></span>
-            <span id="wsLabel" style="color:var(--success);font-weight:600">Agent Online</span>
+        <!-- Connection Status (LED + Tooltip) -->
+        <div style="display:flex;align-items:center;gap:4px;font-size:0.75em;margin-right:4px;padding:2px 6px;border-radius:12px;background:rgba(72,187,120,0.12);border:1px solid rgba(72,187,120,0.2)" title="Status do Agente: Agent Online (Conectado)">
+            <span id="wsDot" style="width:6px;height:6px;border-radius:50%;background:var(--success);display:inline-block;box-shadow:0 0 6px var(--success)"></span>
+            <span id="wsLabel" style="color:var(--success);font-weight:600;font-size:0.9em">Online</span>
         </div>
 
         <!-- 1. Tema (Moon/Sun) -->
@@ -216,6 +217,18 @@ document.addEventListener('fullscreenchange', ()=>{
         }else{
             icon.classList.remove('fa-compress'); icon.classList.add('fa-expand');
         }
+    }
+});
+
+// Manipulador de Clique do Mouse em Pulldowns no Agente
+document.addEventListener('click', function(e) {
+    const dropdown = e.target.closest('.tb-dropdown');
+    document.querySelectorAll('.tb-dropdown.active').forEach(d => {
+        if (d !== dropdown) d.classList.remove('active');
+    });
+    if (dropdown && (e.target.closest('.tb-nav-link') || e.target.closest('.tb-avatar'))) {
+        dropdown.classList.toggle('active');
+        e.stopPropagation();
     }
 });
 </script>
