@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # ==============================================================================
-# GBOC System v13.2.0 Enterprise Edition
+# GBOC System v14.0.0 Enterprise Edition
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # Propriedade Intelectual & Direitos Autorais Registrados.
 # A cópia, distribuição ou modificação não autorizada é estritamente proibida.
 # ==============================================================================
 
 """
-GBOC System v13.2.0 Enterprise - Unificador Global de Versões e Auditoria Integrada
-Varre todo o repositório GBOC e garante que 100% das referências residuais sejam unificadas para 13.2.0.
+GBOC System v14.0.0 Enterprise - Unificador Global de Versões e Auditoria Integrada
+Varre todo o repositório GBOC e garante que 100% das referências residuais sejam unificadas para 14.0.0.
 """
 
 import os
@@ -19,19 +19,21 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("VersionUnifier")
 
-TARGET_VERSION = "13.2.0"
+TARGET_VERSION = "14.0.0"
 
 LEGACY_EXACT_PATTERNS = [
-    (r'v13\.1\.2', 'v13.2.0'),
-    (r'13\.1\.2', '13.2.0'),
-    (r'v13\.1\.1', 'v13.2.0'),
-    (r'13\.1\.1', '13.2.0'),
-    (r'v13\.1\.0', 'v13.2.0'),
-    (r'13\.1\.0', '13.2.0'),
-    (r'v13\.0\.0', 'v13.2.0'),
-    (r'13\.0\.0', '13.2.0'),
-    (r'v12\.0\.0', 'v13.2.0'),
-    (r'12\.0\.0', '13.2.0')
+    (r'v13\.2\.0', 'v14.0.0'),
+    (r'13\.2\.0', '14.0.0'),
+    (r'v13\.1\.2', 'v14.0.0'),
+    (r'13\.1\.2', '14.0.0'),
+    (r'v13\.1\.1', 'v14.0.0'),
+    (r'13\.1\.1', '14.0.0'),
+    (r'v13\.1\.0', 'v14.0.0'),
+    (r'13\.1\.0', '14.0.0'),
+    (r'v13\.0\.0', 'v14.0.0'),
+    (r'13\.0\.0', '14.0.0'),
+    (r'v12\.0\.0', 'v14.0.0'),
+    (r'12\.0\.0', '14.0.0')
 ]
 
 TARGET_EXTENSIONS = {'.py', '.html', '.js', '.css', '.md', '.ps1', '.bat', '.txt'}

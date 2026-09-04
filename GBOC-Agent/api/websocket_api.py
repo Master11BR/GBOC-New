@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 13.2.0 - WebSocket API
+GBOC 14.0.0 - WebSocket API
 Real-time event broadcasting for backup progress, alerts, system metrics.
 """
 

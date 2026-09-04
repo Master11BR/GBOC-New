@@ -1,16 +1,16 @@
 /*
 ==============================================================================
-GBOC System v13.2.0 Enterprise Edition
+GBOC System v14.0.0 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
 */
 // ====================================================================
-// GBOC Agent 13.2.0 - JavaScript DEFINITIVO
+// GBOC Agent 14.0.0 - JavaScript DEFINITIVO
 // Detecta página automaticamente e evita erros
 // ====================================================================
 
-console.log('🚀 GBOC Agent 13.2.0 - JavaScript carregando...');
+console.log('🚀 GBOC Agent 14.0.0 - JavaScript carregando...');
 
 // ====================================================================
 // DETECTAR PÁGINA ATUAL
@@ -186,7 +186,7 @@ window.runBackup = function(taskId) {
     // TODO: Implementar chamada à API
 };
 
-console.log('✅ GBOC Agent 13.2.0 JavaScript carregado com sucesso');
+console.log('✅ GBOC Agent 14.0.0 JavaScript carregado com sucesso');
 
 // === CHECK PASSWORD STRENGTH (moved from repositories.html) ===
 window.checkPasswordStrength = function(password) {

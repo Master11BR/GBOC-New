@@ -1,12 +1,12 @@
 # ==============================================================================
-# GBOC System v13.2.0 Enterprise Edition
+# GBOC System v14.0.0 Enterprise Edition
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # Propriedade Intelectual & Direitos Autorais Registrados.
 # A cópia, distribuição ou modificação não autorizada é estritamente proibida.
 # ==============================================================================
 
 """
-GBOC Real AI Diagnostic Engine v13.2.0 Enterprise
+GBOC Real AI Diagnostic Engine v14.0.0 Enterprise
 Integração Real com 11 Motores de IA (Local Ollama, Kimi, Grok, OpenAI, Gemini, DeepSeek, Claude, Qwen, Mistral, Llama 3.3 e Cohere).
 Análise preditiva de logs, falhas de backup, integridade de disco e auto-reparo.
 """
@@ -119,7 +119,7 @@ class AIDiagnosticEngine:
         is_test = "teste" in error_context.lower()
 
         # Prompt estruturado
-        prompt = f"""Você é o Assistente Especialista de Inteligência Artificial do GBOC System v13.2.0 Enterprise.
+        prompt = f"""Você é o Assistente Especialista de Inteligência Artificial do GBOC System v14.0.0 Enterprise.
 Analise a seguinte falha de backup/sistema e forneça o diagnóstico exato da causa raiz e a solução em 1 clique.
 
 ERRO REGISTRADO:

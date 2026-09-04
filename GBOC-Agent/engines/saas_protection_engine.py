@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v13.2.0 Enterprise Edition
+# GBOC System v14.0.0 Enterprise Edition
 # Module: SaaS Cloud-Native Protection Engine (M365, Entra ID, Google Workspace)
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================

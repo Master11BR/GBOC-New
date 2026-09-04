@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-GBOC Agent 13.2.0 - SHARED CORE (Refactored)
+GBOC Agent 14.0.0 - SHARED CORE (Refactored)
 Arquitetura centralizada para inicialização de componentes
 """
 
@@ -47,7 +47,7 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 LOGS_DIR = os.path.join(BASE_DIR, "logs")
 REPO_DIR = os.path.join(BASE_DIR, "repositorios")
 KOPIA_CONFIGS_DIR = os.path.join(DATA_DIR, "engine_data", "kopia_configs")
-GBOC_VERSION = "13.2.0"
+GBOC_VERSION = "14.0.0"
 
 # Configuração de logging (ANTES de usar logger)
 os.makedirs(LOGS_DIR, exist_ok=True)

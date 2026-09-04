@@ -1,0 +1,145 @@
+<!--
+==============================================================================
+GBOC System v14.0.0 Enterprise Edition
+Copyright (c) 2026 Master11BR - Todos os direitos reservados.
+==============================================================================
+-->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GBOC Agent - Importação de Motores para o Nativo</title>
+    <link rel="stylesheet" href="/static/style.css?v=14.0.0">
+    <link rel="stylesheet" href="/static/gboc-themes.css">
+    <link rel="stylesheet" href="/static/gboc-layout.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="/static/gboc-layout-manager.js"></script>
+    <script src="/static/auth_interceptor.js"></script>
+</head>
+<body>
+<div class="app">
+    <div id="sidebar"></div>
+    <main class="main-content">
+        <header class="header">
+            <div>
+                <h1 class="page-title"><i class="fas fa-file-import" style="color:var(--primary);margin-right:8px;"></i>Importação de Motores para o Nativo</h1>
+                <div class="page-subtitle">Descoberta e conversão automática de repositórios e tarefas do Duplicati, Restic, Kopia e Borg para o Motor Nativo GBOC</div>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-primary" onclick="runImport()" id="btnImportAction" style="background:var(--success);border-color:var(--success)">
+                    <i class="fas fa-magic"></i> Importar Motores para o Nativo
+                </button>
+                <button class="btn btn-secondary" onclick="scanSystems()">
+                    <i class="fas fa-search"></i> Escanear Motores
+                </button>
+            </div>
+        </header>
+
+        <div class="content">
+            <div class="kpi-grid" style="margin-bottom:20px;">
+                <div class="kpi-card">
+                    <div class="kpi-header"><span>Motores Detectados</span><div class="kpi-icon blue"><i class="fas fa-cogs"></i></div></div>
+                    <div class="kpi-value" id="kpi-engines">0</div>
+                    <div class="kpi-sub">Duplicati, Restic, Kopia, Borg</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-header"><span>Repositórios Descobertos</span><div class="kpi-icon green"><i class="fas fa-database"></i></div></div>
+                    <div class="kpi-value" id="kpi-repos">0</div>
+                    <div class="kpi-sub">Prontos para migração nativa</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-header"><span>Tarefas Duplicati</span><div class="kpi-icon orange"><i class="fas fa-tasks"></i></div></div>
+                    <div class="kpi-value" id="kpi-duplicati">0</div>
+                    <div class="kpi-sub">Jobs SQLite encontrados</div>
+                </div>
+            </div>
+
+            <!-- Painel de Log e Resultados -->
+            <div class="status-card" style="margin-bottom:20px">
+                <div class="status-header" style="margin-bottom:16px;">
+                    <h3 style="font-size:1em;color:var(--text);margin:0;">
+                        <i class="fas fa-terminal" style="color:var(--primary);margin-right:8px;"></i>Log de Execução & Migração
+                    </h3>
+                </div>
+                <div id="import-log" style="background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:16px;font-family:monospace;font-size:0.9em;color:var(--text);min-height:160px;max-height:300px;overflow-y:auto">
+                    Clique em "Escanear Motores" para detectar instalações ou "Importar Motores para o Nativo" para iniciar a conversão.
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script src="/static/sidebar.js"></script>
+<script>
+async function scanSystems() {
+    const logEl = document.getElementById('import-log');
+    logEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Escaneando o sistema em busca de motores e bancos de dados legados...';
+    try {
+        const res = await fetch('/api/import/scan');
+        const data = await res.json();
+
+        if (data.status === 'success' && data.scan_results) {
+            const sr = data.scan_results;
+            const engines = sr.engines_detected || {};
+            const repos = sr.repositories_found || [];
+            const dupJobs = sr.duplicati_jobs_found || [];
+
+            let engineCount = Object.values(engines).filter(e => e.available).length;
+            document.getElementById('kpi-engines').textContent = engineCount;
+            document.getElementById('kpi-repos').textContent = repos.length;
+            document.getElementById('kpi-duplicati').textContent = dupJobs.length;
+
+            let html = `<strong>🔍 Descoberta do Sistema Concluída:</strong><br>`;
+            html += `• Motores disponíveis: ${Object.keys(engines).filter(k => engines[k].available).join(', ') || 'Nenhum executável externo'}<br>`;
+            html += `• Repositórios locais descobertos: ${repos.length}<br>`;
+            html += `• Jobs do Duplicati encontrados: ${dupJobs.length}<br>`;
+            dupJobs.forEach(j => {
+                html += `  └─ Job: <strong>${j.name}</strong> (Origens: ${j.sources ? j.sources.join(', ') : 'N/A'})<br>`;
+            });
+            logEl.innerHTML = html;
+        } else {
+            logEl.innerHTML = '⚠️ Erro ao realizar varredura de importação.';
+        }
+    } catch(e) {
+        logEl.innerHTML = '❌ Falha de comunicação: ' + e.message;
+    }
+}
+
+async function runImport() {
+    if (!confirm("Deseja converter todos os motores, repositórios e tarefas (incluindo Duplicati) para o Motor Nativo GBOC?")) return;
+    const btn = document.getElementById('btnImportAction');
+    const logEl = document.getElementById('import-log');
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Convertendo...';
+    logEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processando migração para o Motor Nativo GBOC...';
+
+    try {
+        const res = await fetch('/api/import/execute', { method: 'POST' });
+        const data = await res.json();
+
+        if (data.status === 'success') {
+            let html = `<strong style="color:var(--success)">✅ ${data.message}</strong><br><br>`;
+            html += `• Repositórios nativos: <strong>${data.imported_repositories || 0}</strong><br>`;
+            html += `• Tarefas nativas criadas: <strong>${data.imported_tasks || 0}</strong><br><br>`;
+            if (data.logs && data.logs.length) {
+                html += `<strong>Detalhes da Operação:</strong><br>${data.logs.join('<br>')}`;
+            }
+            logEl.innerHTML = html;
+            scanSystems();
+        } else {
+            logEl.innerHTML = `<strong style="color:var(--danger)">❌ Falha na importação:</strong> ${data.message}`;
+        }
+    } catch(e) {
+        logEl.innerHTML = `<strong style="color:var(--danger)">❌ Erro na importação:</strong> ${e.message}`;
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-magic"></i> Importar Motores para o Nativo';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', scanSystems);
+</script>
+</body>
+</html>

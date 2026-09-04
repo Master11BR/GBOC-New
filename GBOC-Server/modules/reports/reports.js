@@ -1,4 +1,4 @@
-/* GBOC System v13.2.0 Enterprise Edition */
+/* GBOC System v14.0.0 Enterprise Edition */
 /* Module: Reports JavaScript Controller (Server) */
 
 let srvAllReports = [];
@@ -161,7 +161,7 @@ async function runSrvSelectedReport() {
                 </div>
                 <div style="font-size:0.8em;color:var(--text-muted);text-align:right">
                     Gerado em: <strong>${new Date(data.generated_at).toLocaleString()}</strong><br>
-                    Engine: <span>GBOC Server 13.2.0</span>
+                    Engine: <span>GBOC Server 14.0.0</span>
                 </div>
             </div>
 

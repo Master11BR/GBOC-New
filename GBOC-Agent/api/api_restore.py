@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-🔄 GBOC Agent 13.2.0 - API de Restauração REAL
+🔄 GBOC Agent 14.0.0 - API de Restauração REAL
 Gerencia restauração de arquivos de snapshots reais
 """
 

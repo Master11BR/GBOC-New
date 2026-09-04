@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 13.2.0 - API de Verificação de Integridade
+GBOC 14.0.0 - API de Verificação de Integridade
 Executa restic check / kopia verify para validar integridade dos repositórios
 """
 

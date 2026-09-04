@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v13.2.0 Enterprise Edition
+# GBOC System v14.0.0 Enterprise Edition
 # Module: Compliance Central Server Router
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================
@@ -22,11 +22,29 @@ from pydantic import BaseModel
 
 logger = logging.getLogger("compliance_server_router")
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-try:
-    from server_gboc import get_db, release_db
-except Exception:
-    from gboc_server import get_db, release_db
+def get_db():
+    mod = sys.modules.get("server_gboc") or sys.modules.get("__main__")
+    if mod and hasattr(mod, "get_db"):
+        return mod.get_db()
+    try:
+        from server_gboc import get_db as _gdb
+        return _gdb()
+    except Exception:
+        from gboc_server import get_db as _gdb
+        return _gdb()
+
+
+def release_db(conn):
+    mod = sys.modules.get("server_gboc") or sys.modules.get("__main__")
+    if mod and hasattr(mod, "release_db"):
+        return mod.release_db(conn)
+    try:
+        from server_gboc import release_db as _rdb
+        return _rdb(conn)
+    except Exception:
+        from gboc_server import release_db as _rdb
+        return _rdb(conn)
+
 
 router = APIRouter(prefix="/api/v1/server/compliance", tags=["Compliance Central"])
 

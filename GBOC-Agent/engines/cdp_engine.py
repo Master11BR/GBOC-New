@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v13.2.0 Enterprise Edition
+# GBOC System v14.0.0 Enterprise Edition
 # Module: Continuous Data Protection (CDP Engine - Sub-Minute RPO)
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================
@@ -34,22 +34,19 @@ class ContinuousDataProtectionEngine:
             self.cdp_journal_dir.mkdir(parents=True, exist_ok=True)
         except Exception:
             pass
-        self._init_mock_or_real_checkpoints()
+        self._load_real_cdp_checkpoints()
 
-    def _init_mock_or_real_checkpoints(self):
-        """Gera histórico contínuo de micro-checkpoints das últimas 2 horas."""
-        now = datetime.now()
+    def _load_real_cdp_checkpoints(self):
+        """Carrega checkpoints reais salvos no diretório de journal do CDP."""
         with self.lock:
-            for m in range(60, 0, -2):
-                t = now - timedelta(minutes=m)
-                self.checkpoints.append({
-                    "checkpoint_id": f"chk_{int(t.timestamp())}",
-                    "timestamp": t.isoformat(),
-                    "rpo_seconds": 12,
-                    "delta_size_kb": (m * 42) % 512 + 64,
-                    "events_count": (m * 7) % 35 + 5,
-                    "consistency": "TRANSACTION_CONSISTENT"
-                })
+            self.checkpoints = []
+            if self.cdp_journal_dir.exists():
+                for item in sorted(self.cdp_journal_dir.glob("chk_*.json"), key=os.path.getmtime, reverse=True):
+                    try:
+                        with open(item, "r", encoding="utf-8") as f:
+                            self.checkpoints.append(json.load(f))
+                    except Exception:
+                        pass
 
     def start_cdp_daemon(self) -> Dict[str, Any]:
         """Inicia o coletor contínuo de micro-journaling de I/O."""

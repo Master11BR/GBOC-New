@@ -1,4 +1,4 @@
-# GBOC System v13.2.0 Enterprise Edition
+# GBOC System v14.0.0 Enterprise Edition
 # Module: Server RMM & Remote Terminal Router
 # Remote Agent Execution Dispatcher, WebSocket/HTTP Proxy & Local Execution Fallback
 
@@ -365,7 +365,7 @@ async def rmm_get_mirror(agent_id: Optional[str] = None):
             "agent_id": agent_id or "servidor-central",
             "hostname": hostname,
             "ip_address": socket.gethostbyname(hostname),
-            "version": "GBOC Server 13.2.0 Enterprise",
+            "version": "GBOC Server 14.0.0 Enterprise",
             "system_telemetry": {
                 "hostname": hostname,
                 "os_info": os_info,

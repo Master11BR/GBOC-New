@@ -204,3 +204,55 @@ async def get_last_result(backup_id: str) -> Dict[str, Any]:
     if result.get("status") == "error":
         raise HTTPException(status_code=502, detail=result)
     return result
+
+
+# ── Criação, Exclusão, Reparo e Manutenção de Backups ──────────────────────────
+
+@router.post("/backups")
+async def create_backup(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Cria um novo job de backup no Duplicati."""
+    service = get_duplicati_native_service()
+    result = service.create_backup(payload)
+    if result.get("status") == "error":
+        raise HTTPException(status_code=502, detail=result)
+    return result
+
+
+@router.delete("/backups/{backup_id}")
+async def delete_backup(backup_id: str, delete_remote_files: bool = False) -> Dict[str, Any]:
+    """Exclui um job de backup do Duplicati."""
+    service = get_duplicati_native_service()
+    result = service.delete_backup(backup_id, delete_remote_files=delete_remote_files)
+    if result.get("status") == "error":
+        raise HTTPException(status_code=502, detail=result)
+    return result
+
+
+@router.post("/backups/{backup_id}/repair")
+async def repair_backup(backup_id: str) -> Dict[str, Any]:
+    """Executa a reconstrução/reparo do banco local do backup."""
+    service = get_duplicati_native_service()
+    result = service.repair_backup(backup_id)
+    if result.get("status") == "error":
+        raise HTTPException(status_code=502, detail=result)
+    return result
+
+
+@router.post("/backups/{backup_id}/verify")
+async def verify_backup(backup_id: str) -> Dict[str, Any]:
+    """Testa a conexão e a integridade com o destino remoto."""
+    service = get_duplicati_native_service()
+    result = service.verify_backup(backup_id)
+    if result.get("status") == "error":
+        raise HTTPException(status_code=502, detail=result)
+    return result
+
+
+@router.post("/backups/{backup_id}/compact")
+async def compact_backup(backup_id: str) -> Dict[str, Any]:
+    """Compacta e limpa blocos no destino remoto do backup."""
+    service = get_duplicati_native_service()
+    result = service.compact_backup(backup_id)
+    if result.get("status") == "error":
+        raise HTTPException(status_code=502, detail=result)
+    return result

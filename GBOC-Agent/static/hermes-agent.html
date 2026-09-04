@@ -3,10 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hermes Agent — GBOC v13.2.0</title>
+  <title>Hermes Agent — GBOC Agent</title>
   <meta name="description" content="Hermes Agent — Painel de controle do agente de borda autônomo e auto-curável do GBOC System">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/gboc-themes.css">
+  <link rel="stylesheet" href="/static/gboc-layout.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="/static/gboc-layout-manager.js"></script>
   <style>
     :root {
       --bg-primary: #0a0e1a;
@@ -30,11 +34,10 @@
       --font-mono: 'JetBrains Mono', monospace;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * { box-sizing: border-box; }
 
     body {
       font-family: 'Inter', sans-serif;
-      background: var(--bg-primary);
       color: var(--text-primary);
       min-height: 100vh;
     }
@@ -310,13 +313,16 @@
   </style>
 </head>
 <body>
+<div class="app-layout">
+    <div id="sidebar-container"></div>
+    <main class="main-content">
 
 <!-- Header -->
 <header class="hermes-header">
   <div class="hermes-icon">🏛️</div>
   <div class="hermes-header-text">
     <h1>Hermes Agent</h1>
-    <p>Agente de Borda Autônomo &amp; Auto-Curável — GBOC v13.2.0 Enterprise</p>
+    <p>Agente de Borda Autônomo &amp; Auto-Curável — GBOC v14.0.0 Enterprise</p>
   </div>
   <div class="live-badge">
     <div class="live-dot" id="liveDot"></div>
@@ -480,7 +486,16 @@
   </section>
 
 </main>
+</div>
 
-<script src="hermes-agent.js"></script>
+<script src="/static/sidebar.js"></script>
+<script src="/static/hermes-agent.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    if (typeof UnifiedSidebar !== 'undefined') {
+        new UnifiedSidebar().initialize();
+    }
+});
+</script>
 </body>
 </html>

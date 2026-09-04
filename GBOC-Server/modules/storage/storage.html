@@ -1,4 +1,4 @@
-<!-- GBOC Server v13.2.0 — Fragmento de Armazenamento Central -->
+<!-- GBOC Server v14.0.0 — Fragmento de Armazenamento Central -->
 <div class="panel">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:12px">
         <h3><i class="fas fa-hdd" style="color:var(--primary)"></i> Uso & Crescimento de Armazenamento Central</h3>
@@ -20,6 +20,11 @@
             <div class="kpi-header"><span>Espaço Livre</span><div class="kpi-icon green"><i class="fas fa-check-circle"></i></div></div>
             <div class="kpi-value" id="srv-storage-free">0 GB</div>
             <div class="kpi-sub">Disponível</div>
+        </div>
+    <div class="panel" style="margin-bottom:20px;padding:16px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px">
+        <h4 style="margin-bottom:12px"><i class="fas fa-layer-group" style="color:var(--primary)"></i> Consumo de Armazenamento por Motor (Disco Local vs. Nuvem)</h4>
+        <div id="srv-engine-storage-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px">
+            <div style="text-align:center;padding:20px;color:var(--text-muted);grid-column:1/-1">Carregando estatísticas dos motores...</div>
         </div>
     </div>
 

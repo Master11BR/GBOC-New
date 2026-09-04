@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 13.2.0 - Reports API (Agent)
+GBOC 14.0.0 - Reports API (Agent)
 Generate, schedule, download and manage backup reports with 100% real system data.
 Supports HTML (print-to-PDF), CSV, JSON formats.
 """
@@ -37,7 +37,7 @@ def get_usd_to_brl_rate() -> float:
     try:
         req = urllib.request.Request(
             "https://economia.awesomeapi.com.br/json/last/USD-BRL",
-            headers={"User-Agent": "GBOC-System/13.2.0"}
+            headers={"User-Agent": "GBOC-System/14.0.0"}
         )
         with urllib.request.urlopen(req, timeout=3) as resp:
             if resp.status == 200:
@@ -691,13 +691,13 @@ def generate_real_report_data(rep_id: int) -> Dict[str, Any]:
     elif rep_id == 30:
         metrics = [
             {"label": "Licença Agent", "value": "🟢 VÁLIDA (Enterprise)"},
-            {"label": "Build Agente", "value": "v13.2.0 Stable"},
+            {"label": "Build Agente", "value": "v14.0.0 Stable"},
             {"label": "Status Certificado", "value": "SSL / TLS Ativo"},
             {"label": "Nó Conectado", "value": "GBOC Node 01"}
         ]
         table_headers = ["Agente Node ID", "Hostname", "Versão Build", "Certificado SSL", "Status Licenciamento"]
-        table_rows = [["node-local-01", "Local Host", "v13.2.0 Enterprise", "🟢 VÁLIDO (TLS 1.3)", "🟢 LICENCIADO"]]
-        detalhes = "Status Geral de Licenciamento: O nó local opera com licença válida Enterprise v13.2.0 com comunicação cifrada via SSL/TLS."
+        table_rows = [["node-local-01", "Local Host", "v14.0.0 Enterprise", "🟢 VÁLIDO (TLS 1.3)", "🟢 LICENCIADO"]]
+        detalhes = "Status Geral de Licenciamento: O nó local opera com licença válida Enterprise v14.0.0 com comunicação cifrada via SSL/TLS."
 
     elif rep_id == 31:
         days_left = 340 if cur_gb < 10 else 120

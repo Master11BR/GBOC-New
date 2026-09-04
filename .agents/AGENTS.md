@@ -10,6 +10,7 @@
   * `modules/<domain>/<domain>.js`
   * `modules/<domain>/<domain>.html`
   * Additional CSS, assets, services, models or utilities when required by the architecture.
+* **Distribution Package Update Requirement:** A cada novo arquivo, módulo ou funcionalidade criada ou modificada nos fontes do sistema (`GBOC-Server` ou `GBOC-Agent`), o pacote de distribuição DEVE ser atualizado rodando `build_installer_package.ps1` (ou `tools/make_distribution.py`) para manter a pasta externa `GBOC-Distribution` sincronizada.
 * **Clean Entrypoints:** Keep `gboc_server.py`, `agent_server.py`, and `dashboard.html` lean.
 * Entrypoints must only:
 
@@ -572,6 +573,9 @@ The following rules are mandatory:
 * **ALWAYS validate API responses and system command results.**
 * **ALWAYS maintain the modular architecture defined by `ARCHITECTURE_POLICIES.md`.**
 * **ALWAYS preserve the separation between frontend, backend and system-integration responsibilities.**
+* **ALWAYS update the distribution package (`build_installer_package.ps1`) whenever a new file is added or modified in the workspace.**
+* **ALWAYS apply Motion Principles (Kyle Zantos Motion Principles: Skeleton loaders, lazy loading, smooth entering/exiting and fluid progress animations) on all user interfaces.**
+* **ALWAYS enforce Observability (Sentry, OpenTelemetry, Datadog APM, NewRelic), Code Governance (Arch-contract, Biome, Commitlint, Knip, Stryker) and E2E/Unit Test Integrity (Playwright, Pytest, Codecov).**
 * **ALWAYS prioritize security, reliability, accessibility and maintainability.**
 
 ---

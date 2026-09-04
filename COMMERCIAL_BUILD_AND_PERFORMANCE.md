@@ -1,8 +1,8 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v13.2.0 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.0.0 Enterprise. Todos os direitos reservados. -->
 
-# 🚀 GBOC System v13.2.0 — Roteiro de Desempenho, Qualidade Comercial e Compilação Standalone
+# 🚀 GBOC System v14.0.0 — Roteiro de Desempenho, Qualidade Comercial e Compilação Standalone
 
-[![GBOC Version](https://img.shields.io/badge/GBOC%20Version-13.2.0-blue.svg)](file:///d:/GBOC-New/GBOC-New/README.md)
+[![GBOC Version](https://img.shields.io/badge/GBOC%20Version-14.0.0-blue.svg)](file:///d:/GBOC-New/GBOC-New/README.md)
 [![Commercial Ready](https://img.shields.io/badge/commercial-ready-brightgreen.svg)]()
 
 > **Roteiro Técnico para Transformar o GBOC em um Produto Comercial de Alta Performance, Protegido contra Engenharia Reversa e Compilável em Executáveis Standalone Autônomos (`.exe` / Binários Linux)**.
@@ -152,11 +152,11 @@ Para distribuir o GBOC como um instalador comercial `.exe` com assistente gráfi
 ```pascal
 [Setup]
 AppName=GBOC Operations Center
-AppVersion=13.2.0
+AppVersion=14.0.0
 DefaultDirName={autopf}\GBOC
 DefaultGroupName=GBOC
 OutputDir=Output
-OutputBaseFilename=GBOC_Installer_v13.2.0
+OutputBaseFilename=GBOC_Installer_v14.0.0
 Compression=lzma2
 SolidCompression=yes
 ArchitecturesInstallIn64BitMode=x64
@@ -177,4 +177,4 @@ Filename: "{app}\Tools\nssm\nssm.exe"; Parameters: "remove GBOCAgent confirm"; F
 
 ---
 
-**GBOC System v13.2.0** — Roteiro de Desempenho e Comercialização.
+**GBOC System v14.0.0** — Roteiro de Desempenho e Comercialização.

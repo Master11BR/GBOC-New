@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 13.2.0 - Kubernetes, OpenShift & Container Backup Engine
+GBOC 14.0.0 - Kubernetes, OpenShift & Container Backup Engine
 Native backup & restore for K8s Namespaces, StatefulSets, PVCs (PersistentVolumeClaims), Helm releases and Docker volumes.
 """
 

@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v13.2.0 Enterprise Edition
+# GBOC System v14.0.0 Enterprise Edition
 # Module: Virtual Cloud Drive Mount Engine (Z:\ Drive Letter via VFS)
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================

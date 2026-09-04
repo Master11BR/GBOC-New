@@ -1,6 +1,6 @@
 <!--
 ==============================================================================
-GBOC System v13.2.0 Enterprise Edition
+GBOC System v14.0.0 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
@@ -11,8 +11,8 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GBOC Agent 13.2.0 - Central de Relatórios UniFi</title>
-    <link rel="stylesheet" href="/static/style.css?v=13.2.0">
+    <title>GBOC Agent 14.0.0 - Central de Relatórios UniFi</title>
+    <link rel="stylesheet" href="/static/style.css?v=14.0.0">
     <link rel="stylesheet" href="/static/gboc-themes.css">
     <link rel="stylesheet" href="/static/gboc-layout.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -230,8 +230,8 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             }
         }
     </style>
-    <script src="/static/auth_interceptor.js?v=13.2.0"></script>
-    <script src="/static/gboc-global.js?v=13.2.0"></script>
+    <script src="/static/auth_interceptor.js?v=14.0.0"></script>
+    <script src="/static/gboc-global.js?v=14.0.0"></script>
 </head>
 
 <body data-theme="unifi">
@@ -241,7 +241,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 <div>
                     <h1 class="page-title"><i class="fas fa-file-contract" style="color:var(--primary)"></i> Central de Relatórios Gerenciais</h1>
                     <div class="page-subtitle">Catálogo unificado de inteligência preditiva, SLAs, capacidade e
-                        auditoria GBOC v13.2.0</div>
+                        auditoria GBOC v14.0.0</div>
                 </div>
                 <div class="header-actions">
                     <button class="btn btn-secondary" onclick="loadCatalog()"><i class="fas fa-sync-alt"></i>
@@ -307,7 +307,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         </main>
     </div>
 
-    <script src="/static/sidebar.js?v=13.2.0"></script>
+    <script src="/static/sidebar.js?v=14.0.0"></script>
     <script>
         let allReports = [];
         let selectedReportId = null;
@@ -397,7 +397,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 <p style="color:var(--text-muted);font-size:0.88em">Código Único de Exportação: <code>${rep.code || 'REP-' + rep.id}</code></p>
             </div>
             <div style="text-align:center;padding:40px">
-                <p style="color:var(--text-muted);margin-bottom:16px">Clique no botão abaixo para processar os dados deste relatório com a Engine GBOC v13.2.0.</p>
+                <p style="color:var(--text-muted);margin-bottom:16px">Clique no botão abaixo para processar os dados deste relatório com a Engine GBOC v14.0.0.</p>
                 <button class="btn btn-primary" onclick="runCurrentSelectedReport()" style="padding:10px 24px;font-size:1em"><i class="fas fa-play"></i> Processar & Gerar Relatório #${rep.id}</button>
             </div>
         `;

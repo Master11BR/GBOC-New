@@ -1,14 +1,14 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v13.2.0 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.0.0 Enterprise. Todos os direitos reservados. -->
 
-# GBOC v13.2.0 - Sistema de Backup e Monitoramento
+# GBOC v14.0.0 - Sistema de Backup e Monitoramento
 
 ## 📋 Visão Geral
 
-O GBOC (Generic Backup Operations Center) v13.2.0 é um sistema completo de gerenciamento de backups com recursos avançados de diagnóstico, monitoramento e análise estatística, inspirado no Duplicati.
+O GBOC (Generic Backup Operations Center) v14.0.0 é um sistema completo de gerenciamento de backups com recursos avançados de diagnóstico, monitoramento e análise estatística, inspirado no Duplicati.
 
-### ✨ Novidades da v13.2.0
+### ✨ Novidades da v14.0.0
 
-- ✅ **Versão Unificada**: Agente e Servidor sincronizados na versão 13.2.0
+- ✅ **Versão Unificada**: Agente e Servidor sincronizados na versão 14.0.0
 - ✅ **Diagnóstico Completo**: Sistema de diagnóstico preemptivo e preventivo
 - ✅ **Estatísticas Avançadas**: Análise detalhada com previsões e tendências
 - ✅ **Detecção de Órfãos**: Identificação e integração de arquivos não utilizados
@@ -20,7 +20,7 @@ O GBOC (Generic Backup Operations Center) v13.2.0 é um sistema completo de gere
 
 ```
 GBOC-New/
-├── gboc_v8/                    # Agente (v13.2.0)
+├── gboc_v8/                    # Agente (v14.0.0)
 │   ├── agent_server.py         # Servidor principal do agente
 │   ├── start_server.py         # Script de inicialização
 │   ├── server_client.py        # Cliente para servidor central
@@ -32,16 +32,16 @@ GBOC-New/
 │   │   ├── tasks.py
 │   │   ├── diagnostics.py
 │   │   ├── statistics.py
-│   │   ├── advanced_stats_api.py    # ✨ Nova API v13.2.0
-│   │   ├── preemptive_api.py        # ✨ Nova API v13.2.0
-│   │   └── system_api.py            # ✨ Nova API v13.2.0
+│   │   ├── advanced_stats_api.py    # ✨ Nova API v14.0.0
+│   │   ├── preemptive_api.py        # ✨ Nova API v14.0.0
+│   │   └── system_api.py            # ✨ Nova API v14.0.0
 │   │
 │   ├── engines/                # Motores de processamento
 │   │   ├── backup_engine.py
 │   │   ├── scheduler.py
 │   │   ├── diagnostic_system.py
-│   │   ├── advanced_statistics.py   # ✨ Novo v13.2.0
-│   │   └── preemptive_diagnostic.py # ✨ Novo v13.2.0
+│   │   ├── advanced_statistics.py   # ✨ Novo v14.0.0
+│   │   └── preemptive_diagnostic.py # ✨ Novo v14.0.0
 │   │
 │   ├── storage_backends/       # Backends de armazenamento
 │   │   ├── local.py
@@ -51,7 +51,7 @@ GBOC-New/
 │   ├── logs/                   # Logs do sistema
 │   └── static/                 # Frontend web
 │
-└── GBOC-Server/               # Servidor Central (v13.2.0)
+└── GBOC-Server/               # Servidor Central (v14.0.0)
     ├── gboc_server.py         # Servidor principal PostgreSQL
     └── index.html             # Dashboard web
 
@@ -196,7 +196,7 @@ GET http://localhost:9200/api/system/orphan-files
 
 ### 5. Unificação de Versões
 
-Unifica todas as versões para 13.2.0:
+Unifica todas as versões para 14.0.0:
 
 ```bash
 cd gboc_v8
@@ -221,7 +221,7 @@ GET http://localhost:9200/api/system/health
 
 ## 📊 APIs Disponíveis
 
-### APIs v13.2.0 (Novas)
+### APIs v14.0.0 (Novas)
 
 | Endpoint | Método | Descrição |
 |----------|--------|-----------|
@@ -253,7 +253,7 @@ GET http://localhost:9200/api/system/health
 
 ## 🎯 Recursos Inspirados no Duplicati
 
-### Implementados na v13.2.0
+### Implementados na v14.0.0
 
 1. **Sistema de Estatísticas Avançadas**
    - Métricas detalhadas de backup
@@ -393,5 +393,5 @@ Para suporte e questões:
 
 ---
 
-**GBOC v13.2.0** - Sistema Completo de Backup e Monitoramento
+**GBOC v14.0.0** - Sistema Completo de Backup e Monitoramento
 Desenvolvido com ❤️ inspirado no Duplicati

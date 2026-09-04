@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v13.2.0 Enterprise Edition
+# GBOC System v14.0.0 Enterprise Edition
 # Module: Cyber Cleanroom & ITIL Central Server Router
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================
@@ -16,11 +16,41 @@ from pydantic import BaseModel
 
 logger = logging.getLogger("cyber_server_router")
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-try:
-    from server_gboc import get_db, release_db, manager
-except Exception:
-    from gboc_server import get_db, release_db, manager
+def get_db():
+    mod = sys.modules.get("server_gboc") or sys.modules.get("__main__")
+    if mod and hasattr(mod, "get_db"):
+        return mod.get_db()
+    try:
+        from server_gboc import get_db as _gdb
+        return _gdb()
+    except Exception:
+        from gboc_server import get_db as _gdb
+        return _gdb()
+
+
+def release_db(conn):
+    mod = sys.modules.get("server_gboc") or sys.modules.get("__main__")
+    if mod and hasattr(mod, "release_db"):
+        return mod.release_db(conn)
+    try:
+        from server_gboc import release_db as _rdb
+        return _rdb(conn)
+    except Exception:
+        from gboc_server import release_db as _rdb
+        return _rdb(conn)
+
+
+def get_manager():
+    mod = sys.modules.get("server_gboc") or sys.modules.get("__main__")
+    if mod and hasattr(mod, "manager"):
+        return mod.manager
+    try:
+        from server_gboc import manager as _mgr
+        return _mgr
+    except Exception:
+        from gboc_server import manager as _mgr
+        return _mgr
+
 
 router = APIRouter(prefix="/api/v1/server/cyber", tags=["Cyber Cleanroom & ITIL Central"])
 
@@ -91,12 +121,18 @@ async def trigger_remote_cleanroom(req: CleanroomTriggerRequest):
             "target_path": req.target_path,
             "issued_at": datetime.now().isoformat()
         })
-        await manager.send_personal_message(command, req.agent_id)
+        mgr = get_manager()
+        if mgr:
+            await mgr.send_personal_message(command, req.agent_id)
+        else:
+            raise HTTPException(status_code=503, detail="Connection manager não disponível")
         return {
             "status": "success",
             "message": f"Cyber Cleanroom acionado no agente '{req.agent_id}'",
             "target_path": req.target_path
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -152,13 +188,19 @@ async def itil_manual_webhook(req: ITILWebhookRequest):
             "severity": req.severity,
             "issued_at": datetime.now().isoformat()
         })
-        await manager.send_personal_message(command, req.agent_id)
+        mgr = get_manager()
+        if mgr:
+            await mgr.send_personal_message(command, req.agent_id)
+        else:
+            raise HTTPException(status_code=503, detail="Connection manager não disponível")
         return {
             "status": "success",
             "message": f"Webhook ITIL disparado no agente '{req.agent_id}'",
             "incident_title": req.incident_title,
             "severity": req.severity
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

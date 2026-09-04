@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC Agent 13.2.0 - API Repositories
+GBOC Agent 14.0.0 - API Repositories
 ✅ Aceita payload flexível do frontend
 ✅ Integra com RepositoryManager
 ✅ Inicialização em background

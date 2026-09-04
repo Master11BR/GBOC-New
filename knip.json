@@ -1,0 +1,6 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": ["GBOC-Server/server_gboc.py", "GBOC-Agent/agent_gboc.py"],
+  "project": ["GBOC-Server/**/*.{js,py,html}", "GBOC-Agent/**/*.{js,py,html}"],
+  "ignore": ["node_modules/**", "venv/**", "d:\\GBOC-New\\GBOC-Distribution\\**"]
+}

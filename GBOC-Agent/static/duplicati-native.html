@@ -1,8 +1,8 @@
 <!--
 ==============================================================================
-GBOC System v13.2.0 Enterprise Edition
+GBOC System v14.0.0 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
-Propriedade Intelectual & Direitos Autorais Registrados.
+Modulo: Duplicati Nativo Completo no Layout GBOC
 ==============================================================================
 -->
 <!DOCTYPE html>
@@ -10,8 +10,8 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GBOC Agent - Duplicati Nativo</title>
-    <link rel="stylesheet" href="/static/style.css?v=13.2.0">
+    <title>GBOC Agent - Duplicati Nativo Completo</title>
+    <link rel="stylesheet" href="/static/style.css?v=14.0.0">
     <link rel="stylesheet" href="/static/gboc-themes.css">
     <link rel="stylesheet" href="/static/gboc-layout.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -20,7 +20,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     <style>
         .dup-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
         @media(max-width:900px){ .dup-grid{grid-template-columns:1fr;} }
-        .dup-status-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);}
+        .dup-status-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);}
         .dup-status-row:last-child{border-bottom:none;}
         .dup-status-label{color:var(--text-muted);font-size:.85em;min-width:140px;}
         .dup-status-value{color:var(--text);font-weight:600;font-size:.9em;word-break:break-all;}
@@ -29,32 +29,29 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         .dup-badge.warn{background:rgba(240,169,64,.15); color:var(--warning);}
         .dup-badge.crit{background:rgba(240,107,107,.15);color:var(--danger);}
         .dup-badge.info{background:rgba(79,163,232,.15); color:var(--primary);}
-        [data-theme="light"] .dup-badge.ok  {background:#d1fae5;color:#065f46;}
-        [data-theme="light"] .dup-badge.warn{background:#fef3c7;color:#92400e;}
-        [data-theme="light"] .dup-badge.crit{background:#fee2e2;color:#991b1b;}
-        [data-theme="light"] .dup-badge.info{background:#dbeafe;color:#1e40af;}
-        .backup-card{background:var(--bg-input);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:12px;}
-        .backup-card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
-        .backup-card-name{font-weight:700;color:var(--text);font-size:.95em;}
-        .backup-card-meta{font-size:.82em;color:var(--text-muted);margin-top:4px;display:flex;flex-wrap:wrap;gap:10px;}
-        .conn-form{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-        @media(max-width:700px){.conn-form{grid-template-columns:1fr;}}
-        .conn-form label{display:flex;flex-direction:column;gap:4px;font-size:.85em;color:var(--text-muted);font-weight:600;}
-        .conn-form input{background:var(--bg-input);border:1px solid var(--border);border-radius:6px;padding:9px 11px;color:var(--text);font-size:.9em;}
-        .conn-form input:focus{outline:none;border-color:var(--primary);}
-        .conn-form .full{grid-column:1/-1;}
-        .feedback-block{border-radius:8px;padding:12px 14px;font-size:.88em;line-height:1.5;margin-top:14px;display:none;}
-        .feedback-block.ok  {background:rgba(78,203,136,.1); border:1px solid var(--success);color:var(--success);}
-        .feedback-block.err {background:rgba(240,107,107,.1);border:1px solid var(--danger); color:var(--danger);}
-        .feedback-block.info{background:rgba(79,163,232,.1); border:1px solid var(--primary);color:var(--text);}
-        .feedback-block.warn{background:rgba(240,169,64,.1); border:1px solid var(--warning);color:var(--warning);}
-        [data-theme="light"] .feedback-block.ok  {background:#f0fdf4;}
-        [data-theme="light"] .feedback-block.err {background:#fef2f2;}
-        [data-theme="light"] .feedback-block.info{background:#eff6ff;}
-        [data-theme="light"] .feedback-block.warn{background:#fffbeb;}
-        .section-spinner{text-align:center;padding:30px;color:var(--text-muted);}
-        .empty-backups{text-align:center;padding:40px 20px;color:var(--text-muted);}
-        .empty-backups i{font-size:2.5em;margin-bottom:12px;opacity:.5;display:block;}
+
+        .backup-card-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap:16px; margin-top:16px; }
+        .backup-card { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:18px; display:flex; flex-direction:column; justify-content:space-between; transition:transform 0.2s, box-shadow 0.2s; }
+        .backup-card:hover { transform:translateY(-2px); border-color:var(--primary); box-shadow:0 8px 24px rgba(0,0,0,0.15); }
+        .backup-card-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; }
+        .backup-card-title { font-size:1.05em; font-weight:700; color:var(--text); }
+        .backup-card-desc { font-size:0.85em; color:var(--text-muted); margin-top:4px; }
+        .backup-stats-list { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:14px 0; background:var(--bg-input); padding:12px; border-radius:8px; border:1px solid var(--border); font-size:0.85em; }
+        .backup-stats-item { display:flex; flex-direction:column; }
+        .backup-stats-item span:first-child { color:var(--text-muted); font-size:0.8em; }
+        .backup-stats-item span:last-child { color:var(--text); font-weight:600; }
+        .backup-actions-bar { display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; pt-3; border-top:1px solid var(--border); }
+
+        .modal-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); display:none; justify-content:center; align-items:center; z-index:9999; backdrop-filter:blur(4px); }
+        .modal-card { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; width:90%; max-width:650px; max-height:90vh; overflow-y:auto; padding:24px; box-shadow:0 12px 32px rgba(0,0,0,0.4); }
+        .modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; border-bottom:1px solid var(--border); padding-bottom:12px; }
+        .modal-header h3 { margin:0; color:var(--text); font-size:1.2em; }
+        .modal-close { background:none; border:none; color:var(--text-muted); font-size:1.4em; cursor:pointer; }
+        .modal-close:hover { color:var(--danger); }
+        .form-group { margin-bottom:16px; }
+        .form-group label { display:block; font-size:0.85em; color:var(--text-muted); font-weight:600; margin-bottom:6px; }
+        .form-group input, .form-group select, .form-group textarea { width:100%; background:var(--bg-input); border:1px solid var(--border); border-radius:6px; padding:10px 12px; color:var(--text); font-size:0.9em; box-sizing:border-box; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline:none; border-color:var(--primary); }
     </style>
 </head>
 <body>
@@ -63,10 +60,19 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     <main class="main-content">
         <header class="header">
             <div>
-                <h1 class="page-title"><i class="fas fa-plug" style="color:var(--accent);margin-right:8px;"></i>Duplicati Nativo</h1>
-                <div class="page-subtitle">Integração com instancia local do Duplicati (modulo de leitura e diagnostico)</div>
+                <h1 class="page-title"><i class="fas fa-plug" style="color:var(--primary);margin-right:8px;"></i>Duplicati Nativo Completo</h1>
+                <div class="page-subtitle">Gestão completa de backups, restauração, agendamentos e diagnósticos do Duplicati no visual GBOC</div>
             </div>
             <div class="header-actions">
+                <button class="btn btn-primary" onclick="openNewBackupModal()">
+                    <i class="fas fa-plus"></i> Novo Backup
+                </button>
+                <button class="btn btn-primary" onclick="importToNative()" style="background:var(--success);border-color:var(--success)">
+                    <i class="fas fa-file-import"></i> Importar para Nativo
+                </button>
+                <button class="btn btn-secondary" onclick="togglePauseServer()" id="btnPauseServer">
+                    <i class="fas fa-pause"></i> Pausar Agendador
+                </button>
                 <button class="btn btn-secondary" onclick="loadAll()">
                     <i class="fas fa-sync-alt"></i> Atualizar
                 </button>
@@ -74,266 +80,407 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         </header>
 
         <div class="content">
-            <div class="dup-grid" style="margin-bottom:20px;">
-
-                <!-- Status -->
-                <div class="status-card">
-                    <div class="status-header" style="margin-bottom:16px;">
-                        <h3 style="font-size:1em;color:var(--text);margin:0;">
-                            <i class="fas fa-info-circle" style="color:var(--primary);margin-right:8px;"></i>Status da Instancia
-                        </h3>
-                        <span id="statusBadge" class="dup-badge info">
-                            <i class="fas fa-circle-notch fa-spin"></i> Verificando...
-                        </span>
-                    </div>
-                    <div id="statusRows">
-                        <div class="section-spinner"><i class="fas fa-circle-notch fa-spin"></i> Carregando...</div>
-                    </div>
+            <!-- Painel KPI -->
+            <div class="kpi-grid" style="margin-bottom:20px;">
+                <div class="kpi-card">
+                    <div class="kpi-header"><span>Status do Servidor</span><div class="kpi-icon blue"><i class="fas fa-server"></i></div></div>
+                    <div class="kpi-value" id="kpi-srv-status">Carregando...</div>
+                    <div class="kpi-sub" id="kpi-srv-sub">Instância Duplicati</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-header"><span>Backups Configurados</span><div class="kpi-icon green"><i class="fas fa-database"></i></div></div>
+                    <div class="kpi-value" id="kpi-total-backups">0</div>
+                    <div class="kpi-sub">Jobs Ativos</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-header"><span>Espaço Protegido</span><div class="kpi-icon orange"><i class="fas fa-hdd"></i></div></div>
+                    <div class="kpi-value" id="kpi-total-protected">0 GB</div>
+                    <div class="kpi-sub">Total de Fontes</div>
                 </div>
             </div>
 
-            <!-- Backups -->
+            <!-- Lista de Backups -->
             <div class="status-card">
-                <div class="status-header" style="margin-bottom:16px;">
-                    <h3 style="font-size:1em;color:var(--text);margin:0;">
-                        <i class="fas fa-database" style="color:var(--primary);margin-right:8px;"></i>Backups Configurados no Duplicati
+                <div class="status-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                    <h3 style="font-size:1.1em;color:var(--text);margin:0;">
+                        <i class="fas fa-list-alt" style="color:var(--primary);margin-right:8px;"></i>Jobs de Backup Registrados
                     </h3>
-                    <button class="btn btn-small btn-secondary" onclick="loadBackups()">
-                        <i class="fas fa-list"></i> Listar
-                    </button>
+                    <span class="dup-badge info" id="dupCountBadge">0 Jobs</span>
                 </div>
-                <div id="backupsContainer">
-                    <div class="section-spinner"><i class="fas fa-circle-notch fa-spin"></i> Carregando...</div>
+                <div id="backupsGrid" class="backup-card-grid">
+                    <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-muted);">
+                        <i class="fas fa-spinner fa-spin fa-2x" style="margin-bottom:12px"></i>
+                        <p>Carregando backups do Duplicati...</p>
+                    </div>
                 </div>
             </div>
         </div>
     </main>
 </div>
 
+<!-- MODAL: Novo / Editar Backup -->
+<div class="modal-overlay" id="backupModal">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3 id="modalBackupTitle"><i class="fas fa-plus-circle" style="color:var(--primary)"></i> Configurar Backup Duplicati</h3>
+            <button class="modal-close" onclick="closeModal('backupModal')">&times;</button>
+        </div>
+        <form id="backupForm" onsubmit="saveBackupForm(event)">
+            <input type="hidden" id="formBackupId" value="">
+            <div class="form-group">
+                <label>Nome do Backup</label>
+                <input type="text" id="formName" required placeholder="Ex: Backup Meus Documentos">
+            </div>
+            <div class="form-group">
+                <label>Descrição</label>
+                <input type="text" id="formDesc" placeholder="Descrição opcional do job">
+            </div>
+            <div class="form-group">
+                <label>Destino de Armazenamento</label>
+                <select id="formTargetType" onchange="updateTargetUrlPlaceholder()">
+                    <option value="file">Disco Local / Pasta em Rede (file://)</option>
+                    <option value="wasabi">Wasabi S3 Cloud</option>
+                    <option value="s3">Amazon S3 Cloud</option>
+                    <option value="b2">Backblaze B2</option>
+                    <option value="sftp">Servidor SFTP / SSH</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Caminho ou URL do Destino (TargetURL)</label>
+                <input type="text" id="formTargetUrl" required placeholder="file://C:\GBOC-Backups">
+            </div>
+            <div class="form-group">
+                <label>Diretórios de Origem (Caminhos a Incluir)</label>
+                <input type="text" id="formSources" required placeholder="C:\Users\Administrador\Documents, D:\Dados">
+            </div>
+            <div class="form-group">
+                <label>Senha de Criptografia AES-256 (Opcional)</label>
+                <input type="password" id="formPassphrase" placeholder="Deixe em branco para sem criptografia">
+            </div>
+            <div class="form-group">
+                <label>Agendamento Automático</label>
+                <select id="formRepeat">
+                    <option value="1D">Diário (1D)</option>
+                    <option value="1W">Semanal (1W)</option>
+                    <option value="1h">A cada hora (1h)</option>
+                    <option value="manual">Manual apenas</option>
+                </select>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:24px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('backupModal')">Cancelar</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Salvar Backup</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL: Restaurar Arquivos -->
+<div class="modal-overlay" id="restoreModal">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3><i class="fas fa-history" style="color:var(--primary)"></i> Restaurar Arquivos Duplicati</h3>
+            <button class="modal-close" onclick="closeModal('restoreModal')">&times;</button>
+        </div>
+        <form onsubmit="executeRestore(event)">
+            <input type="hidden" id="restoreBackupId" value="">
+            <div class="form-group">
+                <label>Ponto no Tempo / Snapshot</label>
+                <select id="restoreFilesetSelect">
+                    <option value="now">Mais recente (Now)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Caminho de Destino da Restauração</label>
+                <input type="text" id="restorePathInput" required value="C:\GBOC-Restaurados">
+            </div>
+            <div class="form-group">
+                <label><input type="checkbox" id="restoreOverwrite"> Sobrescrever arquivos existentes</label>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:24px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('restoreModal')">Cancelar</button>
+                <button type="submit" class="btn btn-primary" style="background:var(--success);border-color:var(--success)"><i class="fas fa-play"></i> Iniciar Restauração</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL: Log Detalhado -->
+<div class="modal-overlay" id="logModal">
+    <div class="modal-card" style="max-width:750px">
+        <div class="modal-header">
+            <h3><i class="fas fa-file-alt" style="color:var(--primary)"></i> Log de Execução</h3>
+            <button class="modal-close" onclick="closeModal('logModal')">&times;</button>
+        </div>
+        <div id="logContent" style="background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:16px;font-family:monospace;font-size:0.85em;color:var(--text);max-height:400px;overflow-y:auto;white-space:pre-wrap">
+            Carregando log...
+        </div>
+    </div>
+</div>
+
 <script src="/static/sidebar.js"></script>
 <script>
-function showFeedback(id, msg, type) {
-    var el = document.getElementById(id);
-    if (!el) return;
-    el.innerHTML = msg;
-    el.className = 'feedback-block ' + (type || 'info');
-    el.style.display = 'block';
-}
-function hideFeedback(id) {
-    var el = document.getElementById(id);
-    if (el) { el.style.display = 'none'; el.innerHTML = ''; }
-}
+let allBackups = [];
+let isServerPaused = false;
+
 async function apiCall(path, options) {
-    var res = await fetch(path, Object.assign({ headers: { 'Content-Type': 'application/json' } }, options || {}));
-    var data = await res.json().catch(function(){ return {}; });
+    const res = await fetch(path, Object.assign({ headers: { 'Content-Type': 'application/json' } }, options || {}));
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.detail || data.message || JSON.stringify(data));
     return data;
 }
-async function loadConfig() {
-    try {
-        var cfg = await apiCall('/api/duplicati-native/config');
-        var elUrl = document.getElementById('baseUrl');
-        if (elUrl) elUrl.value = cfg.base_url || '';
-    } catch(e) {}
-}
-async function saveConfig() {
-    var elUrl = document.getElementById('baseUrl');
-    if (!elUrl) return;
-    hideFeedback('connFeedback');
-    var btn = document.querySelector('[onclick="saveConfig()"]');
-    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...'; }
-    try {
-        var payload = {
-            base_url: elUrl.value.trim(),
-            username: (document.getElementById('username') ? document.getElementById('username').value.trim() : ''),
-            password: (document.getElementById('password') ? document.getElementById('password').value : ''),
-            timeout_seconds: Number((document.getElementById('timeout') ? document.getElementById('timeout').value : 8)),
-            verify_tls: (document.getElementById('verifyTls') ? document.getElementById('verifyTls').checked : false)
-        };
-        if (!payload.base_url) { showFeedback('connFeedback', 'URL Base obrigatoria', 'err'); return; }
-        await apiCall('/api/duplicati-native/config', { method: 'POST', body: JSON.stringify(payload) });
-        showFeedback('connFeedback', '<i class="fas fa-check-circle"></i> Configuracao salva', 'ok');
-        await probe();
-    } catch(e) {
-        showFeedback('connFeedback', '<i class="fas fa-times-circle"></i> Erro: ' + e.message, 'err');
-    } finally {
-        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Salvar'; }
-    }
-}
-function renderStatusRows(data) {
-    var rows = document.getElementById('statusRows');
-    var badge = document.getElementById('statusBadge');
-    if (!rows) return;
 
-    var online = data && data.online !== false && (data.probe ? data.probe.ok : true);
-    var probeObj = (data && data.probe) || {};
-    var msg = probeObj.message || (online ? '🟢 Instância Operacional' : '❌ Instância Offline');
-
-    if (badge) {
-        badge.className = 'dup-badge ' + (online ? 'ok' : 'crit');
-        badge.innerHTML = online ? '<i class="fas fa-check-circle"></i> Operacional' : '<i class="fas fa-times-circle"></i> Offline';
-    }
-
-    var fields = [
-        ['Status Conexão', msg],
-        ['URL Base', data ? (data.base_url || (probeObj.base_url || 'http://localhost:8200')) : 'http://localhost:8200'],
-        ['Modo de Leitura', (probeObj.authenticated ? 'API HTTP Autenticada' : 'SQLite DB Direct Reader / Local')],
-        ['Instalação Local', (probeObj.installation && probeObj.installation.detected) ? 'Detectada no Sistema' : 'Serviço em Execução']
-    ];
-    rows.innerHTML = fields.map(function(f) {
-        return '<div class="dup-status-row"><span class="dup-status-label">' + f[0] + '</span><span class="dup-status-value">' + f[1] + '</span></div>';
-    }).join('');
+async function loadAll() {
+    await checkServerState();
+    await loadBackups();
 }
-async function probe() {
-    var rows = document.getElementById('statusRows');
-    if (rows) rows.innerHTML = '<div class="section-spinner"><i class="fas fa-circle-notch fa-spin"></i> Verificando...</div>';
-    var badge = document.getElementById('statusBadge');
-    if (badge) { badge.className = 'dup-badge info'; badge.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Verificando...'; }
+
+async function checkServerState() {
     try {
-        var data = await apiCall('/api/duplicati-native/status');
-        renderStatusRows(data);
-    } catch(e) {
-        renderStatusRows({ error: e.message });
-    }
-}
-async function discover() {
-    showFeedback('connFeedback', '<i class="fas fa-search"></i> Descobrindo endpoints...', 'info');
-    try {
-        var data = await apiCall('/api/duplicati-native/discover');
-        var found = data.endpoints || data.discovered || [];
-        var elUrl = document.getElementById('baseUrl');
-        if (found.length) {
-            showFeedback('connFeedback', '<i class="fas fa-check-circle"></i> Endpoints: ' + found.join(', '), 'ok');
-            if (found[0] && elUrl && !elUrl.value) elUrl.value = found[0];
+        const data = await apiCall('/api/duplicati-native/serverstate');
+        const st = data.state || {};
+        const isRunning = st.ProgramState === 'Running' || st.programState === 'Running' || true;
+        isServerPaused = st.ProgramState === 'Paused';
+
+        document.getElementById('kpi-srv-status').textContent = isServerPaused ? 'Pausado' : 'Online';
+        document.getElementById('kpi-srv-sub').textContent = st.ProgramState || 'Servidor Ativo';
+        
+        const btnP = document.getElementById('btnPauseServer');
+        if (isServerPaused) {
+            btnP.innerHTML = '<i class="fas fa-play"></i> Retomar Agendador';
+            btnP.className = 'btn btn-primary';
         } else {
-            showFeedback('connFeedback', '<i class="fas fa-exclamation-circle"></i> Nenhum endpoint encontrado', 'warn');
+            btnP.innerHTML = '<i class="fas fa-pause"></i> Pausar Agendador';
+            btnP.className = 'btn btn-secondary';
         }
     } catch(e) {
-        showFeedback('connFeedback', '<i class="fas fa-times-circle"></i> ' + e.message, 'err');
+        document.getElementById('kpi-srv-status').textContent = 'Online (SQLite)';
     }
 }
-function esc(s) {
-    if (!s) return '';
-    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
 
-function fmtBytes(b) {
-    if (!b || isNaN(b)) return '—';
-    b = Number(b);
-    if (b >= 1e9) return (b / 1e9).toFixed(2).replace('.', ',') + ' GB';
-    if (b >= 1e6) return (b / 1e6).toFixed(2).replace('.', ',') + ' MB';
-    if (b >= 1e3) return (b / 1e3).toFixed(1).replace('.', ',') + ' KB';
-    return b + ' B';
-}
-
-function fmtDate(dt) {
-    if (!dt) return '—';
+async function togglePauseServer() {
     try {
-        var s = String(dt).trim();
-        if (s.length === 16 && s[8] === 'T' && s[15] === 'Z') {
-            s = s.substring(0,4) + '-' + s.substring(4,6) + '-' + s.substring(6,8) + 'T' + s.substring(9,11) + ':' + s.substring(11,13) + ':' + s.substring(13,15) + 'Z';
-        }
-        var d = new Date(s);
-        if (isNaN(d.getTime())) return String(dt);
-        return d.toLocaleString('pt-BR');
-    } catch(e) { return String(dt); }
-}
-
-function fmtDuration(dur) {
-    if (!dur) return '—';
-    var s = String(dur);
-    var parts = s.split(':');
-    if (parts.length === 3) {
-        var hrs = parseInt(parts[0], 10);
-        var mins = parseInt(parts[1], 10);
-        var secs = Math.round(parseFloat(parts[2]));
-        if (hrs > 0) return hrs + 'h ' + mins + 'm';
-        if (mins > 0) return mins + 'm ' + secs + 's';
-        return secs + 's';
-    }
-    return s;
-}
-
-function stClass(st) {
-    if (!st) return 'info';
-    var s = String(st).toLowerCase();
-    if (s.includes('success') || s.includes('complet') || s === 'ok') return 'ok';
-    if (s.includes('error') || s.includes('fail') || s.includes('cancel')) return 'crit';
-    if (s.includes('run') || s.includes('active')) return 'info';
-    return 'warn';
-}
-
-async function runDuplicatiBackup(jobId) {
-    if (!confirm('Deseja iniciar a execução deste backup agora?')) return;
-    try {
-        await apiCall('/api/duplicati-native/backups/' + jobId + '/run', { method: 'POST' });
-        alert('🚀 Execução do backup enviada com sucesso ao Duplicati!');
-        setTimeout(loadBackups, 2000);
+        const endpoint = isServerPaused ? '/api/duplicati-native/server/resume' : '/api/duplicati-native/server/pause';
+        await apiCall(endpoint, { method: 'POST' });
+        loadAll();
     } catch(e) {
-        alert('⚠️ Erro ao acionar backup: ' + e.message);
+        alert('Erro ao alterar estado do servidor: ' + e.message);
     }
 }
 
 async function loadBackups() {
-    var cont = document.getElementById('backupsContainer');
-    if (cont) cont.innerHTML = '<div class="section-spinner"><i class="fas fa-circle-notch fa-spin"></i> Carregando backups...</div>';
+    const grid = document.getElementById('backupsGrid');
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;"><i class="fas fa-spinner fa-spin fa-2x"></i></div>';
+
     try {
-        var data = await apiCall('/api/duplicati-native/backups');
-        var list = Array.isArray(data) ? data : (data.items || data.backups || data.data || []);
-        if (!list.length) {
-            cont.innerHTML = '<div class="empty-backups"><i class="fas fa-database"></i><p>Nenhum backup configurado no Duplicati</p><p style="font-size:.85em;">Verifique se a instância está conectada e acessível.</p></div>';
+        const data = await apiCall('/api/duplicati-native/backups');
+        const items = data.items || [];
+        allBackups = items;
+
+        document.getElementById('kpi-total-backups').textContent = items.length;
+        document.getElementById('dupCountBadge').textContent = items.length + ' Jobs';
+
+        let totalBytes = 0;
+        items.forEach(i => {
+            const sz = Number(i.source_size || (i.Backup && i.Backup.Metadata && i.Backup.Metadata.SourceFilesSize) || 0);
+            totalBytes += sz;
+        });
+        document.getElementById('kpi-total-protected').textContent = (totalBytes / (1024**3)).toFixed(2) + ' GB';
+
+        if (items.length === 0) {
+            grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-muted);"><i class="fas fa-info-circle fa-2x"></i><p>Nenhum backup encontrado. Clique em "Novo Backup" ou "Importar para Nativo".</p></div>';
             return;
         }
-        cont.innerHTML = list.map(function(b) {
-            var bk = b.Backup || {};
-            var meta = bk.Metadata || {};
-            var name = bk.Name || b.name || '(sem nome)';
-            var bId = bk.ID || b.id || '—';
-            var desc = bk.Description || b.description || '';
-            var destLabel = b.target_label || (meta.TargetURL && meta.TargetURL.includes('wasabi') ? 'Wasabi S3' : 'Destino Remoto');
 
-            var lastRun = fmtDate(meta.LastBackupDate || b.last_run);
-            var sourceSize = fmtBytes(meta.SourceFilesSize || b.source_size);
-            var targetSize = fmtBytes(meta.TargetFilesSize || b.target_size);
-            var versions = meta.BackupListCount || b.versions_count || '0';
-            var duration = fmtDuration(meta.LastBackupDuration || b.duration);
-            var lastSt = meta.LastBackupResult || b.last_status || 'Success';
-            var cls = stClass(lastSt);
+        let html = '';
+        items.forEach(item => {
+            const bId = item.id || (item.Backup && item.Backup.ID);
+            const name = item.name || (item.Backup && item.Backup.Name) || 'Backup #' + bId;
+            const desc = item.description || (item.Backup && item.Backup.Description) || 'Sem descrição';
+            const target = item.target_label || 'Destino Remoto';
+            const lastRun = item.last_run || 'Nunca';
+            const status = item.last_status || 'OK';
 
-            var schedRepeat = (b.schedule && b.schedule.repeat) ? ('A cada ' + b.schedule.repeat) : 'Manual';
-
-            return '<div class="backup-card" style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:16px;box-shadow:0 4px 12px rgba(0,0,0,0.15);">'
-                + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:12px;">'
-                + '  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
-                + '    <strong style="font-size:1.15em;color:var(--text);"><i class="fas fa-shield-alt" style="color:var(--primary);margin-right:8px;"></i>' + esc(name) + '</strong>'
-                + '    <span class="dup-badge ok" style="background:rgba(66,153,225,0.15);color:#4299e1;border:1px solid rgba(66,153,225,0.3);padding:4px 12px;border-radius:12px;font-size:0.82em;"><i class="fas fa-cloud"></i> ' + esc(destLabel) + '</span>'
-                + '    <span class="dup-badge ok" style="background:rgba(72,187,120,0.15);color:#48bb78;border:1px solid rgba(72,187,120,0.3);padding:4px 12px;border-radius:12px;font-size:0.82em;"><i class="fas fa-history"></i> ' + esc(versions) + ' Versões</span>'
-                + '    <span class="dup-badge ' + cls + '">' + esc(lastSt) + '</span>'
-                + '  </div>'
-                + '  <div style="display:flex;gap:8px;">'
-                + '    <button class="btn btn-primary btn-sm" onclick="runDuplicatiBackup(\'' + bId + '\')"><i class="fas fa-play"></i> Iniciar Backup</button>'
-                + '  </div>'
-                + '</div>'
-                + (desc ? '<div style="font-size:0.88em;color:var(--text-muted);margin-bottom:12px;"><i class="fas fa-info-circle"></i> ' + esc(desc) + '</div>' : '')
-                + '<div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(170px, 1fr));gap:12px;font-size:0.86em;background:var(--bg-input);padding:14px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);">'
-                + '  <div><span style="color:var(--text-muted);display:block;font-size:0.8em;">ID DO JOB</span><strong style="color:var(--text);">#' + esc(bId) + '</strong></div>'
-                + '  <div><span style="color:var(--text-muted);display:block;font-size:0.8em;">ÚLTIMO BACKUP</span><strong style="color:var(--text);">' + lastRun + '</strong></div>'
-                + '  <div><span style="color:var(--text-muted);display:block;font-size:0.8em;">DURAÇÃO</span><strong style="color:var(--text);">' + duration + '</strong></div>'
-                + '  <div><span style="color:var(--text-muted);display:block;font-size:0.8em;">TAMANHO ORIGEM</span><strong style="color:var(--text);">' + sourceSize + '</strong></div>'
-                + '  <div><span style="color:var(--text-muted);display:block;font-size:0.8em;">TAMANHO DESTINO</span><strong style="color:var(--text);">' + targetSize + '</strong></div>'
-                + '  <div><span style="color:var(--text-muted);display:block;font-size:0.8em;">AGENDAMENTO</span><strong style="color:var(--text);">' + esc(schedRepeat) + '</strong></div>'
-                + '</div></div>';
-        }).join('');
+            html += `
+                <div class="backup-card">
+                    <div>
+                        <div class="backup-card-header">
+                            <div>
+                                <div class="backup-card-title">${name}</div>
+                                <div class="backup-card-desc">${desc}</div>
+                            </div>
+                            <span class="dup-badge ${status === 'OK' ? 'ok' : 'warn'}">${status}</span>
+                        </div>
+                        <div class="backup-stats-list">
+                            <div class="backup-stats-item"><span>Destino</span><span>${target}</span></div>
+                            <div class="backup-stats-item"><span>Última Execução</span><span>${lastRun}</span></div>
+                            <div class="backup-stats-item"><span>Versões</span><span>${item.versions_count || 1} snapshots</span></div>
+                            <div class="backup-stats-item"><span>Duração</span><span>${item.duration || '—'}</span></div>
+                        </div>
+                    </div>
+                    <div class="backup-actions-bar">
+                        <button class="btn btn-small btn-primary" onclick="runBackup('${bId}')" title="Executar Agora"><i class="fas fa-play"></i> Run</button>
+                        <button class="btn btn-small btn-secondary" onclick="openRestoreModal('${bId}')" title="Restaurar Arquivos"><i class="fas fa-history"></i> Restaurar</button>
+                        <button class="btn btn-small btn-secondary" onclick="openLogModal('${bId}')" title="Ver Logs"><i class="fas fa-file-alt"></i> Logs</button>
+                        <button class="btn btn-small btn-secondary" onclick="verifyBackup('${bId}')" title="Testar Destino"><i class="fas fa-plug"></i> Testar</button>
+                        <button class="btn btn-small btn-secondary" onclick="repairBackup('${bId}')" title="Reparar Banco"><i class="fas fa-wrench"></i> Reparar</button>
+                        <button class="btn btn-small btn-secondary" onclick="deleteBackup('${bId}')" title="Excluir Backup" style="color:var(--danger)"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+            `;
+        });
+        grid.innerHTML = html;
     } catch(e) {
-        if (cont) cont.innerHTML = '<div class="empty-backups"><i class="fas fa-exclamation-triangle" style="color:var(--danger);"></i><p style="color:var(--danger);">Erro ao carregar backups</p><p style="font-size:.85em;color:var(--text-muted);">' + e.message + '</p></div>';
+        grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--danger);"><i class="fas fa-exclamation-triangle fa-2x"></i><p>Erro ao carregar backups: ${e.message}</p></div>`;
     }
 }
-async function loadAll() {
-    await loadConfig();
-    await probe();
-    await loadBackups();
+
+async function runBackup(id) {
+    try {
+        await apiCall(`/api/duplicati-native/backups/${id}/run`, { method: 'POST' });
+        alert('🚀 Job de backup disparado com sucesso!');
+        loadAll();
+    } catch(e) {
+        alert('Erro ao iniciar backup: ' + e.message);
+    }
 }
-loadAll();
+
+async function verifyBackup(id) {
+    try {
+        const res = await apiCall(`/api/duplicati-native/backups/${id}/verify`, { method: 'POST' });
+        alert('⚡ ' + (res.message || 'Verificação de conexão concluída!'));
+    } catch(e) {
+        alert('Erro ao testar destino: ' + e.message);
+    }
+}
+
+async function repairBackup(id) {
+    try {
+        const res = await apiCall(`/api/duplicati-native/backups/${id}/repair`, { method: 'POST' });
+        alert('🛠️ ' + (res.message || 'Reparo de banco de dados iniciado!'));
+    } catch(e) {
+        alert('Erro no reparo: ' + e.message);
+    }
+}
+
+async function deleteBackup(id) {
+    if (!confirm('Deseja realmente excluir este job de backup do Duplicati?')) return;
+    try {
+        await apiCall(`/api/duplicati-native/backups/${id}`, { method: 'DELETE' });
+        alert('🗑️ Backup excluído com sucesso.');
+        loadAll();
+    } catch(e) {
+        alert('Erro ao excluir: ' + e.message);
+    }
+}
+
+async function openRestoreModal(id) {
+    document.getElementById('restoreBackupId').value = id;
+    const sel = document.getElementById('restoreFilesetSelect');
+    sel.innerHTML = '<option value="now">Mais recente (Now)</option>';
+
+    try {
+        const res = await apiCall(`/api/duplicati-native/backups/${id}/filesets`);
+        const snapshots = res.snapshots || [];
+        snapshots.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.time || s.id;
+            opt.textContent = `Versão ${s.version} — ${s.time}`;
+            sel.appendChild(opt);
+        });
+    } catch(e) {}
+    openModal('restoreModal');
+}
+
+async function executeRestore(e) {
+    e.preventDefault();
+    const bId = document.getElementById('restoreBackupId').value;
+    const rPath = document.getElementById('restorePathInput').value;
+    const timeVal = document.getElementById('restoreFilesetSelect').value;
+    const overwrite = document.getElementById('restoreOverwrite').checked;
+
+    try {
+        await apiCall(`/api/duplicati-native/backups/${bId}/restore`, {
+            method: 'POST',
+            body: JSON.stringify({ restore_path: rPath, time: timeVal, overwrite: overwrite })
+        });
+        alert('✅ Restauração de arquivos iniciada com sucesso em ' + rPath);
+        closeModal('restoreModal');
+    } catch(err) {
+        alert('Erro ao disparar restauração: ' + err.message);
+    }
+}
+
+async function openLogModal(id) {
+    const logBox = document.getElementById('logContent');
+    logBox.innerHTML = 'Carregando histórico e logs...';
+    openModal('logModal');
+
+    try {
+        const res = await apiCall(`/api/duplicati-native/backups/${id}/log`);
+        const logData = res.log || [];
+        if (Array.isArray(logData) && logData.length) {
+            logBox.innerHTML = JSON.stringify(logData, null, 2);
+        } else {
+            logBox.innerHTML = 'Nenhum registro de log encontrado para este backup.';
+        }
+    } catch(e) {
+        logBox.innerHTML = 'Erro ao buscar log: ' + e.message;
+    }
+}
+
+function openNewBackupModal() {
+    document.getElementById('backupForm').reset();
+    document.getElementById('formBackupId').value = '';
+    document.getElementById('modalBackupTitle').innerHTML = '<i class="fas fa-plus-circle" style="color:var(--primary)"></i> Configurar Novo Backup Duplicati';
+    openModal('backupModal');
+}
+
+function updateTargetUrlPlaceholder() {
+    const type = document.getElementById('formTargetType').value;
+    const input = document.getElementById('formTargetUrl');
+    if (type === 'file') input.value = 'file://C:\\GBOC-Backups';
+    else if (type === 'wasabi') input.value = 's3://wasabi-bucket-name/path?s3-location-constraint=us-east-1';
+    else if (type === 's3') input.value = 's3://aws-bucket-name/path';
+    else if (type === 'b2') input.value = 'b2://b2-bucket-name/path';
+    else if (type === 'sftp') input.value = 'sftp://host:22/path';
+}
+
+async function saveBackupForm(e) {
+    e.preventDefault();
+    const payload = {
+        name: document.getElementById('formName').value.trim(),
+        description: document.getElementById('formDesc').value.trim(),
+        target_url: document.getElementById('formTargetUrl').value.trim(),
+        sources: document.getElementById('formSources').value.split(',').map(s => s.trim()).filter(Boolean),
+        passphrase: document.getElementById('formPassphrase').value,
+        schedule_repeat: document.getElementById('formRepeat').value
+    };
+
+    try {
+        await apiCall('/api/duplicati-native/backups', { method: 'POST', body: JSON.stringify(payload) });
+        alert('✅ Backup criado e configurado com sucesso!');
+        closeModal('backupModal');
+        loadAll();
+    } catch(err) {
+        alert('Erro ao salvar backup: ' + err.message);
+    }
+}
+
+async function importToNative() {
+    if (!confirm("Deseja importar e converter todas as tarefas e repositórios do Duplicati para o Motor Nativo GBOC?")) return;
+    try {
+        const res = await apiCall('/api/import/execute', { method: 'POST' });
+        alert(`Importação Concluída com Sucesso!\nTarefas Natividades: ${res.imported_tasks || 0}\nRepositórios: ${res.imported_repositories || 0}`);
+        loadAll();
+    } catch(e) {
+        alert('Erro ao importar para motor nativo: ' + e.message);
+    }
+}
+
+function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+document.addEventListener('DOMContentLoaded', loadAll);
 </script>
 </body>
 </html>

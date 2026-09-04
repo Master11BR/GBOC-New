@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC Agent 13.2.0 - Startup Script
+GBOC Agent 14.0.0 - Startup Script
 Suporta HTTP/1.1 (uvicorn) e HTTP/2+TLS (hypercorn) via variável GBOC_HTTP2=true
 Redireciona HTTP→HTTPS automaticamente (porta AGENT_HTTP_PORT, padrão 9201)
 """

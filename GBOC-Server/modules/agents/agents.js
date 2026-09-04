@@ -23,7 +23,7 @@ async function loadAgentsList() {
                 <td style="font-weight:600">${a.hostname || a.agent_id}</td>
                 <td>${a.ip_address || '—'}</td>
                 <td>${a.os_info || 'Windows/Linux'}</td>
-                <td><span class="badge badge-info">v${a.agent_version || '13.2.0'}</span></td>
+                <td><span class="badge badge-info">v${a.agent_version || '14.0.0'}</span></td>
                 <td>${a.last_heartbeat || '—'}</td>
                 <td><span class="badge ${a.status === 'online' ? 'badge-success' : 'badge-error'}">${(a.status || 'OFFLINE').toUpperCase()}</span></td>
             </tr>

@@ -1,19 +1,19 @@
 @REM ==============================================================================
-@REM GBOC System v13.2.0 Enterprise Edition
+@REM GBOC System v14.0.0 Enterprise Edition
 @REM Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 @REM Propriedade Intelectual & Direitos Autorais Registrados.
 @REM ==============================================================================
 
 @echo off
 REM ========================================
-REM GBOC Agent v13.2.0 - Instalador COMPLETO
+REM GBOC Agent v14.0.0 - Instalador COMPLETO
 REM Inclui PostgreSQL e outras dependências avançadas
 REM Requer: Build Tools e PostgreSQL instalados
 REM ========================================
 
 echo.
 echo ========================================
-echo   GBOC Agent v13.2.0 - Instalador COMPLETO
+echo   GBOC Agent v14.0.0 - Instalador COMPLETO
 echo   (Inclui PostgreSQL e deps avancadas)
 echo ========================================
 echo.

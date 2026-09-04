@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v13.2.0 Enterprise Edition
+# GBOC System v14.0.0 Enterprise Edition
 # Module: Hermes Central Hub — Server-Side (Central WebSocket Hub & Queue Stats)
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================
@@ -27,12 +27,41 @@ from pydantic import BaseModel
 
 logger = logging.getLogger("hermes_server_router")
 
-# Importar get_db e release_db do server_gboc
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-try:
-    from server_gboc import get_db, release_db, manager
-except Exception:
-    from gboc_server import get_db, release_db, manager
+def get_db():
+    mod = sys.modules.get("server_gboc") or sys.modules.get("__main__")
+    if mod and hasattr(mod, "get_db"):
+        return mod.get_db()
+    try:
+        from server_gboc import get_db as _gdb
+        return _gdb()
+    except Exception:
+        from gboc_server import get_db as _gdb
+        return _gdb()
+
+
+def release_db(conn):
+    mod = sys.modules.get("server_gboc") or sys.modules.get("__main__")
+    if mod and hasattr(mod, "release_db"):
+        return mod.release_db(conn)
+    try:
+        from server_gboc import release_db as _rdb
+        return _rdb(conn)
+    except Exception:
+        from gboc_server import release_db as _rdb
+        return _rdb(conn)
+
+
+def get_manager():
+    mod = sys.modules.get("server_gboc") or sys.modules.get("__main__")
+    if mod and hasattr(mod, "manager"):
+        return mod.manager
+    try:
+        from server_gboc import manager as _mgr
+        return _mgr
+    except Exception:
+        from gboc_server import manager as _mgr
+        return _mgr
+
 
 router = APIRouter(prefix="/api/v1/server/hermes", tags=["Hermes Central Hub"])
 
@@ -192,13 +221,19 @@ async def hermes_remote_heal(agent_id: str, cmd: HermesHealCommand):
             "service_names": cmd.service_names,
             "issued_at": datetime.now().isoformat()
         })
-        await manager.send_personal_message(command_payload, agent_id)
+        mgr = get_manager()
+        if mgr:
+            await mgr.send_personal_message(command_payload, agent_id)
+        else:
+            raise HTTPException(status_code=503, detail="Connection manager não disponível")
         return {
             "status": "success",
             "message": f"Comando de auto-cura '{cmd.action}' enviado ao agente '{agent_id}'",
             "agent_id": agent_id,
             "timestamp": datetime.now().isoformat()
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao enviar comando: {e}")
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC Agent 13.2.0 - Task Manager
+GBOC Agent 14.0.0 - Task Manager
 [OK] Usa motor_password para repositórios locais e cloud_password para nuvem
 """
 
@@ -19,6 +19,32 @@ from typing import Dict, Any, Optional, List
 import psycopg2.extras
 import re
 from logging.handlers import RotatingFileHandler
+
+class SafeRotatingFileHandler(RotatingFileHandler):
+    """RotatingFileHandler imune a PermissionError no Windows durante rotação de logs."""
+    def shouldRollover(self, record):
+        try:
+            return super().shouldRollover(record)
+        except PermissionError:
+            return False
+        except Exception:
+            return False
+
+    def doRollover(self):
+        try:
+            super().doRollover()
+        except PermissionError:
+            pass
+        except Exception:
+            pass
+
+    def emit(self, record):
+        try:
+            super().emit(record)
+        except PermissionError:
+            pass
+        except Exception:
+            pass
 
 from engines.engine_paths import get_engine_path_or_raise, get_engine_path
 from engines.realtime_backup_monitor import RealTimeBackupMonitor
@@ -60,7 +86,7 @@ class TaskManager:
         if not self.task_error_logger.handlers:
             logs_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "logs")
             os.makedirs(logs_dir, exist_ok=True)
-            err_handler = RotatingFileHandler(
+            err_handler = SafeRotatingFileHandler(
                 os.path.join(logs_dir, "task_errors.log"),
                 maxBytes=5 * 1024 * 1024,
                 backupCount=5,

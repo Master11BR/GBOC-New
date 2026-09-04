@@ -1,4 +1,4 @@
-# GBOC Agent v13.2.0 - Dependências Mínimas
+# GBOC Agent v14.0.0 - Dependências Mínimas
 # Sem necessidade de compilação C/Rust
 # ==========================================
 

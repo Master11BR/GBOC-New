@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v13.2.0 Enterprise Edition
+# GBOC System v14.0.0 Enterprise Edition
 # Module: Active Directory Dedicated Backup & Recovery Engine
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================
@@ -261,7 +261,7 @@ class ActiveDirectoryBackupEngine:
             
             target_dit = os.path.join(ntds_export_dir, "ntds.dit")
             with open(target_dit, "wb") as f:
-                f.write(b"GBOC_ACTIVE_DIRECTORY_NTDS_ESENT_DATABASE_STREAM_v13.2.0\n" + b"\x00" * 8192)
+                f.write(b"GBOC_ACTIVE_DIRECTORY_NTDS_ESENT_DATABASE_STREAM_v14.0.0\n" + b"\x00" * 8192)
 
             time.sleep(1.5)
             self._update_progress(job_id, 45)
@@ -309,7 +309,7 @@ class ActiveDirectoryBackupEngine:
 
             # 6. Geração do Manifesto e Hash de Integridade
             manifest = {
-                "gboc_version": "13.2.0 Enterprise",
+                "gboc_version": "14.0.0 Enterprise",
                 "backup_type": "FULL_ACTIVE_DIRECTORY_HOT_BACKUP",
                 "forest": top.get("forest_name"),
                 "domain": top.get("domain_name"),
@@ -491,7 +491,7 @@ class ActiveDirectoryBackupEngine:
 # ==============================================================================
 # Script de Restauração Autoritativa do Active Directory (NTDSUTIL)
 # Objeto Alvo: {target_ou_dn}
-# Gerado pelo GBOC Agent v13.2.0 Enterprise
+# Gerado pelo GBOC Agent v14.0.0 Enterprise
 # ==============================================================================
 
 # 1. Reinicie o Controlador de Domínio no modo DSRM (Directory Services Restore Mode)

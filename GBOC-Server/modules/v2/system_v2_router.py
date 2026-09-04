@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v13.2.0 Enterprise Edition
+# GBOC System v14.0.0 Enterprise Edition
 # Module: System & Telemetry Router (API v2)
 # ==============================================================================
 
@@ -82,7 +82,7 @@ async def get_system_version_v2(request: Request):
         from version_control import get_version_info
         v_info = get_version_info()
     except Exception:
-        v_info = {"raw_version": "13.2.0", "semver": "13.2.0"}
+        v_info = {"raw_version": "14.0.0", "semver": "14.0.0"}
     
     elapsed = (time.perf_counter() - t0) * 1000
     return build_v2_response(data=v_info, execution_time_ms=elapsed)
@@ -105,7 +105,7 @@ async def get_system_info_v2(request: Request):
         from version_control import get_version_info
         telemetry["version"] = get_version_info()
     except Exception:
-        telemetry["version"] = {"raw_version": "13.2.0"}
+        telemetry["version"] = {"raw_version": "14.0.0"}
         
     telemetry["active_websocket_agents"] = active_agents
     

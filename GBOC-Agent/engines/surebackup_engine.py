@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 13.2.0 - SureBackup & Assured Recovery Engine
+GBOC 14.0.0 - SureBackup & Assured Recovery Engine
 Automated sandbox verification for disk images, Hyper-V, VMware and database backups.
 Mounts backup image in isolated environment, verifies OS boot and logs proof screenshot.
 """

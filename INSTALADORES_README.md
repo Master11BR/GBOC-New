@@ -1,6 +1,6 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v13.2.0 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v13.3.0 Enterprise. Todos os direitos reservados. -->
 
-# 📦 GBOC System v13.2.0 Enterprise — Guia Oficial de Instaladores & Implantação
+# 📦 GBOC System v13.3.0 Enterprise — Guia Oficial de Instaladores & Implantação
 
 Este guia detalha a instalação do **GBOC Server (Servidor Central)** e do **GBOC Agent (Agente Local e Remoto LAN)**.
 
@@ -51,9 +51,18 @@ Para instalar o GBOC Agent em outros servidores ou estações de trabalho sem pr
 
 ---
 
-## 🔄 4. Disaster Recovery (Restauração 1-Click pós Formatação)
+---
 
-Caso um servidor seja formatado ou sofra desastre total:
-1. Instale um novo GBOC Agent.
-2. Na tela de restauração, clique em **"Restaurar Agente da Nuvem"** ou selecione o arquivo `.gbocdr`.
-3. Todas as tarefas, repositórios e agendamentos serão reconstruídos instantaneamente.
+## 🎁 5. Instalador Unificado Enterprise & Pacote de Distribuição
+
+Para gerar uma pasta externa de distribuição limpa contendo o **Server**, o **Agent** e o **Instalador Unificado**:
+
+```powershell
+.\build_installer_package.ps1 -OutputDir "D:\GBOC-Distribution"
+```
+
+No servidor/estação de destino, abra a pasta `GBOC-Distribution` e execute:
+- **`Setup.bat`** (Interface interativa visual para instalar Server, Agent ou Ambos).
+
+> ⚠️ **DIRETRIZ OBRIGATÓRIA DE DESENVOLVIMENTO:**
+> A cada novo arquivo, módulo ou funcionalidade criada ou modificada no código-fonte (`GBOC-Server` ou `GBOC-Agent`), o script `build_installer_package.ps1` **DEVE ser executado obrigatoriamente** para sincronizar e atualizar a pasta externa de distribuição (`GBOC-Distribution`).

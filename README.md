@@ -1,25 +1,25 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v13.2.0 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v13.3.0 Enterprise. Todos os direitos reservados. -->
 
-# 🚀 GBOC - Gestão & Backup Operations Center (v13.2.0 Enterprise Edition)
+# 🚀 GBOC - Gestão & Backup Operations Center (v13.3.0 Enterprise Edition)
 
-[![GBOC System Version](https://img.shields.io/badge/version-13.2.0--Enterprise-blue.svg)](https://github.com/Master11BR/GBOC-New)
+[![GBOC System Version](https://img.shields.io/badge/version-13.3.0--Enterprise-blue.svg)](https://github.com/Master11BR/GBOC-New)
 [![Python Version](https://img.shields.io/badge/python-3.11%2B%20%7C%203.14-green.svg)](https://www.python.org/)
 [![PostgreSQL](https://img.shields.io/badge/postgresql-16-blue.svg)](https://www.postgresql.org/)
 [![Status](https://img.shields.io/badge/status-production--ready-brightgreen.svg)]()
 
-> **GBOC (Gestão & Backup Operations Center v13.2.0 Enterprise Edition)** é a mais avançada plataforma corporativa de orquestração de backup, RMM, monitoramento preditivo e resposta cibernética a incidentes. 10x mais potente que soluções do mercado pago e open-source.
+> **GBOC (Gestão & Backup Operations Center v13.3.0 Enterprise Edition)** é a mais avançada plataforma corporativa de orquestração de backup, RMM, monitoramento preditivo e resposta cibernética a incidentes. 10x mais potente que soluções do mercado pago e open-source.
 
 ---
 
 ## 📌 Sumário
 1. [Visão Geral e Arquitetura](#-visão-geral-e-arquitetura)
-2. [Recursos de Destaque (v13.2.0 Enterprise)](#-recursos-de-destaque-v1300-enterprise)
+2. [Recursos de Destaque (v14.0.0 Enterprise)](#-recursos-de-destaque-v1300-enterprise)
 3. [Cyber Security Sentinel (ClamAV, YARA, Maltrail, Wazuh, Defender)](#-cyber-security-sentinel)
 4. [Assistente de Inteligência Artificial & LLMs (Ollama & Nuvem)](#-assistente-de-inteligência-artificial--llms)
 5. [Disaster Recovery (DR) & Sync em Nuvem 1-Click](#-disaster-recovery-dr--sync-em-nuvem-1-click)
 6. [Resiliência a Longos Intervalos (Auto-Heal & Lock Prune)](#-resiliência-a-longos-intervalos-auto-heal--lock-prune)
 7. [Instalação & Configuração Rápida](#-instalação--configuração-rápida)
-8. [Histórico de Mudanças (Changelog v13.2.0 Enterprise)](#-histórico-de-mudanças)
+8. [Histórico de Mudanças (Changelog v14.0.0 Enterprise)](#-histórico-de-mudanças)
 
 ---
 
@@ -54,14 +54,18 @@
 
 ---
 
-## ⚡ Recursos de Destaque (v13.2.0 Enterprise)
+## ⚡ Recursos de Destaque (v14.0.0 Full Stable Enterprise)
 
+- **Motion Principles UX Engine (Kyle Zantos)**: Interface 100% dinâmica com Skeleton Loaders, Lazy Loading inteligente via Intersection Observer, animações de entrada/saída suaves e barras de progresso contínuas e fluidas.
 - **Storage Usage & Growth Monitor GUI**: Módulo centralizado (`modules/storage`) para monitoramento em tempo real de volumes de armazenamento, capacidade utilizada/livre e tendência de crescimento com gráficos dinâmicos Chart.js.
 - **Job Failure & Alert Monitor GUI**: Módulo centralizado (`modules/job_alert`) para consolidação de falhas de jobs ativas, fluxo de resolução com 1-clique e testes de disparo de alertas em múltiplos canais.
 - **GBOC Native Engine v4**: FastCDC (Content-Defined Chunking 4KB-4MB), compressão Zstd, encriptação autenticada AES-256-GCM e WORM Immutability.
 - **Direct-to-Cloud Memory Streaming**: Envio contínuo via RAM buffer (< 100MB) diretamente para repositórios Cloud (S3, MinIO, Azure, SFTP) sem criar arquivos staging no disco local.
 - **RMM Proxy & Espelho Web do Agente**: Execute PowerShell/Bash remotos com o terminal interativo do servidor e controle a interface web do agente via proxy em tempo real.
 - **SureRestore Sandbox**: Testes automatizados de restauração em máquinas virtuais isoladas com reporte de tempo de boot e teste de pulso de SO (*os_heartbeat*).
+- **Stack de Observabilidade & APM**: Telemetria corporativa integrada com **Sentry**, **OpenTelemetry (OTel)**, **Datadog APM**, **NewRelic** e métricas Prometheus nativas.
+- **Governança & Linting de Código**: Qualidade de código mantida via **Arch-contract**, **Biome Linter**, **Commitlint**, **Knip** (detector de código morto) e **Stryker** (testes de mutação).
+- **Suíte de Testes & Cobertura**: Testes End-to-End automatizados com **Playwright**, testes de integração com **Pytest** e relatórios de cobertura **Codecov**.
 - **Gestão Multi-Tenant MSP**: Estruturação completa por Organizações, Clientes e Quotas de armazenamento.
 
 ---

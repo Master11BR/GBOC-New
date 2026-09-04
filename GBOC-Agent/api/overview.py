@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC Agent 13.2.0 - API OVERVIEW (STATUS DETALHADO)
+GBOC Agent 14.0.0 - API OVERVIEW (STATUS DETALHADO)
 Adiciona contagem de tarefas em execução vs paradas.
 """
 

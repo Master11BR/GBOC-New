@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assistente de Migração de Motores - GBOC Server</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/gboc-themes.css">
+    <link rel="stylesheet" href="/static/gboc-layout.css">
+    <script src="/static/gboc-layout-manager.js"></script>
+    <script src="/static/gboc-motion.js"></script>
+    <script src="/modules/engine_migration/engine_migration.js"></script>
+    <style>
+        .step-wizard-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; position: relative; }
+        .step-item { display: flex; align-items: center; gap: 10px; opacity: 0.5; transition: all 0.3s ease; }
+        .step-item.active { opacity: 1; font-weight: 700; color: var(--primary, #4fa3e8); }
+        .step-number { width: 34px; height: 34px; border-radius: 50%; background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; font-weight: 700; }
+        .step-item.active .step-number { background: var(--primary, #4fa3e8); color: #fff; box-shadow: 0 0 12px var(--primary, #4fa3e8); }
+        .wizard-step-pane { display: none; }
+        .wizard-step-pane.active { display: block; }
+        .selection-card { background: var(--bg-card, #1e293b); border: 1px solid var(--border, #2a3f5f); border-radius: 12px; padding: 16px; margin-bottom: 12px; transition: all 0.2s ease; }
+        .selection-card:hover { border-color: var(--primary, #4fa3e8); }
+    </style>
+</head>
+<body class="layout-vertical">
+    <main class="main-content" style="padding: 24px;">
+        <h2 style="font-size:1.4em;margin-bottom:8px;display:flex;align-items:center;gap:10px">
+            <i class="fas fa-magic" style="color:var(--primary)"></i> Assistente de Migração Universal para Motor Nativo GBOC
+        </h2>
+        <p style="font-size:0.88em;color:var(--text-muted);margin-bottom:24px">
+            Migre facilmente tarefas, repositórios e senhas de motores legados (Restic, Duplicati, etc.) para o <strong>Motor Nativo GBOC (FastCDC v4 / Zstd / AES-256-GCM / Imutabilidade WORM)</strong>.
+        </p>
+
+        <!-- NAVEGAÇÃO DO WIZARD PASSO A PASSO -->
+        <div class="panel step-wizard-nav" style="background:var(--bg-card);padding:18px 24px;border-radius:14px;border:1px solid var(--border)">
+            <div class="step-item active" id="step-nav-1">
+                <div class="step-number">1</div>
+                <div>Descoberta de Motores</div>
+            </div>
+            <i class="fas fa-chevron-right" style="color:var(--text-muted);font-size:0.8em"></i>
+            <div class="step-item" id="step-nav-2">
+                <div class="step-number">2</div>
+                <div>Seleção de Conteúdo</div>
+            </div>
+            <i class="fas fa-chevron-right" style="color:var(--text-muted);font-size:0.8em"></i>
+            <div class="step-item" id="step-nav-3">
+                <div class="step-number">3</div>
+                <div>Parâmetros do Motor Nativo</div>
+            </div>
+            <i class="fas fa-chevron-right" style="color:var(--text-muted);font-size:0.8em"></i>
+            <div class="step-item" id="step-nav-4">
+                <div class="step-number">4</div>
+                <div>Execução &amp; Progresso</div>
+            </div>
+        </div>
+
+        <!-- PASSO 1: DESCOBERTA DE MOTORES -->
+        <div class="wizard-step-pane active motion-slide-up" id="wizard-step-1">
+            <div class="panel" style="background:var(--bg-card);padding:24px;border-radius:14px;border:1px solid var(--border)">
+                <h3 style="margin-bottom:12px"><i class="fas fa-search" style="color:var(--primary)"></i> Etapa 1: Varredura &amp; Descoberta Automática</h3>
+                <p style="font-size:0.86em;color:var(--text-muted);margin-bottom:20px">
+                    Buscando tarefas, rotinas, senhas e repositórios existentes no sistema...
+                </p>
+
+                <!-- SKELETON LOADER ENQUANTO VARRE -->
+                <div id="discovery-skeleton-loader">
+                    <div class="skeleton skeleton-card" style="margin-bottom:12px"></div>
+                    <div class="skeleton skeleton-card" style="margin-bottom:12px"></div>
+                </div>
+
+                <div id="discovery-results" style="display:none">
+                    <!-- Resultados inseridos via JS -->
+                </div>
+
+                <div style="display:flex;justify-content:flex-end;margin-top:24px">
+                    <button class="btn btn-primary" onclick="goToWizardStep(2)"><i class="fas fa-arrow-right"></i> Avançar para Seleção</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- PASSO 2: SELEÇÃO DE CONTEÚDO -->
+        <div class="wizard-step-pane motion-slide-up" id="wizard-step-2">
+            <div class="panel" style="background:var(--bg-card);padding:24px;border-radius:14px;border:1px solid var(--border)">
+                <h3 style="margin-bottom:12px"><i class="fas fa-check-square" style="color:var(--success)"></i> Etapa 2: Selecione o que Deseja Migrar</h3>
+                <p style="font-size:0.86em;color:var(--text-muted);margin-bottom:20px">
+                    Marque os itens que serão automaticamente convertidos para o Motor Nativo GBOC.
+                </p>
+
+                <h4 style="font-size:0.95em;margin:16px 0 10px 0;color:var(--primary)"><i class="fas fa-tasks"></i> Tarefas &amp; Rotinas de Backup</h4>
+                <div id="list-tasks-selection"></div>
+
+                <h4 style="font-size:0.95em;margin:20px 0 10px 0;color:var(--warning)"><i class="fas fa-database"></i> Repositórios &amp; Destinos</h4>
+                <div id="list-repos-selection"></div>
+
+                <div style="display:flex;justify-content:space-between;margin-top:24px">
+                    <button class="btn btn-secondary" onclick="goToWizardStep(1)"><i class="fas fa-arrow-left"></i> Voltar</button>
+                    <button class="btn btn-primary" onclick="goToWizardStep(3)"><i class="fas fa-arrow-right"></i> Avançar para Configuração</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- PASSO 3: PARÂMETROS DO MOTOR NATIVO -->
+        <div class="wizard-step-pane motion-slide-up" id="wizard-step-3">
+            <div class="panel" style="background:var(--bg-card);padding:24px;border-radius:14px;border:1px solid var(--border);max-width:800px">
+                <h3 style="margin-bottom:12px"><i class="fas fa-cogs" style="color:var(--primary)"></i> Etapa 3: Parâmetros do Motor Nativo GBOC v4</h3>
+                <p style="font-size:0.86em;color:var(--text-muted);margin-bottom:20px">
+                    Defina as tecnologias de de-duplicação, encriptação e imutabilidade do novo motor.
+                </p>
+
+                <div style="margin-bottom:16px">
+                    <label style="display:block;font-size:0.88em;font-weight:600;margin-bottom:6px">Algoritmo de De-duplicação de Blocos</label>
+                    <select id="cfg-chunking" style="width:100%;padding:10px;border-radius:8px;background:var(--bg-input);border:1px solid var(--border);color:var(--text)">
+                        <option value="FastCDC 4KB-4MB" selected>FastCDC 4KB-4MB (Recomendado - Ultra Rápido)</option>
+                        <option value="Fixed 1MB">Blocos Fixos 1MB (Padrão Corporativo)</option>
+                    </select>
+                </div>
+
+                <div style="margin-bottom:16px">
+                    <label style="display:block;font-size:0.88em;font-weight:600;margin-bottom:6px">Compressão de Dados</label>
+                    <select id="cfg-compression" style="width:100%;padding:10px;border-radius:8px;background:var(--bg-input);border:1px solid var(--border);color:var(--text)">
+                        <option value="Zstd" selected>Zstd - Zstandard Level 3 (Alta Compressão &amp; Velocidade)</option>
+                        <option value="LZ4">LZ4 (Velocidade Máxima)</option>
+                    </select>
+                </div>
+
+                <div style="margin-bottom:16px">
+                    <label style="display:block;font-size:0.88em;font-weight:600;margin-bottom:6px">Encriptação &amp; Imutabilidade</label>
+                    <label style="display:flex;align-items:center;gap:10px;font-size:0.88em">
+                        <input type="checkbox" id="cfg-worm" checked style="width:18px;height:18px"> Ativar Imutabilidade WORM (Bloqueio Anti-Ransomware)
+                    </label>
+                </div>
+
+                <div style="display:flex;justify-content:space-between;margin-top:24px">
+                    <button class="btn btn-secondary" onclick="goToWizardStep(2)"><i class="fas fa-arrow-left"></i> Voltar</button>
+                    <button class="btn btn-success" onclick="startExecutionMigration()"><i class="fas fa-play"></i> Iniciar Migração Automatizada</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- PASSO 4: EXECUÇÃO & PROGRESSO -->
+        <div class="wizard-step-pane motion-slide-up" id="wizard-step-4">
+            <div class="panel" style="background:var(--bg-card);padding:24px;border-radius:14px;border:1px solid var(--border);max-width:800px;text-align:center">
+                <h3 style="margin-bottom:12px"><i class="fas fa-sync fa-spin" style="color:var(--primary)"></i> Etapa 4: Migração em Andamento</h3>
+                <p style="font-size:0.86em;color:var(--text-muted);margin-bottom:20px">
+                    Convertendo tarefas e repositórios para o Motor Nativo GBOC v4...
+                </p>
+
+                <div class="progress-fluid" style="margin:24px 0">
+                    <div class="progress-fluid-bar" id="migration-progress-bar" style="width:15%"></div>
+                </div>
+                <div id="migration-status-text" style="font-size:0.9em;font-weight:600;margin-bottom:20px">Iniciando conversão...</div>
+
+                <div id="migration-final-report" style="display:none;text-align:left;background:rgba(72,187,120,0.12);border:1px solid var(--success);padding:16px;border-radius:10px;margin-top:20px">
+                    <h4 style="color:var(--success);margin-bottom:8px"><i class="fas fa-check-circle"></i> Migração Concluída com Sucesso!</h4>
+                    <p style="font-size:0.85em;line-height:1.5" id="migration-report-details"></p>
+                    <button class="btn btn-primary" style="margin-top:12px" onclick="window.location.href='/'"><i class="fas fa-home"></i> Ir para o Dashboard</button>
+                </div>
+            </div>
+        </div>
+    </main>
+</body>
+</html>

@@ -1,5 +1,5 @@
 @REM ==============================================================================
-@REM GBOC System v13.2.0 Enterprise Edition
+@REM GBOC System v14.0.0 Enterprise Edition
 @REM Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 @REM Propriedade Intelectual & Direitos Autorais Registrados.
 @REM ==============================================================================
@@ -7,12 +7,12 @@
 @echo off
 setlocal enabledelayedexpansion
 CLS
-title GBOC Scheduler Agent - Background Worker (v13.2.0)
+title GBOC Scheduler Agent - Background Worker (v14.0.0)
 color 0B
 
 echo.
 echo ======================================================================
-echo   GBOC System v13.2.0 - Agente Autonomo de Backup e Restore Agendado
+echo   GBOC System v14.0.0 - Agente Autonomo de Backup e Restore Agendado
 echo ======================================================================
 echo.
 

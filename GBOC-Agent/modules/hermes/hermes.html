@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hermes Edge Agent Local - GBOC Agent</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/gboc-themes.css">
+    <link rel="stylesheet" href="/static/gboc-layout.css">
+    <script src="/static/gboc-layout-manager.js"></script>
+    <script src="/static/gboc-motion.js"></script>
+    <script src="/modules/hermes/hermes.js"></script>
+    <style>
+        .hermes-hero { background: linear-gradient(135deg, rgba(124,58,237,0.2) 0%, rgba(79,70,229,0.15) 100%); border: 1px solid rgba(124,58,237,0.3); border-radius: 16px; padding: 24px; margin-bottom: 24px; }
+        .heal-log-terminal { background: #090d16; border: 1px solid var(--border); border-radius: 10px; padding: 14px; font-family: 'Consolas', monospace; font-size: 0.82em; color: #a78bfa; max-height: 250px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <div class="app-layout">
+        <div id="sidebar-container"></div>
+        <main class="main-content" style="padding: 24px;">
+            <div class="hermes-hero motion-slide-up">
+                <div style="display:flex;align-items:center;justify-content:space-between">
+                    <div style="display:flex;align-items:center;gap:16px">
+                        <div style="width:54px;height:54px;border-radius:14px;background:linear-gradient(135deg,#7c3aed,#4f46e5);display:flex;align-items:center;justify-content:center;font-size:1.8em;color:#fff">
+                            🏛️
+                        </div>
+                        <div>
+                            <h2 style="font-size:1.4em;margin:0;color:#fff">Hermes Edge Agent Local</h2>
+                            <p style="margin:4px 0 0 0;font-size:0.86em;color:var(--text-secondary)">
+                                Agente de Borda Autônomo com Store-and-Forward Offline, Watchdog Self-Healing e Mesh P2P.
+                            </p>
+                        </div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px">
+                        <span class="badge" style="background:rgba(16,185,129,0.15);color:var(--success);border:1px solid rgba(16,185,129,0.3)" id="hermes-status-badge">Operacional</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STATS DO AGENTE -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:16px;margin-bottom:24px">
+                <div class="panel" style="background:var(--bg-card);padding:18px;border-radius:14px;border:1px solid var(--border)">
+                    <div style="font-size:0.8em;color:var(--text-muted)"><i class="fas fa-inbox" style="color:#a78bfa"></i> Mensagens na Fila</div>
+                    <div style="font-size:1.8em;font-weight:700;color:var(--primary)" id="h-queue-count">0 msgs</div>
+                </div>
+
+                <div class="panel" style="background:var(--bg-card);padding:18px;border-radius:14px;border:1px solid var(--border)">
+                    <div style="font-size:0.8em;color:var(--text-muted)"><i class="fas fa-heartbeat" style="color:#10b981"></i> Self-Healing Eventos</div>
+                    <div style="font-size:1.8em;font-weight:700;color:var(--success)" id="h-heal-count">0 eventos</div>
+                </div>
+
+                <div class="panel" style="background:var(--bg-card);padding:18px;border-radius:14px;border:1px solid var(--border)">
+                    <div style="font-size:0.8em;color:var(--text-muted)"><i class="fas fa-network-wired" style="color:#38bdf8"></i> Peers Mesh LAN</div>
+                    <div style="font-size:1.8em;font-weight:700;color:#38bdf8" id="h-mesh-count">0 peers</div>
+                </div>
+
+                <div class="panel" style="background:var(--bg-card);padding:18px;border-radius:14px;border:1px solid var(--border)">
+                    <div style="font-size:0.8em;color:var(--text-muted)"><i class="fas fa-tachometer-alt" style="color:#f59e0b"></i> Limite de Banda</div>
+                    <div style="font-size:1.8em;font-weight:700;color:#f59e0b" id="h-bw-val">Automático</div>
+                </div>
+            </div>
+
+            <!-- AÇÕES DE REPARO SELF-HEALING -->
+            <div class="panel" style="background:var(--bg-card);padding:24px;border-radius:14px;border:1px solid var(--border);margin-bottom:24px">
+                <h3 style="margin-bottom:16px;font-size:1.1em"><i class="fas fa-tools" style="color:var(--primary)"></i> Ações de Auto-Recuperação (Self-Healing Watchdog)</h3>
+                <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">
+                    <button class="btn btn-secondary" onclick="repairVSSWriters()"><i class="fas fa-wrench"></i> Reparação VSS Writers</button>
+                    <button class="btn btn-secondary" onclick="restartBackupServices()"><i class="fas fa-sync"></i> Reiniciar Serviços de Backup</button>
+                </div>
+
+                <div class="heal-log-terminal" id="heal-terminal">
+                    <div>[Hermes Agent] Inicializado. Watchdog em escuta ativa.</div>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script src="/static/sidebar.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        if (typeof UnifiedSidebar !== 'undefined') {
+            new UnifiedSidebar().initialize();
+        }
+    });
+    </script>
+</body>
+</html>

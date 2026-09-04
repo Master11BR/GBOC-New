@@ -1,6 +1,6 @@
 <!--
 ==============================================================================
-GBOC System v13.2.0 Enterprise Edition
+GBOC System v14.0.0 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
@@ -10,8 +10,8 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Diagnóstico - GBOC Agent 13.2.0</title>
-    <link rel="stylesheet" href="/static/style.css?v=13.2.0">
+    <title>Diagnóstico - GBOC Agent 14.0.0</title>
+    <link rel="stylesheet" href="/static/style.css?v=14.0.0">
     <link rel="stylesheet" href="/static/gboc-themes.css">
     <link rel="stylesheet" href="/static/gboc-layout.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -116,7 +116,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             <div>
                 <h1 class="page-title"><i class="fas fa-stethoscope"></i> Diagnóstico</h1>
                 <div class="page-subtitle">
-                    Sistema de Backup Centralizado • v13.2.0 
+                    Sistema de Backup Centralizado • v14.0.0 
                     <span style="margin-left:12px;"><span class="ws-dot on" id="wsDot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--success);margin-right:4px;"></span><span id="wsLabel" style="font-size:.85em;font-weight:600;color:var(--success)">Online (Conectado)</span></span>
                 </div>
             </div>
@@ -844,7 +844,7 @@ async function loadSystem(){
         document.getElementById('siHostname').textContent=s.hostname||'--';
         document.getElementById('siProcessor').textContent=(s.processor||'--').substring(0,30);
         document.getElementById('siPython').textContent=s.python_version||'--';
-        document.getElementById('siGboc').textContent=sys.gboc_version||'13.2.0';
+        document.getElementById('siGboc').textContent=sys.gboc_version||'14.0.0';
 
         document.getElementById('siCpuCount').textContent=r.cpu_count||'--';
         document.getElementById('siRamTotal').textContent=(r.memory_total_gb||0).toFixed(1)+' GB';
