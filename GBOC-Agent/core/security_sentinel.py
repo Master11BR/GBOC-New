@@ -6,8 +6,7 @@
 # A cópia, distribuição ou modificação não autorizada é estritamente proibida.
 # ==============================================================================
 
-"""
-GBOC Central Orchestrator - Security Sentinel (MDR/EDR Integration & Wazuh SIEM Connector)prise
+GBOC Central Orchestrator - Security Sentinel (MDR/EDR Integration & Wazuh SIEM Connector) Enterprise
 Integração de Cibersegurança: ClamAV, YARA Rules, Maltrail Threat Feed, Wazuh SIEM HIDS & Windows Defender Native Hook.
 """
 

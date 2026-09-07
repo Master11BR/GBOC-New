@@ -62,6 +62,18 @@ async def list_backups() -> Dict[str, Any]:
     return result
 
 
+@router.post("/sync")
+@router.get("/sync")
+async def sync_duplicati() -> Dict[str, Any]:
+    """Sincroniza os backups e execuções do Duplicati Native com o banco de dados do GBOC."""
+    try:
+        service = get_duplicati_native_service()
+        result = service.sync_to_gboc()
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/backups/{backup_id}/filesets")
 async def list_backup_filesets(backup_id: str) -> Dict[str, Any]:
     """Lista snapshots / pontos de recuperação de um backup do Duplicati."""

@@ -39,6 +39,10 @@ PUBLIC_PREFIXES = [
     '/api/ai/',
     '/api/ransomware/',
     '/api/v2/system/',
+    '/api/v1/diagnostics/',
+    '/api/diagnostics/',
+    '/api/preemptive/',
+    '/api/integrity/',
 ]
 
 # ── Global Rate Limiting ──────────────────────────────────────────

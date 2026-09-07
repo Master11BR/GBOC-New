@@ -319,41 +319,57 @@ class TaskManager:
     def _build_task_diagnostic(self, engine: str, error_msg: str) -> str:
         msg = (error_msg or '').lower()
         if 'wrong password' in msg or 'no key found' in msg or 'incorrect password' in msg:
-            return f"Falha de autenticação do repositório ({engine}). Verifique senha/chave usada na criação do repositório."
-        if 'access denied' in msg or 'forbidden' in msg or 'signaturedoesnotmatch' in msg:
-            return f"Falha de credenciais/permissão no storage ({engine}). Verifique access key/secret e permissões do bucket."
-        if 'timeout' in msg or 'connection refused' in msg or 'no such host' in msg:
-            return f"Falha de conectividade com destino ({engine}). Verifique rede, endpoint e DNS."
-        if 'not found' in msg or 'repository does not exist' in msg:
-            return f"Repositório não encontrado ({engine}). Confirme bucket/path/prefix."
-        return f"Falha operacional no módulo de tarefas ({engine}). Revisar log detalhado da execução."
+            return f"Falha de autenticação do repositório ({engine}). Recomendação IA: Atualize a senha ou chave de acesso do repositório nas configurações do módulo de Repositórios."
+        if 'access denied' in msg or 'forbidden' in msg or 'signaturedoesnotmatch' in msg or '403' in msg:
+            return f"Falha de credenciais/permissão no storage ({engine}). Recomendação IA: Verifique as chaves de acesso (Access Key/Secret Key) e permissões de escrita no bucket de destino (S3/B2/Wasabi)."
+        if 'timeout' in msg or 'connection refused' in msg or 'no such host' in msg or 'unreachable' in msg:
+            return f"Falha de conectividade com o destino de backup ({engine}). Recomendação IA: Verifique a conexão de rede, resolução DNS do endpoint e liberações em firewalls/proxies."
+        if 'not found' in msg or 'repository does not exist' in msg or 'não encontrado' in msg:
+            return f"Repositório ou caminho de origem não encontrado ({engine}). Recomendação IA: Valide se o caminho físico de origem existe no host e se o repositório foi devidamente inicializado."
+        if 'motor de backup' in msg and ('desconhecido' in msg or 'não reconhecido' in msg):
+            return f"Motor de backup inválido ou não configurado ({engine}). Recomendação IA: Edite a tarefa e selecione um motor suportado (GBOC Native, Restic, Duplicati ou Kopia)."
+        if 'space' in msg or 'disk full' in msg or 'enospc' in msg:
+            return f"Espaço em disco insuficiente ({engine}). Recomendação IA: Libere espaço no volume local ou no repositório de destino, ou ajuste a política de retenção para expurgar backups antigos."
+        if 'locked' in msg or 'lock' in msg:
+            return f"Repositório bloqueado por outra execução ({engine}). Recomendação IA: Aguarde a finalização do processo ativo ou execute a limpeza de trava (unlock) no repositório."
+        return f"Falha operacional durante execução do motor ({engine}). Recomendação IA: Inspecione os logs detalhados do agente e verifique a integridade dos caminhos de origem e parâmetros de execução."
 
     def _register_task_error(self, task_id: int, execution_id: int, task_name: str, engine: str, error_msg: str):
         try:
             diagnostic = self._build_task_diagnostic(engine, error_msg)
+            full_error = error_msg if "Recomendação IA:" in error_msg else f"{error_msg} | {diagnostic}"
             details = (
                 f"task_id={task_id}\n"
                 f"execution_id={execution_id}\n"
                 f"task_name={task_name}\n"
                 f"engine={engine}\n"
-                f"error={error_msg}"
+                f"error={full_error}"
             )
 
             self.task_error_logger.error(
-                f"task_id={task_id} execution_id={execution_id} task={task_name} engine={engine} error={error_msg} diagnostic={diagnostic}"
+                f"task_id={task_id} execution_id={execution_id} task={task_name} engine={engine} error={full_error}"
             )
 
             if hasattr(self.core, 'register_error_event'):
                 self.core.register_error_event(
                     source='task_manager',
-                    message=f"Falha na tarefa '{task_name}' (engine={engine})",
+                    message=f"Falha na tarefa '{task_name}' (engine={engine}): {full_error}",
                     details=details,
                     module='engines.task_manager',
                     diagnostic=diagnostic,
                     severity='error'
                 )
             else:
-                self.core.log_system_event('ERROR', 'task_manager', f"Falha na tarefa '{task_name}'", details)
+                self.core.log_system_event('ERROR', 'task_manager', f"Falha na tarefa '{task_name}': {full_error}", details)
+
+            # 🔔 Registro direto em job_failure_log para consistência imediata com failed-jobs.html
+            try:
+                from engines.job_alert_monitor import record_job_failure, dispatch_job_failure_alert, load_alert_config
+                rec = record_job_failure(str(task_id), task_name, str(execution_id), full_error)
+                cfg = load_alert_config()
+                dispatch_job_failure_alert(task_name, str(execution_id), full_error, rec.get("retry_count", 0), rec.get("retry_count", 0) >= cfg.get("escalation_after_failures", 2))
+            except Exception as _jf_err:
+                logger.warning(f"Aviso ao sincronizar falha no job_failure_log: {_jf_err}")
         except Exception as reg_err:
             logger.error(f"❌ Erro ao registrar falha da tarefa em alertas/logs: {reg_err}")
 
@@ -811,16 +827,17 @@ class TaskManager:
 
             self.monitor.start_backup(task_id, execution_id, task_name, task.get('repo_name', 'Unknown'))
 
-            if engine == 'restic':
+            if engine in ('restic', 'restic_native', 'restic native'):
                 result = self._run_restic_backup(task, execution_id)
-            elif engine == 'duplicati':
+            elif engine in ('duplicati', 'duplicati_native', 'duplicati native'):
                 result = self._run_duplicati_backup(task, execution_id)
-            elif engine == 'kopia':
+            elif engine in ('kopia', 'kopia_native', 'kopia native'):
                 result = self._run_kopia_backup(task, execution_id)
-            elif engine == 'gboc_native':
+            elif engine in ('gboc_native', 'native', 'gboc', 'gboc_native_v4', 'gboc native', 'local'):
                 result = self._run_gboc_native_backup(task, execution_id)
             else:
-                result = {"success": False, "error": f"Motor de backup desconhecido: {engine}"}
+                diag = f"Recomendação IA: Selecione um motor de backup suportado (GBOC Native, Restic, Duplicati ou Kopia) nas configurações da tarefa #{task_id} ou do repositório."
+                result = {"success": False, "error": f"Motor de backup '{engine}' não reconhecido. Motores suportados: GBOC Native, Restic, Duplicati, Kopia. | {diag}"}
 
             self._ensure_process_terminated()
 
@@ -846,7 +863,9 @@ class TaskManager:
                 except Exception as _ave_err:
                     logger.warning(f"[SureRestore] Aviso ao disparar auto-verificação pós-backup: {_ave_err}")
             else:
-                error_msg = result.get('error', 'Erro desconhecido')
+                raw_err = result.get('error') or 'Falha operacional na execução da tarefa'
+                diagnostic = self._build_task_diagnostic(engine, raw_err)
+                error_msg = raw_err if "Recomendação IA:" in raw_err else f"{raw_err} | {diagnostic}"
                 self._update_execution(execution_id, 'failed', error_message=error_msg)
                 self.monitor.complete_backup(task_id, error_message=error_msg)
                 logger.error(f"❌ Falha na tarefa {task_name}: {error_msg}")

@@ -6,7 +6,6 @@
 # A cópia, distribuição ou modificação não autorizada é estritamente proibida.
 # ==============================================================================
 
-"""
 GBOC Remote Restore Manager v14.0.0 Enterprise
 Orquestração de Monitoramento e Restauração Remota de Arquivos entre Agentes na Rede.
 """

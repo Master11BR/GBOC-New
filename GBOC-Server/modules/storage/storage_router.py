@@ -6,9 +6,26 @@ Módulo estrito para gerenciamento de armazenamento centralizado.
 
 import shutil
 import os
+import logging
+from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import JSONResponse
+
+try:
+    from database import db_manager
+    def get_db(): return db_manager.get_connection()
+    def release_db(conn): db_manager.release_connection(conn)
+except Exception:
+    def get_db(): return None
+    def release_db(conn): pass
+
+try:
+    from psycopg2.extras import RealDictCursor
+except Exception:
+    RealDictCursor = None
+
+logger = logging.getLogger("gboc_storage_module")
 
 router = APIRouter(prefix="/api/v1/server/storage", tags=["Server Storage Monitor"])
 
@@ -105,9 +122,13 @@ async def get_storage_history(days: int = 30):
     """Retorna histórico real de crescimento de dados coletado pelo sistema."""
     days_limit = min(days, 90)
     history = []
+    conn = None
     try:
         conn = get_db()
-        cur = conn.cursor(cursor_factory=RealDictCursor)
+        if not conn:
+            raise RuntimeError("Conexão com o banco de dados indisponível")
+        
+        cur = conn.cursor(cursor_factory=RealDictCursor) if RealDictCursor else conn.cursor()
         cur.execute("""
             SELECT recorded_at, size_bytes, repository_name
             FROM storage_usage_history
@@ -116,13 +137,20 @@ async def get_storage_history(days: int = 30):
         """, (days_limit,))
         rows = cur.fetchall()
         for r in rows:
+            if isinstance(r, dict):
+                rec_at = r.get("recorded_at")
+                sz_bytes = r.get("size_bytes")
+                repo_name = r.get("repository_name")
+            else:
+                rec_at = r[0]
+                sz_bytes = r[1]
+                repo_name = r[2]
             history.append({
-                "timestamp": r["recorded_at"].isoformat() if hasattr(r["recorded_at"], 'isoformat') else str(r["recorded_at"]),
-                "used_gb": round((r["size_bytes"] or 0) / (1024**3), 2),
-                "repository_name": r["repository_name"]
+                "timestamp": rec_at.isoformat() if hasattr(rec_at, 'isoformat') else str(rec_at),
+                "used_gb": round((sz_bytes or 0) / (1024**3), 2),
+                "repository_name": repo_name
             })
         cur.close()
-        release_db(conn)
     except Exception as e:
         logger.warning(f"Histórico DB indisponível, usando leitura de volumes locais: {e}")
         # Fallback 100% Real Data: Leitura empírica atual dos discos do host
@@ -133,6 +161,9 @@ async def get_storage_history(days: int = 30):
             "used_gb": round(base_used, 2),
             "repository_name": "Volumes Locais"
         }]
+    finally:
+        if conn:
+            release_db(conn)
 
     return JSONResponse({
         "status": "success",

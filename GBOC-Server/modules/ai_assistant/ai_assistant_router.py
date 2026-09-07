@@ -115,40 +115,57 @@ def _try_ollama_fallback(prompt: str, full_system: str, preferred_model: Optiona
 
     target_model = preferred_model or cfg.get("ollama_model") or cfg.get("model") or "gemma4:latest"
 
+    active_host = None
+    installed_models = []
     for host in cleaned_hosts:
-        installed_models = []
         try:
-            r_tags = requests.get(f"{host}/api/tags", timeout=3)
+            r_tags = requests.get(f"{host}/api/tags", timeout=1.5)
             if r_tags.status_code == 200:
                 m_list = r_tags.json().get("models", [])
                 installed_models = [m.get("name") or m.get("model") for m in m_list if m.get("name") or m.get("model")]
-        except Exception:
-            pass
-
-        model_to_use = target_model
-        if installed_models:
-            if target_model not in installed_models:
-                match = next((m for m in installed_models if target_model.lower().split(':')[0] in m.lower()), None)
-                model_to_use = match or installed_models[0]
-            else:
-                model_to_use = target_model
-
-        try:
-            res = requests.post(
-                f"{host}/api/generate",
-                json={"model": model_to_use, "prompt": f"{full_system}\n\nUsuário: {prompt}\nAssistente:", "stream": False},
-                timeout=40
-            )
-            if res.status_code == 200:
-                ans_text = res.json().get("response", "").strip()
-                if ans_text:
-                    return {
-                        "host": host,
-                        "model": model_to_use,
-                        "answer": ans_text
-                    }
+                active_host = host
+                break
         except Exception:
             continue
+
+    if not active_host:
+        return None
+
+    model_to_use = target_model
+    if installed_models:
+        if target_model not in installed_models:
+            prefix = target_model.lower().split(':')[0]
+            match = next((m for m in installed_models if prefix == m.lower().split(':')[0]), None)
+            if not match:
+                match = next((m for m in installed_models if prefix in m.lower()), None)
+            model_to_use = match or installed_models[0]
+        else:
+            model_to_use = target_model
+
+    try:
+        res = requests.post(
+            f"{active_host}/api/generate",
+            json={
+                "model": model_to_use,
+                "prompt": f"{full_system}\n\nUsuário: {prompt}\nAssistente:",
+                "stream": False,
+                "options": {
+                    "num_predict": 256,
+                    "temperature": 0.2
+                }
+            },
+            timeout=6
+        )
+        if res.status_code == 200:
+            ans_text = res.json().get("response", "").strip()
+            if ans_text:
+                return {
+                    "host": active_host,
+                    "model": model_to_use,
+                    "answer": ans_text
+                }
+    except Exception:
+        pass
 
     return None
 
@@ -300,8 +317,35 @@ async def server_ai_query(request: Request):
                 except Exception as e_gem:
                     config_error_detail = f"Falha de conexão com Google Gemini API: {str(e_gem)}"
 
+        # 6. ANTHROPIC CLAUDE
+        elif provider == "claude":
+            if not api_key:
+                config_error_detail = "A Chave de API do Anthropic Claude não foi informada em Configurações Gerais > IA & LLMs."
+            else:
+                try:
+                    actual_model = cfg.get("model") or "claude-3-5-sonnet-20241022"
+                    url = "https://api.anthropic.com/v1/messages"
+                    headers = {
+                        "x-api-key": api_key,
+                        "anthropic-version": "2023-06-01",
+                        "content-type": "application/json"
+                    }
+                    payload = {
+                        "model": actual_model,
+                        "max_tokens": 512,
+                        "messages": [{"role": "user", "content": f"{full_system}\n\nUsuário: {prompt}"}]
+                    }
+                    res = requests.post(url, json=payload, headers=headers, timeout=20)
+                    if res.status_code == 200:
+                        ans_text = res.json()["content"][0]["text"]
+                        return JSONResponse({"status": "success", "provider": "Anthropic Claude", "model": actual_model, "answer": ans_text, "duration_seconds": round(time.time() - start_time, 2)})
+                    else:
+                        config_error_detail = f"Falha na API Claude (HTTP {res.status_code}: {res.text[:180]})."
+                except Exception as e_claude:
+                    config_error_detail = f"Falha de conexão com Anthropic Claude API: {str(e_claude)}"
+
         # FALLBACK AUTOMÁTICO PARA OLLAMA LOCAL QUANDO O PROVEDOR PRINCIPAL FALHAR OU NÃO POSSUIR API KEY
-        ollama_fallback = _try_ollama_fallback(prompt, full_system, preferred_model=model_name, cfg=cfg)
+        ollama_fallback = _try_ollama_fallback(prompt, full_system, preferred_model=model_name, cfg=cfg) if provider != "ollama" else None
 
         err_msg = config_error_detail or f"Erro de conexão com a API do provedor {provider_label}."
 
@@ -389,29 +433,11 @@ async def save_server_ai_config_endpoint(request: Request):
 async def server_ai_diagnose(request: Request):
     """Diagnóstico preditivo por IA para qualquer módulo do Servidor Central."""
     try:
-        body = await request.json()
-        error_context = body.get("error_context") or body.get("module") or "Diagnóstico geral"
-        provider = body.get("provider")
+        body = await request.json() if request.headers.get("content-type") == "application/json" else {}
+        error_context = body.get("error_context") or body.get("module") or "Diagnóstico geral do Servidor Central"
 
-        cfg = load_server_ai_config()
-        is_llm_real = False
-        analysis = f"🔍 **Diagnóstico de Inteligência Artificial GBOC (Servidor Central)**:\n\n"
-        analysis += f"• **Contexto Analisado**: {error_context}\n"
-        analysis += f"• **Integridade do Servidor**: Todos os componentes do ecossistema e banco de dados estão respondendo sem interrupções críticas.\n"
-        analysis += f"• **Recomendação Preditiva**: Mantenha as políticas de backup e retentativas automáticas em execução regular."
-
-        if cfg.get("provider") == "ollama_local" or cfg.get("groq_api_key") or cfg.get("openai_api_key") or cfg.get("gemini_api_key") or cfg.get("deepseek_api_key"):
-            try:
-                prov = provider or cfg.get("provider", "ollama_local")
-                if prov in ["ollama_local", "ollama"]:
-                    res = requests.post(f"{cfg.get('ollama_url', 'http://localhost:11434')}/api/generate",
-                                        json={"model": cfg.get("ollama_model", "llama3"), "prompt": f"Analise este log/evento de backup/servidor e responda resumidamente em Português com diagnóstico e recomendação: {error_context}", "stream": False},
-                                        timeout=10)
-                    if res.status_code == 200:
-                        analysis = res.json().get("response", analysis)
-                        is_llm_real = True
-            except Exception:
-                pass
+        from modules.ai_assistant.ai_diagnostic_engine import server_ai_diagnostic_engine
+        ai_res = await server_ai_diagnostic_engine.analyze_error(error_context)
 
         disk = body.get("disk_percent", 42)
         ram = body.get("ram_percent", 58)
@@ -421,12 +447,8 @@ async def server_ai_diagnose(request: Request):
         return JSONResponse({
             "status": "HEALTHY" if health_score >= 80 else "WARNING",
             "health_score": health_score,
-            "ai_insights": analysis,
-            "result": {
-                "is_llm_real": is_llm_real,
-                "analysis": analysis,
-                "module": error_context
-            }
+            "ai_insights": ai_res.get("analysis", "Diagnóstico processado com sucesso."),
+            "result": ai_res
         })
     except Exception as e:
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)

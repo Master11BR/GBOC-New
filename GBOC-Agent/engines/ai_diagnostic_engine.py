@@ -136,30 +136,34 @@ Responda em formato JSON contendo obrigatoriamente:
 """
 
         # 1. Ollama Local ou modelos locais
-        if provider in ("ollama", "qwen", "llama3", "mistral_local"):
+        if provider in ("ollama", "qwen", "llama3", "mistral_local", "ollama_local"):
             ollama_info = await self.get_installed_ollama_models(ollama_host)
             active_host = ollama_info.get("ollama_host") if ollama_info.get("connected") else ollama_host.rstrip('/')
-            installed_models = ollama_info.get("models", [])
+            installed_models = ollama_info.get("installed_models") or ollama_info.get("models", [])
 
             # Resolver o melhor modelo disponível se o especificado não for exato
             selected_model = model
             if installed_models:
                 if selected_model not in installed_models:
-                    match = next((m for m in installed_models if selected_model.lower() in m.lower()), None)
-                    if match:
-                        selected_model = match
-                    else:
-                        selected_model = installed_models[0]
+                    prefix = selected_model.lower().split(':')[0]
+                    match = next((m for m in installed_models if prefix == m.lower().split(':')[0]), None)
+                    if not match:
+                        match = next((m for m in installed_models if prefix in m.lower()), None)
+                    selected_model = match or installed_models[0]
 
             if ollama_info.get("connected"):
                 try:
-                    async with httpx.AsyncClient(timeout=30.0) as client:
+                    async with httpx.AsyncClient(timeout=6.0) as client:
                         resp = await client.post(
                             f"{active_host}/api/generate",
                             json={
                                 "model": selected_model,
                                 "prompt": "Responda apenas: OK - Ollama Conectado" if is_test else prompt,
-                                "stream": False
+                                "stream": False,
+                                "options": {
+                                    "num_predict": 256,
+                                    "temperature": 0.2
+                                }
                             }
                         )
                         if resp.status_code == 200:
@@ -186,8 +190,83 @@ Responda em formato JSON contendo obrigatoriamente:
                 except Exception as e:
                     logger.warning(f"Ollama local indisponível no modelo {selected_model} ({e})...")
 
-        # 2. Provedores Cloud (Kimi, Grok, OpenAI, DeepSeek, Mistral, Claude)
+        # 2. Google Gemini
+        if provider in ("gemini", "google"):
+            if not api_key:
+                return {
+                    "is_llm_real": False,
+                    "provider": "Google Gemini (Sem Chave API)",
+                    "model": model,
+                    "analysis": "⚠️ A Chave de API do Google Gemini não foi preenchida nas configurações.\n\nPor favor, insira a sua API Key e clique em 'Salvar Configuração de IA'."
+                }
+            try:
+                gemini_model = model if "gemini" in model.lower() else "gemini-1.5-flash"
+                target_url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_model}:generateContent?key={api_key}"
+                payload = {"contents": [{"parts": [{"text": "Responda apenas: OK" if is_test else prompt}]}]}
+                async with httpx.AsyncClient(timeout=15.0) as client:
+                    resp = await client.post(target_url, json=payload)
+                    if resp.status_code == 200:
+                        content = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+                        if is_test:
+                            return {
+                                "is_llm_real": True,
+                                "provider": "Google Gemini (API Conectada)",
+                                "model": gemini_model,
+                                "analysis": f"✅ CONEXÃO COM GOOGLE GEMINI OK!\n\nA API respondeu com sucesso usando o modelo '{gemini_model}'."
+                            }
+                        res = self._parse_ai_response(content, error_context)
+                        res["is_llm_real"] = True
+                        res["provider"] = "Google Gemini (LLM Real)"
+                        res["model"] = gemini_model
+                        return res
+            except Exception as e:
+                logger.warning(f"Falha na API Google Gemini ({e})...")
+
+        # 3. Anthropic Claude
+        if provider in ("claude", "anthropic"):
+            if not api_key:
+                return {
+                    "is_llm_real": False,
+                    "provider": "Anthropic Claude (Sem Chave API)",
+                    "model": model,
+                    "analysis": "⚠️ A Chave de API do Anthropic Claude não foi preenchida nas configurações.\n\nPor favor, insira a sua API Key e clique em 'Salvar Configuração de IA'."
+                }
+            try:
+                claude_model = model if "claude" in model.lower() else "claude-3-5-sonnet-20241022"
+                target_url = "https://api.anthropic.com/v1/messages"
+                headers = {
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json"
+                }
+                payload = {
+                    "model": claude_model,
+                    "max_tokens": 512,
+                    "messages": [{"role": "user", "content": "Responda apenas: OK" if is_test else prompt}]
+                }
+                async with httpx.AsyncClient(timeout=15.0) as client:
+                    resp = await client.post(target_url, json=payload, headers=headers)
+                    if resp.status_code == 200:
+                        content = resp.json()["content"][0]["text"]
+                        if is_test:
+                            return {
+                                "is_llm_real": True,
+                                "provider": "Anthropic Claude (API Conectada)",
+                                "model": claude_model,
+                                "analysis": f"✅ CONEXÃO COM ANTHROPIC CLAUDE OK!\n\nA API respondeu com sucesso usando o modelo '{claude_model}'."
+                            }
+                        res = self._parse_ai_response(content, error_context)
+                        res["is_llm_real"] = True
+                        res["provider"] = "Anthropic Claude (LLM Real)"
+                        res["model"] = claude_model
+                        return res
+            except Exception as e:
+                logger.warning(f"Falha na API Anthropic Claude ({e})...")
+
+        # 4. Provedores Cloud padrão OpenAI-compatíveis (Groq, OpenAI, DeepSeek, Kimi, Mistral)
         endpoints = {
+            "groq": "https://api.groq.com/openai/v1/chat/completions",
+            "groq_free": "https://api.groq.com/openai/v1/chat/completions",
             "kimi": "https://api.moonshot.cn/v1/chat/completions",
             "grok": "https://api.x.ai/v1/chat/completions",
             "openai": "https://api.openai.com/v1/chat/completions",
@@ -206,8 +285,9 @@ Responda em formato JSON contendo obrigatoriamente:
             try:
                 target_url = endpoints[provider]
                 headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+                actual_model = self.config.get("groq_model", "llama-3.3-70b-versatile") if "groq" in provider else model
                 payload = {
-                    "model": model,
+                    "model": actual_model,
                     "messages": [{"role": "user", "content": "Responda apenas: OK" if is_test else prompt}],
                     "temperature": 0.2
                 }
@@ -219,13 +299,13 @@ Responda em formato JSON contendo obrigatoriamente:
                             return {
                                 "is_llm_real": True,
                                 "provider": f"{provider.upper()} Nuvem (API Conectada)",
-                                "model": model,
-                                "analysis": f"✅ CONEXÃO COM {provider.upper()} OK!\n\nA API em nuvem respondeu com sucesso usando o modelo '{model}'."
+                                "model": actual_model,
+                                "analysis": f"✅ CONEXÃO COM {provider.upper()} OK!\n\nA API em nuvem respondeu com sucesso usando o modelo '{actual_model}'."
                             }
                         res = self._parse_ai_response(content, error_context)
                         res["is_llm_real"] = True
                         res["provider"] = f"{provider.upper()} Nuvem (LLM Real)"
-                        res["model"] = model
+                        res["model"] = actual_model
                         return res
             except Exception as e:
                 logger.warning(f"Falha na API {provider} ({e})...")

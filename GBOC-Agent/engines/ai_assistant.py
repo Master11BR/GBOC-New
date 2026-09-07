@@ -91,40 +91,57 @@ def _try_ollama_fallback(prompt: str, full_system: str, preferred_model: Optiona
 
     target_model = preferred_model or cfg.get("ollama_model") or cfg.get("model") or "gemma4:latest"
 
+    active_host = None
+    installed_models = []
     for host in cleaned_hosts:
-        installed_models = []
         try:
-            r_tags = requests.get(f"{host}/api/tags", timeout=3)
+            r_tags = requests.get(f"{host}/api/tags", timeout=1.5)
             if r_tags.status_code == 200:
                 m_list = r_tags.json().get("models", [])
                 installed_models = [m.get("name") or m.get("model") for m in m_list if m.get("name") or m.get("model")]
-        except Exception:
-            pass
-
-        model_to_use = target_model
-        if installed_models:
-            if target_model not in installed_models:
-                match = next((m for m in installed_models if target_model.lower().split(':')[0] in m.lower()), None)
-                model_to_use = match or installed_models[0]
-            else:
-                model_to_use = target_model
-
-        try:
-            res = requests.post(
-                f"{host}/api/generate",
-                json={"model": model_to_use, "prompt": f"{full_system}\n\nUsuário: {prompt}\nAssistente:", "stream": False},
-                timeout=40
-            )
-            if res.status_code == 200:
-                ans_text = res.json().get("response", "").strip()
-                if ans_text:
-                    return {
-                        "host": host,
-                        "model": model_to_use,
-                        "answer": ans_text
-                    }
+                active_host = host
+                break
         except Exception:
             continue
+
+    if not active_host:
+        return None
+
+    model_to_use = target_model
+    if installed_models:
+        if target_model not in installed_models:
+            prefix = target_model.lower().split(':')[0]
+            match = next((m for m in installed_models if prefix == m.lower().split(':')[0]), None)
+            if not match:
+                match = next((m for m in installed_models if prefix in m.lower()), None)
+            model_to_use = match or installed_models[0]
+        else:
+            model_to_use = target_model
+
+    try:
+        res = requests.post(
+            f"{active_host}/api/generate",
+            json={
+                "model": model_to_use,
+                "prompt": f"{full_system}\n\nUsuário: {prompt}\nAssistente:",
+                "stream": False,
+                "options": {
+                    "num_predict": 256,
+                    "temperature": 0.2
+                }
+            },
+            timeout=6
+        )
+        if res.status_code == 200:
+            ans_text = res.json().get("response", "").strip()
+            if ans_text:
+                return {
+                    "host": active_host,
+                    "model": model_to_use,
+                    "answer": ans_text
+                }
+    except Exception:
+        pass
 
     return None
 
@@ -288,8 +305,41 @@ def query_ai_assistant(prompt: str, provider_override: Optional[str] = None) -> 
             except Exception as e_gem:
                 config_error_detail = f"Falha de conexão com Google Gemini API: {str(e_gem)}"
 
+    # 6. ANTHROPIC CLAUDE
+    elif provider == "claude":
+        if not api_key:
+            config_error_detail = "A Chave de API do Anthropic Claude não foi informada em Configurações > Provedores de IA."
+        else:
+            try:
+                actual_model = cfg.get("model") or "claude-3-5-sonnet-20241022"
+                url = "https://api.anthropic.com/v1/messages"
+                headers = {
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json"
+                }
+                payload = {
+                    "model": actual_model,
+                    "max_tokens": 512,
+                    "messages": [{"role": "user", "content": f"{full_system}\n\nUsuário: {prompt}"}]
+                }
+                res = requests.post(url, json=payload, headers=headers, timeout=20)
+                if res.status_code == 200:
+                    ans_text = res.json()["content"][0]["text"]
+                    return {
+                        "status": "success",
+                        "provider": "Anthropic Claude",
+                        "model": actual_model,
+                        "answer": ans_text,
+                        "duration_seconds": round(time.time() - start_time, 2)
+                    }
+                else:
+                    config_error_detail = f"Falha na API Claude (HTTP {res.status_code}: {res.text[:180]})."
+            except Exception as e_claude:
+                config_error_detail = f"Falha de conexão com Anthropic Claude API: {str(e_claude)}"
+
     # EXECUÇÃO DO FALLBACK AUTOMÁTICO PARA OLLAMA LOCAL QUANDO HOUVER FALHA NA IA PRINCIPAL
-    ollama_fallback = _try_ollama_fallback(prompt, full_system, cfg=cfg)
+    ollama_fallback = _try_ollama_fallback(prompt, full_system, cfg=cfg) if provider != "ollama" else None
 
     err_msg = config_error_detail or f"Erro de conexão com a API do provedor {provider_label}."
 

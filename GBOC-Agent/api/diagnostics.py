@@ -252,10 +252,30 @@ async def router_ai_repair():
     }
 
 @router.post("/ai-analyze")
-async def router_ai_analyze():
+async def router_ai_analyze(request: Request = None):
     """Análise de IA de diagnóstico preditivo"""
+    err_msg = "Verificação preventiva de integridade e diagnósticos de rotina."
+    if request:
+        try:
+            body = await request.json() if request.headers.get("content-type") == "application/json" else {}
+            err_msg = body.get("error_message") or body.get("prompt") or err_msg
+        except Exception:
+            pass
     from engines.ai_diagnostic_engine import ai_diagnostic_engine
-    return await ai_diagnostic_engine.analyze_error("Verificação preventiva de integridade e diagnósticos de rotina.")
+    return await ai_diagnostic_engine.analyze_error(err_msg)
+
+@router.post("/ai-analyze-risk")
+async def router_ai_analyze_risk(request: Request = None):
+    """Análise de risco de IA por item"""
+    risk_item = "Falha Crítica de Inicialização / Repositório"
+    if request:
+        try:
+            body = await request.json() if request.headers.get("content-type") == "application/json" else {}
+            risk_item = body.get("risk_item") or risk_item
+        except Exception:
+            pass
+    from engines.ai_diagnostic_engine import ai_diagnostic_engine
+    return await ai_diagnostic_engine.analyze_error(f"Erro Crítico de Risco: {risk_item}")
 
 @router.post("/ai-analyze-sla")
 async def router_ai_analyze_sla():
