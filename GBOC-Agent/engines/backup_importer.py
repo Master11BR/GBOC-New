@@ -146,18 +146,16 @@ class RealBackupImporter:
             with core.get_db_connection() as conn:
                 cur = conn.cursor()
 
-                # 1. Converter repositórios existentes com outro motor para 'native'
-                cur.execute("UPDATE repositories SET engine = 'native' WHERE engine IS NULL OR engine != 'native'")
+                # 1. Preencher repositórios sem motor definido mantendo os motores existentes intactos
+                cur.execute("UPDATE repositories SET engine = 'gboc_native' WHERE engine IS NULL OR TRIM(engine) = ''")
                 imported_repos += cur.rowcount if hasattr(cur, 'rowcount') and cur.rowcount is not None else 0
                 conn.commit()
-                logs.append(f"✓ Repositórios de backup convertidos para o motor Nativo ({imported_repos} repositórios).")
 
-                # 2. Converter tarefas existentes com outro motor para 'native'
-                cur.execute("UPDATE tasks SET engine = 'native' WHERE engine IS NULL OR engine != 'native'")
+                # 2. Preencher tarefas sem motor definido mantendo os motores existentes intactos
+                cur.execute("UPDATE tasks SET engine = 'gboc_native' WHERE engine IS NULL OR TRIM(engine) = ''")
                 converted_tasks = cur.rowcount if hasattr(cur, 'rowcount') and cur.rowcount is not None else 0
                 imported_tasks += converted_tasks
                 conn.commit()
-                logs.append(f"✓ Tarefas registradas convertidas para o motor Nativo ({converted_tasks} tarefas).")
 
                 # 3. Importar tarefas do Duplicati caso existam
                 duplicati_jobs = self._scan_duplicati_dbs()

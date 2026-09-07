@@ -156,11 +156,40 @@ def resolve_job_failure(task_id: str):
         conn.commit()
 
 def get_failed_jobs(limit: int = 50) -> List[Dict]:
-    """Retorna a lista de jobs com falhas ativas."""
+    """Retorna a lista de jobs com falhas ativas, sincronizando com task_executions para garantir 100% de consistência."""
     ensure_alert_tables()
     core = _get_core()
     with core.get_db_connection() as conn:
         cur = conn.cursor()
+
+        # 🔄 Auto-Sincronização: Importar falhas ativas de task_executions para job_failure_log se ainda não existirem
+        try:
+            cur.execute("""
+                SELECT te.task_id, COALESCE(t.name, 'Tarefa ' || te.task_id) as task_name,
+                       te.id as execution_id, COALESCE(te.error_message, 'Falha operacional na execução') as failure_reason,
+                       te.started_at
+                FROM task_executions te
+                LEFT JOIN tasks t ON t.id = te.task_id
+                WHERE te.status IN ('failed', 'error', 'cancelled', 'interrupted')
+                AND NOT EXISTS (
+                    SELECT 1 FROM job_failure_log jfl 
+                    WHERE jfl.execution_id = CAST(te.id AS TEXT) 
+                       OR (jfl.task_id = CAST(te.task_id AS TEXT) AND jfl.status = 'failed')
+                )
+                ORDER BY te.id DESC LIMIT 50
+            """)
+            unregistered = cur.fetchall()
+            for u in unregistered:
+                u_task_id, u_task_name, u_exec_id, u_reason, u_start = str(u[0]), str(u[1]), str(u[2]), str(u[3]), u[4]
+                cur.execute("""
+                    INSERT INTO job_failure_log (task_id, task_name, execution_id, failure_reason, max_retries, first_failed_at)
+                    VALUES (%s, %s, %s, %s, 3, COALESCE(%s, CURRENT_TIMESTAMP))
+                """, (u_task_id, u_task_name, u_exec_id, u_reason, u_start))
+            if unregistered:
+                conn.commit()
+        except Exception as _sync_err:
+            logger.warning(f"Aviso no auto-sync de falhas em get_failed_jobs: {_sync_err}")
+
         cur.execute("""
             SELECT id, task_id, task_name, failure_reason, retry_count, max_retries,
                    status, alert_sent, escalated, first_failed_at, last_retried_at, resolved_at

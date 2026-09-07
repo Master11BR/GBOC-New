@@ -591,6 +591,8 @@ API_MODULES = [
     ("api.duplicati_native_api", "router"),  # ✅ Duplicati native module (isolado)
     ("api.schema_check_api", "router"),  # ✅ Schema diagnostics and auto-fix
     ("api.hardware_api", "router"),  # ✅ Hardware, Disks & SMART
+    ("api.ai_api", "router"),  # ✅ GBOC Copilot AI Assistant (/api/ai)
+    ("api.ai_api", "router_v1"),  # ✅ GBOC Copilot AI Assistant v1 (/api/v1/ai)
 ]
 
 
@@ -860,6 +862,7 @@ async def remote_restore_register(request: Request):
         raise HTTPException(500, detail=str(e))
 
 @app.post("/api/v1/diagnostics/ai-analyze")
+@app.post("/api/diagnostics/ai-analyze")
 async def ai_diagnostic_analyze(request: Request):
     """Executa a análise real via IA (Ollama ou Cloud) dos últimos logs e erros."""
     try:
@@ -928,6 +931,7 @@ async def ai_diagnostic_repair(request: Request):
         return JSONResponse({"status": "success", "message": f"Auto-reparo executado: {str(e)}", "actions_taken": ["✓ Operação concluída com sucesso [OK]"]})
 
 @app.post("/api/v1/diagnostics/ai-analyze-sla")
+@app.post("/api/diagnostics/ai-analyze-sla")
 async def ai_analyze_sla():
     """Análise preditiva de métricas de SLA via IA com dados reais do sistema."""
     try:
@@ -957,6 +961,7 @@ async def ai_analyze_sla():
         }
 
 @app.post("/api/v1/diagnostics/ai-analyze-risk")
+@app.post("/api/diagnostics/ai-analyze-risk")
 async def ai_analyze_risk(request: Request):
     """Análise de risco direcionada por item."""
     try:
