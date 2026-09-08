@@ -1,4 +1,4 @@
-/* GBOC 14.0.0 Enterprise Edition — Interactive GBOC Copilot AI Chatbot Floating Widget */
+/* GBOC 14.1.0 Enterprise Edition — Interactive GBOC Copilot AI Chatbot Floating Widget */
 (function() {
     'use strict';
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC Agent 14.0.0 - Database Wrapper
+GBOC Agent 14.1.0 - Database Wrapper
 PostgreSQL exclusivo via psycopg2
 """
 

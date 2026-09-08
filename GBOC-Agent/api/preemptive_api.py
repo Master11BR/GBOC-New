@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 14.0.0 - API de Diagnóstico Preemptivo
+GBOC 14.1.0 - API de Diagnóstico Preemptivo
 Consulta PostgreSQL via SharedCore
 """
 
@@ -17,14 +17,31 @@ def _get_core():
     return get_shared_core()
 
 
-def _run_check():
-    """Executa verificação preemptiva consultando PostgreSQL."""
+_last_check_ts = 0.0
+_cached_check_result = None
+
+
+def _run_check(force: bool = False):
+    """Executa verificação preemptiva consultando PostgreSQL com cache TTL."""
+    global _last_check_ts, _cached_check_result
+    import time as _py_time
+    now = _py_time.monotonic()
+    if not force and _cached_check_result and (now - _last_check_ts < 10.0):
+        return _cached_check_result
+
     core = _get_core()
     alerts = []
     warnings = []
     recommendations = []
     risk_level = "minimal"
     days_until_full = None
+
+    # Sincronizar execuções reais do Duplicati Native se disponível (usando cache)
+    try:
+        from core.integrations.duplicati_native import get_duplicati_native_service
+        get_duplicati_native_service().sync_to_gboc(core, force=False)
+    except Exception as _sync_err:
+        logger.debug(f"Sync Duplicati preemptive check bypass: {_sync_err}")
 
     try:
         with core.get_db_connection() as conn:
@@ -51,72 +68,91 @@ def _run_check():
                     for f_row in cursor.fetchall():
                         f_id, f_task_id, f_task_name, f_engine, f_error, f_started = f_row
                         alerts.append({
-                            "type": "task_execution_failed",
-                            "message": f"Falha na execução da tarefa '{f_task_name}'",
-                            "detail": f"Erro reportado pela engine {f_engine}: {f_error or 'Execução finalizada com erro não-zero'}",
+                            "type": "recent_failures",
                             "severity": "critical",
-                            "task_name": f_task_name,
-                            "engine": f_engine,
-                            "last_error": f_error or 'Desconhecido',
-                            "timestamp": str(f_started)
+                            "message": f"Falha na tarefa '{f_task_name}' ({f_engine}): {f_error or 'Erro desconhecido'}",
+                            "task_id": f_task_id,
+                            "execution_id": f_id,
+                            "started_at": str(f_started)
                         })
-                    if recent_failures >= 2:
-                        risk_level = "high" if recent_failures >= 5 else "moderate"
-                except Exception as _fe:
-                    logger.warning(f"Erro ao buscar detalhes de falhas: {_fe}")
-
-            # Verificar se há tarefas sem backup recente
-            cursor.execute("""
-                SELECT t.id, t.name,
-                       MAX(te.started_at) as last_run
-                FROM tasks t
-                LEFT JOIN task_executions te ON t.id = te.task_id AND te.status = 'completed'
-                GROUP BY t.id, t.name
-            """)
-            for row in cursor.fetchall():
-                task_id, task_name, last_run = row
-                if last_run is None:
-                    warnings.append({
-                        "type": "no_backup",
-                        "message": f"Tarefa '{task_name}' nunca completou um backup",
-                        "severity": "warning"
+                except Exception as _e_fail:
+                    alerts.append({
+                        "type": "recent_failures",
+                        "severity": "critical",
+                        "message": f"{recent_failures} backup(s) falharam nas últimas 24 horas"
                     })
-                elif (datetime.now() - last_run).days > 7:
-                    warnings.append({
-                        "type": "stale_backup",
-                        "message": f"Tarefa '{task_name}' sem backup há {(datetime.now() - last_run).days} dias",
-                        "severity": "warning"
-                    })
+                risk_level = "high"
 
-            # Taxa de sucesso geral (7 dias)
+            # Verificar integridade geral (últimos 7 dias) - apenas tarefas ativas
             cursor.execute("""
-                SELECT
+                SELECT 
                     COUNT(*) as total,
-                    SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as ok
-                FROM task_executions
-                WHERE started_at >= %s
+                    COUNT(*) FILTER (WHERE te.status IN ('completed', 'repaired')) as success,
+                    COUNT(*) FILTER (WHERE te.status = 'failed') as failed
+                FROM task_executions te
+                JOIN tasks t ON te.task_id = t.id
+                WHERE te.started_at >= %s AND t.active = true
             """, ((datetime.now() - timedelta(days=7)).isoformat(),))
             row = cursor.fetchone()
             total_7d = row[0] or 0
-            ok_7d = row[1] or 0
-            rate_7d = (ok_7d / total_7d * 100) if total_7d > 0 else 100
+            success_7d = row[1] or 0
+            failed_7d = row[2] or 0
 
-            if rate_7d < 50:
-                alerts.append({
+            rate_7d = round((success_7d / total_7d) * 100, 1) if total_7d > 0 else 0
+
+            if total_7d > 0 and rate_7d < 80:
+                warnings.append({
                     "type": "low_success_rate",
-                    "message": f"Taxa de sucesso nos últimos 7 dias: {rate_7d:.0f}%",
-                    "severity": "critical"
+                    "severity": "warning",
+                    "message": f"Taxa de sucesso nos últimos 7 dias está em {rate_7d}% ({failed_7d} falhas de {total_7d} execuções)"
                 })
                 if risk_level != "high":
-                    risk_level = "high"
-            elif rate_7d < 80:
+                    risk_level = "medium"
+
+            # Verificar tarefas que nunca completaram com sucesso
+            cursor.execute("""
+                SELECT t.id, t.name, t.engine
+                FROM tasks t
+                WHERE t.active = true
+                  AND NOT EXISTS (
+                      SELECT 1 FROM task_executions te
+                      WHERE te.task_id = t.id AND te.status IN ('completed', 'repaired')
+                  )
+            """)
+            never_completed = cursor.fetchall()
+            for t_row in never_completed:
+                t_id, t_name, t_engine = t_row
+                cursor.execute("""
+                    SELECT te.error_message, te.started_at
+                    FROM task_executions te
+                    WHERE te.task_id = %s AND te.status = 'failed'
+                    ORDER BY te.started_at DESC LIMIT 1
+                """, (t_id,))
+                last_fail = cursor.fetchone()
+                fail_reason = f" Último erro: {last_fail[0]}" if (last_fail and last_fail[0]) else ""
+                
                 warnings.append({
-                    "type": "moderate_success_rate",
-                    "message": f"Taxa de sucesso nos últimos 7 dias: {rate_7d:.0f}%",
-                    "severity": "warning"
+                    "type": "never_completed",
+                    "severity": "warning",
+                    "message": f"Tarefa '{t_name}' ({t_engine}) nunca completou um backup com sucesso.{fail_reason}"
                 })
-                if risk_level == "minimal":
-                    risk_level = "moderate"
+
+            # Verificar tarefas sem execução recente (mais de 48h)
+            cursor.execute("""
+                SELECT t.name, MAX(te.started_at) as last_run
+                FROM tasks t
+                JOIN task_executions te ON t.id = te.task_id
+                WHERE t.active = true
+                GROUP BY t.id, t.name
+                HAVING MAX(te.started_at) < %s
+            """, ((datetime.now() - timedelta(hours=48)).isoformat(),))
+            stale_tasks = cursor.fetchall()
+            for st in stale_tasks:
+                warnings.append({
+                    "type": "stale_task",
+                    "severity": "warning",
+                    "message": f"Tarefa '{st[0]}' sem execução há mais de 48 horas (última: {st[1]})"
+                })
 
             # Recomendações
             if recent_failures > 0:
@@ -141,13 +177,16 @@ def _run_check():
     except Exception as e:
         logger.error(f"Erro no diagnóstico preemptivo: {e}", exc_info=True)
 
-    return {
+    check_res = {
         "alerts": alerts,
         "warnings": warnings,
         "risk_level": risk_level,
         "recommendations": recommendations,
         "checks": {"storage_capacity": {"days_until_full": days_until_full}}
     }
+    _last_check_ts = _py_time.monotonic()
+    _cached_check_result = check_res
+    return check_res
 
 
 @router.get("/check")
@@ -203,6 +242,12 @@ async def get_sla_compliance():
     """Calcula SLA compliance por tarefa — RPO, taxa de sucesso, última execução"""
     core = _get_core()
     try:
+        try:
+            from core.integrations.duplicati_native import get_duplicati_native_service
+            get_duplicati_native_service().sync_to_gboc(core)
+        except Exception:
+            pass
+
         with core.get_db_connection() as conn:
             cursor = conn.cursor()
 
@@ -210,13 +255,13 @@ async def get_sla_compliance():
                 SELECT t.id, t.name, t.schedule_cron, t.schedule_enabled, t.engine,
                        t.retention_days,
                        (SELECT COUNT(*) FROM task_executions te
-                        WHERE te.task_id = t.id AND te.status = 'completed'
+                        WHERE te.task_id = t.id AND te.status IN ('completed', 'repaired')
                         AND te.started_at >= NOW() - INTERVAL '30 days') as success_30d,
                        (SELECT COUNT(*) FROM task_executions te
                         WHERE te.task_id = t.id
                         AND te.started_at >= NOW() - INTERVAL '30 days') as total_30d,
                        (SELECT MAX(te.started_at) FROM task_executions te
-                        WHERE te.task_id = t.id AND te.status = 'completed') as last_success,
+                        WHERE te.task_id = t.id AND te.status IN ('completed', 'repaired')) as last_success,
                        (SELECT MAX(te.started_at) FROM task_executions te
                         WHERE te.task_id = t.id AND te.status = 'failed') as last_failure
                 FROM tasks t WHERE t.enabled = true
@@ -285,6 +330,12 @@ async def get_tasks_at_risk():
     """Identifica tarefas em risco — falhas consecutivas, sem backup recente, RPO violado"""
     core = _get_core()
     try:
+        try:
+            from core.integrations.duplicati_native import get_duplicati_native_service
+            get_duplicati_native_service().sync_to_gboc(core)
+        except Exception:
+            pass
+
         with core.get_db_connection() as conn:
             cursor = conn.cursor()
 
@@ -300,7 +351,7 @@ async def get_tasks_at_risk():
                      WHERE te.task_id = t.id AND te.status = 'failed'
                      ORDER BY te.started_at DESC LIMIT 1) as last_error,
                     (SELECT MAX(te.started_at) FROM task_executions te
-                     WHERE te.task_id = t.id AND te.status = 'completed') as last_success
+                     WHERE te.task_id = t.id AND te.status IN ('completed', 'repaired')) as last_success
                 FROM tasks t WHERE t.enabled = true
             """)
 

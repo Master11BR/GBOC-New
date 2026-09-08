@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 14.0.0 - Job Alert Monitor & Proactive Failure Detection Engine
+GBOC 14.1.0 - Job Alert Monitor & Proactive Failure Detection Engine
 Monitors backup task executions in real-time.
 On failure: retries automatically (configurable) and dispatches multi-channel alerts
 (Email SMTP, Telegram Bot, WhatsApp, Webhook HTTP/S).
@@ -330,6 +330,14 @@ def _monitor_loop():
 
             ensure_alert_tables()
             core = _get_core()
+
+            # Sincronização periódica de execuções nativas do Duplicati
+            try:
+                from core.integrations.duplicati_native import get_duplicati_native_service
+                get_duplicati_native_service().sync_to_gboc(core)
+            except Exception:
+                pass
+
             with core.get_db_connection() as conn:
                 cur = conn.cursor()
                 # Fetch active failures not yet alerted

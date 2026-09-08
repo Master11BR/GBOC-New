@@ -272,16 +272,16 @@ class DuplicatiNativeService:
         }
 
     def discover_endpoints(self) -> List[str]:
-        candidates = [
+        cfg = self.load_config()
+        candidates = list(dict.fromkeys([
+            cfg.base_url.rstrip("/"),
             "http://localhost:8200",
             "http://127.0.0.1:8200",
-            "http://localhost:8300",
-            "http://127.0.0.1:8300",
-        ]
+        ]))
         found: List[str] = []
         for base in candidates:
             try:
-                response = self._session.get(f"{base}/", timeout=2)
+                response = self._session.get(f"{base}/", timeout=0.5)
                 if response.status_code < 500:
                     found.append(base)
             except Exception:
@@ -294,7 +294,7 @@ class DuplicatiNativeService:
         # 1. Testar conectividade HTTP básica no servidor Duplicati
         server_reachable = False
         try:
-            r = self._session.get(f"{cfg.base_url}/", timeout=cfg.timeout_seconds, verify=cfg.verify_tls)
+            r = self._session.get(f"{cfg.base_url}/", timeout=min(cfg.timeout_seconds, 2.0), verify=cfg.verify_tls)
             if r.status_code < 500:
                 server_reachable = True
         except Exception:
@@ -329,6 +329,9 @@ class DuplicatiNativeService:
         else:
             status_msg = "❌ Servidor Duplicati não foi localizado no endereço especificado."
 
+        # Otimização de latência: se já conectou, não precisa varrer portas alternativas
+        discovered = [cfg.base_url] if (ok or server_reachable or auth_required) else self.discover_endpoints()
+
         return {
             "ok": ok or server_reachable or auth_required,
             "message": status_msg,
@@ -337,7 +340,7 @@ class DuplicatiNativeService:
             "auth_required": auth_required,
             "installation": install,
             "probes": results,
-            "discovered": self.discover_endpoints(),
+            "discovered": discovered,
         }
 
     def _read_duplicati_server_db(self) -> List[Dict[str, Any]]:
@@ -856,12 +859,96 @@ class DuplicatiNativeService:
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
-    def sync_to_gboc(self, core: Any = None) -> Dict[str, Any]:
+    def create_backup(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Cria uma nova rotina de backup no Duplicati Server nativo e sincroniza com o GBOC.
+        Suporta o formulário simplificado do GBOC e a estrutura oficial do Duplicati API.
+        """
+        cfg = self.load_config()
+
+        # Determinar se o payload já possui a estrutura completa do Duplicati
+        if "Backup" in payload:
+            dup_payload = payload
+        else:
+            name = payload.get("name") or "Backup_GBOC"
+            desc = payload.get("description") or ""
+            target_url = payload.get("target_url") or "file://C:\\GBOC-Backups"
+            sources = payload.get("sources") or []
+            if isinstance(sources, str):
+                sources = [s.strip() for s in sources.split(",") if s.strip()]
+            passphrase = payload.get("passphrase") or ""
+            repeat = payload.get("schedule_repeat") or "2h"
+
+            from datetime import datetime, timezone, timedelta
+            now = datetime.now(timezone.utc)
+            sched_time = (now + timedelta(hours=1)).strftime('%Y-%m-%dT%H:%M:00Z')
+
+            settings = [
+                {"Name": "dblock-size", "Value": "50MB"},
+                {"Name": "compression-module", "Value": "zip"},
+            ]
+            if passphrase:
+                settings.extend([
+                    {"Name": "encryption-module", "Value": "aes"},
+                    {"Name": "passphrase", "Value": passphrase}
+                ])
+            else:
+                settings.append({"Name": "no-encryption", "Value": "true"})
+
+            dup_payload = {
+                "Backup": {
+                    "Name": name,
+                    "Description": desc,
+                    "TargetURL": target_url,
+                    "Sources": sources,
+                    "Settings": settings,
+                    "Filters": []
+                },
+                "Schedule": {
+                    "Repeat": repeat,
+                    "Time": sched_time,
+                    "AllowedDays": None
+                }
+            }
+
+        try:
+            resp = self._api_post(cfg, "api/v1/backups", json_body=dup_payload)
+            if resp.status_code in (200, 201):
+                data = resp.json()
+                new_id = data.get("ID") or data.get("Id") or (data.get("Backup", {}).get("ID"))
+                # Sincronizar imediatamente com o GBOC (forçando atualização)
+                try:
+                    self.sync_to_gboc(force=True)
+                except Exception as _sync_err:
+                    logger.warning(f"Erro no sync imediato pós-criação de backup Duplicati: {_sync_err}")
+                return {
+                    "status": "success",
+                    "message": f"Backup Duplicati '{dup_payload.get('Backup', {}).get('Name')}' criado com sucesso!",
+                    "id": new_id,
+                    "data": data
+                }
+            else:
+                return {
+                    "status": "error",
+                    "message": f"Erro HTTP {resp.status_code} ao criar backup no Duplicati",
+                    "detail": resp.text[:400]
+                }
+        except Exception as e:
+            logger.error(f"Exceção ao criar backup Duplicati: {e}")
+            return {"status": "error", "message": str(e)}
+
+    def sync_to_gboc(self, core: Any = None, force: bool = False) -> Dict[str, Any]:
         """
         Sincroniza os backups e execuções reais do Duplicati Native com o PostgreSQL do GBOC.
         Identifica tarefas existentes ou cria o vínculo com engine='duplicati' e espelha
         os snapshots históricos como task_executions completadas.
+        Utiliza TTL cache de 30 segundos para evitar contenção de I/O em chamadas concorrentes.
         """
+        import time as _py_time
+        if not force and hasattr(self, '_last_sync_ts'):
+            if _py_time.time() - self._last_sync_ts < 30.0:
+                return getattr(self, '_last_sync_result', {"status": "success", "cached": True})
+
         if core is None:
             try:
                 from shared_core import get_shared_core
@@ -873,6 +960,10 @@ class DuplicatiNativeService:
         backups_res = self.list_backups()
         items = backups_res.get("items", [])
         if not items:
+            res = {"status": "success", "synced_tasks": 0, "synced_executions": 0, "message": "Nenhum backup Duplicati detectado"}
+            self._last_sync_ts = _py_time.time()
+            self._last_sync_result = res
+            return res
             return {"status": "success", "synced_tasks": 0, "synced_executions": 0, "message": "Nenhum backup Duplicati detectado"}
 
         from datetime import datetime, timedelta, timezone
@@ -985,12 +1076,15 @@ class DuplicatiNativeService:
 
                     conn.commit()
 
-            return {
+            res = {
                 "status": "success",
                 "synced_tasks": synced_tasks,
                 "synced_executions": total_new_executions,
                 "message": f"Sincronização Duplicati concluída com sucesso ({synced_tasks} tarefa(s), {total_new_executions} nova(s) execução(ões))."
             }
+            self._last_sync_ts = _py_time.time()
+            self._last_sync_result = res
+            return res
         except Exception as e:
             logger.error(f"Erro ao sincronizar Duplicati com PostgreSQL: {e}")
             return {"status": "error", "message": str(e)}

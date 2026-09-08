@@ -1,6 +1,6 @@
 /*
 ==============================================================================
-GBOC System v14.0.0 Enterprise Edition
+GBOC System v14.1.0 Enterprise Edition
 Layout & Navigation Manager — Controls Dual Layout Engine (Vertical/Horizontal)
 and Color Themes across all resolutions (1024px, 720p HD, 1080p FHD, 4K UHD).
 Zero-Overflow & Smart Sidebar Presence Detection.

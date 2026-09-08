@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v14.0.0 Enterprise Edition
+# GBOC System v14.1.0 Enterprise Edition
 # Module: Hermes Mesh Engine — P2P LAN Discovery & Block Cache
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================
@@ -117,7 +117,7 @@ class HermesMeshEngine:
             "hostname": AGENT_NAME,
             "ip": self._local_ip,
             "port": MESH_DISCOVERY_PORT,
-            "version": "14.0.0",
+            "version": "14.1.0",
             "timestamp": datetime.now().isoformat()
         }
         return json.dumps(payload).encode("utf-8")

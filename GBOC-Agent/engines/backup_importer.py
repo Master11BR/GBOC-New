@@ -170,10 +170,10 @@ class RealBackupImporter:
                         cur.execute("""
                             INSERT INTO tasks (name, engine, source_paths, status, schedule_cron, created_at)
                             VALUES (%s, %s, %s, %s, %s, %s)
-                        """, (job_name, 'native', sources_json, 'active', '0 2 * * *', datetime.now().isoformat()))
+                        """, (job_name, 'duplicati', sources_json, 'active', '0 */2 * * *', datetime.now().isoformat()))
                         imported_tasks += 1
                         conn.commit()
-                        logs.append(f"✓ Importada tarefa Duplicati '{job['name']}' como Tarefa Nativa GBOC.")
+                        logs.append(f"✓ Mapeada tarefa Duplicati '{job['name']}' como Tarefa Duplicati GBOC.")
 
                 # 4. Caso não existam tarefas nativas registradas, criar uma tarefa padrão do sistema nativo
                 cur.execute("SELECT COUNT(*) FROM tasks WHERE engine = 'native'")

@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v14.0.0 Enterprise Edition
+# GBOC System v14.1.0 Enterprise Edition
 # Module: Hermes Central Hub — Server-Side (Central WebSocket Hub & Queue Stats)
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================

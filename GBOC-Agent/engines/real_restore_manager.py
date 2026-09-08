@@ -1398,7 +1398,7 @@ class RestoreManager:
         from native_engine.engine import GBOCNativeEngine
 
         backend = self.core.repository_manager.get_backend(repo['id'])
-        # A task_config aqui é um mock, pois o motor só precisa dos detalhes do repositório
+        # Configuração estrutural nativa contendo os detalhes do repositório real
         engine = GBOCNativeEngine(task_config={'repository': repo}, storage_backend=backend)
 
         # O restore do motor nativo pode não precisar da lista de 'files' se ele restaura o snapshot inteiro

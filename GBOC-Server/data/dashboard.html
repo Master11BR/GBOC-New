@@ -449,8 +449,7 @@
                 }
             } catch (error) {
                 console.log('⚠️ Stats não disponíveis:', error);
-                // Usar dados mock para demonstração
-                updateDashboardStats(getMockStats());
+                updateDashboardStats({ total_agents: 0, offline_agents: 0, backups_24h: 0, success_rate: 0, total_gb_7d: 0, total_alerts: 0 });
             }
         }
 
@@ -464,7 +463,7 @@
                 }
             } catch (error) {
                 console.log('⚠️ Agentes não disponíveis:', error);
-                updateAgentsList(getMockAgents());
+                updateAgentsList([]);
             }
         }
 
@@ -478,7 +477,7 @@
                 }
             } catch (error) {
                 console.log('⚠️ Eventos não disponíveis:', error);
-                updateEventsLog(getMockEvents());
+                updateEventsLog([]);
             }
         }
 
@@ -492,7 +491,7 @@
                 }
             } catch (error) {
                 console.log('⚠️ Repositórios não disponíveis:', error);
-                updateRepositoriesStatus(getMockRepositories());
+                updateRepositoriesStatus([]);
             }
         }
 
@@ -597,7 +596,7 @@
                     labels: getLast24Hours(),
                     datasets: [{
                         label: 'Backups Realizados',
-                        data: generateMockTimelineData(),
+                        data: Array(24).fill(0),
                         borderColor: '#3b82f6',
                         backgroundColor: 'rgba(59, 130, 246, 0.1)',
                         fill: true,
@@ -808,12 +807,6 @@
                 labels.push(date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
             }
             return labels;
-        }
-
-        function generateMockTimelineData() {
-            return Array.from({length: 24}, () => Math.floor(Math.random() * 10));
-        }
-
         function formatTime(timestamp) {
             if (!timestamp) return 'N/A';
             const date = new Date(timestamp);
@@ -847,103 +840,6 @@
         function showErrorMessage(message) {
             // Implementar toast de erro
             console.error('🚨 Erro:', message);
-        }
-
-        // ===========================
-        // DADOS MOCK PARA DEMONSTRAÇÃO
-        // ===========================
-
-        function getMockStats() {
-            return {
-                total_agents: 3,
-                offline_agents: 1,
-                backups_24h: 47,
-                success_rate: 94.5,
-                total_gb_7d: 1250,
-                total_alerts: 2,
-                critical_alerts: 0
-            };
-        }
-
-        function getMockAgents() {
-            return [
-                {
-                    hostname: 'DESKTOP-PRINCIPAL',
-                    status: 'online',
-                    os_info: 'Windows 11 Pro',
-                    agent_version: '2.1.2',
-                    last_heartbeat: new Date().toISOString(),
-                    jobs_count: 4
-                },
-                {
-                    hostname: 'SERVIDOR-BACKUP',
-                    status: 'online',
-                    os_info: 'Ubuntu 22.04 LTS',
-                    agent_version: '2.1.1',
-                    last_heartbeat: new Date(Date.now() - 30000).toISOString(),
-                    jobs_count: 7
-                },
-                {
-                    hostname: 'NOTEBOOK-DEV',
-                    status: 'offline',
-                    os_info: 'Windows 10 Pro',
-                    agent_version: '2.0.9',
-                    last_heartbeat: new Date(Date.now() - 3600000).toISOString(),
-                    jobs_count: 2
-                }
-            ];
-        }
-
-        function getMockEvents() {
-            return [
-                {
-                    type: 'backup_success',
-                    message: 'Backup de documentos-importantes concluído com sucesso',
-                    timestamp: new Date(Date.now() - 300000).toISOString(),
-                    agent_hostname: 'DESKTOP-PRINCIPAL'
-                },
-                {
-                    type: 'backup_failure',
-                    message: 'Falha no backup de projetos-codigo - destino indisponível',
-                    timestamp: new Date(Date.now() - 900000).toISOString(),
-                    agent_hostname: 'SERVIDOR-BACKUP'
-                },
-                {
-                    type: 'agent_offline',
-                    message: 'Agente NOTEBOOK-DEV perdeu conexão',
-                    timestamp: new Date(Date.now() - 3600000).toISOString(),
-                    agent_hostname: null
-                },
-                {
-                    type: 'warning',
-                    message: 'Repositório B2 com 85% de capacidade utilizada',
-                    timestamp: new Date(Date.now() - 7200000).toISOString(),
-                    agent_hostname: null
-                }
-            ];
-        }
-
-        function getMockRepositories() {
-            return [
-                {
-                    name: 'backblaze-b2-principal',
-                    type: 'b2',
-                    status: 'healthy',
-                    size: '2.3 TB'
-                },
-                {
-                    name: 'amazon-s3-corporate',
-                    type: 's3',
-                    status: 'healthy',
-                    size: '1.8 TB'
-                },
-                {
-                    name: 'disco-local-backup',
-                    type: 'local',
-                    status: 'healthy',
-                    size: '500 GB'
-                }
-            ];
         }
 
         console.log('✅ GBOC Dashboard carregado com sucesso');

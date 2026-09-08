@@ -1,4 +1,4 @@
-// GBOC System v14.0.0 Full Stable Enterprise — End-to-End (E2E) Test Suite with Playwright
+// GBOC System v14.1.0 Full Stable Enterprise — End-to-End (E2E) Test Suite with Playwright
 const { test, expect } = require('@playwright/test');
 
 test.describe('GBOC Server & Agent E2E Integrity Suite', () => {
@@ -8,7 +8,7 @@ test.describe('GBOC Server & Agent E2E Integrity Suite', () => {
     await expect(page).toHaveTitle(/GBOC/i);
     const badge = page.locator('#serverVersionBadge');
     if (await badge.isVisible()) {
-      await expect(badge).toContainText('v14.0.0');
+      await expect(badge).toContainText('v14.1.0');
     }
   });
 

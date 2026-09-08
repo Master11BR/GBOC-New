@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 14.0.0 - Multi-Provider AI Assistant Engine (GBOC Copilot AI)
+GBOC 14.1.0 - Multi-Provider AI Assistant Engine (GBOC Copilot AI)
 Supports:
   1. Ollama Local (Off-line / On-Premises without token limits) - Default / Fallback
   2. DeepSeek (V3 / R1 Nuvem)
