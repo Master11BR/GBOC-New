@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v14.0.0 Enterprise Edition
+# GBOC System v14.1.0 Enterprise Edition
 # Module: Enterprise Robotic Tape Library & SCSI Media Changer Engine
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================
@@ -41,42 +41,54 @@ class TapeRoboticsEngine:
 
     def get_tape_library_inventory(self, changer_id: str = "Changer0") -> Dict[str, Any]:
         """
-        Retorna o inventário completo dos slots, fitas com código de barras e drives da biblioteca.
+        Retorna o inventário de hardware de fitas a partir do SO real (Zero-Mock).
         """
+        import subprocess
+        import sys
+        
+        has_tape_hardware = False
+        changer_info = None
+        drives = []
         slots = []
-        drives = [
-            {"drive_index": 0, "name": "Tape0 (LTO-8 SAS Drive)", "loaded_barcode": "L8-001024", "status": "LOADED_READY"},
-            {"drive_index": 1, "name": "Tape1 (LTO-8 SAS Drive)", "loaded_barcode": None, "status": "EMPTY"}
-        ]
 
-        # Simular inventário real dos 24 slots
-        barcodes = [
-            "L8-001024", "L8-001025", "L8-001026", "L8-001027", "L8-001028",
-            "L8-001029", "L8-001030", "L8-001031", "L8-001032", "CLN-0001",
-            "L8-001033", "L8-001034"
-        ]
+        try:
+            if sys.platform == "win32":
+                ps_cmd = """
+                $ErrorActionPreference = 'SilentlyContinue'
+                $drives = Get-WmiObject Win32_TapeDrive
+                $changers = Get-WmiObject Win32_Autoloader
+                [PSCustomObject]@{
+                    HasTape = ($null -ne $drives -or $null -ne $changers)
+                    TapeDrives = @($drives | ForEach-Object { $_.Name })
+                    Changers = @($changers | ForEach-Object { $_.Name })
+                } | ConvertTo-Json
+                """
+                res = subprocess.run(["powershell", "-NoProfile", "-Command", ps_cmd], capture_output=True, text=True, timeout=5)
+                if res.returncode == 0 and res.stdout.strip():
+                    raw = json.loads(res.stdout.strip())
+                    if raw.get("HasTape"):
+                        has_tape_hardware = True
+                        changer_info = raw.get("Changers")[0] if raw.get("Changers") else "Generic Tape Changer"
+                        for idx, drv in enumerate(raw.get("TapeDrives") or []):
+                            drives.append({"drive_index": idx, "name": drv, "status": "READY"})
+        except Exception:
+            pass
 
-        for i in range(1, 25):
-            slot_type = "STORAGE"
-            if i <= 3:
-                slot_type = "MAIL_SLOT (I/O Port)"
-            elif i == 24:
-                slot_type = "CLEANING"
-
-            barcode = barcodes[i - 1] if i - 1 < len(barcodes) else None
-            is_loaded = barcode is not None and barcode != "L8-001024" # 1024 está no Drive 0
-
-            slots.append({
-                "slot_number": i,
-                "slot_type": slot_type,
-                "is_full": is_loaded,
-                "barcode": barcode if is_loaded else None,
-                "media_type": "LTO-8 Ultrium (12TB/30TB)" if (barcode and "CLN" not in barcode) else ("Universal Cleaning Tape" if barcode else "EMPTY")
-            })
+        if not has_tape_hardware:
+            return {
+                "status": "unavailable",
+                "installed": False,
+                "changer": None,
+                "drives": [],
+                "slots": [],
+                "message": "Nenhuma biblioteca de fitas (autoloader/robô Tape Changer) detectada no sistema operacional host.",
+                "timestamp": datetime.now().isoformat()
+            }
 
         return {
             "status": "success",
-            "changer": self.libraries[0],
+            "installed": True,
+            "changer": changer_info or self.libraries[0],
             "drives": drives,
             "slots": slots,
             "timestamp": datetime.now().isoformat()

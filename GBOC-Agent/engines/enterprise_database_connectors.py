@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v14.0.0 Enterprise Edition
+# GBOC System v14.1.0 Enterprise Edition
 # Module: Enterprise Database Connectors (Oracle RMAN, SAP HANA, IBM DB2)
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================
@@ -149,11 +149,13 @@ class EnterpriseDatabaseConnectors:
 
         try:
             os.makedirs(target_dir, exist_ok=True)
-            self._append_log(job_id, "Conectando ao catálogo RMAN local (TARGET /)...")
-            time.sleep(1.0)
-            self.active_jobs[job_id]["progress"] = 20
+            
+            # Verificar se o executável rman existe no PATH
+            rman_bin = shutil.which("rman") or shutil.which("rman.exe")
+            if not rman_bin:
+                raise RuntimeError(f"O utilitário 'rman' (Oracle RMAN) não está instalado ou disponível no PATH do SO host.")
 
-            # Gerar script RMAN nativo
+            self._append_log(job_id, f"Binário RMAN localizado em: {rman_bin}. Compilando comandos...")
             rman_script_path = os.path.join(target_dir, "rman_backup.cmd")
             rman_commands = f"""
 CONNECT TARGET /;
@@ -171,23 +173,13 @@ EXIT;
             with open(rman_script_path, "w", encoding="utf-8") as f:
                 f.write(rman_commands)
 
-            self._append_log(job_id, f"Script RMAN compilado e alocado: {rman_script_path}")
-            self._append_log(job_id, "Iniciando streaming de blocos de tablespaces (SYSTEM, SYSAUX, USERS, UNDOTBS1)...")
-            time.sleep(1.5)
-            self.active_jobs[job_id]["progress"] = 60
+            self._append_log(job_id, f"Executando comando RMAN: {rman_bin} target / cmdfile={rman_script_path}")
+            res = subprocess.run([rman_bin, "target", "/", f"cmdfile={rman_script_path}"], capture_output=True, text=True, timeout=120)
+            
+            if res.returncode != 0:
+                raise RuntimeError(f"Oracle RMAN retornou código de erro {res.returncode}: {res.stderr or res.stdout}")
 
-            # Criar arquivos de backup para simulação/execução
-            with open(os.path.join(target_dir, f"df_{oracle_sid}_01_1.bkp"), "wb") as f:
-                f.write(b"GBOC_ORACLE_RMAN_LEVEL0_DATABASE_STREAM_HEADER_v14.0.0\n" + b"\x00" * 8192)
-            with open(os.path.join(target_dir, f"cf_{oracle_sid}_controlfile.bkp"), "wb") as f:
-                f.write(b"GBOC_ORACLE_RMAN_AUTOBACKUP_CONTROLFILE_HEADER_v14.0.0\n" + b"\x00" * 4096)
-
-            self._append_log(job_id, "Arquivando Redo Logs e Controlfiles com consistência SCN...")
-            time.sleep(1.0)
-            self.active_jobs[job_id]["progress"] = 90
-
-            self._append_log(job_id, "✅ Backup Oracle RMAN validado com sucesso! SCN consistente.")
-
+            self._append_log(job_id, "✅ Backup Oracle RMAN concluído e validado com sucesso!")
             with self.lock:
                 if job_id in self.active_jobs:
                     self.active_jobs[job_id]["status"] = "completed"
@@ -195,7 +187,7 @@ EXIT;
                     self.active_jobs[job_id]["completed_at"] = datetime.now().isoformat()
 
         except Exception as e:
-            logger.error(f"Erro no Oracle RMAN worker: {e}", exc_info=True)
+            logger.error(f"Erro no Oracle RMAN worker: {e}")
             self._append_log(job_id, f"❌ Falha no Oracle RMAN: {e}")
             with self.lock:
                 if job_id in self.active_jobs:
@@ -249,31 +241,18 @@ EXIT;
         
         try:
             os.makedirs(target_dir, exist_ok=True)
-            self._append_log(job_id, f"Conectando via interface SQL (hdbsql) ao tenant: {tenant_db}...")
-            time.sleep(1.0)
-            self.active_jobs[job_id]["progress"] = 25
+            hdbsql_bin = shutil.which("hdbsql") or shutil.which("hdbsql.exe")
+            if not hdbsql_bin:
+                raise RuntimeError(f"O utilitário 'hdbsql' (SAP HANA Client) não está instalado no sistema operacional host.")
 
-            self._append_log(job_id, "Invocando comando: BACKUP DATA FOR FULL SYSTEM USING BACKINT ('GBOC_BACKINT_STREAM')...")
-            time.sleep(1.5)
-            self.active_jobs[job_id]["progress"] = 65
+            self._append_log(job_id, f"Executando hdbsql no tenant {tenant_db}...")
+            res = subprocess.run([
+                hdbsql_bin, "-i", instance_id, "-d", tenant_db,
+                f"BACKUP DATA FOR FULL SYSTEM USING BACKINT ('{target_dir}\\saphana_stream')"
+            ], capture_output=True, text=True, timeout=180)
 
-            # Gerar arquivo de catálogo do SAP HANA
-            catalog_file = os.path.join(target_dir, "sap_hana_backup_catalog.json")
-            catalog_data = {
-                "sap_instance": instance_id,
-                "tenant": tenant_db,
-                "backup_id": int(time.time()),
-                "backup_type": "COMPLETE_DATA_BACKUP",
-                "backint_version": "1.5 Enterprise",
-                "services": ["nameserver", "indexserver", "statisticsserver", "dpserver"],
-                "created_at": datetime.now().isoformat()
-            }
-            with open(catalog_file, "w", encoding="utf-8") as f:
-                json.dump(catalog_data, f, indent=2)
-
-            self._append_log(job_id, "Exportando Redo Log Segments e Topologia do Catálogo de Colunas (In-Memory)...")
-            time.sleep(1.0)
-            self.active_jobs[job_id]["progress"] = 90
+            if res.returncode != 0:
+                raise RuntimeError(f"SAP HANA hdbsql falhou ({res.returncode}): {res.stderr or res.stdout}")
 
             self._append_log(job_id, "✅ Backup SAP HANA concluído com sucesso via Backint Stream!")
 
@@ -284,7 +263,7 @@ EXIT;
                     self.active_jobs[job_id]["completed_at"] = datetime.now().isoformat()
 
         except Exception as e:
-            logger.error(f"Erro no SAP HANA worker: {e}", exc_info=True)
+            logger.error(f"Erro no SAP HANA worker: {e}")
             self._append_log(job_id, f"❌ Falha no backup SAP HANA: {e}")
             with self.lock:
                 if job_id in self.active_jobs:
@@ -333,15 +312,18 @@ EXIT;
 
         try:
             os.makedirs(target_dir, exist_ok=True)
-            self._append_log(job_id, f"Invocando comando: db2 BACKUP DATABASE {db_name} ONLINE TO '{target_dir}' INCLUDE LOGS...")
-            time.sleep(1.2)
-            self.active_jobs[job_id]["progress"] = 50
+            db2_bin = shutil.which("db2") or shutil.which("db2.exe")
+            if not db2_bin:
+                raise RuntimeError(f"O utilitário 'db2' (IBM DB2 Command Line Processor) não foi localizado no SO host.")
 
-            with open(os.path.join(target_dir, f"{db_name}.0.DB2.NODE0000.CATN0000.bkp"), "wb") as f:
-                f.write(b"GBOC_IBM_DB2_ONLINE_BACKUP_STREAM_v14.0.0\n" + b"\x00" * 4096)
+            self._append_log(job_id, f"Invocando comando: {db2_bin} BACKUP DATABASE {db_name} ONLINE TO '{target_dir}' INCLUDE LOGS...")
+            res = subprocess.run([
+                db2_bin, "BACKUP", "DATABASE", db_name, "ONLINE", "TO", target_dir, "INCLUDE", "LOGS"
+            ], capture_output=True, text=True, timeout=180)
 
-            time.sleep(1.0)
-            self.active_jobs[job_id]["progress"] = 90
+            if res.returncode != 0:
+                raise RuntimeError(f"IBM DB2 backup falhou ({res.returncode}): {res.stderr or res.stdout}")
+
             self._append_log(job_id, "✅ Backup IBM DB2 finalizado com sucesso com logs transacionais inclusos.")
 
             with self.lock:
@@ -351,7 +333,7 @@ EXIT;
                     self.active_jobs[job_id]["completed_at"] = datetime.now().isoformat()
 
         except Exception as e:
-            logger.error(f"Erro no IBM DB2 worker: {e}", exc_info=True)
+            logger.error(f"Erro no IBM DB2 worker: {e}")
             self._append_log(job_id, f"❌ Falha no IBM DB2: {e}")
             with self.lock:
                 if job_id in self.active_jobs:

@@ -1,13 +1,13 @@
 <#
 ==============================================================================
-GBOC System v14.0.0 Enterprise Edition
+GBOC System v14.1.0 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
 #>
 
 # ========================================
-# GBOC Agent 14.0.0 - Shutdown Agent/Server
+# GBOC Agent 14.1.0 - Shutdown Agent/Server
 # ========================================
 param(
     [switch]$Agent,

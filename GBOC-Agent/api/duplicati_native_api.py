@@ -62,6 +62,22 @@ async def list_backups() -> Dict[str, Any]:
     return result
 
 
+@router.post("/backups")
+async def create_backup(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Cria uma nova rotina de backup no Duplicati nativo e vincula ao GBOC."""
+    try:
+        service = get_duplicati_native_service()
+        result = service.create_backup(payload)
+        if result.get("status") == "error":
+            raise HTTPException(status_code=400, detail=result)
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
 @router.post("/sync")
 @router.get("/sync")
 async def sync_duplicati() -> Dict[str, Any]:

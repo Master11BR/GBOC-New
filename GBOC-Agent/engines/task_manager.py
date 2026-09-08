@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC Agent 14.0.0 - Task Manager
+GBOC Agent 14.1.0 - Task Manager
 [OK] Usa motor_password para repositórios locais e cloud_password para nuvem
 """
 
@@ -791,7 +791,7 @@ class TaskManager:
                            r.type as repo_type, r.name as repo_name, r.config as repo_config,
                            r.engine as repository_engine
                     FROM tasks t
-                    JOIN repositories r ON t.repository_id = r.id
+                    LEFT JOIN repositories r ON t.repository_id = r.id
                     WHERE t.id = %s
                 """, (task_id,))
                 row = cursor.fetchone()
@@ -977,6 +977,30 @@ class TaskManager:
     def _run_duplicati_backup(self, task: Dict, execution_id: int) -> Dict:
         """Executa backup com Duplicati"""
         try:
+            # Se for um backup gerenciado pelo Duplicati Native Server (sem repositório GBOC CLI)
+            if not task.get('repository_id') or not task.get('repo_type'):
+                try:
+                    from core.integrations.duplicati_native import get_duplicati_native_service
+                    dup_service = get_duplicati_native_service()
+                    b_list = dup_service.list_backups().get("items", [])
+                    for item in b_list:
+                        b_obj = item.get("Backup", {}) if isinstance(item, dict) else {}
+                        b_id = str(item.get("id") or b_obj.get("ID") or "")
+                        b_name = item.get("name") or b_obj.get("Name") or ""
+                        if b_id and (b_name in task.get('name', '') or b_id in task.get('name', '') or len(b_list) == 1):
+                            logger.info(f"▶️ Disparando backup no Duplicati Native Server (ID: {b_id}, Nome: {b_name})")
+                            res = dup_service.run_backup(b_id)
+                            dup_service.sync_to_gboc(self.core)
+                            meta = b_obj.get("Metadata", {}) if isinstance(b_obj, dict) else (item.get("Metadata") or {})
+                            return {
+                                "success": True,
+                                "files": int(meta.get("SourceFilesCount") or 0),
+                                "bytes": int(meta.get("SourceFilesSize") or 0),
+                                "snapshot_id": f"dup_{b_id}"
+                            }
+                except Exception as e_nat:
+                    logger.warning(f"Fallback DuplicatiNative falhou: {e_nat}")
+
             dup_exe = get_engine_path('duplicati')
             if not dup_exe:
                 return {"success": False, "error": "Duplicati-CLI não encontrado"}

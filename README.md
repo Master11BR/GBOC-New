@@ -1,25 +1,25 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v13.3.0 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.1.0 Enterprise. Todos os direitos reservados. -->
 
-# 🚀 GBOC - Gestão & Backup Operations Center (v13.3.0 Enterprise Edition)
+# 🚀 GBOC - Gestão & Backup Operations Center (v14.1.0 Enterprise Edition)
 
-[![GBOC System Version](https://img.shields.io/badge/version-13.3.0--Enterprise-blue.svg)](https://github.com/Master11BR/GBOC-New)
+[![GBOC System Version](https://img.shields.io/badge/version-14.1.0--Enterprise-blue.svg)](https://github.com/Master11BR/GBOC-New)
 [![Python Version](https://img.shields.io/badge/python-3.11%2B%20%7C%203.14-green.svg)](https://www.python.org/)
 [![PostgreSQL](https://img.shields.io/badge/postgresql-16-blue.svg)](https://www.postgresql.org/)
 [![Status](https://img.shields.io/badge/status-production--ready-brightgreen.svg)]()
 
-> **GBOC (Gestão & Backup Operations Center v13.3.0 Enterprise Edition)** é a mais avançada plataforma corporativa de orquestração de backup, RMM, monitoramento preditivo e resposta cibernética a incidentes. 10x mais potente que soluções do mercado pago e open-source.
+> **GBOC (Gestão & Backup Operations Center v14.1.0 Enterprise Edition)** é a mais avançada plataforma corporativa de orquestração de backup, RMM, monitoramento preditivo, telemetria 100% real (Zero-Mock Strict) e resposta cibernética a incidentes. 10x mais potente que soluções do mercado pago e open-source.
 
 ---
 
 ## 📌 Sumário
 1. [Visão Geral e Arquitetura](#-visão-geral-e-arquitetura)
-2. [Recursos de Destaque (v14.0.0 Enterprise)](#-recursos-de-destaque-v1300-enterprise)
+2. [Recursos de Destaque (v14.1.0 Enterprise)](#-recursos-de-destaque-v1410-enterprise)
 3. [Cyber Security Sentinel (ClamAV, YARA, Maltrail, Wazuh, Defender)](#-cyber-security-sentinel)
 4. [Assistente de Inteligência Artificial & LLMs (Ollama & Nuvem)](#-assistente-de-inteligência-artificial--llms)
 5. [Disaster Recovery (DR) & Sync em Nuvem 1-Click](#-disaster-recovery-dr--sync-em-nuvem-1-click)
 6. [Resiliência a Longos Intervalos (Auto-Heal & Lock Prune)](#-resiliência-a-longos-intervalos-auto-heal--lock-prune)
 7. [Instalação & Configuração Rápida](#-instalação--configuração-rápida)
-8. [Histórico de Mudanças (Changelog v14.0.0 Enterprise)](#-histórico-de-mudanças)
+8. [Histórico de Mudanças (Changelog v14.1.0 Enterprise)](#-histórico-de-mudanças)
 
 ---
 
@@ -54,7 +54,7 @@
 
 ---
 
-## ⚡ Recursos de Destaque (v14.0.0 Full Stable Enterprise)
+## ⚡ Recursos de Destaque (v14.1.0 Full Stable Enterprise)
 
 - **Motion Principles UX Engine (Kyle Zantos)**: Interface 100% dinâmica com Skeleton Loaders, Lazy Loading inteligente via Intersection Observer, animações de entrada/saída suaves e barras de progresso contínuas e fluidas.
 - **Storage Usage & Growth Monitor GUI**: Módulo centralizado (`modules/storage`) para monitoramento em tempo real de volumes de armazenamento, capacidade utilizada/livre e tendência de crescimento com gráficos dinâmicos Chart.js.
@@ -99,6 +99,13 @@ Integrado com os 5 principais ecossistemas globais de segurança:
 ## 🛡️ Resiliência a Longos Intervalos (Auto-Heal & Lock Prune)
 
 - **Rotina Preventiva para Falhas por Inatividade**: Quando uma tarefa fica mais de 3 dias sem executar, o GBOC executa automaticamente o Auto-Heal: higieniza travas obsoletas (`.lock`), valida o banco do repositório (`repair`) e garante a execução transparente do backup sem desincronizações.
+
+## 📜 Histórico de Mudanças (Changelog v14.1.0 Enterprise)
+
+- **Strict Zero-Mock Architecture**: Remoção de 100% de dados simulados, respostas estáticas e fallbacks fake em todos os motores e rotas API (`healer_engine.py`, `tape_robotics_engine.py`, `auto_verify_engine.py`, `cyber_cleanroom_engine.py`, `enterprise_database_connectors.py`).
+- **Telemetria 100% Real do SO Host**: Detecção de hardware de fita LTO/autoloader via WMI real, medição de entropia de Shannon sobre bytes físicos de arquivos no disk, e verificação de hashes SHA-256 em blocos de dados.
+- **Relatórios Preditivos com Dados Reais**: Refatoração dos relatórios de Deduplicação, Outage Cloud, Volumes Desprotegidos e Restauração Bare-Metal (BMR) para consultar o banco de dados e partições reais do SO host.
+- **Sincronização de Pacote de Distribuição**: Pacote `GBOC-Distribution` atualizado com scripts de instalação rápida (`Setup.bat`, `Setup.ps1`).
 
 ---
 

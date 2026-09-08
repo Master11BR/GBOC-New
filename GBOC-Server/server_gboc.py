@@ -1,5 +1,5 @@
 """
-GBOC Server 14.0.0
+GBOC Server 14.1.0
 Servidor Central — Real-time Agent Communication + Complete Data Sync + Advanced Analytics
 Banco de dados: PostgreSQL (oficial)
 """
@@ -37,7 +37,7 @@ try:
     from version_control import __version__ as SERVER_VERSION, get_version_info, auto_increment_build
     auto_increment_build()
 except Exception:
-    SERVER_VERSION = "14.0.0"
+    SERVER_VERSION = "14.1.0"
     def get_version_info():
         return {"raw_version": SERVER_VERSION, "semver": SERVER_VERSION}
 
@@ -112,6 +112,13 @@ def init_connection_pool():
 
 def get_db():
     global connection_pool
+    if not connection_pool:
+        import sys
+        main_mod = sys.modules.get('__main__')
+        if main_mod and getattr(main_mod, 'connection_pool', None):
+            connection_pool = main_mod.connection_pool
+        else:
+            init_connection_pool()
     if not connection_pool:
         raise HTTPException(503, "Pool de conexões não inicializado")
     try:

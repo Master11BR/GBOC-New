@@ -135,7 +135,7 @@ function Show-InteractiveMenu {
     Clear-Host
     Write-Host ""
     Write-Host "=================================================================" -ForegroundColor Cyan
-    Write-Host "          GBOC SYSTEM v14.0.0 - INSTALADOR FULL STABLE           " -ForegroundColor Cyan
+    Write-Host "          GBOC SYSTEM v14.1.0 - INSTALADOR FULL STABLE           " -ForegroundColor Cyan
     Write-Host "          Servidor Central, Agente e Motores de Backup           " -ForegroundColor Cyan
     Write-Host "=================================================================" -ForegroundColor Cyan
     Write-Host ""
@@ -353,7 +353,7 @@ Write-Step "Criando scripts de controle e execucao em $TargetDir..."
 if ($InstallMode -in @("Server", "Both")) {
     $sLines = @(
         "@echo off",
-        "title GBOC Server v14.0.0 Enterprise",
+        "title GBOC Server v14.1.0 Enterprise",
         "cd /d ""$ServerDir""",
         "set SERVER_PORT=$ServerPort",
         "set SERVER_HOST=0.0.0.0",
@@ -368,7 +368,7 @@ if ($InstallMode -in @("Server", "Both")) {
 if ($InstallMode -in @("Agent", "Both")) {
     $aLines = @(
         "@echo off",
-        "title GBOC Agent v14.0.0 Enterprise",
+        "title GBOC Agent v14.1.0 Enterprise",
         "cd /d ""$AgentDir""",
         "set AGENT_PORT=$AgentPort",
         "set AGENT_HOST=0.0.0.0",

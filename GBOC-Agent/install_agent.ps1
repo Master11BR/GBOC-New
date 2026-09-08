@@ -1,13 +1,13 @@
 <#
 ==============================================================================
-GBOC System v14.0.0 Enterprise Edition
+GBOC System v14.1.0 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
 #>
 
 # ============================================================================
-# GBOC Agent - Instalador Completo v14.0.0
+# GBOC Agent - Instalador Completo v14.1.0
 # ============================================================================
 # Instala e configura automaticamente:
 # - Python 3.11+
@@ -108,7 +108,7 @@ Write-Host @"
 
 ╔═══════════════════════════════════════════════════════════╗
 ║                                                           ║
-║          GBOC Agent - Instalador Completo v14.0.0           ║
+║          GBOC Agent - Instalador Completo v14.1.0           ║
 ║                                                           ║
 ╚═══════════════════════════════════════════════════════════╝
 

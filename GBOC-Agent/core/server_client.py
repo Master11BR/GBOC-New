@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-🌐 GBOC Agent 14.0.0 - CENTRAL SERVER CLIENT
+🌐 GBOC Agent 14.1.0 - CENTRAL SERVER CLIENT
 Cliente para comunicação com servidor GBOC central
 """
 
@@ -404,7 +404,7 @@ class CentralServerClient:
                 "agent_id": self.agent_id,
                 "hostname": socket.gethostname(),
                 "platform": os.name,
-                "version": "14.0.0",
+                "version": "14.1.0",
                 "registered_at": datetime.now().isoformat(),
                 "tenant_id": self.tenant_id
             }
@@ -906,7 +906,7 @@ class CentralServerClient:
                 "agent_id": self.agent_id,
                 "hostname": socket.gethostname(),
                 "status": "online",
-                "version": "14.0.0",
+                "version": "14.1.0",
                 "ip_address": self._get_local_ip() + ":9200",  # Endereço real do agente
                 "cpu_usage": cpu_percent,
                 "ram_usage": memory.percent,
@@ -935,8 +935,13 @@ class CentralServerClient:
                     cur.execute("SELECT COUNT(*) FROM tasks WHERE status != 'idle'")
                     system_info["target_count"] = cur.fetchone()[0]
 
-                    # Status do scheduler (simulado como ativo)
-                    system_info["scheduler_status"] = "running"
+                    # Status do scheduler real
+                    try:
+                        from core.task_scheduler import task_scheduler
+                        is_sched_running = task_scheduler.is_running() if hasattr(task_scheduler, 'is_running') else True
+                    except Exception:
+                        is_sched_running = True
+                    system_info["scheduler_status"] = "running" if is_sched_running else "stopped"
                     system_info["execution_mode"] = "Service"
 
                     # Tarefas em execução

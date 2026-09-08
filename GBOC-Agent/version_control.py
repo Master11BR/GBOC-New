@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v14.0.0 Full Stable Enterprise Edition
+# GBOC System v14.1.0 Full Stable Enterprise Edition
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # Propriedade Intelectual & Direitos Autorais Registrados.
 # A cópia, distribuição ou modificação não autorizada é estritamente proibida.
@@ -22,7 +22,7 @@ VERSION_FILE = os.path.join(BASE_DIR, "data", "version_info.json")
 
 # Configuração Base SemVer
 MAJOR = 14
-MINOR = 0
+MINOR = 1
 PATCH = 0
 PRERELEASE = "full-stable"
 
@@ -142,7 +142,7 @@ def get_version_info() -> Dict[str, Any]:
         "last_updated": meta.get("last_updated"),
         "release_channel": "Enterprise Stable",
         "compatibility": {
-            "min_server_version": "14.0.0",
+            "min_server_version": "14.1.0",
             "recommended_server_version": raw_version,
             "protocol_version": "2.1"
         }

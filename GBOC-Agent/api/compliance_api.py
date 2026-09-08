@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 14.0.0 - Compliance API
+GBOC 14.1.0 - Compliance API
 Compliance score, policies CRUD, automated rules evaluation, audit trail.
 """
 

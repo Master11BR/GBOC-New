@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-🔍 GBOC Agent 14.0.0 - API DIAGNOSTICS
+🔍 GBOC Agent 14.1.0 - API DIAGNOSTICS
 Responsável por: Rotas para sistema de diagnóstico
 """
 
@@ -22,8 +22,9 @@ router = APIRouter(prefix="/api/diagnostics", tags=["diagnostics"])
 
 @router.get("/quick")
 async def quick_diagnostic() -> Dict[str, Any]:
-    """Diagnóstico rápido do sistema"""
+    """Diagnóstico rápido do sistema (100% Real - Zero-Mock)"""
     try:
+        t0 = time.perf_counter()
         core = get_shared_core()
         
         # Métricas básicas do sistema
@@ -35,9 +36,10 @@ async def quick_diagnostic() -> Dict[str, Any]:
         # Health score
         health_score = _calculate_health_score(system_metrics, backup_tools)
         
+        elapsed = round(time.perf_counter() - t0, 3)
         result = {
             "timestamp": datetime.now().isoformat(),
-            "execution_time": 0.5,  # Simulado
+            "execution_time": elapsed,
             "overall_health": health_score,
             "status": _get_health_status(health_score),
             "system": {
@@ -54,10 +56,6 @@ async def quick_diagnostic() -> Dict[str, Any]:
             "recent_errors": await _get_recent_error_count(core)
         }
 
-        # substituir valor simulado por tempo real de execução
-        started = datetime.fromisoformat(result["timestamp"])
-        result["execution_time"] = round((datetime.now() - started).total_seconds(), 3)
-        
         # Salvar no banco
         await _save_diagnostic(core, result, "quick")
         

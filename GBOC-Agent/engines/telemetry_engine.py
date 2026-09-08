@@ -1,4 +1,4 @@
-# GBOC Agent v14.0.0 Full Stable Enterprise Edition
+# GBOC Agent v14.1.0 Full Stable Enterprise Edition
 # Module: Enterprise Telemetry & Observability Engine (Sentry, OpenTelemetry, Datadog, NewRelic, Prometheus)
 
 import os
@@ -28,7 +28,7 @@ class GBOCAgentTelemetryEngine:
         if sentry_dsn:
             try:
                 import sentry_sdk
-                sentry_sdk.init(dsn=sentry_dsn, traces_sample_rate=0.2, release="gboc-agent@14.0.0")
+                sentry_sdk.init(dsn=sentry_dsn, traces_sample_rate=0.2, release="gboc-agent@14.1.0")
                 self.sentry_active = True
                 logger.info("📡 Sentry SDK ativado no Agente com sucesso.")
             except Exception as e:
