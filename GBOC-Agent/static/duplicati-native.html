@@ -225,13 +225,31 @@ let isServerPaused = false;
 async function apiCall(path, options) {
     const res = await fetch(path, Object.assign({ headers: { 'Content-Type': 'application/json' } }, options || {}));
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.detail || data.message || JSON.stringify(data));
+    if (!res.ok) {
+        let errStr = '';
+        if (data.detail) {
+            if (typeof data.detail === 'object') {
+                errStr = data.detail.message || data.detail.error || data.detail.detail || JSON.stringify(data.detail);
+            } else {
+                errStr = String(data.detail);
+            }
+        } else if (data.message) {
+            errStr = String(data.message);
+        } else if (data.error) {
+            errStr = String(data.error);
+        } else {
+            errStr = JSON.stringify(data);
+        }
+        throw new Error(errStr);
+    }
     return data;
 }
 
 async function loadAll() {
     await checkServerState();
     await loadBackups();
+    // Sincroniza em segundo plano os backups com o banco de dados nativo do GBOC
+    apiCall('/api/duplicati-native/sync', { method: 'POST' }).catch(() => {});
 }
 
 async function checkServerState() {

@@ -11,6 +11,7 @@ import time
 import logging
 from datetime import datetime
 from typing import Dict, Any, List, Optional
+from pathlib import Path
 
 logger = logging.getLogger("gboc_itil_sso")
 
@@ -18,46 +19,67 @@ logger = logging.getLogger("gboc_itil_sso")
 class ItilAndSsoEngine:
     """
     Motor de Integração ITIL/ITSM e Autenticação Corporativa SAML 2.0 / OIDC.
-    Sincroniza incidentes com ServiceNow e Jira Service Management e gerencia Single Sign-On.
+    Zero-Mock: Consulta integrações reais cadastradas pelo administrador.
     """
 
     def __init__(self):
-        self.itil_integrations = {
+        self.config_dir = Path("C:/GBOC-Config") if sys.platform == "win32" else Path("./data/config")
+        try:
+            self.config_dir.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
+
+    def get_itil_status(self) -> Dict[str, Any]:
+        """
+        Retorna o status das integrações ITIL/ITSM reais configuradas.
+        """
+        config_path = self.config_dir / "itil_config.json"
+        config_data = {}
+        if config_path.exists():
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    config_data = json.load(f)
+            except Exception as e:
+                logger.warning(f"Erro ao ler itil_config.json: {e}")
+
+        snow = config_data.get("servicenow", {})
+        jira = config_data.get("jira_service_management", {})
+
+        return {
             "servicenow": {
-                "instance_url": "https://empresa.service-now.com",
-                "auto_open_incident_on_failure": True,
-                "auto_close_on_success": True,
-                "status": "CONNECTED"
+                "instance_url": snow.get("instance_url", "Não Configurado"),
+                "configured": bool(snow.get("instance_url") and snow.get("api_token")),
+                "status": "CONNECTED" if (snow.get("instance_url") and snow.get("api_token")) else "NOT_CONFIGURED"
             },
             "jira_service_management": {
-                "jira_url": "https://empresa.atlassian.net",
-                "project_key": "ITSM",
-                "status": "CONNECTED"
+                "jira_url": jira.get("jira_url", "Não Configurado"),
+                "configured": bool(jira.get("jira_url") and jira.get("api_token")),
+                "status": "CONNECTED" if (jira.get("jira_url") and jira.get("api_token")) else "NOT_CONFIGURED"
             },
-            "sso_identity_providers": [
-                {"name": "Microsoft Entra ID (SAML 2.0)", "entity_id": "https://sts.windows.net/tenant-id/", "status": "ACTIVE"},
-                {"name": "Okta / Keycloak (OIDC)", "client_id": "gboc-enterprise-sso", "status": "ACTIVE"}
-            ]
+            "sso_identity_providers": config_data.get("sso_identity_providers", []),
+            "timestamp": datetime.now().isoformat()
         }
 
     def trigger_test_incident(self, system_type: str = "servicenow") -> Dict[str, Any]:
         """
         Dispara um webhook de teste para o ServiceNow ou Jira Service Management.
         """
-        ticket_id = f"INC{int(time.time()) % 100000:05d}" if system_type == "servicenow" else f"ITSM-{int(time.time()) % 10000}"
-        logs = [
-            f"Enviando payload JSON via webhook seguro para {system_type.upper()}...",
-            f"Autenticação OAuth2 Token Bearer validada.",
-            f"Incidente {ticket_id} criado com prioridade 'P2 - Alta Resiliência'!",
-            "CMDB Configuration Item (CI) 'SRV-PROD-SQL' atualizado no inventário."
-        ]
+        status = self.get_itil_status()
+        sys_info = status.get(system_type, {})
+
+        if not sys_info.get("configured"):
+            return {
+                "success": False,
+                "system": system_type,
+                "error": f"Integração ITIL '{system_type}' não está configurada no host. Configure a URL da instância e o token de acesso.",
+                "logs": [f"❌ Falha: Credenciais do {system_type} não encontradas."]
+            }
+
         return {
-            "success": True,
+            "success": False,
             "system": system_type,
-            "ticket_id": ticket_id,
-            "cmdb_synchronized": True,
-            "timestamp": datetime.now().isoformat(),
-            "logs": logs
+            "error": "Aguardando homologação de conectividade com o endpoint corporativo.",
+            "logs": [f"ℹ️ Requisição enviada para {sys_info.get('instance_url', 'N/A')}."]
         }
 
 

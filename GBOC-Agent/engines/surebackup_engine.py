@@ -61,9 +61,9 @@ def run_surebackup_verification(backup_id: str, target_name: str, image_path: Op
         services_ok = True
         proof_path = f"surebackup_proof_{backup_id}.png"
     else:
-        # Teste de integridade de montagem genérica
-        boot_ok = True
-        services_ok = True
+        boot_ok = False
+        services_ok = False
+        logger.warning(f"[SureBackup] Arquivo de imagem '{image_path}' inexistente para {backup_id}")
 
     duration = int((datetime.now() - start_time).total_seconds())
 

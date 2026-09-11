@@ -21,38 +21,38 @@ logger = logging.getLogger("gboc_power_tools_router")
 router = APIRouter(prefix="/api/v1/power-tools", tags=["Freemium & Open-Source Power Tools"])
 
 
-# Modelos
+# Modelos Pydantic
 class VisualDiffRequest(BaseModel):
-    left_path: str = "C:\\Dados\\Producao"
-    right_path: str = "D:\\Backup\\Mirror"
+    left_path: str = ""
+    right_path: str = ""
 
 
 class SyncExecRequest(BaseModel):
-    left_path: str = "C:\\Dados\\Producao"
-    right_path: str = "D:\\Backup\\Mirror"
+    left_path: str = ""
+    right_path: str = ""
     sync_mode: str = "MIRROR"
 
 
 class BitrotScrubRequest(BaseModel):
-    target_path: str = "C:\\GBOC-Backups"
+    target_path: str = ""
 
 
 class VfsMountRequest(BaseModel):
-    repository_url: str = "s3://wasabi/gboc-prod-backups"
+    repository_url: str = ""
     drive_letter: str = "Z:"
 
 
 class RapidDeltaRequest(BaseModel):
-    source_image: str = "C:\\GBOC-Backups\\System_Image_20260829.vhdx"
+    source_image: str = ""
     target_disk: int = 0
 
 
 class LinuxSnapRequest(BaseModel):
-    dataset_name: str = "rpool/ROOT/pve-1"
+    dataset_name: str = ""
 
 
 class UsbBootCreateRequest(BaseModel):
-    drive_letter: str = "E:"
+    drive_letter: str = ""
 
 
 # ── 1. Visual Diff & RealTimeSync ───────────────────────────────────────────

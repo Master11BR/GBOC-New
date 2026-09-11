@@ -224,14 +224,19 @@ print("=" * 80)
 
 # Final result
 all_passed = all(result[1] for result in test_results)
-if all_passed:
-    print("\n🎉 TODOS OS TESTES PASSARAM!")
-    print("\nAgora você pode tentar:")
-    print("  1. Reiniciar o servidor: docker-compose restart gboc-agent")
-    print("  2. Verificar logs: docker-compose logs -f gboc-agent")
-    print("  3. Testar API: curl http://localhost:8001/api/v1/repositories")
-    sys.exit(0)
-else:
-    print("\n❌ ALGUNS TESTES FALHARAM!")
-    print("\nVerifique os erros acima e corrija antes de continuar.")
-    sys.exit(1)
+
+def test_repository_modules_loadable():
+    assert all_passed, "Nem todos os módulos de repositório carregaram corretamente"
+
+if __name__ == '__main__':
+    if all_passed:
+        print("\n🎉 TODOS OS TESTES PASSARAM!")
+        print("\nAgora você pode tentar:")
+        print("  1. Reiniciar o servidor: docker-compose restart gboc-agent")
+        print("  2. Verificar logs: docker-compose logs -f gboc-agent")
+        print("  3. Testar API: curl http://localhost:8001/api/v1/repositories")
+        sys.exit(0)
+    else:
+        print("\n❌ ALGUNS TESTES FALHARAM!")
+        print("\nVerifique os erros acima e corrija antes de continuar.")
+        sys.exit(1)

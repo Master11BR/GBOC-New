@@ -130,6 +130,18 @@ async def get_storage_history(days: int = 30):
         
         cur = conn.cursor(cursor_factory=RealDictCursor) if RealDictCursor else conn.cursor()
         cur.execute("""
+            CREATE TABLE IF NOT EXISTS storage_usage_history (
+                id SERIAL PRIMARY KEY,
+                repository_id TEXT,
+                repository_name TEXT,
+                engine TEXT DEFAULT 'unknown',
+                path TEXT,
+                size_bytes BIGINT DEFAULT 0,
+                snapshot_count INTEGER DEFAULT 0,
+                recorded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        cur.execute("""
             SELECT recorded_at, size_bytes, repository_name
             FROM storage_usage_history
             WHERE recorded_at >= NOW() - INTERVAL '%s days'

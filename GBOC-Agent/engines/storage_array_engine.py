@@ -11,6 +11,7 @@ import time
 import logging
 from datetime import datetime
 from typing import Dict, Any, List, Optional
+from pathlib import Path
 
 logger = logging.getLogger("gboc_storage_array")
 
@@ -18,53 +19,64 @@ logger = logging.getLogger("gboc_storage_array")
 class StorageArrayIntegrationEngine:
     """
     Motor de Integração Direta com Arrays de Armazenamento SAN/NAS (Hardware Snapshots).
-    Dispara snapshots em nível de hardware em menos de 2 segundos via API REST em:
-    - NetApp ONTAP (Filer / MetroCluster)
-    - Pure Storage FlashArray (Purity REST)
-    - Dell PowerStore / Unity / PowerMax (Unisphere REST)
-    - HPE Primera / Nimble / 3PAR (WSAPI)
+    Zero-Mock: Consulta arrays de storage reais configurados pelo administrador.
     """
 
     def __init__(self):
-        self.configured_arrays = [
-            {"id": "netapp-01", "name": "NetApp AFF A400 (ONTAP 9.14)", "vendor": "NetApp", "ip": "192.168.100.50", "status": "CONNECTED", "protocol": "iSCSI / NFS"},
-            {"id": "pure-01", "name": "Pure Storage FlashArray//X50", "vendor": "Pure Storage", "ip": "192.168.100.60", "status": "CONNECTED", "protocol": "NVMe-oF / FC"},
-            {"id": "dell-01", "name": "Dell PowerStore 5000T", "vendor": "Dell Technologies", "ip": "192.168.100.70", "status": "CONNECTED", "protocol": "iSCSI / FC"},
-            {"id": "hpe-01", "name": "HPE Alletra 9000 / Nimble", "vendor": "HPE", "ip": "192.168.100.80", "status": "CONNECTED", "protocol": "FC"}
-        ]
+        self.config_dir = Path("C:/GBOC-Config") if sys.platform == "win32" else Path("./data/config")
+        try:
+            self.config_dir.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
 
     def list_storage_arrays(self) -> List[Dict[str, Any]]:
-        return self.configured_arrays
+        """
+        Retorna a lista de arrays de storage SAN/NAS configurados no sistema.
+        Zero-Mock: Não retorna appliances fictícios ou IPs simulados.
+        """
+        config_path = self.config_dir / "storage_arrays.json"
+        if config_path.exists():
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, list):
+                        return data
+            except Exception as e:
+                logger.warning(f"Erro ao ler storage_arrays.json: {e}")
+        return []
 
     def trigger_hardware_snapshot(
         self,
         array_id: str,
-        volume_or_lun: str = "vol_sql_prod_data"
+        volume_or_lun: str = ""
     ) -> Dict[str, Any]:
         """
-        Dispara um snapshot de hardware no array SAN/NAS selecionado em < 2 segundos.
+        Dispara um snapshot de hardware no array SAN/NAS selecionado.
         """
-        start_time = time.time()
-        arr = next((a for a in self.configured_arrays if a["id"] == array_id), self.configured_arrays[0])
-        snap_name = f"GBOC_HW_SNAP_{volume_or_lun}_{int(time.time())}"
+        arrays = self.list_storage_arrays()
+        arr = next((a for a in arrays if a.get("id") == array_id), None)
 
-        logs = [
-            f"Enviando requisição REST API para o array de storage '{arr['name']}' ({arr['ip']})...",
-            f"Alocando snapshot de hardware para LUN/Volume: {volume_or_lun}",
-            f"Comando executado via {arr['vendor']} API: POST /api/storage/volumes/{volume_or_lun}/snapshots",
-            f"Snapshot de hardware '{snap_name}' criado com sucesso no storage em {round(time.time() - start_time + 0.8, 2)}s!",
-            "Zero impacto de CPU no host Windows Server / Hyper-V."
-        ]
+        if not arr:
+            return {
+                "success": False,
+                "error": f"Array de storage '{array_id}' não está cadastrado ou configurado no host.",
+                "timestamp": datetime.now().isoformat(),
+                "logs": [f"❌ Falha: O storage ID '{array_id}' não foi encontrado na configuração."]
+            }
 
+        if not volume_or_lun:
+            return {
+                "success": False,
+                "error": "Identificador do Volume/LUN não especificado.",
+                "logs": ["❌ Nome da LUN/Volume obrigatório."]
+            }
+
+        # Snapshot real requer integração com API do vendor
         return {
-            "success": True,
-            "array": arr,
-            "snapshot_name": snap_name,
-            "volume": volume_or_lun,
-            "latency_seconds": round(time.time() - start_time + 0.8, 2),
-            "cpu_overhead_percent": 0.0,
+            "success": False,
+            "error": f"Comunicação com o endpoint {arr.get('ip', 'N/A')} do storage requer credenciais de API REST configuradas.",
             "timestamp": datetime.now().isoformat(),
-            "logs": logs
+            "logs": [f"⚠️ Tentativa de conexão ao array {arr.get('name')}: API de integração aguardando credenciais."]
         }
 
 

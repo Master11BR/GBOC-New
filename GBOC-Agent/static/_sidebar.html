@@ -36,12 +36,27 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     text-align: left;
 }
 .nav-group-header:hover { background: var(--primary-soft, rgba(99, 102, 241, 0.12)); }
+.nav-group-header.has-active-child {
+    background: var(--primary-soft, rgba(99, 102, 241, 0.16)) !important;
+    color: var(--primary, #818cf8) !important;
+    font-weight: 700 !important;
+}
+.nav-group-header.has-active-child .nav-group-arrow {
+    color: var(--primary, #818cf8) !important;
+}
 .nav-group-arrow { font-size: 0.72em; transition: transform 0.25s; color: var(--text-muted, #64748b); }
 .nav-group-items {
     overflow: hidden; max-height: 0; transition: max-height 0.3s ease;
 }
-.nav-group-items.open { max-height: 600px; }
+.nav-group-items.open { max-height: 800px; }
 .nav-link.nav-sub { padding-left: 26px; font-size: 0.81em; }
+.nav-link.active {
+    background: var(--primary-soft, rgba(99, 102, 241, 0.25)) !important;
+    color: #ffffff !important;
+    font-weight: 700 !important;
+    border-left: 3px solid var(--primary, #6366f1) !important;
+    box-shadow: inset 3px 0 0 var(--primary, #6366f1) !important;
+}
 </style>
 <aside class="sidebar">
     <nav class="nav" id="gboc-nav" style="padding-top:16px">
@@ -220,19 +235,42 @@ async function gbocLogout(){
     initNavGroups();
 })();
 function initNavGroups() {
-    const groups = ['grp-backup','grp-virt','grp-security','grp-monitor','grp-system'];
-    const cur = window.location.pathname;
-    groups.forEach(grpId => {
-        const items = document.getElementById('items-' + grpId);
-        const arrow = document.getElementById('arrow-' + grpId);
+    const navGroups = document.querySelectorAll('.nav-group');
+    const curPath = window.location.pathname.toLowerCase();
+    navGroups.forEach(grp => {
+        const grpId = grp.id;
+        const items = grp.querySelector('.nav-group-items');
+        const header = grp.querySelector('.nav-group-header');
+        const arrow = grp.querySelector('.nav-group-arrow');
         if (!items) return;
-        // Auto-open group if current page is inside it
-        const hasActive = Array.from(items.querySelectorAll('a')).some(a => cur.startsWith(a.getAttribute('href')));
+
+        const links = Array.from(items.querySelectorAll('a.nav-link'));
+        let hasActiveChild = false;
+
+        links.forEach(link => {
+            const href = (link.getAttribute('href') || '').toLowerCase();
+            const cleanHref = href.split('?')[0].split('#')[0];
+            const cleanCur = curPath.split('?')[0].split('#')[0];
+
+            if (cleanHref && (cleanCur === cleanHref || (cleanHref !== '/' && (cleanCur.endsWith(cleanHref) || cleanCur.includes(cleanHref.replace('.html', '')))))) {
+                link.classList.add('active');
+                hasActiveChild = true;
+            }
+        });
+
         const savedOpen = localStorage.getItem('gboc-nav-' + grpId);
-        const shouldOpen = hasActive || savedOpen === 'open';
-        if (shouldOpen) {
+        if (hasActiveChild) {
             items.classList.add('open');
             if (arrow) arrow.style.transform = 'rotate(180deg)';
+            if (header) header.classList.add('has-active-child');
+            localStorage.setItem('gboc-nav-' + grpId, 'open');
+        } else if (savedOpen === 'open' || savedOpen === null) {
+            items.classList.add('open');
+            if (arrow) arrow.style.transform = 'rotate(180deg)';
+        } else if (savedOpen === 'closed') {
+            items.classList.remove('open');
+            if (arrow) arrow.style.transform = '';
+            if (header) header.classList.remove('has-active-child');
         }
     });
 }

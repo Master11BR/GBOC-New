@@ -79,8 +79,6 @@ class UnifiedSidebar {
             }
             window.__gbocSidebarInitializing = true;
 
-            console.log('🔵 UnifiedSidebar: Inicializando...');
-
             // Injetar Layout Manager (GUI Horizontal/Vertical + Botão Paleta de Cores)
             if (!window.GBOCLayout && !document.getElementById('gboc-layout-manager-script')) {
                 const lmScript = document.createElement('script');
@@ -89,27 +87,35 @@ class UnifiedSidebar {
                 document.head.appendChild(lmScript);
             }
 
-            // Carregar HTML do sidebar
-            await this._loadSidebarHtml();
-
-            // Injetar sidebar no DOM
-            this._injectSidebar();
-
-            // Inicializar grupos colapsáveis e autenticação da sidebar
-            if (typeof window.initNavGroups === 'function') {
-                window.initNavGroups();
+            // Renderização instantânea do cache da sessão para evitar que o menu desapareça
+            const cachedHtml = sessionStorage.getItem('gboc_sidebar_html');
+            if (cachedHtml) {
+                this._sidebarHtml = cachedHtml;
+                this._injectSidebar();
+                if (typeof window.initNavGroups === 'function') {
+                    window.initNavGroups();
+                }
+                this._updateActiveLink();
             }
 
-            // Configurar navegação ativa
-            this._updateActiveLink();
+            // Carregar HTML do sidebar (e atualizar cache se houver alterações)
+            await this._loadSidebarHtml();
 
-            // Configurar event listeners
+            // Se não estava em cache, injetar agora no DOM
+            if (!cachedHtml) {
+                this._injectSidebar();
+                if (typeof window.initNavGroups === 'function') {
+                    window.initNavGroups();
+                }
+                this._updateActiveLink();
+            }
+
+            // Configurar event listeners e runtime
             this._setupEventListeners();
             this._setupSidebarRuntime();
 
             this._isLoaded = true;
             window.__gbocSidebarInitialized = true;
-            console.log('✅ UnifiedSidebar: Inicialização concluída');
 
             // Setup sidebar auth (user info + logout button)
             if (typeof window.gbocSetupSidebarAuth === 'function') {
@@ -137,7 +143,7 @@ class UnifiedSidebar {
     }
 
     /**
-     * Carrega o HTML do sidebar da API/Assets
+     * Carrega o HTML do sidebar da API/Assets e mantém cache da sessão
      * @private
      * @returns {Promise<void>}
      */
@@ -147,11 +153,24 @@ class UnifiedSidebar {
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
-            this._sidebarHtml = await response.text();
-            console.log('✅ Sidebar HTML carregado');
+            const html = await response.text();
+            if (html) {
+                const prev = sessionStorage.getItem('gboc_sidebar_html');
+                this._sidebarHtml = html;
+                sessionStorage.setItem('gboc_sidebar_html', html);
+                if (prev && prev !== html) {
+                    this._injectSidebar();
+                    if (typeof window.initNavGroups === 'function') {
+                        window.initNavGroups();
+                    }
+                    this._updateActiveLink();
+                }
+            }
         } catch (error) {
-            console.error('❌ Erro ao carregar sidebar HTML:', error);
-            throw error;
+            if (!this._sidebarHtml) {
+                console.error('❌ Erro ao carregar sidebar HTML:', error);
+                throw error;
+            }
         }
     }
 
@@ -192,21 +211,33 @@ class UnifiedSidebar {
         navLinks.forEach(link => link.classList.remove('active'));
 
         let activeFound = false;
+        let activeEl = null;
         navLinks.forEach(link => {
             const href = link.getAttribute('href');
             if (this._isActiveLink(href)) {
                 link.classList.add('active');
                 activeFound = true;
+                activeEl = link;
             }
         });
 
         // fallback defensivo: marca dashboard se nada casar
         if (!activeFound) {
-            const home = document.querySelector(`${SIDEBAR_CONFIG.SELECTORS.NAV_LINK}[href="/"]`);
-            if (home) home.classList.add('active');
+            const home = document.querySelector(`${SIDEBAR_CONFIG.SELECTORS.NAV_LINK}[href="/"]`) ||
+                         document.querySelector(`${SIDEBAR_CONFIG.SELECTORS.NAV_LINK}[href="/index.html"]`);
+            if (home) {
+                home.classList.add('active');
+                activeEl = home;
+            }
         }
 
-        console.log('✅ Link ativo atualizado:', window.location.pathname);
+        if (activeEl) {
+            try {
+                setTimeout(() => {
+                    activeEl.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+                }, 100);
+            } catch(e) {}
+        }
     }
 
     /**
@@ -478,21 +509,44 @@ window.updateThemeButton = function(theme) {
  * Funções globais de navegação colapsável da Sidebar (Grupos de Menu)
  */
 window.initNavGroups = function() {
-    const groups = ['grp-backup','grp-virt','grp-security','grp-monitor','grp-system'];
-    const cur = window.location.pathname;
-    groups.forEach(grpId => {
-        const items = document.getElementById('items-' + grpId);
-        const arrow = document.getElementById('arrow-' + grpId);
+    const navGroups = document.querySelectorAll('.nav-group');
+    const curPath = window.location.pathname.toLowerCase();
+
+    navGroups.forEach(grp => {
+        const grpId = grp.id;
+        const items = grp.querySelector('.nav-group-items');
+        const header = grp.querySelector('.nav-group-header');
+        const arrow = grp.querySelector('.nav-group-arrow');
         if (!items) return;
-        const hasActive = Array.from(items.querySelectorAll('a')).some(a => {
-            const href = a.getAttribute('href');
-            return href && cur.startsWith(href) && href !== '/';
+
+        const links = Array.from(items.querySelectorAll('a.nav-link'));
+        let hasActiveChild = false;
+
+        links.forEach(link => {
+            const href = (link.getAttribute('href') || '').toLowerCase();
+            const cleanHref = href.split('?')[0].split('#')[0];
+            const cleanCur = curPath.split('?')[0].split('#')[0];
+
+            if (cleanHref && (cleanCur === cleanHref || (cleanHref !== '/' && (cleanCur.endsWith(cleanHref) || cleanCur.includes(cleanHref.replace('.html', '')))))) {
+                link.classList.add('active');
+                hasActiveChild = true;
+            }
         });
-        const savedOpen = localStorage.getItem('gboc-nav-' + grpId);
-        const shouldOpen = hasActive || savedOpen === 'open';
-        if (shouldOpen) {
+
+        const savedState = localStorage.getItem('gboc-nav-' + grpId);
+        // Se a página ativa pertence a este grupo, SEMPRE o mantém aberto e destacado
+        if (hasActiveChild) {
             items.classList.add('open');
             if (arrow) arrow.style.transform = 'rotate(180deg)';
+            if (header) header.classList.add('has-active-child');
+            localStorage.setItem('gboc-nav-' + grpId, 'open');
+        } else if (savedState === 'open' || savedState === null) {
+            items.classList.add('open');
+            if (arrow) arrow.style.transform = 'rotate(180deg)';
+        } else if (savedState === 'closed') {
+            items.classList.remove('open');
+            if (arrow) arrow.style.transform = '';
+            if (header) header.classList.remove('has-active-child');
         }
     });
 };

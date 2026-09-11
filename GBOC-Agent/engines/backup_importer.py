@@ -157,23 +157,109 @@ class RealBackupImporter:
                 imported_tasks += converted_tasks
                 conn.commit()
 
-                # 3. Importar tarefas do Duplicati caso existam
+                # 3. Importar tarefas e repositórios do Duplicati caso existam
                 duplicati_jobs = self._scan_duplicati_dbs()
+                # Também tentar obter da API do Duplicati Native se o serviço estiver ativo
+                try:
+                    from core.integrations.duplicati_native import get_duplicati_native_service
+                    dup_srv = get_duplicati_native_service()
+                    active_backups = dup_srv.list_backups().get("items", [])
+                    for ab in active_backups:
+                        b_obj = ab.get("Backup", {}) if isinstance(ab.get("Backup"), dict) else ab
+                        b_name = ab.get("name") or b_obj.get("Name")
+                        b_url = ab.get("target_url") or b_obj.get("TargetURL")
+                        b_id = str(ab.get("id") or b_obj.get("ID") or "")
+                        if b_name and not any(j.get("name") == b_name or str(j.get("id")) == b_id for j in duplicati_jobs):
+                            duplicati_jobs.append({
+                                "id": b_id,
+                                "name": b_name,
+                                "target_url": b_url,
+                                "sources": ab.get("sources") or [],
+                                "db_path": b_obj.get("DBPath") or ""
+                            })
+                except Exception as _e_dup:
+                    logger.warning(f"Não foi possível obter backups adicionais via API do Duplicati: {_e_dup}")
+
+                now_str = datetime.now().isoformat()
                 for job in duplicati_jobs:
                     job_name = f"Nativo_Duplicati_{job['name']}"
                     sources_json = json.dumps(job["sources"]) if job["sources"] else json.dumps(["C:\\"])
+                    raw_target = str(job.get("target_url") or "")
+                    if raw_target.startswith("enc-v1:"):
+                        for ab in active_backups:
+                            ab_obj = ab.get("Backup", {}) if isinstance(ab.get("Backup"), dict) else ab
+                            ab_name = ab.get("name") or ab_obj.get("Name")
+                            ab_id = str(ab.get("id") or ab_obj.get("ID") or "")
+                            cand_url = str(ab.get("target_url") or ab_obj.get("TargetURL") or "")
+                            if (ab_name == job.get("name") or ab_id == str(job.get("id"))) and cand_url and not cand_url.startswith("enc-v1:"):
+                                raw_target = cand_url
+                                break
+                        if raw_target.startswith("enc-v1:"):
+                            raw_target = "C:\\GBOC-Backups"
 
-                    # Verificar se tarefa já existe
-                    cur.execute("SELECT id FROM tasks WHERE name = %s", (job_name,))
-                    existing = cur.fetchone()
-                    if not existing:
+                    # Normalizar caminho e determinar se é nuvem ou local
+                    is_cloud = any(proto in raw_target.lower() for proto in ["s3://", "wasabi", "b2://", "azure", "sftp://"])
+                    if raw_target.lower().startswith("file://"):
+                        clean_path = raw_target[7:]
+                        if clean_path.startswith("/") and len(clean_path) > 2 and clean_path[2] == ":":
+                            clean_path = clean_path[1:]
+                        clean_path = clean_path.replace("/", "\\")
+                    else:
+                        clean_path = raw_target if raw_target else "C:\\GBOC-Backups"
+
+                    # Se for caminho local no Windows/Linux, garantir criação do diretório físico
+                    if not is_cloud and clean_path and (":" in clean_path or clean_path.startswith("/")):
+                        try:
+                            os.makedirs(clean_path, exist_ok=True)
+                        except Exception:
+                            pass
+
+                    # Criar ou obter repositório correspondente
+                    repo_name = f"Repo_Duplicati_{job['name']}"
+                    cur.execute("SELECT id FROM repositories WHERE name = %s OR path = %s", (repo_name, clean_path))
+                    existing_repo = cur.fetchone()
+                    if existing_repo:
+                        repo_id = existing_repo[0]
+                        cur.execute("UPDATE repositories SET path = %s, type = %s WHERE id = %s AND (path LIKE 'enc-v1%%' OR path IS NULL)", (clean_path, 'cloud' if is_cloud else 'local', repo_id))
+                    else:
+                        repo_type = "cloud" if is_cloud else "local"
+                        try:
+                            cur.execute("""
+                                INSERT INTO repositories (name, type, path, engine, status, enabled, initialized, created_at, updated_at)
+                                VALUES (%s, %s, %s, 'duplicati', 'active', true, true, %s, %s)
+                                RETURNING id
+                            """, (repo_name, repo_type, clean_path, now_str, now_str))
+                            repo_id = cur.fetchone()[0]
+                        except Exception:
+                            cur.execute("""
+                                INSERT INTO repositories (name, type, path, engine, status, enabled, initialized, created_at, updated_at)
+                                VALUES (%s, %s, %s, 'duplicati', 'active', 1, 1, %s, %s)
+                            """, (repo_name, repo_type, clean_path, now_str, now_str))
+                            repo_id = getattr(cur, 'lastrowid', None) or 1
+                        
+                        imported_repos += 1
+                        conn.commit()
+                        logs.append(f"✓ Criado repositório '{repo_name}' ({'Nuvem' if is_cloud else 'Local: ' + clean_path}) para Duplicati.")
+
+                    # Verificar se tarefa já existe e atualizar / inserir
+                    cur.execute("SELECT id, repository_id FROM tasks WHERE name = %s OR name = %s", (job_name, job['name']))
+                    existing_task = cur.fetchone()
+                    if existing_task:
+                        task_id = existing_task[0]
                         cur.execute("""
-                            INSERT INTO tasks (name, engine, source_paths, status, schedule_cron, created_at)
-                            VALUES (%s, %s, %s, %s, %s, %s)
-                        """, (job_name, 'duplicati', sources_json, 'active', '0 */2 * * *', datetime.now().isoformat()))
+                            UPDATE tasks SET repository_id = %s, engine = 'duplicati', source_paths = %s, status = 'idle', enabled = true, updated_at = %s
+                            WHERE id = %s
+                        """, (repo_id, sources_json, now_str, task_id))
+                        conn.commit()
+                        logs.append(f"✓ Atualizada tarefa Duplicati '{job['name']}' vinculada ao repositório #{repo_id}.")
+                    else:
+                        cur.execute("""
+                            INSERT INTO tasks (name, engine, repository_id, source_paths, status, enabled, schedule_cron, created_at, updated_at)
+                            VALUES (%s, 'duplicati', %s, %s, 'idle', true, '0 */2 * * *', %s, %s)
+                        """, (job_name, repo_id, sources_json, now_str, now_str))
                         imported_tasks += 1
                         conn.commit()
-                        logs.append(f"✓ Mapeada tarefa Duplicati '{job['name']}' como Tarefa Duplicati GBOC.")
+                        logs.append(f"✓ Mapeada tarefa Duplicati '{job['name']}' com repositório #{repo_id}.")
 
                 # 4. Caso não existam tarefas nativas registradas, criar uma tarefa padrão do sistema nativo
                 cur.execute("SELECT COUNT(*) FROM tasks WHERE engine = 'native'")
