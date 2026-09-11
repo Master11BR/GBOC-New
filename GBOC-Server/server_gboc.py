@@ -480,8 +480,95 @@ def init_database():
             )
         ''')
 
+        # ── Storage Usage History & Storage Alert Config ─────────────────────
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS storage_usage_history (
+                id SERIAL PRIMARY KEY,
+                repository_id TEXT,
+                repository_name TEXT,
+                engine TEXT DEFAULT 'unknown',
+                path TEXT,
+                size_bytes BIGINT DEFAULT 0,
+                snapshot_count INTEGER DEFAULT 0,
+                recorded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS storage_alert_config (
+                id SERIAL PRIMARY KEY,
+                alert_threshold_gb REAL DEFAULT 0,
+                alert_growth_pct_per_week REAL DEFAULT 0,
+                scan_interval_hours INTEGER DEFAULT 6,
+                last_scan_at TIMESTAMP WITH TIME ZONE
+            )
+        ''')
+
+        # ── Storage Destinations ──────────────────────────────────────────────
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS storage_destinations (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                type VARCHAR(50) DEFAULT 's3',
+                bucket VARCHAR(255),
+                provider VARCHAR(100),
+                region VARCHAR(50),
+                status VARCHAR(20) DEFAULT 'active',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        # ── Ransomware Central Tables ─────────────────────────────────────────
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS ransomware_agent_snapshots (
+                id SERIAL PRIMARY KEY,
+                agent_id VARCHAR(100) NOT NULL,
+                agent_hostname VARCHAR(255),
+                snapshot_type VARCHAR(100) NOT NULL,
+                payload_json TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS ransomware_ai_diagnostics (
+                id SERIAL PRIMARY KEY,
+                scope VARCHAR(50) NOT NULL,
+                node_id VARCHAR(150),
+                threat_score INTEGER DEFAULT 0,
+                status VARCHAR(50),
+                summary TEXT,
+                details_json TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS ransomware_central_events (
+                id SERIAL PRIMARY KEY,
+                agent_id VARCHAR(100) NOT NULL,
+                agent_hostname VARCHAR(255),
+                event_type VARCHAR(120),
+                message TEXT,
+                event_time TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS ransomware_central_incidents (
+                id SERIAL PRIMARY KEY,
+                agent_id VARCHAR(100) NOT NULL,
+                incident_external_id VARCHAR(100),
+                status VARCHAR(50),
+                detected_at TIMESTAMP,
+                resolved_at TIMESTAMP,
+                threat_info_json TEXT,
+                response_actions_json TEXT,
+                raw_json TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(agent_id, incident_external_id)
+            )
+        ''')
+
         conn.commit()
-        logger.info("✓ Banco de dados PostgreSQL inicializado com todas as tabelas (incluindo Hermes + Power Tools).")
+        logger.info("✓ Banco de dados PostgreSQL inicializado com todas as 24 tabelas autoritativas (incluindo Hermes, Power Tools, Storage e Ransomware).")
     except Exception as e:
         if conn:
             conn.rollback()

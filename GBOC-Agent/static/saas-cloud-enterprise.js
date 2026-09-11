@@ -2,6 +2,7 @@
  * GBOC System v14.1.0 Enterprise Edition
  * Module: SaaS, Kubernetes, Storage Arrays, Cleanroom, Cloud Failover & ITIL Controller
  * Copyright (c) 2026 Master11BR - Todos os direitos reservados.
+ * Zero-Mock: 100% de integração com APIs reais e dados do sistema host.
  */
 
 let _activeSaasPolling = null;
@@ -36,10 +37,40 @@ async function loadSaasStatus() {
         const gws = data.data?.google_workspace || {};
 
         const m365El = document.getElementById('m365-tenant-name');
-        const gwsEl = document.getElementById('gws-domain-name');
+        const m365Badge = document.getElementById('m365-badge-status');
+        const m365Details = document.getElementById('m365-details');
 
-        if (m365El) m365El.textContent = m365.tenant_name || 'Conectado';
-        if (gwsEl) gwsEl.textContent = gws.domain || 'Conectado';
+        const gwsEl = document.getElementById('gws-domain-name');
+        const gwsBadge = document.getElementById('gws-badge-status');
+        const gwsDetails = document.getElementById('gws-details');
+
+        if (m365El) m365El.textContent = m365.tenant_name || 'Não Configurado';
+        if (m365Badge) {
+            if (m365.connected) {
+                m365Badge.className = 'badge badge-success';
+                m365Badge.innerHTML = '<i class="fas fa-check-circle"></i> Conectado (Graph API)';
+            } else {
+                m365Badge.className = 'badge badge-warning';
+                m365Badge.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Não Conectado';
+            }
+        }
+        if (m365Details && m365.message) {
+            m365Details.textContent = m365.message;
+        }
+
+        if (gwsEl) gwsEl.textContent = gws.domain || 'Não Configurado';
+        if (gwsBadge) {
+            if (gws.connected) {
+                gwsBadge.className = 'badge badge-success';
+                gwsBadge.innerHTML = '<i class="fas fa-check-circle"></i> Conectado (Google API)';
+            } else {
+                gwsBadge.className = 'badge badge-warning';
+                gwsBadge.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Não Conectado';
+            }
+        }
+        if (gwsDetails && gws.message) {
+            gwsDetails.textContent = gws.message;
+        }
     } catch (e) {
         console.error('Erro ao carregar status SaaS:', e);
     }
@@ -53,6 +84,10 @@ async function startSaasBackupAction(provider) {
             body: JSON.stringify({ provider: provider })
         });
         const data = await res.json();
+        if (data.status === 'error') {
+            alert(`⚠️ ${data.error || data.message}`);
+            return;
+        }
         openSaasMonitorModal(data.job_id, `SaaS Backup (${provider.toUpperCase()})`);
     } catch (e) {
         alert('Erro ao iniciar backup SaaS: ' + e.message);
@@ -70,12 +105,23 @@ async function loadK8sInventory() {
         const clusterEl = document.getElementById('k8s-cluster-name');
         const nsSelect = document.getElementById('k8s-namespace-select');
 
-        if (clusterEl) clusterEl.textContent = `${k8s.cluster_name} (${k8s.server_version})`;
+        if (clusterEl) {
+            if (k8s.available) {
+                clusterEl.textContent = `${k8s.cluster_name} (${k8s.server_version})`;
+            } else {
+                clusterEl.textContent = 'kubectl não disponível no host';
+                clusterEl.className = 'badge badge-warning';
+            }
+        }
 
-        if (nsSelect && Array.isArray(k8s.namespaces)) {
-            nsSelect.innerHTML = k8s.namespaces.map(ns => `
-                <option value="${ns.name}">${ns.name} (${ns.pods_count} Pods • ${ns.pvcs_count} PVCs)</option>
-            `).join('');
+        if (nsSelect) {
+            if (Array.isArray(k8s.namespaces) && k8s.namespaces.length > 0) {
+                nsSelect.innerHTML = k8s.namespaces.map(ns => `
+                    <option value="${ns.name}">${ns.name}</option>
+                `).join('');
+            } else {
+                nsSelect.innerHTML = '<option value="" disabled selected>Nenhum namespace detectado</option>';
+            }
         }
     } catch (e) {
         console.error('Erro ao carregar inventário K8s:', e);
@@ -83,8 +129,13 @@ async function loadK8sInventory() {
 }
 
 async function startK8sBackupAction() {
-    const ns = document.getElementById('k8s-namespace-select')?.value || 'production-apps';
+    const ns = document.getElementById('k8s-namespace-select')?.value;
     const pvcs = document.getElementById('k8s-include-pvcs')?.checked !== false;
+
+    if (!ns) {
+        alert('Selecione ou informe um namespace Kubernetes válido.');
+        return;
+    }
 
     try {
         const res = await fetch('/api/v1/saas-cloud/k8s/backup', {
@@ -93,6 +144,10 @@ async function startK8sBackupAction() {
             body: JSON.stringify({ namespace: ns, include_pvcs: pvcs })
         });
         const data = await res.json();
+        if (data.status === 'error') {
+            alert(`⚠️ ${data.error}`);
+            return;
+        }
         openSaasMonitorModal(data.job_id, `Kubernetes Backup (${ns})`);
     } catch (e) {
         alert('Erro ao disparar backup K8s: ' + e.message);
@@ -109,17 +164,21 @@ async function loadStorageArrays() {
 
         const listEl = document.getElementById('storage-arrays-grid');
         if (listEl) {
-            listEl.innerHTML = arrays.map(arr => `
-                <div style="background:var(--bg-input); padding:14px; border-radius:8px; border:1px solid var(--border); margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
-                    <div>
-                        <strong style="color:var(--text);"><i class="fas fa-server" style="color:var(--primary); margin-right:8px;"></i> ${arr.name}</strong>
-                        <div style="font-size:0.78em; color:var(--text-muted); margin-top:2px;">IP: ${arr.ip} • Protocolo: ${arr.protocol}</div>
+            if (arrays.length === 0) {
+                listEl.innerHTML = '<div style="color:var(--text-muted); font-size:0.85em; padding:12px;">Nenhum array de storage SAN/NAS configurado no host. Cadastre storage_arrays.json para integrar NetApp, Pure, Dell ou HPE.</div>';
+            } else {
+                listEl.innerHTML = arrays.map(arr => `
+                    <div style="background:var(--bg-input); padding:14px; border-radius:8px; border:1px solid var(--border); margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <strong style="color:var(--text);"><i class="fas fa-server" style="color:var(--primary); margin-right:8px;"></i> ${arr.name}</strong>
+                            <div style="font-size:0.78em; color:var(--text-muted); margin-top:2px;">IP: ${arr.ip} • Protocolo: ${arr.protocol}</div>
+                        </div>
+                        <button class="btn btn-sm btn-primary" onclick="triggerHardwareSnapAction('${arr.id}')">
+                            <i class="fas fa-camera"></i> Snapshot Hardware
+                        </button>
                     </div>
-                    <button class="btn btn-sm btn-primary" onclick="triggerHardwareSnapAction('${arr.id}')">
-                        <i class="fas fa-camera"></i> Snapshot Hardware (<2s)
-                    </button>
-                </div>
-            `).join('');
+                `).join('');
+            }
         }
     } catch (e) {
         console.error('Erro ao carregar storage arrays:', e);
@@ -127,15 +186,20 @@ async function loadStorageArrays() {
 }
 
 async function triggerHardwareSnapAction(arrayId) {
+    const vol = prompt('Informe o nome do volume ou LUN no storage:');
+    if (!vol) return;
+
     try {
         const res = await fetch('/api/v1/saas-cloud/storage-arrays/snapshot', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ array_id: arrayId, volume_or_lun: 'vol_sql_prod_data' })
+            body: JSON.stringify({ array_id: arrayId, volume_or_lun: vol })
         });
         const data = await res.json();
         if (data.success) {
-            alert(`🎉 Snapshot de hardware '${data.snapshot_name}' criado no storage em ${data.latency_seconds}s sem uso de CPU no host!`);
+            alert(`🎉 Snapshot de hardware criado com sucesso!`);
+        } else {
+            alert(`Aviso: ${data.error}`);
         }
     } catch (e) {
         alert('Erro no snapshot de storage: ' + e.message);
@@ -144,10 +208,15 @@ async function triggerHardwareSnapAction(arrayId) {
 
 // ── 4. Cyber Cleanroom & Shannon Entropy ───────────────────────────────────
 async function runCleanroomScanAction() {
-    const snapId = document.getElementById('cleanroom-snap-input')?.value || 'SNAP_SQL_PROD_20260829';
+    const snapId = document.getElementById('cleanroom-snap-input')?.value?.trim();
     const consoleEl = document.getElementById('cleanroom-scan-console');
 
-    if (consoleEl) consoleEl.textContent = 'Iniciando varredura de Entropia de Shannon e regras YARA...';
+    if (!snapId) {
+        alert('Informe o ID do Snapshot ou o caminho físico do arquivo para varredura forense.');
+        return;
+    }
+
+    if (consoleEl) consoleEl.textContent = `Iniciando varredura forense real de Entropia de Shannon em: ${snapId}...`;
 
     try {
         const res = await fetch('/api/v1/saas-cloud/cleanroom/scan', {
@@ -158,6 +227,8 @@ async function runCleanroomScanAction() {
         const data = await res.json();
         if (consoleEl && Array.isArray(data.logs)) {
             consoleEl.textContent = data.logs.join('\n');
+        } else if (consoleEl) {
+            consoleEl.textContent = data.error || 'Varredura finalizada.';
         }
     } catch (e) {
         if (consoleEl) consoleEl.textContent = 'Erro na varredura: ' + e.message;
@@ -166,17 +237,22 @@ async function runCleanroomScanAction() {
 
 // ── 5. Multi-Cloud Direct Failover ─────────────────────────────────────────
 async function launchCloudFailoverAction(provider) {
-    if (!confirm(`Confirmar 1-Click Disaster Recovery Failover para ${provider.toUpperCase()}?`)) return;
+    const imgPath = prompt(`Informe o caminho da imagem VHDX para failover na ${provider.toUpperCase()}:`);
+    if (!imgPath) return;
+
+    if (!confirm(`Confirmar inicialização de procedimento de Failover para ${provider.toUpperCase()} a partir de:\n${imgPath}?`)) return;
 
     try {
         const res = await fetch('/api/v1/saas-cloud/cloud-failover/launch', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ provider: provider, backup_image_path: 'C:\\GBOC-Backups\\DR_System_20260829.vhdx' })
+            body: JSON.stringify({ provider: provider, backup_image_path: imgPath })
         });
         const data = await res.json();
         if (data.success) {
-            alert(`🎉 1-Click Failover concluído para ${data.cloud_provider}!\nIP Público: ${data.public_ip}\nInstância: ${data.instance_id || data.vm_name}\nStatus: ${data.status}`);
+            alert(`🎉 Procedimento concluído!\n${data.logs.join('\n')}`);
+        } else {
+            alert(`Aviso de pré-requisito:\n${data.error || (data.logs ? data.logs.join('\n') : 'Falha desconhecida')}`);
         }
     } catch (e) {
         alert('Erro no failover cloud: ' + e.message);
@@ -194,68 +270,56 @@ async function loadItilStatus() {
         const snowEl = document.getElementById('itil-snow-status');
         const jiraEl = document.getElementById('itil-jira-status');
 
-        if (snowEl) snowEl.innerHTML = '<span class="badge badge-success"><i class="fas fa-check-circle"></i> Conectado (OAuth2)</span>';
-        if (jiraEl) jiraEl.innerHTML = '<span class="badge badge-success"><i class="fas fa-check-circle"></i> Conectado (Bearer Token)</span>';
+        if (snowEl) {
+            if (itil.servicenow?.configured) {
+                snowEl.innerHTML = '<span class="badge badge-success"><i class="fas fa-check-circle"></i> Conectado</span>';
+            } else {
+                snowEl.innerHTML = '<span class="badge badge-warning"><i class="fas fa-info-circle"></i> Não Configurado</span>';
+            }
+        }
+
+        if (jiraEl) {
+            if (itil.jira_service_management?.configured) {
+                jiraEl.innerHTML = '<span class="badge badge-success"><i class="fas fa-check-circle"></i> Conectado</span>';
+            } else {
+                jiraEl.innerHTML = '<span class="badge badge-warning"><i class="fas fa-info-circle"></i> Não Configurado</span>';
+            }
+        }
     } catch (e) {
         console.error('Erro no status ITIL:', e);
     }
 }
 
-async function testItilWebhookAction(system) {
+async function testItilWebhookAction(systemType) {
     try {
         const res = await fetch('/api/v1/saas-cloud/itil/test-incident', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ system_type: system })
+            body: JSON.stringify({ system_type: systemType })
         });
         const data = await res.json();
         if (data.success) {
-            alert(`✅ Webhook disparado com sucesso para ${system.toUpperCase()}!\nTicket Criado: ${data.ticket_id}\nCMDB Sincronizado: OK`);
+            alert(`✅ Webhook enviado com sucesso para ${systemType}!`);
+        } else {
+            alert(`Aviso: ${data.error}`);
         }
     } catch (e) {
-        alert('Erro no webhook ITIL: ' + e.message);
+        alert('Erro ao disparar webhook: ' + e.message);
     }
 }
 
-// ── Modal Monitor ──────────────────────────────────────────────────────────
+// ── Modal de Monitoramento ──────────────────────────────────────────────────
 function openSaasMonitorModal(jobId, title) {
     const modal = document.getElementById('saas-monitor-modal');
     const titleEl = document.getElementById('saas-modal-title');
     const logsEl = document.getElementById('saas-live-logs');
-    const fillEl = document.getElementById('saas-modal-progress-fill');
-    const pctEl = document.getElementById('saas-modal-progress-pct');
 
-    if (titleEl) titleEl.textContent = title;
-    if (logsEl) logsEl.textContent = 'Iniciando operação de alta resiliência...';
-    if (fillEl) fillEl.style.width = '0%';
-    if (pctEl) pctEl.textContent = '0%';
+    if (titleEl) titleEl.innerHTML = `<i class="fas fa-spinner fa-spin" style="color:var(--primary)"></i> ${title}`;
+    if (logsEl) logsEl.textContent = 'Iniciando sincronização e coleta de telemetria...';
     if (modal) modal.style.display = 'block';
 
     if (_activeSaasPolling) clearInterval(_activeSaasPolling);
-
-    _activeSaasPolling = setInterval(async () => {
-        try {
-            const res = await fetch(`/api/v1/saas-cloud/saas/status/${jobId}`);
-            if (!res.ok) return;
-            const data = await res.json();
-            const job = data.job || {};
-
-            const prog = job.progress || 0;
-            if (fillEl) fillEl.style.width = `${prog}%`;
-            if (pctEl) pctEl.textContent = `${prog}%`;
-
-            if (logsEl && Array.isArray(job.logs)) {
-                logsEl.textContent = job.logs.map(l => `[${new Date(l.timestamp || Date.now()).toLocaleTimeString('pt-BR')}] ${l.message}`).join('\n');
-                logsEl.scrollTop = logsEl.scrollHeight;
-            }
-
-            if (job.status === 'completed' || job.status === 'failed') {
-                clearInterval(_activeSaasPolling);
-            }
-        } catch (e) {
-            console.error('Erro no polling:', e);
-        }
-    }, 1000);
+    _activeSaasPolling = setInterval(() => pollJobStatus(jobId), 1500);
 }
 
 function closeSaasMonitorModal() {
@@ -264,5 +328,43 @@ function closeSaasMonitorModal() {
     if (_activeSaasPolling) {
         clearInterval(_activeSaasPolling);
         _activeSaasPolling = null;
+    }
+}
+
+async function pollJobStatus(jobId) {
+    const endpoint = jobId.startsWith('saas') ? `/api/v1/saas-cloud/saas/status/${jobId}` : `/api/v1/saas-cloud/k8s/status/${jobId}`;
+    try {
+        const res = await fetch(endpoint);
+        if (!res.ok) return;
+        const data = await res.json();
+        const job = data.job;
+
+        const fill = document.getElementById('saas-modal-progress-fill');
+        const pct = document.getElementById('saas-modal-progress-pct');
+        const logsEl = document.getElementById('saas-live-logs');
+
+        if (job && fill && pct) {
+            fill.style.width = `${job.progress || 0}%`;
+            pct.textContent = `${job.progress || 0}%`;
+        }
+
+        if (job && logsEl && Array.isArray(job.logs)) {
+            const formatted = job.logs.map(l => typeof l === 'object' ? `[${l.timestamp?.slice(11, 19)}] ${l.message}` : l).join('\n');
+            logsEl.textContent = formatted || 'Processando dados...';
+            logsEl.scrollTop = logsEl.scrollHeight;
+        }
+
+        if (job && (job.status === 'completed' || job.status === 'failed')) {
+            clearInterval(_activeSaasPolling);
+            _activeSaasPolling = null;
+            const titleEl = document.getElementById('saas-modal-title');
+            if (titleEl) {
+                titleEl.innerHTML = job.status === 'completed' ?
+                    '<i class="fas fa-check-circle" style="color:var(--success)"></i> Operação Concluída' :
+                    '<i class="fas fa-times-circle" style="color:var(--danger)"></i> Operação Falhou';
+            }
+        }
+    } catch (e) {
+        console.error('Erro ao consultar job:', e);
     }
 }

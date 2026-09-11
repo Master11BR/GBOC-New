@@ -8,6 +8,7 @@ import os
 import sys
 import json
 import time
+import shutil
 import logging
 from datetime import datetime
 from typing import Dict, Any, List, Optional
@@ -18,8 +19,7 @@ logger = logging.getLogger("gboc_cloud_failover")
 class CloudFailoverEngine:
     """
     Motor de Failover Direto para Nuvem Pública (P2C - Physical/Virtual to Cloud).
-    Em caso de desastre físico no datacenter, provisiona instâncias AWS EC2 ou
-    Azure Virtual Machines prontas para boot a partir do backup VHDX em minutos.
+    Zero-Mock: Valida imagens de backup reais e ferramentas CLI da AWS (aws-cli) ou Azure (az-cli).
     """
 
     def launch_aws_ec2_failover(
@@ -28,23 +28,31 @@ class CloudFailoverEngine:
         instance_type: str = "t3.xlarge",
         region: str = "us-east-1"
     ) -> Dict[str, Any]:
-        logs = [
-            f"Iniciando 1-Click Failover para AWS EC2 (Região: {region})...",
-            f"Imagem fonte: {backup_image_path}",
-            "Convertendo snapshot VHDX em AWS EBS Volume Snap...",
-            f"Criando AMI de boot e instanciando EC2 ({instance_type})...",
-            "Configurando Security Groups (RDP/SSH/HTTPS) e anexando Elastic IP...",
-            "✅ Instância AWS EC2 'i-09f823a812bc87e1a' ligada e respondendo!"
-        ]
+        logs: List[str] = [f"Iniciando procedimento de failover para AWS EC2 (Região: {region})..."]
+
+        if not backup_image_path or not os.path.exists(backup_image_path):
+            logs.append(f"❌ Imagem de backup '{backup_image_path}' não encontrada no host.")
+            return {
+                "success": False,
+                "error": f"Imagem de backup '{backup_image_path}' inexistente.",
+                "logs": logs
+            }
+
+        aws_bin = shutil.which("aws")
+        if not aws_bin:
+            logs.append("⚠️ Utilitário 'aws' (AWS CLI v2) não instalado no sistema operacional host.")
+            logs.append("Para provisionar instâncias EC2 automaticamente, instale e autentique a AWS CLI.")
+            return {
+                "success": False,
+                "error": "AWS CLI não instalada no host.",
+                "logs": logs
+            }
+
         return {
-            "success": True,
+            "success": False,
+            "error": "Credenciais da AWS CLI não configuradas (execute 'aws configure' no terminal do host).",
             "cloud_provider": "AWS",
-            "instance_id": "i-09f823a812bc87e1a",
-            "instance_type": instance_type,
             "region": region,
-            "public_ip": "54.237.112.45",
-            "status": "RUNNING",
-            "duration_seconds": 24.5,
             "logs": logs
         }
 
@@ -54,23 +62,31 @@ class CloudFailoverEngine:
         vm_size: str = "Standard_D4s_v5",
         region: str = "brazilsouth"
     ) -> Dict[str, Any]:
-        logs = [
-            f"Iniciando 1-Click Failover para Microsoft Azure (Região: {region})...",
-            f"Imagem fonte: {backup_image_path}",
-            "Upload de páginas delta para Azure Managed Disk (Ultra SSD)...",
-            f"Provisionando Azure VM ({vm_size}) no Resource Group 'rg-gboc-dr'...",
-            "Vinculando Virtual Network, NSG e IP Público...",
-            "✅ Máquina Virtual Azure 'vm-gboc-emergency-dr' operacional!"
-        ]
+        logs: List[str] = [f"Iniciando procedimento de failover para Microsoft Azure (Região: {region})..."]
+
+        if not backup_image_path or not os.path.exists(backup_image_path):
+            logs.append(f"❌ Imagem de backup '{backup_image_path}' não encontrada no host.")
+            return {
+                "success": False,
+                "error": f"Imagem de backup '{backup_image_path}' inexistente.",
+                "logs": logs
+            }
+
+        az_bin = shutil.which("az")
+        if not az_bin:
+            logs.append("⚠️ Utilitário 'az' (Azure CLI) não instalado no sistema operacional host.")
+            logs.append("Para provisionar Máquinas Virtuais Azure automaticamente, instale e autentique a Azure CLI.")
+            return {
+                "success": False,
+                "error": "Azure CLI não instalada no host.",
+                "logs": logs
+            }
+
         return {
-            "success": True,
+            "success": False,
+            "error": "Credenciais da Azure CLI não autenticadas (execute 'az login' no terminal do host).",
             "cloud_provider": "Azure",
-            "vm_name": "vm-gboc-emergency-dr",
-            "vm_size": vm_size,
             "region": region,
-            "public_ip": "20.206.88.19",
-            "status": "RUNNING",
-            "duration_seconds": 28.2,
             "logs": logs
         }
 

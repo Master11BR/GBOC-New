@@ -28,22 +28,22 @@ class SaasBackupRequest(BaseModel):
 
 
 class K8sBackupRequest(BaseModel):
-    namespace: str = "production-apps"
+    namespace: str = "default"
     include_pvcs: bool = True
 
 
 class StorageArraySnapRequest(BaseModel):
-    array_id: str = "netapp-01"
-    volume_or_lun: str = "vol_sql_prod_data"
+    array_id: str = ""
+    volume_or_lun: str = ""
 
 
 class CleanroomScanRequest(BaseModel):
-    snapshot_id: str = "SNAP_SQL_PROD_20260829"
+    snapshot_id: str = ""
 
 
 class CloudFailoverRequest(BaseModel):
-    provider: str = "AWS" # "AWS" ou "Azure"
-    backup_image_path: str = "C:\\GBOC-Backups\\DR_System_20260829.vhdx"
+    provider: str = "AWS"  # "AWS" ou "Azure"
+    backup_image_path: str = ""
     instance_type: str = "t3.xlarge"
     region: str = "us-east-1"
 

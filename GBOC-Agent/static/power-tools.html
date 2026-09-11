@@ -146,11 +146,11 @@ Copyright (c) 2026 Master11BR - Todos os direitos reservados.
                     <div style="display:grid; grid-template-columns:1fr 1fr auto; gap:16px; align-items:flex-end;">
                         <div>
                             <label style="font-weight:700; font-size:0.85em; display:block; margin-bottom:4px;">Pasta de Origem (Left)</label>
-                            <input type="text" id="diff-left-path" class="form-control" value="C:\Dados\Producao" style="width:100%; padding:9px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
+                            <input type="text" id="diff-left-path" class="form-control" placeholder="C:\Caminho\Origem" style="width:100%; padding:9px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
                         </div>
                         <div>
                             <label style="font-weight:700; font-size:0.85em; display:block; margin-bottom:4px;">Pasta de Destino (Right)</label>
-                            <input type="text" id="diff-right-path" class="form-control" value="D:\Backup\Mirror" style="width:100%; padding:9px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
+                            <input type="text" id="diff-right-path" class="form-control" placeholder="D:\Caminho\Destino" style="width:100%; padding:9px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
                         </div>
                         <div style="display:flex; gap:8px;">
                             <button class="btn btn-secondary" onclick="runVisualDiffComparison()"><i class="fas fa-search"></i> Comparar</button>
@@ -176,7 +176,7 @@ Copyright (c) 2026 Master11BR - Todos os direitos reservados.
                                 </tr>
                             </thead>
                             <tbody id="visual-diff-table-body">
-                                <tr><td colspan="5" style="text-align:center; padding:16px;">Clique em "Comparar" para gerar o Visual Diff.</td></tr>
+                                <tr><td colspan="5" style="text-align:center; padding:16px; color:var(--text-muted);">Informe as pastas de origem e destino e clique em "Comparar".</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -186,16 +186,17 @@ Copyright (c) 2026 Master11BR - Todos os direitos reservados.
             <!-- TAB 2: BITROT SCRUB -->
             <div class="pow-tab-content" id="tab-content-bitrot">
                 <div class="pow-hud-card">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-                        <div>
-                            <h3 style="font-size:1.15em; margin:0; display:flex; align-items:center; gap:8px;">
-                                <i class="fas fa-heartbeat" style="color:#48bb78"></i> Auto-Cura de Corrupção Silenciosa (Anti-Bitrot &amp; Reed-Solomon)
-                            </h3>
-                            <p style="font-size:0.82em; color:var(--text-muted); margin:4px 0 0 0;">
-                                Validação profunda de somas de verificação SHA-256 e reparo automático de bits degradados usando matrizes de paridade locais.
-                            </p>
+                    <div style="margin-bottom:16px;">
+                        <h3 style="font-size:1.15em; margin:0; display:flex; align-items:center; gap:8px;">
+                            <i class="fas fa-heartbeat" style="color:#48bb78"></i> Auto-Cura de Corrupção Silenciosa (Anti-Bitrot &amp; Reed-Solomon)
+                        </h3>
+                        <p style="font-size:0.82em; color:var(--text-muted); margin:4px 0 14px 0;">
+                            Validação profunda de somas de verificação SHA-256 e detecção de bits degradados diretamente nos blocos do disco host.
+                        </p>
+                        <div style="display:flex; gap:12px; align-items:center;">
+                            <input type="text" id="bitrot-path-input" class="form-control" placeholder="C:\GBOC-Backups ou pasta do repositório" style="flex:1; padding:9px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
+                            <button class="btn btn-success" onclick="runBitrotScrubAction()"><i class="fas fa-play"></i> Iniciar Varredura de Integridade</button>
                         </div>
-                        <button class="btn btn-success" onclick="runBitrotScrubAction()"><i class="fas fa-play"></i> Iniciar Varredura de Auto-Cura</button>
                     </div>
                     <div class="pow-console-box" id="bitrot-console">Aguardando comando de varredura...</div>
                 </div>
@@ -208,7 +209,7 @@ Copyright (c) 2026 Master11BR - Todos os direitos reservados.
                     <div style="display:grid; grid-template-columns:1fr auto auto; gap:14px; align-items:flex-end;">
                         <div>
                             <label style="font-weight:700; font-size:0.85em; display:block; margin-bottom:4px;">URL do Repositório de Nuvem</label>
-                            <input type="text" id="vfs-repo-url" class="form-control" value="s3://wasabi/gboc-prod-backups" style="width:100%; padding:9px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
+                            <input type="text" id="vfs-repo-url" class="form-control" placeholder="s3://seu-bucket/caminho" style="width:100%; padding:9px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
                         </div>
                         <div>
                             <label style="font-weight:700; font-size:0.85em; display:block; margin-bottom:4px;">Letra da Unidade</label>
@@ -218,7 +219,7 @@ Copyright (c) 2026 Master11BR - Todos os direitos reservados.
                                 <option value="X:">X:</option>
                             </select>
                         </div>
-                        <button class="btn btn-primary" onclick="mountVfsAction()"><i class="fas fa-plug"></i> Montar Drive Z:\</button>
+                        <button class="btn btn-primary" onclick="mountVfsAction()"><i class="fas fa-plug"></i> Montar Drive</button>
                     </div>
                 </div>
                 <div class="pow-hud-card">
@@ -230,16 +231,24 @@ Copyright (c) 2026 Master11BR - Todos os direitos reservados.
             <!-- TAB 4: RAPID DELTA RESTORE -->
             <div class="pow-tab-content" id="tab-content-rapiddelta">
                 <div class="pow-hud-card">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-                        <div>
-                            <h3 style="font-size:1.15em; margin:0; display:flex; align-items:center; gap:8px;">
-                                <i class="fas fa-bolt" style="color:#ecc94b"></i> Rapid Delta Restore (RDR via NTFS $Bitmap)
-                            </h3>
-                            <p style="font-size:0.82em; color:var(--text-muted); margin:4px 0 0 0;">
-                                Restauração de disco em menos de 2 minutos gravando apenas os setores que foram alterados desde o backup.
-                            </p>
+                    <div style="margin-bottom:16px;">
+                        <h3 style="font-size:1.15em; margin:0; display:flex; align-items:center; gap:8px;">
+                            <i class="fas fa-bolt" style="color:#ecc94b"></i> Rapid Delta Restore (RDR via NTFS $Bitmap)
+                        </h3>
+                        <p style="font-size:0.82em; color:var(--text-muted); margin:4px 0 14px 0;">
+                            Restauração de disco física/lógica gravando apenas setores delta alterados desde o backup.
+                        </p>
+                        <div style="display:grid; grid-template-columns:1fr 140px auto; gap:12px; align-items:flex-end;">
+                            <div>
+                                <label style="font-weight:700; font-size:0.85em; display:block; margin-bottom:4px;">Caminho da Imagem VHDX</label>
+                                <input type="text" id="rapid-delta-image-path" class="form-control" placeholder="C:\GBOC-Backups\System_Image.vhdx" style="width:100%; padding:9px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
+                            </div>
+                            <div>
+                                <label style="font-weight:700; font-size:0.85em; display:block; margin-bottom:4px;">Disco Alvo (#)</label>
+                                <input type="number" id="rapid-delta-disk-number" class="form-control" value="0" min="0" style="width:100%; padding:9px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
+                            </div>
+                            <button class="btn btn-primary" onclick="runRapidDeltaAction()"><i class="fas fa-undo"></i> Executar RDR</button>
                         </div>
-                        <button class="btn btn-primary" onclick="runRapidDeltaAction()"><i class="fas fa-undo"></i> Executar Rapid Delta Restore</button>
                     </div>
                     <div class="pow-console-box" id="rapid-delta-console">Aguardando comando de restauração rápida...</div>
                 </div>
@@ -254,7 +263,7 @@ Copyright (c) 2026 Master11BR - Todos os direitos reservados.
                                 <i class="fab fa-linux" style="color:#38b2ac"></i> Snapshots de Subvolumes ZFS / BTRFS (Linux &amp; Proxmox)
                             </h3>
                             <p style="font-size:0.82em; color:var(--text-muted); margin:4px 0 0 0;">
-                                Pontos de restauração instantâneos criados em 0.04 segundos com consumo zero de espaço inicial.
+                                Pontos de restauração instantâneos criados no subsistema nativo do host.
                             </p>
                         </div>
                         <button class="btn btn-secondary" onclick="createLinuxSnapshotAction()"><i class="fas fa-camera"></i> Criar Snapshot Instantâneo</button>
@@ -282,13 +291,13 @@ Copyright (c) 2026 Master11BR - Todos os direitos reservados.
                         <i class="fas fa-usb" style="color:var(--primary)"></i> Gravador de Mídia de Boot USB 1-Click (WinPE &amp; UEFI Secure Boot)
                     </h3>
                     <p style="font-size:0.82em; color:var(--text-muted); margin-bottom:18px;">
-                        Grava o ambiente de recuperação de emergência GBOC WinPE diretamente no pendrive USB com drivers de controladoras RAID e rede embutidos.
+                        Grava o ambiente de recuperação de emergência GBOC WinPE diretamente no pendrive USB físico detectado no sistema.
                     </p>
                     <div style="display:grid; grid-template-columns:1fr auto; gap:16px; align-items:flex-end; margin-bottom:16px;">
                         <div>
-                            <label style="font-weight:700; font-size:0.85em; display:block; margin-bottom:4px;">Selecione a Unidade USB</label>
+                            <label style="font-weight:700; font-size:0.85em; display:block; margin-bottom:4px;">Selecione a Unidade USB Conectada</label>
                             <select id="usb-drives-select" class="form-control" style="width:100%; padding:9px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
-                                <option value="E:">E: [SANDISK_32G] - SanDisk Ultra USB 3.0 (29.8 GB)</option>
+                                <option value="" disabled selected>Buscando unidades USB conectadas...</option>
                             </select>
                         </div>
                         <button class="btn btn-danger" onclick="createUsbRescueAction()" style="font-weight:700;">

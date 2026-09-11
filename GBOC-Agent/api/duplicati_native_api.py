@@ -69,7 +69,8 @@ async def create_backup(payload: Dict[str, Any]) -> Dict[str, Any]:
         service = get_duplicati_native_service()
         result = service.create_backup(payload)
         if result.get("status") == "error":
-            raise HTTPException(status_code=400, detail=result)
+            err_msg = result.get("message") or result.get("error") or "Falha ao criar backup no Duplicati"
+            raise HTTPException(status_code=400, detail=str(err_msg))
         return result
     except HTTPException:
         raise
@@ -235,16 +236,6 @@ async def get_last_result(backup_id: str) -> Dict[str, Any]:
 
 
 # ── Criação, Exclusão, Reparo e Manutenção de Backups ──────────────────────────
-
-@router.post("/backups")
-async def create_backup(payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Cria um novo job de backup no Duplicati."""
-    service = get_duplicati_native_service()
-    result = service.create_backup(payload)
-    if result.get("status") == "error":
-        raise HTTPException(status_code=502, detail=result)
-    return result
-
 
 @router.delete("/backups/{backup_id}")
 async def delete_backup(backup_id: str, delete_remote_files: bool = False) -> Dict[str, Any]:

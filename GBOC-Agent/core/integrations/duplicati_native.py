@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sys
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
@@ -453,6 +454,61 @@ class DuplicatiNativeService:
 
         return []
 
+    def _normalize_backup_item(self, raw_item: Dict[str, Any]) -> Dict[str, Any]:
+        """Normaliza um item de backup do Duplicati (seja vindo de HTTP ou de SQLite)."""
+        b = raw_item.get("Backup") if isinstance(raw_item.get("Backup"), dict) else raw_item
+        b_id = str(b.get("ID") or raw_item.get("id") or "")
+        name = b.get("Name") or raw_item.get("name") or f"Backup #{b_id}"
+        desc = b.get("Description") or raw_item.get("description") or ""
+        target_url = str(b.get("TargetURL") or raw_item.get("target_url") or "")
+        meta = b.get("Metadata") or raw_item.get("metadata") or {}
+
+        dest_label = "Destino Remoto"
+        if "wasabi" in target_url.lower():
+            dest_label = "Wasabi S3 Cloud"
+        elif "s3.amazonaws" in target_url.lower() or "s3://" in target_url.lower():
+            dest_label = "Amazon S3 Cloud"
+        elif "b2" in target_url.lower():
+            dest_label = "Backblaze B2 Cloud"
+        elif "azure" in target_url.lower():
+            dest_label = "Azure Blob Cloud"
+        elif "file://" in target_url.lower() or ":" in target_url:
+            dest_label = "Disco Local / Pasta"
+
+        def fix_iso_date(raw_val: Any) -> Optional[str]:
+            if not raw_val:
+                return None
+            s = str(raw_val).strip()
+            if len(s) == 16 and s[8] == 'T' and s[15] == 'Z':
+                return f"{s[:4]}-{s[4:6]}-{s[6:8]} {s[9:11]}:{s[11:13]}:{s[13:15]}"
+            return s
+
+        last_run = fix_iso_date(meta.get("LastBackupDate") or raw_item.get("last_run")) or "Nunca"
+        last_error = meta.get("LastErrorMessage") or meta.get("LastErrorDate")
+        last_status = "Erro" if last_error else (meta.get("LastBackupResult") or raw_item.get("last_status") or ("OK" if last_run != "Nunca" else "Pendente"))
+
+        source_size = meta.get("SourceFilesSize") or raw_item.get("source_size") or 0
+        target_size = meta.get("TargetFilesSize") or raw_item.get("target_size") or 0
+        versions_count = meta.get("BackupListCount") or raw_item.get("versions_count") or 1
+        duration = meta.get("LastBackupDuration") or raw_item.get("duration") or "—"
+
+        return {
+            "id": b_id,
+            "name": name,
+            "description": desc,
+            "target_url": target_url,
+            "target_label": dest_label,
+            "last_run": last_run,
+            "last_status": last_status,
+            "source_size": source_size,
+            "target_size": target_size,
+            "versions_count": versions_count,
+            "duration": duration,
+            "schedule": raw_item.get("Schedule") or raw_item.get("schedule") or {},
+            "Backup": b,
+            "Schedule": raw_item.get("Schedule") or raw_item.get("schedule") or {}
+        }
+
     def list_backups(self) -> Dict[str, Any]:
         cfg = self.load_config()
         paths = ["api/v1/backups", "api/v1/backup"]
@@ -462,22 +518,29 @@ class DuplicatiNativeService:
                 resp = self._api_get(cfg, path)
                 if resp.status_code == 200:
                     data = resp.json()
+                    items_list = []
                     if isinstance(data, dict):
                         for key in ("Backups", "backups", "Items", "items"):
                             if key in data and isinstance(data[key], list):
-                                return {"status": "success", "items": data[key], "source": self._build_url(cfg, path)}
-                        return {"status": "success", "items": [data], "source": self._build_url(cfg, path)}
-                    if isinstance(data, list):
-                        return {"status": "success", "items": data, "source": self._build_url(cfg, path)}
+                                items_list = data[key]
+                                break
+                        if not items_list:
+                            items_list = [data]
+                    elif isinstance(data, list):
+                        items_list = data
+                    
+                    normalized = [self._normalize_backup_item(i) for i in items_list]
+                    return {"status": "success", "items": normalized, "source": self._build_url(cfg, path)}
             except Exception as e:
                 last_error = str(e)
 
         # Fallback: tentar ler diretamente do SQLite local do Duplicati
         db_items = self._read_duplicati_server_db()
         if db_items:
+            normalized = [self._normalize_backup_item(i) for i in db_items]
             return {
                 "status": "success",
-                "items": db_items,
+                "items": normalized,
                 "source": "sqlite_local_db"
             }
 
@@ -862,91 +925,150 @@ class DuplicatiNativeService:
     def create_backup(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """
         Cria uma nova rotina de backup no Duplicati Server nativo e sincroniza com o GBOC.
-        Suporta o formulário simplificado do GBOC e a estrutura oficial do Duplicati API.
+        Cria automaticamente o repositório em 'repositories' e vincula em 'tasks'.
         """
         cfg = self.load_config()
 
-        # Determinar se o payload já possui a estrutura completa do Duplicati
-        if "Backup" in payload:
-            dup_payload = payload
+        name = payload.get("name") or "Backup_GBOC"
+        desc = payload.get("description") or ""
+        target_url = str(payload.get("target_url") or "file://C:\\GBOC-Backups").strip()
+        if not ("://" in target_url):
+            target_url = f"file://{target_url}"
+
+        sources = payload.get("sources") or []
+        if isinstance(sources, str):
+            sources = [s.strip() for s in sources.split(",") if s.strip()]
+        passphrase = payload.get("passphrase") or ""
+        repeat = payload.get("schedule_repeat") or "1D"
+
+        from datetime import datetime, timezone, timedelta
+        now = datetime.now(timezone.utc)
+        sched_time = (now + timedelta(hours=1)).strftime('%Y-%m-%dT%H:%M:00Z')
+
+        settings = [
+            {"Name": "dblock-size", "Value": "50MB"},
+            {"Name": "compression-module", "Value": "zip"},
+        ]
+        if passphrase:
+            settings.extend([
+                {"Name": "encryption-module", "Value": "aes"},
+                {"Name": "passphrase", "Value": passphrase}
+            ])
         else:
-            name = payload.get("name") or "Backup_GBOC"
-            desc = payload.get("description") or ""
-            target_url = payload.get("target_url") or "file://C:\\GBOC-Backups"
-            sources = payload.get("sources") or []
-            if isinstance(sources, str):
-                sources = [s.strip() for s in sources.split(",") if s.strip()]
-            passphrase = payload.get("passphrase") or ""
-            repeat = payload.get("schedule_repeat") or "2h"
+            settings.append({"Name": "--no-encryption", "Value": "true"})
 
-            from datetime import datetime, timezone, timedelta
-            now = datetime.now(timezone.utc)
-            sched_time = (now + timedelta(hours=1)).strftime('%Y-%m-%dT%H:%M:00Z')
-
-            settings = [
-                {"Name": "dblock-size", "Value": "50MB"},
-                {"Name": "compression-module", "Value": "zip"},
-            ]
-            if passphrase:
-                settings.extend([
-                    {"Name": "encryption-module", "Value": "aes"},
-                    {"Name": "passphrase", "Value": passphrase}
-                ])
-            else:
-                settings.append({"Name": "no-encryption", "Value": "true"})
-
-            dup_payload = {
-                "Backup": {
-                    "Name": name,
-                    "Description": desc,
-                    "TargetURL": target_url,
-                    "Sources": sources,
-                    "Settings": settings,
-                    "Filters": []
-                },
-                "Schedule": {
-                    "Repeat": repeat,
-                    "Time": sched_time,
-                    "AllowedDays": None
-                }
+        dup_payload = {
+            "Backup": {
+                "Name": name,
+                "Description": desc,
+                "TargetURL": target_url,
+                "Sources": sources,
+                "Settings": settings,
+                "Filters": []
+            },
+            "Schedule": {
+                "Repeat": repeat,
+                "Time": sched_time,
+                "AllowedDays": None
             }
+        }
 
+        # Extrair caminho físico se for local
+        repo_path = target_url
+        if target_url.startswith("file://"):
+            repo_path = target_url[7:].lstrip("/") if sys.platform != "win32" else target_url[7:]
+        
+        is_cloud = any(cloud_p in target_url.lower() for cloud_p in ("s3:", "wasabi", "b2:", "azure", "sftp"))
+        if not is_cloud:
+            try:
+                os.makedirs(repo_path, exist_ok=True)
+            except Exception:
+                pass
+
+        # 1. Enviar para API do Duplicati
+        new_id = None
         try:
             resp = self._api_post(cfg, "api/v1/backups", json_body=dup_payload)
             if resp.status_code in (200, 201):
                 data = resp.json()
                 new_id = data.get("ID") or data.get("Id") or (data.get("Backup", {}).get("ID"))
-                # Sincronizar imediatamente com o GBOC (forçando atualização)
-                try:
-                    self.sync_to_gboc(force=True)
-                except Exception as _sync_err:
-                    logger.warning(f"Erro no sync imediato pós-criação de backup Duplicati: {_sync_err}")
-                return {
-                    "status": "success",
-                    "message": f"Backup Duplicati '{dup_payload.get('Backup', {}).get('Name')}' criado com sucesso!",
-                    "id": new_id,
-                    "data": data
-                }
             else:
+                err_detail = resp.text[:400]
+                try:
+                    err_json = resp.json()
+                    err_detail = err_json.get("Error") or err_json.get("message") or err_detail
+                except Exception:
+                    pass
                 return {
                     "status": "error",
-                    "message": f"Erro HTTP {resp.status_code} ao criar backup no Duplicati",
-                    "detail": resp.text[:400]
+                    "message": f"Erro do Duplicati: {err_detail}",
+                    "detail": err_detail
                 }
         except Exception as e:
             logger.error(f"Exceção ao criar backup Duplicati: {e}")
-            return {"status": "error", "message": str(e)}
+            return {"status": "error", "message": f"Erro de conexão com o Duplicati: {str(e)}"}
+
+        # 2. Criar / Garantir repositório local ou nuvem na tabela 'repositories' do GBOC
+        try:
+            from shared_core import get_shared_core
+            core = get_shared_core()
+            with core.get_db_connection() as conn:
+                cur = conn.cursor()
+                repo_name = f"Repo_Duplicati_{name}"
+                cur.execute("SELECT id FROM repositories WHERE name = %s OR path = %s", (repo_name, repo_path))
+                repo_row = cur.fetchone()
+                now_str = datetime.now().isoformat()
+                if repo_row:
+                    repo_id = repo_row[0]
+                else:
+                    repo_type = "cloud" if is_cloud else "local"
+                    cur.execute("""
+                        INSERT INTO repositories (name, type, path, engine, status, enabled, initialized, created_at, updated_at)
+                        VALUES (%s, %s, %s, 'duplicati', 'active', true, true, %s, %s)
+                        RETURNING id
+                    """, (repo_name, repo_type, repo_path, now_str, now_str))
+                    repo_id = cur.fetchone()[0]
+
+                # Criar / Garantir tarefa na tabela 'tasks'
+                task_name = f"Nativo_Duplicati_{name}"
+                cron_str = "0 */2 * * *" if "2h" in repeat.lower() else ("0 2 * * *" if "1d" in repeat.lower() else "0 * * * *")
+                sources_json = json.dumps(sources)
+                cur.execute("SELECT id FROM tasks WHERE name = %s OR name = %s", (task_name, name))
+                task_row = cur.fetchone()
+                if task_row:
+                    cur.execute("""
+                        UPDATE tasks SET repository_id = %s, engine = 'duplicati', source_paths = %s, status = 'idle', enabled = true, schedule_enabled = true, schedule_cron = %s, updated_at = %s
+                        WHERE id = %s
+                    """, (repo_id, sources_json, cron_str, now_str, task_row[0]))
+                else:
+                    cur.execute("""
+                        INSERT INTO tasks (name, repository_id, engine, source_paths, status, enabled, schedule_enabled, schedule_cron, created_at, updated_at)
+                        VALUES (%s, %s, 'duplicati', %s, 'idle', true, true, %s, %s, %s)
+                    """, (task_name, repo_id, sources_json, cron_str, now_str, now_str))
+                conn.commit()
+        except Exception as e_gboc:
+            logger.warning(f"Erro ao registrar repositório/tarefa no GBOC: {e_gboc}")
+
+        # Sincronizar imediatamente com o GBOC
+        try:
+            self.sync_to_gboc(force=True)
+        except Exception as _sync_err:
+            logger.warning(f"Erro no sync imediato pós-criação de backup Duplicati: {_sync_err}")
+
+        return {
+            "status": "success",
+            "message": f"Backup Duplicati '{name}' criado com sucesso!",
+            "id": new_id
+        }
 
     def sync_to_gboc(self, core: Any = None, force: bool = False) -> Dict[str, Any]:
         """
-        Sincroniza os backups e execuções reais do Duplicati Native com o PostgreSQL do GBOC.
-        Identifica tarefas existentes ou cria o vínculo com engine='duplicati' e espelha
-        os snapshots históricos como task_executions completadas.
-        Utiliza TTL cache de 30 segundos para evitar contenção de I/O em chamadas concorrentes.
+        Sincroniza os backups e execuções reais do Duplicati Native com o banco de dados do GBOC.
+        Garante que cada backup tenha seu repositório criado em 'repositories' e vinculado via 'repository_id' em 'tasks'.
         """
         import time as _py_time
         if not force and hasattr(self, '_last_sync_ts'):
-            if _py_time.time() - self._last_sync_ts < 30.0:
+            if _py_time.time() - self._last_sync_ts < 15.0:
                 return getattr(self, '_last_sync_result', {"status": "success", "cached": True})
 
         if core is None:
@@ -964,7 +1086,6 @@ class DuplicatiNativeService:
             self._last_sync_ts = _py_time.time()
             self._last_sync_result = res
             return res
-            return {"status": "success", "synced_tasks": 0, "synced_executions": 0, "message": "Nenhum backup Duplicati detectado"}
 
         from datetime import datetime, timedelta, timezone
 
@@ -996,43 +1117,74 @@ class DuplicatiNativeService:
                     b_name = item.get("name") or b_obj.get("Name") or f"Duplicati #{b_id}"
                     meta = b_obj.get("Metadata", {}) if isinstance(b_obj, dict) else (item.get("Metadata") or {})
                     schedule = item.get("Schedule", {}) or b_obj.get("Schedule", {})
+                    target_url = str(b_obj.get("TargetURL") or item.get("target_url") or "")
+
+                    repo_path = target_url
+                    if target_url.startswith("file://"):
+                        repo_path = target_url[7:].lstrip("/") if sys.platform != "win32" else target_url[7:]
+
+                    is_cloud = any(cloud_p in target_url.lower() for cloud_p in ("s3:", "wasabi", "b2:", "azure", "sftp"))
+                    if not is_cloud and repo_path:
+                        try:
+                            os.makedirs(repo_path, exist_ok=True)
+                        except Exception:
+                            pass
+
+                    # Garantir que o repositório existe em 'repositories'
+                    repo_name = f"Repo_Duplicati_{b_name}"
+                    cur.execute("SELECT id FROM repositories WHERE name = %s OR path = %s", (repo_name, repo_path))
+                    r_row = cur.fetchone()
+                    now_str = datetime.now().isoformat()
+                    if r_row:
+                        repo_id = r_row[0]
+                    else:
+                        repo_type = "cloud" if is_cloud else "local"
+                        cur.execute("""
+                            INSERT INTO repositories (name, type, path, engine, status, enabled, initialized, created_at, updated_at)
+                            VALUES (%s, %s, %s, 'duplicati', 'active', true, true, %s, %s)
+                            RETURNING id
+                        """, (repo_name, repo_type, repo_path, now_str, now_str))
+                        repo_id = cur.fetchone()[0]
 
                     last_run_dt = _parse_time(meta.get("LastBackupDate") or meta.get("LastBackupFinished") or item.get("last_run"))
-                    files_count = int(meta.get("SourceFilesCount") or 2586)
-                    bytes_size = int(meta.get("SourceFilesSize") or item.get("source_size") or 150551670)
+                    files_count = int(meta.get("SourceFilesCount") or 0)
+                    bytes_size = int(meta.get("SourceFilesSize") or item.get("source_size") or 0)
 
-                    repeat = str(schedule.get("Repeat") or item.get("schedule", {}).get("repeat") or "2h").lower()
-                    cron = "0 */2 * * *" if "2h" in repeat else "0 2 * * *"
+                    repeat = str(schedule.get("Repeat") or item.get("schedule", {}).get("repeat") or "1D").lower()
+                    cron = "0 */2 * * *" if "2h" in repeat else ("0 2 * * *" if "1d" in repeat else "0 * * * *")
 
-                    # Buscar tarefa correspondente no PostgreSQL
+                    # Buscar ou criar tarefa correspondente
                     cur.execute("""
-                        SELECT id, name, engine FROM tasks 
-                        WHERE name = %s OR name = %s OR name = %s OR id = 20
+                        SELECT id FROM tasks 
+                        WHERE name = %s OR name = %s OR name = %s
                     """, (f"Nativo_Duplicati_{b_name}", b_name, f"Duplicati_{b_name}"))
                     task_row = cur.fetchone()
+
+                    sources_list = item.get("sources") or []
+                    sources_json = json.dumps(sources_list) if sources_list else json.dumps(["C:\\"])
 
                     if task_row:
                         task_id = task_row[0]
                         cur.execute("""
                             UPDATE tasks 
-                            SET engine = 'duplicati', 
+                            SET repository_id = %s,
+                                engine = 'duplicati', 
                                 status = 'idle', 
                                 enabled = true, 
                                 schedule_enabled = true, 
                                 schedule_cron = %s, 
                                 last_run = %s, 
                                 last_status = 'completed',
-                                updated_at = NOW()
+                                updated_at = %s
                             WHERE id = %s
-                        """, (cron, last_run_dt or datetime.now(timezone.utc), task_id))
+                        """, (repo_id, cron, last_run_dt or now_str, now_str, task_id))
                     else:
                         task_name = f"Nativo_Duplicati_{b_name}"
-                        sources_json = json.dumps(item.get("sources") or ["C:\\"])
                         cur.execute("""
-                            INSERT INTO tasks (name, engine, source_paths, status, enabled, schedule_enabled, schedule_cron, last_run, last_status, created_at, updated_at)
-                            VALUES (%s, 'duplicati', %s, 'idle', true, true, %s, %s, 'completed', NOW(), NOW())
+                            INSERT INTO tasks (name, repository_id, engine, source_paths, status, enabled, schedule_enabled, schedule_cron, last_run, last_status, created_at, updated_at)
+                            VALUES (%s, %s, 'duplicati', %s, 'idle', true, true, %s, %s, 'completed', %s, %s)
                             RETURNING id
-                        """, (task_name, sources_json, cron, last_run_dt or datetime.now(timezone.utc)))
+                        """, (task_name, repo_id, sources_json, cron, last_run_dt or now_str, now_str, now_str))
                         task_id = cur.fetchone()[0]
 
                     conn.commit()

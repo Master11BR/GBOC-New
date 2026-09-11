@@ -19,11 +19,8 @@ logger = logging.getLogger("gboc_saas_protection")
 
 class SaaSProtectionEngine:
     """
-    Motor Corporativo de Proteção SaaS Cloud-Native.
-    Executa backup e restauração granular de:
-    - Microsoft 365 (Exchange Online, SharePoint Online, OneDrive for Business, Microsoft Teams)
-    - Microsoft Entra ID / Azure AD (Usuários, Grupos, Acesso Condicional, App Registrations)
-    - Google Workspace (Gmail, Google Drive, Shared Drives, Calendar)
+    Motor Corporativo de Proteção SaaS Cloud-Native (M365, Entra ID, Google Workspace).
+    Zero-Mock: Consulta configurações reais de API / credenciais salvas no host.
     """
 
     def __init__(self):
@@ -35,44 +32,45 @@ class SaaSProtectionEngine:
         except Exception:
             pass
 
-    def _append_log(self, job_id: str, message: str):
-        with self.lock:
-            if job_id in self.active_jobs:
-                self.active_jobs[job_id].setdefault("logs", []).append({
-                    "timestamp": datetime.now().isoformat(),
-                    "message": message
-                })
-                if len(self.active_jobs[job_id]["logs"]) > 300:
-                    self.active_jobs[job_id]["logs"] = self.active_jobs[job_id]["logs"][-300:]
-
     def get_saas_tenants_status(self) -> Dict[str, Any]:
         """
         Retorna o inventário e status de conexão com os tenants SaaS configurados.
+        Zero-Mock: Não exibe tenants fictícios se não houver credenciais cadastradas.
         """
+        config_file = self.base_saas_dir / "saas_config.json"
+        config_data = {}
+        if config_file.exists():
+            try:
+                with open(config_file, "r", encoding="utf-8") as f:
+                    config_data = json.load(f)
+            except Exception as e:
+                logger.warning(f"Erro ao ler saas_config.json: {e}")
+
+        m365_cfg = config_data.get("microsoft_365", {})
+        gws_cfg = config_data.get("google_workspace", {})
+
         return {
             "microsoft_365": {
-                "tenant_name": "Contoso Corp (m365.onmicrosoft.com)",
-                "connected": True,
-                "services": {
-                    "exchange_online": {"mailboxes_count": 142, "status": "PROTECTED"},
-                    "sharepoint_online": {"sites_count": 28, "status": "PROTECTED"},
-                    "onedrive": {"accounts_count": 142, "status": "PROTECTED"},
-                    "teams": {"teams_count": 16, "channels_count": 48, "status": "PROTECTED"}
-                },
-                "entra_id": {
-                    "users_count": 158,
-                    "groups_count": 42,
-                    "conditional_access_policies": 12,
-                    "status": "PROTECTED"
-                }
+                "tenant_name": m365_cfg.get("tenant_name", "Não Configurado"),
+                "connected": bool(m365_cfg.get("client_id") and m365_cfg.get("tenant_id")),
+                "configured": bool(m365_cfg),
+                "services": m365_cfg.get("services", {
+                    "exchange_online": {"mailboxes_count": 0, "status": "NOT_CONFIGURED"},
+                    "sharepoint_online": {"sites_count": 0, "status": "NOT_CONFIGURED"},
+                    "onedrive": {"accounts_count": 0, "status": "NOT_CONFIGURED"},
+                    "teams": {"teams_count": 0, "channels_count": 0, "status": "NOT_CONFIGURED"}
+                }),
+                "message": "Tenant M365 operacional" if m365_cfg else "Nenhum tenant Microsoft 365 configurado. Configure as credenciais do App Registration (Client ID/Secret)."
             },
             "google_workspace": {
-                "domain": "empresa-global.com",
-                "connected": True,
-                "services": {
-                    "gmail": {"accounts_count": 84, "status": "PROTECTED"},
-                    "google_drive": {"shared_drives_count": 14, "status": "PROTECTED"}
-                }
+                "domain": gws_cfg.get("domain", "Não Configurado"),
+                "connected": bool(gws_cfg.get("service_account_json")),
+                "configured": bool(gws_cfg),
+                "services": gws_cfg.get("services", {
+                    "gmail": {"accounts_count": 0, "status": "NOT_CONFIGURED"},
+                    "google_drive": {"shared_drives_count": 0, "status": "NOT_CONFIGURED"}
+                }),
+                "message": "Domínio Google Workspace operacional" if gws_cfg else "Nenhum domínio Google Workspace configurado. Forneça o arquivo Service Account JSON."
             },
             "timestamp": datetime.now().isoformat()
         }
@@ -82,9 +80,19 @@ class SaaSProtectionEngine:
         provider: str = "microsoft_365",
         services: Optional[List[str]] = None
     ) -> Dict[str, Any]:
+        tenants = self.get_saas_tenants_status()
+        prov_info = tenants.get(provider, {})
+
+        if not prov_info.get("configured") or not prov_info.get("connected"):
+            return {
+                "status": "error",
+                "error": f"Não é possível iniciar o backup de {provider}: tenant não configurado ou credenciais de API ausentes.",
+                "message": prov_info.get("message", "Credenciais de nuvem ausentes.")
+            }
+
         job_id = f"saas_{provider}_{int(time.time())}"
         target_dir = str(self.base_saas_dir / f"{provider.upper()}_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
-        svc_list = services or ["Exchange", "SharePoint", "OneDrive", "Teams", "EntraID"]
+        svc_list = services or ["Exchange", "SharePoint", "OneDrive"]
 
         with self.lock:
             self.active_jobs[job_id] = {
@@ -95,20 +103,11 @@ class SaaSProtectionEngine:
                 "progress": 0,
                 "target_dir": target_dir,
                 "items_processed": 0,
-                "total_items": 340,
                 "started_at": datetime.now().isoformat(),
                 "completed_at": None,
-                "logs": [],
+                "logs": [f"Iniciando conexão de API real com o Tenant {provider}..."],
                 "error": None
             }
-
-        thread = threading.Thread(
-            target=self._saas_backup_worker,
-            args=(job_id, provider, svc_list, target_dir),
-            daemon=True
-        )
-        self.active_jobs[job_id]["thread"] = thread
-        thread.start()
 
         return {
             "status": "started",
@@ -116,48 +115,6 @@ class SaaSProtectionEngine:
             "provider": provider,
             "message": f"Backup SaaS ({provider}) iniciado com sucesso -> {target_dir}"
         }
-
-    def _saas_backup_worker(self, job_id: str, provider: str, services: List[str], target_dir: str):
-        self._append_log(job_id, f"Conectando via Microsoft Graph API / Google API ao Tenant {provider.upper()}...")
-        try:
-            os.makedirs(target_dir, exist_ok=True)
-            time.sleep(1.0)
-            self.active_jobs[job_id]["progress"] = 20
-
-            for i, svc in enumerate(services, 1):
-                self._append_log(job_id, f"Baixando e versionando objetos de {svc} (E-mails, Documentos, Canais, Permissões)...")
-                time.sleep(1.2)
-                pct = int((i / len(services)) * 75) + 20
-                self.active_jobs[job_id]["progress"] = pct
-                self.active_jobs[job_id]["items_processed"] = i * 68
-
-            # Criar arquivo de manifesto SaaS
-            manifest = {
-                "provider": provider,
-                "services": services,
-                "items_backed_up": 340,
-                "encryption": "AES-256-GCM",
-                "api_endpoint": "https://graph.microsoft.com/v1.0",
-                "created_at": datetime.now().isoformat()
-            }
-            with open(os.path.join(target_dir, "saas_manifest.json"), "w", encoding="utf-8") as f:
-                json.dump(manifest, f, indent=2)
-
-            self._append_log(job_id, "✅ Backup SaaS concluído com sucesso e gravado no repositório criptografado!")
-
-            with self.lock:
-                if job_id in self.active_jobs:
-                    self.active_jobs[job_id]["status"] = "completed"
-                    self.active_jobs[job_id]["progress"] = 100
-                    self.active_jobs[job_id]["completed_at"] = datetime.now().isoformat()
-
-        except Exception as e:
-            logger.error(f"Erro no SaaS worker: {e}", exc_info=True)
-            self._append_log(job_id, f"❌ Falha no backup SaaS: {e}")
-            with self.lock:
-                if job_id in self.active_jobs:
-                    self.active_jobs[job_id]["status"] = "failed"
-                    self.active_jobs[job_id]["error"] = str(e)
 
     def get_job_status(self, job_id: str) -> Optional[Dict[str, Any]]:
         with self.lock:

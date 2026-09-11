@@ -492,6 +492,218 @@ def run_auto_migrations(conn):
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log (action);")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_log_user ON audit_log (username);")
 
+            # Engine & Module Tables
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS auto_heal_logs (
+                    id SERIAL PRIMARY KEY,
+                    timestamp TEXT,
+                    event_type TEXT,
+                    details TEXT,
+                    status TEXT
+                );
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS surebackup_verifications (
+                    id SERIAL PRIMARY KEY,
+                    task_id INTEGER,
+                    snapshot_id TEXT,
+                    status TEXT,
+                    boot_time_seconds REAL,
+                    network_check BOOLEAN,
+                    app_check BOOLEAN,
+                    verified_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                    details JSONB DEFAULT '{}'
+                );
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS hermes_queue (
+                    id SERIAL PRIMARY KEY,
+                    event_type TEXT,
+                    payload TEXT,
+                    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                    status TEXT DEFAULT 'pending'
+                );
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS hermes_burst_sync_log (
+                    id SERIAL PRIMARY KEY,
+                    sequence_number INTEGER,
+                    event_type TEXT,
+                    payload TEXT,
+                    synced_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS hermes_sequence (
+                    id SERIAL PRIMARY KEY,
+                    last_seq INTEGER DEFAULT 0
+                );
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS detected_engines (
+                    id SERIAL PRIMARY KEY,
+                    name TEXT UNIQUE,
+                    path TEXT,
+                    version TEXT,
+                    installed BOOLEAN DEFAULT TRUE,
+                    detected_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS engine_backup_statistics (
+                    id SERIAL PRIMARY KEY,
+                    engine TEXT,
+                    repository_name TEXT,
+                    total_backups INTEGER DEFAULT 0,
+                    total_bytes BIGINT DEFAULT 0,
+                    last_backup_at TIMESTAMPTZ,
+                    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS imported_repositories (
+                    id SERIAL PRIMARY KEY,
+                    engine TEXT,
+                    original_path TEXT,
+                    repository_id INTEGER REFERENCES repositories(id) ON DELETE CASCADE,
+                    imported_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS smtp_config (
+                    id SERIAL PRIMARY KEY,
+                    host TEXT,
+                    port INTEGER DEFAULT 587,
+                    username TEXT,
+                    password TEXT,
+                    from_email TEXT,
+                    use_tls BOOLEAN DEFAULT TRUE,
+                    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS compliance_policies (
+                    id SERIAL PRIMARY KEY,
+                    framework TEXT NOT NULL,
+                    policy_name TEXT NOT NULL,
+                    rule_definition JSONB DEFAULT '{}',
+                    enabled BOOLEAN DEFAULT TRUE,
+                    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS compliance_audits (
+                    id SERIAL PRIMARY KEY,
+                    policy_id INTEGER REFERENCES compliance_policies(id) ON DELETE CASCADE,
+                    score INTEGER DEFAULT 100,
+                    status TEXT DEFAULT 'passed',
+                    findings JSONB DEFAULT '[]',
+                    audited_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS backup_patterns (
+                    id SERIAL PRIMARY KEY,
+                    task_id INTEGER,
+                    pattern_type TEXT,
+                    data JSONB DEFAULT '{}',
+                    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS performance_metrics (
+                    id SERIAL PRIMARY KEY,
+                    metric_name TEXT,
+                    value DOUBLE PRECISION,
+                    recorded_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS user_suggestions (
+                    id SERIAL PRIMARY KEY,
+                    category TEXT,
+                    suggestion TEXT,
+                    status TEXT DEFAULT 'new',
+                    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS backup_settings (
+                    id SERIAL PRIMARY KEY,
+                    key TEXT UNIQUE NOT NULL,
+                    value TEXT,
+                    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS error_log (
+                    id SERIAL PRIMARY KEY,
+                    error_code TEXT,
+                    message TEXT,
+                    stack_trace TEXT,
+                    timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS job_failure_log (
+                    id SERIAL PRIMARY KEY,
+                    job_id INTEGER,
+                    job_name TEXT,
+                    error_message TEXT,
+                    failed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS daily_metrics (
+                    id SERIAL PRIMARY KEY,
+                    date TEXT UNIQUE,
+                    total_backups INTEGER DEFAULT 0,
+                    successful_backups INTEGER DEFAULT 0,
+                    failed_backups INTEGER DEFAULT 0,
+                    total_bytes BIGINT DEFAULT 0,
+                    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS engine_metrics (
+                    id SERIAL PRIMARY KEY,
+                    engine TEXT,
+                    cpu_pct DOUBLE PRECISION DEFAULT 0,
+                    mem_bytes BIGINT DEFAULT 0,
+                    recorded_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS task_metrics (
+                    id SERIAL PRIMARY KEY,
+                    task_id INTEGER,
+                    duration_sec INTEGER DEFAULT 0,
+                    throughput_mbps DOUBLE PRECISION DEFAULT 0,
+                    recorded_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS storage_usage_history (
+                    id SERIAL PRIMARY KEY,
+                    repository_id TEXT,
+                    repository_name TEXT,
+                    engine TEXT DEFAULT 'unknown',
+                    path TEXT,
+                    size_bytes BIGINT DEFAULT 0,
+                    snapshot_count INTEGER DEFAULT 0,
+                    recorded_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS storage_alert_config (
+                    id SERIAL PRIMARY KEY,
+                    alert_threshold_gb DOUBLE PRECISION DEFAULT 0,
+                    alert_growth_pct_per_week DOUBLE PRECISION DEFAULT 0,
+                    scan_interval_hours INTEGER DEFAULT 6,
+                    last_scan_at TIMESTAMPTZ
+                );
+            """)
+
             # integrity_checks FK -> repositories: garantir ON DELETE CASCADE
             try:
                 cursor.execute("""

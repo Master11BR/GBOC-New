@@ -124,6 +124,7 @@ Copyright (c) 2026 Master11BR - Todos os direitos reservados.
             </div>
 
             <!-- TAB 1: SAAS PROTECTION -->
+            <!-- TAB 1: SAAS PROTECTION -->
             <div class="saas-tab-content active" id="tab-content-saas">
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px;">
                     <div class="saas-hud-card">
@@ -131,19 +132,16 @@ Copyright (c) 2026 Master11BR - Todos os direitos reservados.
                             <h3 style="font-size:1.1em; margin:0; display:flex; align-items:center; gap:8px;">
                                 <i class="fab fa-microsoft" style="color:#00a4ef"></i> Microsoft 365 &amp; Entra ID
                             </h3>
-                            <span class="badge badge-success"><i class="fas fa-check-circle"></i> Conectado (Graph API)</span>
+                            <span class="badge" id="m365-badge-status"><i class="fas fa-info-circle"></i> Verificando...</span>
                         </div>
                         <div style="background:var(--bg-input); padding:12px; border-radius:8px; border:1px solid var(--border); font-size:0.85em; margin-bottom:16px;">
-                            Tenant: <strong id="m365-tenant-name" style="color:var(--text);">Contoso Corp</strong>
+                            Tenant: <strong id="m365-tenant-name" style="color:var(--text);">Não Configurado</strong>
                         </div>
-                        <div style="font-size:0.82em; color:var(--text-muted); line-height:1.6; margin-bottom:18px;">
-                            • 142 Caixas Exchange Online &amp; Arquivamento<br>
-                            • 28 Coleções de Sites SharePoint Online &amp; OneDrive<br>
-                            • 16 Equipes do Microsoft Teams (Canais e Conversas)<br>
-                            • Entra ID: 158 Usuários e Políticas de Acesso Condicional
+                        <div id="m365-details" style="font-size:0.82em; color:var(--text-muted); line-height:1.6; margin-bottom:18px;">
+                            Insira credenciais do App Registration no arquivo de configuração do agente para habilitar proteção de Exchange, SharePoint, OneDrive e Entra ID.
                         </div>
                         <button class="btn btn-primary" onclick="startSaasBackupAction('microsoft_365')" style="width:100%; padding:10px; font-weight:700;">
-                            <i class="fas fa-play"></i> Disparar Backup Completo Microsoft 365
+                            <i class="fas fa-play"></i> Disparar Backup Microsoft 365
                         </button>
                     </div>
 
@@ -152,15 +150,13 @@ Copyright (c) 2026 Master11BR - Todos os direitos reservados.
                             <h3 style="font-size:1.1em; margin:0; display:flex; align-items:center; gap:8px;">
                                 <i class="fab fa-google" style="color:#ea4335"></i> Google Workspace
                             </h3>
-                            <span class="badge badge-success"><i class="fas fa-check-circle"></i> Conectado (Google API)</span>
+                            <span class="badge" id="gws-badge-status"><i class="fas fa-info-circle"></i> Verificando...</span>
                         </div>
                         <div style="background:var(--bg-input); padding:12px; border-radius:8px; border:1px solid var(--border); font-size:0.85em; margin-bottom:16px;">
-                            Domínio: <strong id="gws-domain-name" style="color:var(--text);">empresa-global.com</strong>
+                            Domínio: <strong id="gws-domain-name" style="color:var(--text);">Não Configurado</strong>
                         </div>
-                        <div style="font-size:0.82em; color:var(--text-muted); line-height:1.6; margin-bottom:18px;">
-                            • 84 Contas Gmail Empresariais<br>
-                            • 14 Drives Compartilhados (Shared Drives)<br>
-                            • Google Calendar &amp; Contatos Corporativos
+                        <div id="gws-details" style="font-size:0.82em; color:var(--text-muted); line-height:1.6; margin-bottom:18px;">
+                            Configure a chave de serviço (Service Account JSON) para habilitar proteção corporativa de Gmail, Shared Drives e Calendar.
                         </div>
                         <button class="btn btn-success" onclick="startSaasBackupAction('google_workspace')" style="width:100%; padding:10px; font-weight:700; margin-top:28px;">
                             <i class="fas fa-play"></i> Disparar Backup Google Workspace
@@ -181,16 +177,14 @@ Copyright (c) 2026 Master11BR - Todos os direitos reservados.
                                 Backup de recursos YAML (Deployments, Secrets, ConfigMaps) e snapshots de volumes persistentes via CSI Volume Snapshotter.
                             </p>
                         </div>
-                        <span class="badge badge-info" id="k8s-cluster-name">k8s-prod-cluster-01</span>
+                        <span class="badge badge-info" id="k8s-cluster-name">Verificando kubectl...</span>
                     </div>
 
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-top:16px;">
                         <div>
                             <label style="font-weight:700; font-size:0.85em; display:block; margin-bottom:6px;">Namespace Alvo</label>
                             <select id="k8s-namespace-select" class="form-control" style="width:100%; padding:9px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
-                                <option value="production-apps">production-apps (24 Pods • 6 PVCs)</option>
-                                <option value="databases-stateful">databases-stateful (6 Pods • 6 PVCs)</option>
-                                <option value="default">default (8 Pods • 2 PVCs)</option>
+                                <option value="" disabled selected>Buscando namespaces do cluster...</option>
                             </select>
                         </div>
                         <div style="display:flex; flex-direction:column; justify-content:flex-end;">
@@ -207,7 +201,7 @@ Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 
             <!-- TAB 3: STORAGE ARRAYS -->
             <div class="saas-tab-content" id="tab-content-storagearrays">
-                <div class="saas-hud-card">
+                <div class="pow-hud-card">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
                         <div>
                             <h3 style="font-size:1.15em; margin:0; display:flex; align-items:center; gap:8px;">
@@ -218,7 +212,7 @@ Copyright (c) 2026 Master11BR - Todos os direitos reservados.
                             </p>
                         </div>
                     </div>
-                    <div id="storage-arrays-grid">Carregando arrays...</div>
+                    <div id="storage-arrays-grid">Carregando arrays de storage...</div>
                 </div>
             </div>
 
@@ -236,7 +230,7 @@ Copyright (c) 2026 Master11BR - Todos os direitos reservados.
                         </div>
                     </div>
                     <div style="display:flex; gap:12px; margin-bottom:16px;">
-                        <input type="text" id="cleanroom-snap-input" class="form-control" value="SNAP_SQL_PROD_20260829" style="flex:1; padding:9px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
+                        <input type="text" id="cleanroom-snap-input" class="form-control" placeholder="ID do Snapshot ou caminho do arquivo" style="flex:1; padding:9px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
                         <button class="btn btn-primary" onclick="runCleanroomScanAction()" style="font-weight:700;">
                             <i class="fas fa-search"></i> Executar Varredura Forense Cleanroom
                         </button>

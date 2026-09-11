@@ -80,8 +80,12 @@
                     <option value="">Todos os repositórios</option>
                 </select>
             </div>
-            <div class="panel-body" style="height:280px">
+            <div class="panel-body" style="height:280px;position:relative">
                 <canvas id="growth-chart"></canvas>
+                <div id="growth-chart-empty" style="display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;color:var(--text-muted)">
+                    <i class="fas fa-chart-line" style="font-size:2em;display:block;margin-bottom:10px"></i>
+                    Dados de histórico ainda não disponíveis.<br><span style="font-size:0.85em">Execute um scan para começar a coletar dados.</span>
+                </div>
             </div>
         </div>
     </main>
@@ -252,7 +256,7 @@ async function loadUsage() {
 
 async function loadHistory() {
     const repoId = document.getElementById('history-repo-filter').value;
-    const url = repoId ? `${API}/history?days=30&repository_id=${repoId}` : `${API}/history?days=30`;
+    const url = repoId ? `${API}/history?days=30&repository_id=${encodeURIComponent(repoId)}` : `${API}/history?days=30`;
     try {
         const r = await fetch(url);
         const d = await r.json();
@@ -260,44 +264,100 @@ async function loadHistory() {
 
         if (_growthChart) { _growthChart.destroy(); _growthChart = null; }
 
-        const ctx = document.getElementById('growth-chart').getContext('2d');
+        const canvas = document.getElementById('growth-chart');
+        const emptyDiv = document.getElementById('growth-chart-empty');
+        if (!canvas) return;
 
-        // Group by repo, build datasets
-        const byRepo = {};
-        history.forEach(h => {
-            const key = h.repository_name || h.repository_id;
-            if (!byRepo[key]) byRepo[key] = [];
-            byRepo[key].push({ x: h.recorded_at, y: h.size_gb });
-        });
-
-        const colors = ['#6366f1','#48bb78','#ed8936','#38b2ac','#9f7aea','#f56565'];
-        const datasets = Object.entries(byRepo).map(([name, points], i) => ({
-            label: name,
-            data: points,
-            borderColor: colors[i % colors.length],
-            backgroundColor: colors[i % colors.length] + '22',
-            tension: 0.4, fill: true, pointRadius: 3
-        }));
-
-        if (!datasets.length) {
-            ctx.canvas.style.display = 'none';
-            ctx.canvas.parentElement.innerHTML += `<div style="text-align:center;padding:40px;color:var(--text-muted)"><i class="fas fa-chart-line" style="font-size:2em;display:block;margin-bottom:10px"></i>Dados de histórico ainda não disponíveis.<br><span style="font-size:0.85em">Execute um scan para começar a coletar dados.</span></div>`;
+        if (!history.length) {
+            canvas.style.display = 'none';
+            if (emptyDiv) emptyDiv.style.display = 'block';
             return;
         }
 
+        canvas.style.display = 'block';
+        if (emptyDiv) emptyDiv.style.display = 'none';
+
+        const ctx = canvas.getContext('2d');
+
+        // Group by repository name/id
+        const byRepo = {};
+        const timestampsMap = new Map();
+
+        history.forEach(h => {
+            const key = h.repository_name || h.repository_id;
+            if (!byRepo[key]) byRepo[key] = [];
+            
+            let dtLabel = h.recorded_at || '';
+            try {
+                const dt = new Date(h.recorded_at);
+                if (!isNaN(dt.getTime())) {
+                    dtLabel = dt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' ' +
+                              dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                }
+            } catch(e) {}
+            
+            byRepo[key].push({ label: dtLabel, size_gb: Number(h.size_gb || 0) });
+            timestampsMap.set(h.recorded_at, dtLabel);
+        });
+
+        // Determine all unique labels in chronological order
+        const sortedLabels = Array.from(timestampsMap.values());
+        // Deduplicate while preserving order
+        const uniqueLabels = Array.from(new Set(sortedLabels));
+
+        const colors = ['#6366f1','#48bb78','#ed8936','#38b2ac','#9f7aea','#f56565','#3b82f6'];
+        const datasets = Object.entries(byRepo).map(([name, points], i) => {
+            // Map point values to labels
+            const pointMap = new Map(points.map(p => [p.label, p.size_gb]));
+            const dataSeries = uniqueLabels.map(l => pointMap.has(l) ? pointMap.get(l) : null);
+            
+            return {
+                label: name,
+                data: dataSeries,
+                borderColor: colors[i % colors.length],
+                backgroundColor: colors[i % colors.length] + '22',
+                tension: 0.3,
+                fill: true,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                spanGaps: true
+            };
+        });
+
         _growthChart = new Chart(ctx, {
             type: 'line',
-            data: { datasets },
+            data: {
+                labels: uniqueLabels,
+                datasets: datasets
+            },
             options: {
-                responsive: true, maintainAspectRatio: false,
-                parsing: { xAxisKey: 'x', yAxisKey: 'y' },
+                responsive: true,
+                maintainAspectRatio: false,
                 plugins: {
                     legend: { labels: { color: '#a0aec0', font: { size: 11 } } },
-                    tooltip: { callbacks: { label: (c) => ` ${c.dataset.label}: ${c.parsed.y.toFixed(2)} GB` } }
+                    tooltip: {
+                        callbacks: {
+                            label: (c) => {
+                                const val = Number(c.raw);
+                                if (val >= 1) return ` ${c.dataset.label}: ${val.toFixed(2)} GB`;
+                                return ` ${c.dataset.label}: ${(val * 1024).toFixed(1)} MB (${val.toFixed(4)} GB)`;
+                            }
+                        }
+                    }
                 },
                 scales: {
-                    x: { type: 'time', time: { unit: 'day' }, ticks: { color: '#718096' }, grid: { color: 'rgba(255,255,255,0.05)' } },
-                    y: { ticks: { color: '#718096', callback: v => v.toFixed(1) + ' GB' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+                    x: {
+                        ticks: { color: '#718096', maxRotation: 45, maxTicksLimit: 12 },
+                        grid: { color: 'rgba(255,255,255,0.05)' }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            color: '#718096',
+                            callback: v => v >= 1 ? v.toFixed(1) + ' GB' : (v * 1024).toFixed(0) + ' MB'
+                        },
+                        grid: { color: 'rgba(255,255,255,0.05)' }
+                    }
                 }
             }
         });

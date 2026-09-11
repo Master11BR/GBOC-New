@@ -111,7 +111,7 @@ def collect_repository_sizes() -> List[Dict[str, Any]]:
     try:
         with core.get_db_connection() as conn:
             cur = conn.cursor()
-            cur.execute("SELECT id, name, engine, path, status FROM repositories WHERE status = 'active'")
+            cur.execute("SELECT id, name, engine, path, status, type FROM repositories WHERE status = 'active'")
             cols = [d[0] for d in cur.description] if cur.description else []
             db_repos = [dict(zip(cols, row)) for row in cur.fetchall()]
 
@@ -137,6 +137,7 @@ def collect_repository_sizes() -> List[Dict[str, Any]]:
             repo_name = repo.get("name", f"Repo #{repo_id_str}")
             repo_path = repo.get("path") or repo.get("location") or ""
             engine = (repo.get("engine") or "unknown").lower()
+            repo_type = (repo.get("type") or "").lower()
             stats = {"size_bytes": 0, "snapshot_count": 0}
 
             if repo_path and os.path.exists(repo_path):
@@ -145,13 +146,50 @@ def collect_repository_sizes() -> List[Dict[str, Any]]:
                 else:
                     stats["size_bytes"] = _get_dir_size_bytes(repo_path)
 
+            # Se for repositório em Nuvem ou sem caminho físico local, buscar estatísticas das execuções reais
+            is_cloud = (repo_type in ("wasabi", "s3", "b2", "azure", "cloud") or
+                        any(p in repo_path.lower() for p in ["s3://", "wasabi", "b2", "azure", "sftp://"]))
+
+            task_bytes = 0
+            task_snaps = 0
+            try:
+                with core.get_db_connection() as conn_t:
+                    cur_t = conn_t.cursor()
+                    cur_t.execute("""
+                        SELECT COALESCE(MAX(te.bytes_processed), 0),
+                               COALESCE(MAX(te.bytes_total), 0),
+                               COALESCE(MAX(te.bytes_added), 0),
+                               COUNT(te.id)
+                        FROM task_executions te
+                        JOIN tasks t ON te.task_id = t.id
+                        WHERE t.repository_id = %s AND te.status = 'completed'
+                    """, (repo.get("id"),))
+                    row_t = cur_t.fetchone()
+                    if row_t:
+                        task_bytes = max(row_t[0], row_t[1], row_t[2])
+                        task_snaps = row_t[3]
+            except Exception as _e_t:
+                pass
+
+            if stats["size_bytes"] == 0 and task_bytes > 0:
+                stats["size_bytes"] = task_bytes
+            if stats["snapshot_count"] == 0 and task_snaps > 0:
+                stats["snapshot_count"] = task_snaps
+
             repl_info = repl_map.get(repo_id_str, {})
-            dest_type = repl_info.get("dest_type") or ("Armazenamento Secundário" if repl_info.get("dest_path") else "Local Primary")
+            dest_type = repl_info.get("dest_type")
+            if not dest_type:
+                if is_cloud:
+                    dest_type = "Wasabi S3 Cloud" if "wasabi" in (repo_type + repo_path).lower() else "Nuvem / Remote Storage"
+                elif repl_info.get("dest_path"):
+                    dest_type = "Armazenamento Secundário"
+                else:
+                    dest_type = "Local Primary"
+
             dest_path = repl_info.get("dest_path") or repo_path
             
             dest_bytes = 0
-            if dest_path and ("s3://" in dest_path.lower() or "wasabi" in dest_path.lower() or "b2://" in dest_path.lower() or "sftp://" in dest_path.lower()):
-                dest_type = "Nuvem / Remote Storage"
+            if is_cloud:
                 dest_bytes = repl_info.get("total_bytes") or stats["size_bytes"]
             elif dest_path and os.path.exists(dest_path) and dest_path != repo_path:
                 dest_bytes = _get_dir_size_bytes(dest_path)
@@ -168,13 +206,13 @@ def collect_repository_sizes() -> List[Dict[str, Any]]:
                 "engine": engine,
                 "path": repo_path,
                 "size_bytes": stats["size_bytes"],
-                "size_gb": round(stats["size_bytes"] / (1024 ** 3), 3),
+                "size_gb": round(stats["size_bytes"] / (1024 ** 3), 4),
                 "local_bytes": stats["size_bytes"],
-                "local_gb": round(stats["size_bytes"] / (1024 ** 3), 3),
+                "local_gb": round(stats["size_bytes"] / (1024 ** 3), 4),
                 "destination_type": dest_type,
                 "destination_path": dest_path,
                 "destination_bytes": dest_bytes,
-                "destination_gb": round(dest_bytes / (1024 ** 3), 3),
+                "destination_gb": round(dest_bytes / (1024 ** 3), 4),
                 "snapshot_count": stats.get("snapshot_count", 0),
                 "recorded_at": datetime.now().isoformat()
             })
@@ -369,27 +407,28 @@ def get_storage_history(repository_id: Optional[str] = None, days: int = 30) -> 
     core = _get_core()
     with core.get_db_connection() as conn:
         cur = conn.cursor()
+        cutoff = datetime.now() - timedelta(days=days)
         if repository_id:
             cur.execute("""
                 SELECT repository_id, repository_name, engine, size_bytes, snapshot_count, recorded_at
                 FROM storage_usage_history
-                WHERE repository_id = %s AND recorded_at >= NOW() - INTERVAL '%s days'
+                WHERE repository_id = %s AND recorded_at >= %s
                 ORDER BY recorded_at ASC
-            """, (repository_id, days))
+            """, (str(repository_id), cutoff))
         else:
             cur.execute("""
-                SELECT DISTINCT ON (repository_id) repository_id, repository_name, engine, size_bytes, snapshot_count, recorded_at
+                SELECT repository_id, repository_name, engine, size_bytes, snapshot_count, recorded_at
                 FROM storage_usage_history
-                WHERE recorded_at >= NOW() - INTERVAL '%s days'
-                ORDER BY repository_id, recorded_at DESC
-            """, (days,))
+                WHERE recorded_at >= %s
+                ORDER BY recorded_at ASC
+            """, (cutoff,))
         cols = [d[0] for d in cur.description] if cur.description else []
         rows = []
         for row in cur.fetchall():
             d = dict(zip(cols, row))
             if d.get("recorded_at") and hasattr(d["recorded_at"], 'isoformat'):
                 d["recorded_at"] = d["recorded_at"].isoformat()
-            d["size_gb"] = round((d.get("size_bytes") or 0) / (1024**3), 3)
+            d["size_gb"] = round((d.get("size_bytes") or 0) / (1024**3), 4)
             rows.append(d)
         return rows
 
