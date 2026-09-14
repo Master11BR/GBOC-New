@@ -1,0 +1,98 @@
+/* ============================================================================
+   GBOC System v14.2.0 — Modern UI Model Core Specification (Agent)
+   Model ID: modern
+   Status: ACTIVE_UI_MODEL / DEFAULT
+   ============================================================================ */
+
+/* Force explicit model attribute on root */
+html[data-ui-model="modern"], html:not([data-ui-model]) {
+    --ui-model: "modern";
+    --active-ui-model: "modern";
+}
+
+/* UI Component Style Formats under Modern Model */
+
+/* 1. Minimal Clean UI (Default) */
+html[data-ui-style="minimal"], :root {
+    --card-radius:          8px;
+    --btn-radius:           6px;
+    --input-radius:         6px;
+    --card-bg:              var(--bg-card);
+    --card-border:          1px solid var(--border-color);
+    --card-shadow:          0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+    --card-backdrop:        none;
+    --btn-shadow:           0 1px 2px rgba(0, 0, 0, 0.05);
+    --input-bg:             var(--bg-input);
+    --input-border:         1px solid var(--border-color);
+    --input-shadow:         none;
+    --btn-transform-hover:  translateY(-1px);
+    --btn-transform-active: translateY(0) scale(0.99);
+}
+
+/* 2. Neumorphism 3D */
+html[data-ui-style="neumorphism"] {
+    --card-radius:          18px;
+    --btn-radius:           12px;
+    --input-radius:         12px;
+    --card-bg:              var(--nm-bg);
+    --card-border:          none;
+    --card-shadow:          8px 8px 18px var(--nm-shadow-dark), -8px -8px 18px var(--nm-shadow-light);
+    --card-backdrop:        none;
+    --btn-shadow:           5px 5px 12px var(--nm-shadow-dark), -5px -5px 12px var(--nm-shadow-light);
+    --input-bg:             var(--nm-bg);
+    --input-border:         none;
+    --input-shadow:         inset 4px 4px 8px var(--nm-shadow-dark), inset -4px -4px 8px var(--nm-shadow-light);
+    --btn-transform-hover:  translateY(-1px);
+    --btn-transform-active: translateY(1px);
+}
+
+/* 3. 3D Claymorphism */
+html[data-ui-style="claymorphism"] {
+    --card-radius:          24px;
+    --btn-radius:           20px;
+    --input-radius:         16px;
+    --card-bg:              var(--clay-bg);
+    --card-border:          1.5px solid rgba(255, 255, 255, 0.15);
+    --card-shadow:          var(--clay-shadow-drop), var(--clay-shadow-inset);
+    --card-backdrop:        none;
+    --btn-shadow:           0 10px 24px rgba(99, 102, 241, 0.35), inset -3px -3px 8px rgba(0, 0, 0, 0.25), inset 3px 3px 8px rgba(255, 255, 255, 0.35);
+    --input-bg:             var(--bg-input);
+    --input-border:         1px solid var(--border-color);
+    --input-shadow:         inset 3px 3px 8px rgba(0, 0, 0, 0.12);
+    --btn-transform-hover:  translateY(-4px) scale(1.02);
+    --btn-transform-active: translateY(2px) scale(0.98);
+}
+
+/* 4. Fluent Acrylic Glass */
+html[data-ui-style="fluent"] {
+    --card-radius:          10px;
+    --btn-radius:           6px;
+    --input-radius:         6px;
+    --card-bg:              var(--fluent-glass-bg);
+    --card-border:          var(--fluent-border);
+    --card-shadow:          0 12px 32px rgba(0, 0, 0, 0.25);
+    --card-backdrop:        blur(16px) saturate(160%);
+    --btn-shadow:           0 2px 6px rgba(0, 0, 0, 0.15);
+    --input-bg:             rgba(255, 255, 255, 0.05);
+    --input-border:         1px solid rgba(255, 255, 255, 0.18);
+    --input-shadow:         none;
+    --btn-transform-hover:  translateY(-1px);
+    --btn-transform-active: translateY(0);
+}
+
+/* 5. Ultra-Modern Cyber 3D Glassmorphism (Fluid Animations & Holographic Glow) */
+html[data-ui-style="cyber-3d"] {
+    --card-radius:          16px;
+    --btn-radius:           10px;
+    --input-radius:         10px;
+    --card-bg:              linear-gradient(135deg, rgba(30, 41, 59, 0.78) 0%, rgba(15, 23, 42, 0.88) 100%);
+    --card-border:          1px solid var(--primary-glow, rgba(99, 102, 241, 0.4));
+    --card-shadow:          0 16px 40px rgba(0, 0, 0, 0.5), 0 0 24px var(--primary-glow, rgba(99, 102, 241, 0.25));
+    --card-backdrop:        blur(20px) saturate(180%);
+    --btn-shadow:           0 6px 24px var(--primary-glow, rgba(99, 102, 241, 0.4)), inset 0 1px 1px rgba(255, 255, 255, 0.3);
+    --input-bg:             rgba(255, 255, 255, 0.06);
+    --input-border:         1px solid var(--primary-glow, rgba(99, 102, 241, 0.3));
+    --input-shadow:         inset 0 2px 6px rgba(0, 0, 0, 0.3);
+    --btn-transform-hover:  translateY(-3px) scale(1.03);
+    --btn-transform-active: translateY(1px) scale(0.97);
+}

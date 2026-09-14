@@ -107,38 +107,43 @@ async def server_ai_diagnose_v2(request: Request):
         except Exception:
             pass
 
-        error_context = body.get("error_context") or body.get("module") or "Diagnóstico geral do Servidor Central"
+        error_context = body.get("error_context") or body.get("module") or ""
+
+        import psutil
+        import platform
+        cpu = psutil.cpu_percent(interval=0.05) if hasattr(psutil, 'cpu_percent') else 0.0
+        ram = psutil.virtual_memory().percent if hasattr(psutil, 'virtual_memory') else 0.0
+        disk = psutil.disk_usage("C:\\" if platform.system() == "Windows" else "/").percent if hasattr(psutil, 'disk_usage') else 0.0
+
+        telemetry = {
+            "cpu_percent": cpu,
+            "ram_percent": ram,
+            "disk_percent": disk,
+            "platform": platform.system()
+        }
 
         import asyncio
+        ai_res = None
         try:
             from modules.ai_assistant.ai_diagnostic_engine import server_ai_diagnostic_engine
-            ai_res = await asyncio.wait_for(server_ai_diagnostic_engine.analyze_error(error_context), timeout=3.5)
+            ai_res = await asyncio.wait_for(server_ai_diagnostic_engine.analyze_error(error_context, system_logs=body.get("logs")), timeout=3.5)
         except Exception:
-            ai_res = {"analysis": "Diagnóstico do Servidor Central validado pelos motores preditivos GBOC."}
+            pass
 
-        disk = body.get("disk_percent")
-        ram = body.get("ram_percent")
-        cpu = body.get("cpu_percent")
+        if not ai_res or not ai_res.get("analysis") or "Diagnóstico geral" in str(ai_res.get("analysis")):
+            from modules.ai_assistant.ai_diagnostic_engine import server_ai_diagnostic_engine
+            ai_res = server_ai_diagnostic_engine._rule_based_ai_analysis(error_context, telemetry=telemetry)
 
-        if cpu is None or ram is None or disk is None:
-            import psutil
-            import platform
-            if cpu is None:
-                cpu = psutil.cpu_percent(interval=0.1)
-            if ram is None:
-                ram = psutil.virtual_memory().percent
-            if disk is None:
-                disk = psutil.disk_usage("C:\\" if platform.system() == "Windows" else "/").percent
-
-        health_score = max(50, min(100, int(100 - (cpu * 0.2 + ram * 0.3 + (disk if disk > 85 else 0) * 0.5))))
+        health_score = max(40, min(100, int(100 - (cpu * 0.15 + ram * 0.25 + (disk if disk > 85 else 0) * 0.4))))
 
         elapsed = round((time.perf_counter() - t0) * 1000, 2)
         return build_v2_response(
             data={
-                "status": "HEALTHY" if health_score >= 80 else "WARNING",
+                "status": "HEALTHY" if health_score >= 80 else "WARNING" if health_score >= 60 else "CRITICAL",
                 "health_score": health_score,
                 "ai_insights": ai_res.get("analysis", "Diagnóstico processado com sucesso."),
-                "result": ai_res
+                "result": ai_res,
+                "telemetry": telemetry
             },
             execution_time_ms=elapsed
         )

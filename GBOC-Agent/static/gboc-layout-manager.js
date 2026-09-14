@@ -1,6 +1,6 @@
 /*
 ==============================================================================
-GBOC System v14.1.0 Enterprise Edition
+GBOC System v14.3.0 Enterprise Edition
 Layout & Navigation Manager — Controls Dual Layout Engine (Vertical/Horizontal)
 and Color Themes across all resolutions (1024px, 720p HD, 1080p FHD, 4K UHD).
 Zero-Overflow & Smart Sidebar Presence Detection.
@@ -35,28 +35,46 @@ Zero-Overflow & Smart Sidebar Presence Detection.
         }
     }
 
-    // ── Constants ─────────────────────────────────────────────────────────────
-    const LS_LAYOUT = 'gboc-layout';          // 'vertical' | 'horizontal'
-    const LS_COLOR  = 'gboc-color-theme';     // 'dark' | 'light' | 'purple' | 'ocean'
-    const LS_UI_STYLE = 'gboc-ui-style';       // 'minimal' | 'neumorphism' | 'claymorphism' | 'fluent'
+    // ── Constants & Global UI Model Contract ──────────────────────────────────
+    const LS_UI_MODEL = 'gboc-ui-model';      // Always 'modern'
+    const LS_LAYOUT   = 'gboc-layout';        // 'vertical' | 'horizontal'
+    const LS_COLOR    = 'gboc-color-theme';   // 'dark' | 'light' | 'purple' | 'ocean'
+    const LS_UI_STYLE = 'gboc-ui-style';     // 'minimal' | 'neumorphism' | 'claymorphism' | 'fluent'
     const LS_COLLAPSED = 'gboc-sidebar-collapsed';
-    const TOPBAR_URL = '/static/_topbar.html';
+    const TOPBAR_URL  = '/static/_topbar.html';
+
+    const OFFICIAL_MODELS = ['modern'];
+    const DEFAULT_MODEL   = 'modern';
+
+    window.UI_MODEL         = DEFAULT_MODEL;
+    window.ACTIVE_UI_MODEL  = DEFAULT_MODEL;
+    window.DEFAULT_UI_MODEL = DEFAULT_MODEL;
 
     const THEMES = [
         { id: 'dark',   label: 'Dark',   icon: '🌙' },
         { id: 'light',  label: 'Light',  icon: '☀️' },
         { id: 'purple', label: 'Purple', icon: '💜' },
-        { id: 'ocean',  label: 'Ocean',  icon: '🌊' }
+        { id: 'ocean',  label: 'Ocean',  icon: '🌊' },
+        { id: 'red',    label: 'Red',    icon: '🔴' }
     ];
 
     const UI_STYLES = [
-        { id: 'minimal',     label: 'Minimal Clean UI', icon: '✨' },
-        { id: 'neumorphism', label: 'Neumorphism 3D',   icon: '🔘' },
-        { id: 'claymorphism',label: '3D Claymorphism',  icon: '🧱' },
-        { id: 'fluent',      label: 'Fluent Acrylic',   icon: '🪟' }
+        { id: 'minimal',          label: 'Minimal Clean UI',        icon: '✨' },
+        { id: 'neumorphism',      label: 'Neumorphism 3D',          icon: '🔘' },
+        { id: 'claymorphism',     label: '3D Claymorphism',         icon: '🧱' },
+        { id: 'fluent',           label: 'Fluent Acrylic',          icon: '🪟' },
+        { id: 'nexus-widgets',    label: 'Cartões Modulares (Nexus)', icon: '📐' },
+        { id: 'nexus-glass',      label: 'Glassmorphism Técnico',   icon: '💎' },
+        { id: 'command-sentinel', label: 'Command Center Sentinel', icon: '🛰️' },
+        { id: 'cyber-3d',         label: 'Cyber 3D Glass (Animado)', icon: '🌌' }
     ];
 
     // ── State ─────────────────────────────────────────────────────────────────
+    let _currentUiModel = localStorage.getItem(LS_UI_MODEL) || DEFAULT_MODEL;
+    if (!OFFICIAL_MODELS.includes(_currentUiModel)) {
+        console.warn(`[GBOCLayout] Modelo visual solicitado '${_currentUiModel}' é inválido/legado desativado. Fallback automático para DEFAULT '${DEFAULT_MODEL}'.`);
+        _currentUiModel = DEFAULT_MODEL;
+    }
     let _currentLayout = localStorage.getItem(LS_LAYOUT) || 'vertical';
     let _currentColorTheme = localStorage.getItem(LS_COLOR) || localStorage.getItem('gboc-theme') || 'dark';
     let _currentUiStyle = localStorage.getItem(LS_UI_STYLE) || 'minimal';
@@ -68,6 +86,21 @@ Zero-Overflow & Smart Sidebar Presence Detection.
         const hasSidebar = !!document.querySelector('.sidebar, aside.sidebar');
         document.body.classList.toggle('has-sidebar', hasSidebar);
         return hasSidebar;
+    }
+
+    // ── Apply UI Model to <html> ──────────────────────────────────────────────
+    function _applyUiModel(model) {
+        let validModel = model;
+        if (!OFFICIAL_MODELS.includes(validModel)) {
+            console.warn(`[GBOCLayout] Modelo visual '${model}' não suportado. Mantendo '${DEFAULT_MODEL}'.`);
+            validModel = DEFAULT_MODEL;
+        }
+        document.documentElement.setAttribute('data-ui-model', validModel);
+        _currentUiModel = validModel;
+        window.UI_MODEL = validModel;
+        window.ACTIVE_UI_MODEL = validModel;
+        localStorage.setItem(LS_UI_MODEL, validModel);
+        _updatePanelActiveStates();
     }
 
     // ── Apply UI Component Style to <html> ───────────────────────────────────
@@ -190,13 +223,14 @@ Zero-Overflow & Smart Sidebar Presence Detection.
 
     async function _updateDynamicVersion() {
         try {
-            const r = await fetch('/api/v1/version');
+            const r = await fetch('/api/v2/system/version');
             if (r.ok) {
-                const data = await r.json();
+                const res = await r.json();
+                const data = res.data || res;
                 const badge = document.getElementById('serverVersionBadge');
-                if (badge && data.raw_version) {
+                if (badge && (data.raw_version || data.semver)) {
                     badge.textContent = `v${data.raw_version}`;
-                    badge.title = data.semver || `GBOC Agent v${data.raw_version}`;
+                    badge.title = data.semver || `GBOC System v${data.raw_version}`;
                 }
             }
         } catch (e) {}
@@ -360,13 +394,17 @@ Zero-Overflow & Smart Sidebar Presence Detection.
         panel.id = 'gboc-layout-panel';
         panel.className = 'gboc-layout-panel';
         panel.innerHTML = `
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
                 <span style="font-weight:700;font-size:0.9em;display:flex;align-items:center;gap:6px">
                     <i class="fas fa-palette" style="color:var(--primary, #6366f1)"></i> Personalizar Interface
                 </span>
                 <button onclick="window.GBOCLayout.togglePanel()" style="background:none;border:none;color:var(--text-muted, #94a3b8);cursor:pointer;font-size:1.1em" aria-label="Fechar painel">
                     <i class="fas fa-times"></i>
                 </button>
+            </div>
+
+            <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(99,102,241,0.15);color:var(--primary-color,#6366f1);padding:4px 10px;border-radius:9999px;font-size:0.75em;font-weight:700;margin-bottom:14px">
+                <i class="fas fa-shield-check"></i> MODELO UI ATIVO: Modern UI (Padrão Oficial)
             </div>
 
             <div class="lp-title">Layout de Navegação</div>
@@ -441,6 +479,8 @@ Zero-Overflow & Smart Sidebar Presence Detection.
 
     // ── Public API ────────────────────────────────────────────────────
     window.GBOCLayout = {
+        getUiModel() { return _currentUiModel; },
+        setUiModel(model) { _applyUiModel(model); },
         setLayout(mode) {
             _applyLayout(mode);
         },
@@ -466,6 +506,7 @@ Zero-Overflow & Smart Sidebar Presence Detection.
         _injectStylesheets();
         _ensureAiAssistantLoaded();
         _ensureHardwareHudLoaded();
+        _applyUiModel(_currentUiModel);
         _applyColorTheme(_currentColorTheme);
         _applyUiStyle(_currentUiStyle);
         _applyLayout(_currentLayout);
@@ -473,7 +514,6 @@ Zero-Overflow & Smart Sidebar Presence Detection.
         _createPanel();
         _checkSidebarPresence();
 
-        // Observe dynamic DOM changes for sidebar injection
         if (window.MutationObserver) {
             const observer = new MutationObserver(() => {
                 _checkSidebarPresence();

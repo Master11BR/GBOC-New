@@ -1,0 +1,37 @@
+/* ============================================================================
+   GBOC System v14.2.0 — Modern UI Layout Specifications (Agent)
+   ============================================================================ */
+
+body {
+    background-color: var(--bg-main) !important;
+    color: var(--text-primary) !important;
+    font-family: var(--font-sans);
+    margin: 0;
+    padding: 0;
+    transition: background-color var(--transition-normal), color var(--transition-normal);
+}
+
+/* Layout vertical container */
+body.layout-vertical {
+    display: flex;
+    min-height: 100vh;
+}
+
+body.layout-vertical .main-content,
+body.layout-vertical main {
+    flex: 1;
+    padding-top: 64px;
+    transition: margin-left var(--transition-normal);
+}
+
+/* Layout horizontal container */
+body.layout-horizontal .sidebar,
+body.layout-horizontal aside.sidebar {
+    display: none !important;
+}
+
+body.layout-horizontal .main-content,
+body.layout-horizontal main {
+    padding-top: 64px;
+    margin-left: 0 !important;
+}

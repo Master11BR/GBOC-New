@@ -1,8 +1,9 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.1.0 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.3.0 Enterprise. Todos os direitos reservados. -->
 
-# 📘 GBOC System v14.1.0 — Guia Master de Configurações, Parâmetros e Controle de IA
+# 📘 GBOC System v14.3.0 — Guia Master de Configurações, Parâmetros e Controle de IA
 
-[![GBOC Version](https://img.shields.io/badge/GBOC%20Version-14.1.0-blue.svg)](file:///d:/GBOC-New/GBOC-New/README.md)
+[![GBOC Version](https://img.shields.io/badge/GBOC%20Version-14.3.0-blue.svg)](file:///d:/GBOC-New/GBOC-New/README.md)
+[![UI Model](https://img.shields.io/badge/UI__MODEL-modern%20(Official)-indigo.svg)]()
 [![Status](https://img.shields.io/badge/status-active-brightgreen.svg)]()
 
 > **Manual Técnico Central de Configuração, Parâmetros e Diretrizes de IA do GBOC (Gestão & Backup Operations Center)**. Este documento serve como o guia oficial e autoritativo de parâmetros para administradores de sistemas, engenheiros de DevOps e agentes de IA.
@@ -179,4 +180,4 @@ cd d:\GBOC-New\GBOC-New\GBOC-Server
 
 ---
 
-**GBOC System v14.1.0** — Guia Oficial de Parâmetros e Configuração.
+**GBOC System v14.3.0** — Guia Oficial de Parâmetros e Configuração.
