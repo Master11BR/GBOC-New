@@ -15,9 +15,25 @@ from engines.universal_restore import universal_restore_engine
 from engines.ad_granular_explorer import ad_granular_explorer
 from engines.instant_vm_boot import instant_vm_boot_engine
 from engines.virtual_lab_engine import virtual_lab_engine
+from engines.instant_recovery_engine import instant_recovery_engine
 
 logger = logging.getLogger("gboc_agent_dr")
 router = APIRouter(prefix="/api/v1/dr", tags=["Agent Disaster Recovery"])
+
+
+class DatastoreShareRequest(BaseModel):
+    share_name: str
+    folder_path: str
+    read_only: bool = True
+    protocol: str = "SMB"
+
+
+class InstantRecoveryVmRequest(BaseModel):
+    backup_image_path: str
+    vm_name: Optional[str] = None
+    memory_mb: int = 4096
+    cpu_cores: int = 2
+    hypervisor: str = "Hyper-V"
 
 
 class P2VRequest(BaseModel):
@@ -241,6 +257,64 @@ async def stop_instant_vm(instance_id: str):
     if success:
         return JSONResponse({"status": "success", "message": f"Instância {instance_id} finalizada com sucesso."})
     return JSONResponse(status_code=404, content={"status": "error", "message": "Instância não encontrada."})
+
+
+# ── Instant Recovery Datastore (SMB / NFS) ───────────────────────────────────
+
+@router.post("/datastore/start")
+async def start_datastore_share(req: DatastoreShareRequest):
+    """Exporta pasta de backup como Datastore SMB temporário para o Hypervisor."""
+    try:
+        res = instant_recovery_engine.start_datastore_share(
+            share_name=req.share_name,
+            folder_path=req.folder_path,
+            read_only=req.read_only,
+            protocol=req.protocol
+        )
+        return JSONResponse(res)
+    except FileNotFoundError as fnf:
+        return JSONResponse(status_code=404, content={"status": "error", "error": str(fnf)})
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"status": "error", "error": str(e)})
+
+
+@router.post("/datastore/stop/{share_name}")
+async def stop_datastore_share(share_name: str):
+    """Remove o compartilhamento de Datastore do sistema."""
+    res = instant_recovery_engine.stop_datastore_share(share_name)
+    return JSONResponse(res)
+
+
+@router.post("/instant-recovery/start")
+async def start_instant_vm_recovery(req: InstantRecoveryVmRequest):
+    """Inicia Instant VM Recovery completo com montagem de Datastore, disco CoW e boot no Hyper-V."""
+    try:
+        res = instant_recovery_engine.start_instant_vm_recovery(
+            backup_image_path=req.backup_image_path,
+            vm_name=req.vm_name,
+            memory_mb=req.memory_mb,
+            cpu_cores=req.cpu_cores,
+            hypervisor=req.hypervisor
+        )
+        return JSONResponse(res)
+    except FileNotFoundError as fnf:
+        return JSONResponse(status_code=404, content={"status": "error", "error": str(fnf)})
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"status": "error", "error": str(e)})
+
+
+@router.get("/instant-recovery/list")
+async def list_instant_recovery_vms():
+    """Lista todas as instâncias ativas de Instant VM Recovery."""
+    vms = instant_recovery_engine.list_active_vms()
+    return JSONResponse({"status": "success", "vms": vms, "count": len(vms)})
+
+
+@router.post("/instant-recovery/stop/{vm_id}")
+async def stop_instant_vm_recovery(vm_id: str):
+    """Desliga a VM instantânea e limpa os recursos de Datastore."""
+    res = instant_recovery_engine.stop_instant_vm_recovery(vm_id)
+    return JSONResponse(res)
 
 
 # ── Virtual Lab Sandbox ──────────────────────────────────────────────────────

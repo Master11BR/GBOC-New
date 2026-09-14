@@ -22,11 +22,10 @@ class HealerEngine:
         self.core = core
         self.version = "14.1.0"
         self.initialized = False
-
-        self.version = "14.1.0"
-        self.initialized = False
         self.auto_heal_enabled = True
         self.healing_rules = []
+        data_dir = getattr(core, 'data_dir', 'data') if core else 'data'
+        self.db_path = getattr(core, 'db_path', None) or os.path.join(data_dir, 'gboc_agent.db')
         
         try:
             self._initialize()
@@ -254,10 +253,15 @@ class HealerEngine:
     
     def _test_database_access(self):
         """Testa acesso ao banco de dados"""
-        if os.path.exists(self.db_path):
+        if self.core and hasattr(self.core, 'get_db_connection'):
+            with self.core.get_db_connection() as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT 1")
+                cur.close()
+        elif self.db_path and os.path.exists(self.db_path):
             with sqlite3.connect(self.db_path) as conn:
                 conn.execute("SELECT 1")
-    
+
     def _check_system_resources(self) -> Dict[str, Any]:
         """Verifica recursos do sistema"""
         try:
@@ -267,7 +271,6 @@ class HealerEngine:
             issues = []
             auto_fixes = []
             
-            # Verificar CPU
             if cpu_percent > 90:
                 issues.append({
                     "type": "high_cpu_usage",
@@ -275,7 +278,6 @@ class HealerEngine:
                     "message": f"CPU usage alto: {cpu_percent:.1f}%"
                 })
             
-            # Verificar memória
             if memory.percent > 85:
                 issues.append({
                     "type": "high_memory_usage",
@@ -299,30 +301,36 @@ class HealerEngine:
             
         except Exception as e:
             return {"status": "error", "error": str(e)}
-    
+
     def _check_database_health(self) -> Dict[str, Any]:
         """Verifica saúde do banco de dados"""
         try:
-            if not os.path.exists(self.db_path):
+            if self.core and hasattr(self.core, 'get_db_connection'):
+                with self.core.get_db_connection() as conn:
+                    cur = conn.cursor()
+                    cur.execute("SELECT 1")
+                    cur.close()
+                return {
+                    "status": "healthy",
+                    "type": "postgresql",
+                    "issues": []
+                }
+            elif self.db_path and os.path.exists(self.db_path):
+                size_mb = os.path.getsize(self.db_path) / (1024 * 1024)
+                with sqlite3.connect(self.db_path) as conn:
+                    conn.execute("PRAGMA integrity_check")
+                return {
+                    "status": "healthy",
+                    "type": "sqlite",
+                    "size_mb": round(size_mb, 2),
+                    "issues": []
+                }
+            else:
                 return {
                     "status": "missing",
-                    "message": "Arquivo de banco não encontrado",
+                    "message": "Banco de dados não disponível",
                     "issues": [{"type": "database_missing", "severity": "critical"}]
                 }
-            
-            # Verificar tamanho
-            size_mb = os.path.getsize(self.db_path) / (1024 * 1024)
-            
-            # Teste de conectividade
-            with sqlite3.connect(self.db_path) as conn:
-                conn.execute("PRAGMA integrity_check")
-            
-            return {
-                "status": "healthy",
-                "size_mb": round(size_mb, 2),
-                "issues": []
-            }
-            
         except Exception as e:
             return {
                 "status": "error",

@@ -1,133 +1,228 @@
 /* ============================================================================
-   GBOC System v14.1.0 — Multi-Theme CSS Variables
-   Inspired by Tresto Admin (Vertical) & AdminVoice Admin (Horizontal)
-   Themes: dark (default) | light | purple (AdminVoice) | ocean (Tresto)
-   Applied via: <html data-color-theme="X">
-   This file is ADDITIVE — it does not override style.css defaults.
+   GBOC System v14.1.0 — Dynamic UI Style & Illumination Engine
+   Author: Senior Frontend Engineer (Panda CSS, Tailwind, UnoCSS, Bootstrap 5, CSS)
+   Modes: 
+     - Light Mode (Claro)
+     - Dark Mode (Escuro - Carbon/Graphite #121212)
+   UI Component Formats:
+     1. minimal     - SaaS Minimal / Clean UI (Stripe / Vercel flat style)
+     2. neumorphism - Soft UI extruded 3D (Dual soft shadows)
+     3. claymorphism - 3D Clay/Plastic (Volumetric, 24px radius, inset + drop shadows)
+     4. fluent      - Microsoft Fluent Design (Acrylic frosted glass, blur, saturate)
    ============================================================================ */
 
-/* ── 1. Dark Theme (Standard Deep Slate Navy) ─────────────────────────────── */
-[data-color-theme="dark"], :root {
-    --primary:         #6366f1;
-    --primary-hover:   #4f46e5;
-    --primary-soft:    rgba(99, 102, 241, 0.14);
-    --success:         #10b981;
-    --danger:          #ef4444;
-    --warning:         #f59e0b;
-    --info:            #06b6d4;
+/* ── 1. ILLUMINATION MODES (Light / Dark) ────────────────────────────────── */
 
-    --bg:              #0f172a; /* Deep Slate Navy (Tresto style) */
-    --bg-card:         #1e293b;
-    --bg-input:        #0f172a;
-    --sidebar-bg:      #0b1329;
-    --topbar-bg:       #0b1329;
-    --topbar-text:     #f8fafc;
-    --topbar-border:   rgba(255, 255, 255, 0.08);
-    --hero-bg:         linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%);
-    --border:          rgba(255, 255, 255, 0.08);
-    --text:            #f8fafc;
-    --text-secondary:  #94a3b8;
-    --text-muted:      #64748b;
-    --shadow:          0 10px 30px rgba(0, 0, 0, 0.35);
-    --shadow-card:     0 4px 16px rgba(0, 0, 0, 0.25);
-    --radius:          14px;
-    --scrollbar-thumb: #334155;
+/* Dark Mode (Carbon / Graphite #121212) */
+[data-theme="dark"], [data-color-theme="dark"], :root {
+    --bg-main:          #121212;
+    --bg-card:          #1e1e20;
+    --bg-input:         #18181a;
+    --sidebar-bg:       #121212;
+    --topbar-bg:        #18181a;
+    --text-primary:     #f8fafc;
+    --text-secondary:   #a1a1aa;
+    --text-muted:       #71717a;
+    --border-color:     rgba(255, 255, 255, 0.08);
+    --primary-color:    #6366f1;
+    --primary-hover:    #4f46e5;
+    --primary-glow:     rgba(99, 102, 241, 0.35);
+    --success-color:    #10b981;
+    --danger-color:     #ef4444;
+    --warning-color:    #f59e0b;
+    --info-color:       #06b6d4;
+
+    /* Neumorphism Dark dual shadows (#121212 base) */
+    --nm-bg:            #121212;
+    --nm-shadow-dark:   rgba(0, 0, 0, 0.75);
+    --nm-shadow-light:  rgba(255, 255, 255, 0.04);
+    
+    /* Claymorphism Dark volumetric shadows */
+    --clay-bg:          #1c1c20;
+    --clay-shadow-drop: 0 16px 36px rgba(0, 0, 0, 0.65);
+    --clay-shadow-inset: inset -6px -6px 14px rgba(0, 0, 0, 0.55), inset 6px 6px 14px rgba(255, 255, 255, 0.08);
+
+    /* Fluent Dark Acrylic */
+    --fluent-glass-bg:  rgba(26, 26, 28, 0.65);
+    --fluent-border:    1px solid rgba(255, 255, 255, 0.14);
 }
 
-/* ── 2. Light Theme (Clean Minimalist Tresto Style) ────────────────────────── */
-[data-color-theme="light"] {
-    --primary:         #6366f1;
-    --primary-hover:   #4f46e5;
-    --primary-soft:    rgba(99, 102, 241, 0.10);
-    --success:         #10b981;
-    --danger:          #ef4444;
-    --warning:         #f59e0b;
-    --info:            #0284c7;
+/* Light Mode (Claro - High Contrast Clean) */
+[data-theme="light"], [data-color-theme="light"] {
+    --bg-main:          #f8fafc;
+    --bg-card:          #ffffff;
+    --bg-input:         #f1f5f9;
+    --sidebar-bg:       #ffffff;
+    --topbar-bg:        #ffffff;
+    --text-primary:     #0f172a;
+    --text-secondary:   #475569;
+    --text-muted:       #94a3b8;
+    --border-color:     rgba(0, 0, 0, 0.08);
+    --primary-color:    #3b82f6;
+    --primary-hover:    #2563eb;
+    --primary-glow:     rgba(59, 130, 246, 0.25);
+    --success-color:    #10b981;
+    --danger-color:     #ef4444;
+    --warning-color:    #f59e0b;
+    --info-color:       #0284c7;
 
-    --bg:              #f4f6fb; /* Tresto light gray background */
-    --bg-card:         #ffffff;
-    --bg-input:        #f8fafc;
-    --sidebar-bg:      #ffffff;
-    --topbar-bg:       #ffffff;
-    --topbar-text:     #1e293b;
-    --topbar-border:   rgba(0, 0, 0, 0.06);
-    --hero-bg:         linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-    --border:          rgba(0, 0, 0, 0.07);
-    --text:            #0f172a;
-    --text-secondary:  #475569;
-    --text-muted:      #94a3b8;
-    --shadow:          0 10px 30px rgba(0, 0, 0, 0.08);
-    --shadow-card:     0 4px 16px rgba(0, 0, 0, 0.05);
-    --scrollbar-thumb: #cbd5e1;
+    /* Neumorphism Light dual shadows (#f8fafc / #eef2f7 base) */
+    --nm-bg:            #f8fafc;
+    --nm-shadow-dark:   rgba(163, 177, 198, 0.55);
+    --nm-shadow-light:  rgba(255, 255, 255, 0.85);
+
+    /* Claymorphism Light volumetric shadows */
+    --clay-bg:          #ffffff;
+    --clay-shadow-drop: 0 14px 28px rgba(0, 0, 0, 0.12);
+    --clay-shadow-inset: inset -6px -6px 12px rgba(0, 0, 0, 0.08), inset 6px 6px 12px rgba(255, 255, 255, 0.85);
+
+    /* Fluent Light Acrylic */
+    --fluent-glass-bg:  rgba(255, 255, 255, 0.65);
+    --fluent-border:    1px solid rgba(255, 255, 255, 0.45);
 }
 
-/* ── 3. Purple Theme (AdminVoice Gradient Banner Style) ───────────────────── */
-[data-color-theme="purple"] {
-    --primary:         #a855f7;
-    --primary-hover:   #9333ea;
-    --primary-soft:    rgba(168, 85, 247, 0.16);
-    --success:         #34d399;
-    --danger:          #f87171;
-    --warning:         #fbbf24;
-    --info:            #38bdf8;
+/* ── 2. UX/UI COMPONENT STYLE FORMATS ────────────────────────────────────── */
 
-    --bg:              #0b0719;
-    --bg-card:         #160f33;
-    --bg-input:        #100a26;
-    --sidebar-bg:      #0e0824;
-    --topbar-bg:       linear-gradient(135deg, #3730a3 0%, #581c87 50%, #701a75 100%);
-    --topbar-text:     #ffffff;
-    --topbar-border:   rgba(255, 255, 255, 0.14);
-    --hero-bg:         linear-gradient(135deg, #4338ca 0%, #6b21a8 50%, #86198f 100%);
-    --border:          rgba(168, 85, 247, 0.18);
-    --text:            #f5f3ff;
-    --text-secondary:  #ddd6fe;
-    --text-muted:      #a78bfa;
-    --shadow:          0 12px 36px rgba(88, 28, 135, 0.45);
-    --shadow-card:     0 4px 20px rgba(88, 28, 135, 0.28);
-    --scrollbar-thumb: #581c87;
+/* Default fallback: Minimal */
+:root {
+    --card-radius:          8px;
+    --btn-radius:           6px;
+    --input-radius:         6px;
+    --card-bg:              var(--bg-card);
+    --card-border:          1px solid var(--border-color);
+    --card-shadow:          0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+    --card-backdrop:        none;
+    --btn-shadow:           0 1px 2px rgba(0, 0, 0, 0.05);
+    --input-bg:             var(--bg-input);
+    --input-border:         1px solid var(--border-color);
+    --input-shadow:         none;
+    --btn-transform-hover:  translateY(-1px);
+    --btn-transform-active: translateY(0) scale(0.99);
 }
 
-/* ── 4. Ocean Theme (AdminVoice Cyan/Teal Hero Style) ────────────────────── */
-[data-color-theme="ocean"] {
-    --primary:         #0284c7;
-    --primary-hover:   #0369a1;
-    --primary-soft:    rgba(2, 132, 199, 0.14);
-    --success:         #10b981;
-    --danger:          #f43f5e;
-    --warning:         #f59e0b;
-    --info:            #06b6d4;
-
-    --bg:              #f0f9ff;
-    --bg-card:         #ffffff;
-    --bg-input:        #f8fafc;
-    --sidebar-bg:      #ffffff;
-    --topbar-bg:       linear-gradient(135deg, #0369a1 0%, #0d9488 100%);
-    --topbar-text:     #ffffff;
-    --topbar-border:   rgba(255, 255, 255, 0.15);
-    --hero-bg:         linear-gradient(135deg, #0284c7 0%, #0f766e 100%);
-    --border:          rgba(2, 132, 199, 0.12);
-    --text:            #0f172a;
-    --text-secondary:  #334155;
-    --text-muted:      #64748b;
-    --shadow:          0 10px 30px rgba(2, 132, 199, 0.12);
-    --shadow-card:     0 4px 16px rgba(2, 132, 199, 0.07);
-    --scrollbar-thumb: #93c5fd;
+/* Format 1: SaaS Minimal / Clean UI (Stripe / Vercel style) */
+[data-ui-style="minimal"] {
+    --card-radius:          8px;
+    --btn-radius:           6px;
+    --input-radius:         6px;
+    --card-bg:              var(--bg-card);
+    --card-border:          1px solid var(--border-color);
+    --card-shadow:          0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+    --card-backdrop:        none;
+    --btn-shadow:           0 1px 2px rgba(0, 0, 0, 0.05);
+    --input-bg:             var(--bg-input);
+    --input-border:         1px solid var(--border-color);
+    --input-shadow:         none;
+    --btn-transform-hover:  translateY(-1px);
+    --btn-transform-active: translateY(0) scale(0.99);
 }
 
-/* ── Theme Global Body Background Overrides ──────────────────────────────── */
+/* Format 2: Neumorphism (Soft UI) */
+[data-ui-style="neumorphism"] {
+    --card-radius:          18px;
+    --btn-radius:           12px;
+    --input-radius:         12px;
+    --card-bg:              var(--nm-bg);
+    --card-border:          none;
+    --card-shadow:          8px 8px 18px var(--nm-shadow-dark), -8px -8px 18px var(--nm-shadow-light);
+    --card-backdrop:        none;
+    --btn-shadow:           5px 5px 12px var(--nm-shadow-dark), -5px -5px 12px var(--nm-shadow-light);
+    --input-bg:             var(--nm-bg);
+    --input-border:         none;
+    --input-shadow:         inset 4px 4px 8px var(--nm-shadow-dark), inset -4px -4px 8px var(--nm-shadow-light);
+    --btn-transform-hover:  translateY(-1px);
+    --btn-transform-active: translateY(1px);
+}
+
+/* Format 3: 3D Claymorphism */
+[data-ui-style="claymorphism"] {
+    --card-radius:          24px;
+    --btn-radius:           20px;
+    --input-radius:         16px;
+    --card-bg:              var(--clay-bg);
+    --card-border:          1.5px solid rgba(255, 255, 255, 0.15);
+    --card-shadow:          var(--clay-shadow-drop), var(--clay-shadow-inset);
+    --card-backdrop:        none;
+    --btn-shadow:           0 10px 24px rgba(99, 102, 241, 0.35), inset -3px -3px 8px rgba(0, 0, 0, 0.25), inset 3px 3px 8px rgba(255, 255, 255, 0.35);
+    --input-bg:             var(--bg-input);
+    --input-border:         1px solid var(--border-color);
+    --input-shadow:         inset 3px 3px 8px rgba(0, 0, 0, 0.12);
+    --btn-transform-hover:  translateY(-4px) scale(1.02);
+    --btn-transform-active: translateY(2px) scale(0.98);
+}
+
+/* Format 4: Fluent Design (Microsoft Acrylic Glass) */
+[data-ui-style="fluent"] {
+    --card-radius:          10px;
+    --btn-radius:           6px;
+    --input-radius:         6px;
+    --card-bg:              var(--fluent-glass-bg);
+    --card-border:          var(--fluent-border);
+    --card-shadow:          0 12px 32px rgba(0, 0, 0, 0.25);
+    --card-backdrop:        blur(16px) saturate(160%);
+    --btn-shadow:           0 2px 6px rgba(0, 0, 0, 0.15);
+    --input-bg:             rgba(255, 255, 255, 0.05);
+    --input-border:         1px solid rgba(255, 255, 255, 0.18);
+    --input-shadow:         none;
+    --btn-transform-hover:  translateY(-1px);
+    --btn-transform-active: translateY(0);
+}
+
+/* ── 3. GLOBAL BASE OVERRIDES ────────────────────────────────────────────── */
 body {
-    background-color: var(--bg) !important;
-    color: var(--text) !important;
-    transition: background-color 0.3s ease, color 0.3s ease;
+    background-color: var(--bg-main) !important;
+    color: var(--text-primary) !important;
+    transition: background-color 0.3s cubic-bezier(0.16, 1, 0.3, 1), color 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Apply light card styles when light or ocean theme selected */
-[data-color-theme="light"] .panel,
-[data-color-theme="light"] .stat-card,
-[data-color-theme="ocean"] .panel,
-[data-color-theme="ocean"] .stat-card {
-    background: var(--bg-card) !important;
-    border-color: var(--border) !important;
-    box-shadow: var(--shadow-card) !important;
+/* Dynamic Card Selector Class */
+.theme-showcase-card {
+    background: var(--card-bg);
+    border-radius: var(--card-radius);
+    border: var(--card-border);
+    box-shadow: var(--card-shadow);
+    backdrop-filter: var(--card-backdrop);
+    -webkit-backdrop-filter: var(--card-backdrop);
+    transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Dynamic Input Selector Class */
+.theme-showcase-input {
+    background: var(--input-bg);
+    border-radius: var(--input-radius);
+    border: var(--input-border);
+    box-shadow: var(--input-shadow);
+    color: var(--text-primary);
+    padding: 12px 16px;
+    outline: none;
+    width: 100%;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.theme-showcase-input:focus {
+    border-color: var(--primary-color) !important;
+    box-shadow: 0 0 0 3px var(--primary-glow), var(--input-shadow) !important;
+}
+
+/* Dynamic Button Selector Class */
+.theme-showcase-btn {
+    background: var(--primary-color);
+    border-radius: var(--btn-radius);
+    box-shadow: var(--btn-shadow);
+    color: #ffffff;
+    border: none;
+    padding: 12px 24px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.theme-showcase-btn:hover {
+    background: var(--primary-hover);
+    transform: var(--btn-transform-hover);
+}
+.theme-showcase-btn:active {
+    transform: var(--btn-transform-active);
 }

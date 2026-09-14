@@ -364,7 +364,11 @@ class RepositoryManager:
         try:
             # Limpeza de configs temporárias/persistidas do Kopia usadas em tasks/restore
             # data/kopia_configs/task_*.config
-            config_dir = os.path.join(self.core.base_dir, 'data', 'kopia_configs')
+            base_dir = getattr(self.core, 'base_dir', None) or getattr(self.core, 'data_dir', os.path.dirname(os.path.abspath(__file__)))
+            if base_dir.endswith('data'):
+                config_dir = os.path.join(base_dir, 'kopia_configs')
+            else:
+                config_dir = os.path.join(base_dir, 'data', 'kopia_configs')
             if os.path.isdir(config_dir):
                 removed = 0
                 repo_path = str(repo.get('path', '') or '')
@@ -431,11 +435,16 @@ class RepositoryManager:
 
             # Limpeza de diretório local (quando aplicável)
             if not keep_folder and repo.get('type') == 'local':
-                backend = self._create_backend_from_config(repo)
-                base_path = getattr(backend, 'base_path', None)
-                if base_path and os.path.isdir(base_path):
-                    shutil.rmtree(base_path, ignore_errors=True)
-                    logger.info(f"✅ Pasta do repositório local removida: {base_path}")
+                try:
+                    repo_path = str(repo.get('path', '') or '')
+                    if repo_path and not repo_path.startswith('enc-v1:'):
+                        backend = self._create_backend_from_config(repo)
+                        base_path = getattr(backend, 'base_path', None)
+                        if base_path and os.path.isdir(base_path):
+                            shutil.rmtree(base_path, ignore_errors=True)
+                            logger.info(f"✅ Pasta do repositório local removida: {base_path}")
+                except Exception as _e_folder:
+                    logger.warning(f"⚠️ Não foi possível remover pasta local ao excluir repositório {repo_id}: {_e_folder}")
 
         except Exception as e:
             logger.error(f"Erro ao excluir repositório {repo_id}: {e}", exc_info=True)

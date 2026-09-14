@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark" data-color-theme="dark" data-ui-style="minimal">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GBOC Enterprise — Seletor de Estilos de Interface & UI/UX</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- GBOC Themes & Layout CSS -->
+    <link rel="stylesheet" href="/static/gboc-themes.css">
+    <link rel="stylesheet" href="/static/gboc-layout.css">
+
+    <style>
+        :root {
+            font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        .showcase-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 32px 24px 64px 24px;
+        }
+
+        .showcase-header {
+            margin-bottom: 32px;
+            text-align: center;
+        }
+
+        .showcase-header h1 {
+            font-size: 2.25rem;
+            font-weight: 800;
+            letter-spacing: -0.025em;
+            margin-bottom: 12px;
+            background: linear-gradient(135deg, var(--primary-color) 0%, #a855f7 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .showcase-header p {
+            font-size: 1.05rem;
+            color: var(--text-secondary);
+            max-width: 680px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
+        /* Controls Section */
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .control-group {
+            background: var(--card-bg);
+            border-radius: var(--card-radius);
+            border: var(--card-border);
+            box-shadow: var(--card-shadow);
+            backdrop-filter: var(--card-backdrop);
+            -webkit-backdrop-filter: var(--card-backdrop);
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .control-group h3 {
+            font-size: 0.95rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+        }
+
+        .selector-btn {
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 0.88rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .selector-btn:hover {
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+            transform: translateY(-1px);
+        }
+
+        .selector-btn.active {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+            color: #ffffff;
+            box-shadow: 0 4px 12px var(--primary-glow);
+        }
+
+        /* Main Featured Cards Grid */
+        .featured-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+            margin-bottom: 40px;
+        }
+
+        @media (max-width: 900px) {
+            .featured-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Dynamic Card Component */
+        .featured-card {
+            padding: 36px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card-header-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 9999px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            background: rgba(99, 102, 241, 0.12);
+            color: var(--primary-color);
+            width: fit-content;
+        }
+
+        .card-main-title {
+            font-size: 1.75rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            color: var(--text-primary);
+            margin: 0;
+            line-height: 1.25;
+        }
+
+        .card-description {
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+            line-height: 1.55;
+            margin: 0;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .action-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 8px;
+        }
+
+        /* Live Token Inspector Panel */
+        .inspector-panel {
+            background: #09090b;
+            color: #38bdf8;
+            border-radius: 12px;
+            padding: 24px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            overflow-x: auto;
+        }
+
+        .inspector-title {
+            color: #f8fafc;
+            font-weight: 700;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+        }
+
+        .token-line {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+        }
+        .token-name { color: #a5b4fc; }
+        .token-val { color: #34d399; text-align: right; }
+    </style>
+</head>
+<body class="layout-vertical">
+
+    <div class="showcase-container">
+        <!-- Header -->
+        <header class="showcase-header">
+            <div class="card-header-badge" style="margin: 0 auto 12px auto;">
+                <i class="fas fa-magic"></i> GBOC Dynamic Design Engine
+            </div>
+            <h1>Seletor de Estilos & UX/UI Framework</h1>
+            <p>
+                Alterne dinamicamente entre os 4 modos de componentes de interface e 2 modos de iluminação. 
+                As variáveis CSS cruzam e recalculam sombras, bordas, backdrop-filter e volumes em tempo real.
+            </p>
+        </header>
+
+        <!-- Dynamic Control Selectors -->
+        <section class="controls-grid">
+            <!-- Illumination Control -->
+            <div class="control-group">
+                <h3><i class="fas fa-sun"></i> 1. Modo de Iluminação</h3>
+                <div class="btn-grid">
+                    <button class="selector-btn" id="btn-theme-dark" onclick="setIllumination('dark')">
+                        <i class="fas fa-moon"></i> Escuro (Carbon #121212)
+                    </button>
+                    <button class="selector-btn" id="btn-theme-light" onclick="setIllumination('light')">
+                        <i class="fas fa-sun"></i> Claro (High Contrast)
+                    </button>
+                </div>
+            </div>
+
+            <!-- UX/UI Component Style Selector -->
+            <div class="control-group" style="grid-column: span 2;">
+                <h3><i class="fas fa-cubes"></i> 2. Formato de Componentes UX/UI</h3>
+                <div class="btn-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
+                    <button class="selector-btn active" id="btn-style-minimal" onclick="setUiFormat('minimal')">
+                        <i class="fas fa-square"></i> Opção 1: SaaS Minimal
+                    </button>
+                    <button class="selector-btn" id="btn-style-neumorphism" onclick="setUiFormat('neumorphism')">
+                        <i class="fas fa-circle-dot"></i> Opção 2: Neumorphism
+                    </button>
+                    <button class="selector-btn" id="btn-style-claymorphism" onclick="setUiFormat('claymorphism')">
+                        <i class="fas fa-cubes-stacked"></i> Opção 3: 3D Claymorphism
+                    </button>
+                    <button class="selector-btn" id="btn-style-fluent" onclick="setUiFormat('fluent')">
+                        <i class="fas fa-window-restore"></i> Opção 4: Fluent Acrylic
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Demo Area -->
+        <section class="featured-grid">
+            <!-- Featured Card (Card de Exemplo) -->
+            <div class="theme-showcase-card featured-card" id="featuredShowcaseCard">
+                <div class="card-header-badge">
+                    <i class="fas fa-shield-halved"></i> Módulo de Segurança Activa
+                </div>
+                
+                <h2 class="card-main-title">Configurar Backup Criptografado GBOC</h2>
+                
+                <p class="card-description">
+                    Selecione o token de autenticação e defina o repositório de alta disponibilidade do servidor de backup.
+                </p>
+
+                <!-- Input Component -->
+                <div class="form-group">
+                    <label class="form-label" for="repoNameInput">Nome do Repositório Destino</label>
+                    <input type="text" 
+                           id="repoNameInput" 
+                           class="theme-showcase-input" 
+                           placeholder="ex: postgres-primary-wal-vault-01" 
+                           value="gboc-prod-vault-primary">
+                </div>
+
+                <!-- Action Button Component -->
+                <div class="action-row">
+                    <button class="theme-showcase-btn" id="mainActionButton" onclick="simulateAction()">
+                        <i class="fas fa-rocket"></i> Iniciar Sincronização
+                    </button>
+                    <button class="theme-showcase-btn" style="background: transparent; color: var(--text-primary); border: 1px solid var(--border-color); box-shadow: none;" onclick="alert('Ajuda: Selecione um modo no painel superior para testar as transições de CSS.')">
+                        <i class="fas fa-circle-question"></i> Saiba Mais
+                    </button>
+                </div>
+            </div>
+
+            <!-- CSS Tokens Live Inspector -->
+            <div class="inspector-panel">
+                <div class="inspector-title">
+                    <i class="fas fa-code"></i> Inspetor de Variáveis CSS Ativas (:root)
+                </div>
+                
+                <div class="token-line">
+                    <span class="token-name">--bg-main</span>
+                    <span class="token-val" id="tok-bg-main">#121212</span>
+                </div>
+                <div class="token-line">
+                    <span class="token-name">--card-radius</span>
+                    <span class="token-val" id="tok-card-radius">8px</span>
+                </div>
+                <div class="token-line">
+                    <span class="token-name">--card-border</span>
+                    <span class="token-val" id="tok-card-border">1px solid rgba(255, 255, 255, 0.08)</span>
+                </div>
+                <div class="token-line">
+                    <span class="token-name">--card-shadow</span>
+                    <span class="token-val" id="tok-card-shadow">0 1px 3px rgba(0, 0, 0, 0.05)</span>
+                </div>
+                <div class="token-line">
+                    <span class="token-name">--card-backdrop</span>
+                    <span class="token-val" id="tok-card-backdrop">none</span>
+                </div>
+                <div class="token-line">
+                    <span class="token-name">--btn-radius</span>
+                    <span class="token-val" id="tok-btn-radius">6px</span>
+                </div>
+                <div class="token-line">
+                    <span class="token-name">--input-radius</span>
+                    <span class="token-val" id="tok-input-radius">6px</span>
+                </div>
+                <div class="token-line">
+                    <span class="token-name">--input-shadow</span>
+                    <span class="token-val" id="tok-input-shadow">none</span>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- GBOC Layout Manager JS -->
+    <script src="/static/gboc-layout-manager.js"></script>
+
+    <script>
+        function setIllumination(theme) {
+            if (window.GBOCLayout) {
+                window.GBOCLayout.setTheme(theme);
+            } else {
+                document.documentElement.setAttribute('data-theme', theme);
+                document.documentElement.setAttribute('data-color-theme', theme);
+            }
+            updateActiveButtons();
+            updateInspectorTokens();
+        }
+
+        function setUiFormat(style) {
+            if (window.GBOCLayout) {
+                window.GBOCLayout.setUiStyle(style);
+            } else {
+                document.documentElement.setAttribute('data-ui-style', style);
+            }
+            updateActiveButtons();
+            updateInspectorTokens();
+        }
+
+        function updateActiveButtons() {
+            const currentTheme = document.documentElement.getAttribute('data-color-theme') || 'dark';
+            const currentUi = document.documentElement.getAttribute('data-ui-style') || 'minimal';
+
+            document.getElementById('btn-theme-dark')?.classList.toggle('active', currentTheme === 'dark');
+            document.getElementById('btn-theme-light')?.classList.toggle('active', currentTheme === 'light');
+
+            document.getElementById('btn-style-minimal')?.classList.toggle('active', currentUi === 'minimal');
+            document.getElementById('btn-style-neumorphism')?.classList.toggle('active', currentUi === 'neumorphism');
+            document.getElementById('btn-style-claymorphism')?.classList.toggle('active', currentUi === 'claymorphism');
+            document.getElementById('btn-style-fluent')?.classList.toggle('active', currentUi === 'fluent');
+        }
+
+        function updateInspectorTokens() {
+            setTimeout(() => {
+                const computed = getComputedStyle(document.documentElement);
+                document.getElementById('tok-bg-main').textContent = computed.getPropertyValue('--bg-main').trim();
+                document.getElementById('tok-card-radius').textContent = computed.getPropertyValue('--card-radius').trim();
+                document.getElementById('tok-card-border').textContent = computed.getPropertyValue('--card-border').trim();
+                document.getElementById('tok-card-shadow').textContent = computed.getPropertyValue('--card-shadow').trim();
+                document.getElementById('tok-card-backdrop').textContent = computed.getPropertyValue('--card-backdrop').trim();
+                document.getElementById('tok-btn-radius').textContent = computed.getPropertyValue('--btn-radius').trim();
+                document.getElementById('tok-input-radius').textContent = computed.getPropertyValue('--input-radius').trim();
+                document.getElementById('tok-input-shadow').textContent = computed.getPropertyValue('--input-shadow').trim();
+            }, 50);
+        }
+
+        function simulateAction() {
+            const btn = document.getElementById('mainActionButton');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Processando...';
+            btn.style.opacity = '0.85';
+            setTimeout(() => {
+                btn.innerHTML = '<i class="fas fa-check"></i> Concluído com Sucesso!';
+                btn.style.background = 'var(--success-color)';
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.style.background = '';
+                    btn.style.opacity = '1';
+                }, 2000);
+            }, 1000);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            updateActiveButtons();
+            updateInspectorTokens();
+        });
+    </script>
+</body>
+</html>

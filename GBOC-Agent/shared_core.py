@@ -61,8 +61,27 @@ logging.basicConfig(
 )
 logger = logging.getLogger("SharedCore")
 
-# Database Configuration - PostgreSQL por padrão
-USE_POSTGRESQL = PSYCOPG2_AVAILABLE  # Usar PostgreSQL se psycopg2 disponível
+# Database Configuration - PostgreSQL por padrão, com suporte a opção SQLite do usuário
+def get_configured_db_engine() -> str:
+    env_engine = os.getenv('GBOC_DB_ENGINE', os.getenv('DB_ENGINE', '')).lower().strip()
+    if env_engine in ['postgresql', 'sqlite']:
+        return env_engine
+    
+    config_file = os.path.join(DATA_DIR, "system_config.json")
+    if os.path.exists(config_file):
+        try:
+            with open(config_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                engine = str(data.get("db_engine") or data.get("database_engine") or "").lower().strip()
+                if engine in ['postgresql', 'sqlite']:
+                    return engine
+        except Exception:
+            pass
+            
+    return 'postgresql'
+
+DB_ENGINE = get_configured_db_engine()
+USE_POSTGRESQL = (DB_ENGINE == 'postgresql') and PSYCOPG2_AVAILABLE
 SQLITE_DB_PATH = os.path.join(DATA_DIR, "gboc.db")
 
 # PostgreSQL Configuration - AGENTE
@@ -78,9 +97,9 @@ DB_CONFIG = {
 }
 
 if USE_POSTGRESQL:
-    logger.info(f"[CONFIG] Usando PostgreSQL: {DB_CONFIG['database']}@{DB_CONFIG['host']}:{DB_CONFIG['port']}")
+    logger.info(f"[CONFIG] Banco de Dados Principal: PostgreSQL ({DB_CONFIG['database']}@{DB_CONFIG['host']}:{DB_CONFIG['port']}) [Padrão do Sistema]")
 else:
-    logger.info(f"[CONFIG] psycopg2 não disponível - usando SQLite: {SQLITE_DB_PATH}")
+    logger.info(f"[CONFIG] Banco de Dados Principal: SQLite ({SQLITE_DB_PATH}) [Opção do Usuário]")
 
 # ==============================================================================
 # Connection Pool
@@ -265,6 +284,7 @@ class SharedCore:
         os.makedirs(KOPIA_CONFIGS_DIR, exist_ok=True)
 
         self.db_config = DB_CONFIG if USE_POSTGRESQL else None
+        self.base_dir = BASE_DIR
         self.data_dir = DATA_DIR
         self.logs_dir = LOGS_DIR
         self.repo_dir = REPO_DIR
@@ -303,6 +323,18 @@ class SharedCore:
                                 logger.warning(f"[WARN] {err}")
                 except Exception as e:
                     logger.warning(f"[MIGRATIONS] Erro ao executar migrações: {e}")
+
+            # Executar migração bidirecional de dados em caso de troca de banco (Sem Perda de Dados)
+            try:
+                from engines.database_cross_migrator import DatabaseCrossMigrator
+                migrator = DatabaseCrossMigrator(self)
+                if USE_POSTGRESQL and os.path.exists(SQLITE_DB_PATH):
+                    with self.get_db_connection() as conn:
+                        res = migrator.migrate_sqlite_to_postgres(SQLITE_DB_PATH, conn)
+                        if res.get('status') == 'success' and any(res.get('migrated', {}).values()):
+                            logger.info(f"[CROSS-MIGRATION] Dados históricos do SQLite sincronizados no PostgreSQL: {res.get('migrated')}")
+            except Exception as _e_cross:
+                logger.warning(f"[CROSS-MIGRATION] Aviso ao sincronizar histórico entre bancos: {_e_cross}")
 
             # Carregar configurações
             self._load_settings()

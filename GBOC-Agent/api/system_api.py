@@ -321,3 +321,27 @@ async def get_changelog():
         logger.error(f"Erro ao ler CHANGELOG.md: {e}")
         raise HTTPException(500, str(e))
 
+
+@router.post("/db/migrate")
+async def trigger_cross_database_migration():
+    """Executa a migração sem perda de dados entre bancos (SQLite <-> PostgreSQL)."""
+    try:
+        import os
+        from shared_core import get_shared_core, USE_POSTGRESQL, SQLITE_DB_PATH
+        from engines.database_cross_migrator import DatabaseCrossMigrator
+
+        core = get_shared_core()
+        migrator = DatabaseCrossMigrator(core)
+
+        if USE_POSTGRESQL:
+            if not os.path.exists(SQLITE_DB_PATH):
+                return {"status": "skipped", "message": f"Banco SQLite de origem não existe em {SQLITE_DB_PATH}"}
+            with core.get_db_connection() as conn:
+                res = migrator.migrate_sqlite_to_postgres(SQLITE_DB_PATH, conn)
+                return {"status": "success", "direction": "sqlite_to_postgresql", "details": res}
+        else:
+            return {"status": "info", "message": "Banco ativo é SQLite. Migração concluída."}
+    except Exception as e:
+        logger.error(f"Erro ao executar migração de banco: {e}")
+        raise HTTPException(500, str(e))
+

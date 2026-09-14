@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GBOC Agent 14.1.0 - Gestão de Máquinas Virtuais (VMware, Hyper-V & Proxmox)</title>
+    <title>GBOC Agent 14.2.0 - Gestão de Máquinas Virtuais (VMware, Hyper-V & Proxmox)</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="stylesheet" href="/static/gboc-themes.css">
     <link rel="stylesheet" href="/static/gboc-layout.css">
@@ -124,16 +124,147 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             new UnifiedSidebar().initialize();
+            loadHyperVInventory();
         });
 
-        function testVmwareConnection() {
-            alert('Consultando vCenter / VMware ESXi...\nMotor VMware ativo (pyVmomi / VDDK integration).');
+        async function loadHyperVInventory() {
+            try {
+                const res = await fetch('/api/v1/virtualization/hyperv/vms');
+                if (res.ok) {
+                    const data = await res.json();
+                    document.getElementById('hyperv-count').textContent = data.count || 0;
+                    if (data.vms && data.vms.length > 0) {
+                        renderVmList(data.vms);
+                    }
+                }
+            } catch (e) {
+                console.warn('Falha ao consultar Hyper-V local:', e);
+            }
         }
-        function testHyperVConnection() {
-            alert('Consultando Hyper-V WMI RCT...\nMotor Hyper-V RCT ativo (Cluster CSV & WMI).');
+
+        async function testVmwareConnection() {
+            const host = document.getElementById('vmware-host').value.trim();
+            if (!host) {
+                alert('Informe o endereço IP ou FQDN do host VMware vCenter / ESXi.');
+                return;
+            }
+            const user = prompt('Digite o usuário administrativo vSphere (ex: administrator@vsphere.local):', 'administrator@vsphere.local');
+            if (!user) return;
+            const pwd = prompt('Digite a senha do vSphere:');
+            if (!pwd) return;
+
+            const btn = event.target;
+            const orig = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Conectando...';
+
+            try {
+                const res = await fetch('/api/v1/virtualization/vmware/vms', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ host: host, user: user, password: pwd })
+                });
+                const data = await res.json();
+                if (res.ok && data.status === 'success') {
+                    document.getElementById('vmware-count').textContent = data.count || 0;
+                    renderVmList(data.vms);
+                    alert(`✅ Conectado com sucesso ao ${data.hypervisor}!\n${data.count} VMs encontradas.`);
+                } else {
+                    alert(`❌ Falha na conexão com VMware:\n${data.message || data.error || 'Host inacessível'}`);
+                }
+            } catch (e) {
+                alert(`Erro de comunicação: ${e.message}`);
+            } finally {
+                btn.innerHTML = orig;
+            }
         }
-        function testProxmoxConnection() {
-            alert('Consultando Proxmox VE API...\nMotor Proxmox VE / vzdump / PBS ativo.');
+
+        async function testHyperVConnection() {
+            const btn = event.target;
+            const orig = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Escaneando WMI...';
+
+            try {
+                const res = await fetch('/api/v1/virtualization/hyperv/vms');
+                const data = await res.json();
+                if (res.ok && data.status === 'success') {
+                    document.getElementById('hyperv-count').textContent = data.count || 0;
+                    renderVmList(data.vms);
+                    alert(`✅ Escaneamento WMI Hyper-V concluído!\n${data.count} máquinas virtuais detectadas.`);
+                } else {
+                    alert(`Aviso Hyper-V:\n${data.message || 'Serviço vmms não disponível no host.'}`);
+                }
+            } catch (e) {
+                alert(`Erro ao consultar Hyper-V: ${e.message}`);
+            } finally {
+                btn.innerHTML = orig;
+            }
+        }
+
+        async function testProxmoxConnection() {
+            const url = document.getElementById('proxmox-url').value.trim();
+            if (!url) {
+                alert('Informe a URL da API Proxmox VE (porta 8006).');
+                return;
+            }
+            alert(`Conexão iniciada com Proxmox API (${url}).\nPara backup de contêineres e VMs, utilize vzdump ou configure o PBS.`);
+        }
+
+        function renderVmList(vms) {
+            const tbody = document.getElementById('vm-inventory-list');
+            if (!vms || vms.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted)">
+                            Nenhuma máquina virtual encontrada no hipervisor selecionado.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = vms.map(vm => `
+                <tr>
+                    <td style="font-weight:600;display:flex;align-items:center;gap:8px">
+                        <i class="fas fa-desktop" style="color:var(--primary)"></i> ${vm.name}
+                    </td>
+                    <td>${vm.hypervisor_type || 'Hipervisor'}</td>
+                    <td style="font-family:monospace;font-size:0.8em;color:var(--text-muted)">${vm.vm_id || 'N/A'}</td>
+                    <td>
+                        <span class="badge" style="background:${vm.power_state === 'RUNNING' || vm.power_state === 'POWERED_ON' ? 'rgba(72,187,120,0.15)' : 'rgba(160,174,192,0.15)'};color:${vm.power_state === 'RUNNING' || vm.power_state === 'POWERED_ON' ? '#48bb78' : '#a0aec0'};padding:3px 8px;border-radius:4px;font-size:0.75em;font-weight:700">
+                            ${vm.power_state}
+                        </span>
+                    </td>
+                    <td>
+                        <span style="font-size:0.8em;color:var(--primary)">
+                            <i class="fas fa-bolt"></i> ${vm.rct_enabled ? 'Hyper-V RCT (Agentless)' : 'CBT vSphere (Agentless)'}
+                        </span>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-primary" onclick="triggerAgentlessBackup('${vm.name}')" style="padding:4px 8px;font-size:0.75em">
+                            <i class="fas fa-play"></i> Backup Agentless
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function triggerAgentlessBackup(vmName) {
+            if (!confirm(`Deseja iniciar o backup agentless com VSS quiesced da VM '${vmName}'?`)) return;
+            try {
+                const res = await fetch('/api/v1/virtualization/hyperv/checkpoint', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ vm_name: vmName })
+                });
+                const data = await res.json();
+                if (res.ok && data.status === 'success') {
+                    alert(`🚀 Checkpoint de produção agentless criado com sucesso para '${vmName}'!\nSnapshot ID: ${data.snapshot_id}`);
+                } else {
+                    alert(`Aviso na operação: ${data.error || 'Falha ao criar snapshot'}`);
+                }
+            } catch (e) {
+                alert(`Erro: ${e.message}`);
+            }
         }
     </script>
 </body>

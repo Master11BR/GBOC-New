@@ -52,12 +52,60 @@ class ItilTestRequest(BaseModel):
     system_type: str = "servicenow"
 
 
+class M365ConfigureRequest(BaseModel):
+    tenant_id: str
+    client_id: str
+    client_secret: str
+    tenant_name: Optional[str] = None
+
+
 # ── 1. SaaS Cloud-Native Endpoints ──────────────────────────────────────────
 
 @router.get("/saas/tenants")
 async def get_saas_tenants():
     """Retorna status e conexões de tenants SaaS (M365, Google Workspace, Entra ID)."""
     return JSONResponse({"status": "success", "data": saas_protection_engine.get_saas_tenants_status()})
+
+
+@router.post("/saas/m365/configure")
+async def configure_m365(req: M365ConfigureRequest):
+    """Configura e valida credenciais do Microsoft 365 App Registration."""
+    try:
+        res = saas_protection_engine.save_m365_credentials(
+            tenant_id=req.tenant_id,
+            client_id=req.client_id,
+            client_secret=req.client_secret,
+            tenant_name=req.tenant_name
+        )
+        return JSONResponse(res)
+    except Exception as e:
+        logger.error(f"[SaaS Router] Erro ao configurar M365: {e}")
+        return JSONResponse(status_code=400, content={"status": "error", "error": str(e)})
+
+
+@router.get("/saas/m365/discover")
+async def discover_m365_resources():
+    """Descobre caixas postais do Exchange e sites SharePoint no tenant M365 configurado."""
+    cfg = saas_protection_engine.load_config().get("microsoft_365", {})
+    if not (cfg.get("tenant_id") and cfg.get("client_id") and cfg.get("client_secret")):
+        return JSONResponse(status_code=400, content={
+            "status": "error",
+            "message": "Tenant M365 não configurado. Cadastre as credenciais primeiro."
+        })
+    try:
+        from engines.saas_protection_engine import MicrosoftGraphClient
+        client = MicrosoftGraphClient(cfg["tenant_id"], cfg["client_id"], cfg["client_secret"])
+        users = client.list_users_and_mailboxes(top=20)
+        sites = client.list_sharepoint_sites(top=10)
+        return JSONResponse({
+            "status": "success",
+            "mailboxes": users,
+            "mailboxes_count": len(users),
+            "sharepoint_sites": sites,
+            "sharepoint_sites_count": len(sites)
+        })
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"status": "error", "error": str(e)})
 
 
 @router.post("/saas/backup")
@@ -149,7 +197,7 @@ async def launch_cloud_failover(req: CloudFailoverRequest):
 @router.get("/itil/status")
 async def get_itil_status():
     """Retorna status das integrações ServiceNow, Jira e SSO SAML/OIDC."""
-    return JSONResponse({"status": "success", "data": itil_sso_engine.itil_integrations})
+    return JSONResponse({"status": "success", "data": itil_sso_engine.get_itil_status()})
 
 
 @router.post("/itil/test-incident")

@@ -17,8 +17,12 @@ SERVER_NAME = os.getenv("SERVER_NAME", "GBOC Server")
 SERVER_ENVIRONMENT = os.getenv("SERVER_ENV", "development")
 
 # ===========================
+# ===========================
 # BANCO DE DADOS
 # ===========================
+DB_ENGINE = os.getenv("GBOC_DB_ENGINE", os.getenv("DB_ENGINE", "postgresql")).lower().strip()
+USE_POSTGRESQL = (DB_ENGINE == "postgresql")
+
 DB_CONFIG = {
     "host": os.getenv("POSTGRES_HOST", "localhost"),
     "port": int(os.getenv("POSTGRES_PORT", 5432)),

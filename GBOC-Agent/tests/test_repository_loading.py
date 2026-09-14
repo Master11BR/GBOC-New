@@ -8,6 +8,13 @@ import sys
 import os
 import logging
 
+# Garantir encoding UTF-8 no Windows para emojis de console
+if sys.platform.startswith('win'):
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    if hasattr(sys.stderr, 'reconfigure'):
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
 # Garantir raiz do projeto no PYTHONPATH (execução via tests/)
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if PROJECT_ROOT not in sys.path:
@@ -35,7 +42,8 @@ required_dirs = [
 ]
 
 for dir_path, desc in required_dirs:
-    if os.path.exists(dir_path) and os.path.isdir(dir_path):
+    full_dir = os.path.join(PROJECT_ROOT, dir_path)
+    if os.path.exists(full_dir) and os.path.isdir(full_dir):
         print(f"   ✅ {desc}: {dir_path}/")
     else:
         print(f"   ❌ {desc} FALTA: {dir_path}/")
@@ -56,8 +64,9 @@ required_files = [
 ]
 
 for file_path, desc in required_files:
-    if os.path.exists(file_path):
-        size = os.path.getsize(file_path)
+    full_file = os.path.join(PROJECT_ROOT, file_path)
+    if os.path.exists(full_file):
+        size = os.path.getsize(full_file)
         print(f"   ✅ {desc} ({size} bytes)")
     else:
         print(f"   ❌ {desc} FALTA: {file_path}")
