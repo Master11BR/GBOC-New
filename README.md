@@ -1,13 +1,14 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.2.0 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.3.0 Enterprise. Todos os direitos reservados. -->
 
-# 🚀 GBOC - Gestão & Backup Operations Center (v14.2.0 Enterprise Edition)
+# 🚀 GBOC - Gestão & Backup Operations Center (v14.3.0 Enterprise Edition)
 
-[![GBOC System Version](https://img.shields.io/badge/version-14.2.0--Enterprise-blue.svg)](https://github.com/Master11BR/GBOC-New)
+[![GBOC System Version](https://img.shields.io/badge/version-14.3.0--Enterprise-blue.svg)](https://github.com/Master11BR/GBOC-New)
 [![Python Version](https://img.shields.io/badge/python-3.11%2B%20%7C%203.14-green.svg)](https://www.python.org/)
 [![PostgreSQL](https://img.shields.io/badge/postgresql-16-blue.svg)](https://www.postgresql.org/)
+[![UI Model](https://img.shields.io/badge/UI__MODEL-modern%20(Official)-indigo.svg)]()
 [![Status](https://img.shields.io/badge/status-production--ready-brightgreen.svg)]()
 
-> **GBOC (Gestão & Backup Operations Center v14.2.0 Enterprise Edition)** é a mais avançada plataforma corporativa de orquestração de backup, RMM, monitoramento preditivo, telemetria 100% real (Zero-Mock Strict) e resposta cibernética a incidentes. 10x mais potente que soluções do mercado pago e open-source.
+> **GBOC (Gestão & Backup Operations Center v14.3.0 Enterprise Edition)** é a mais avançada plataforma corporativa de orquestração de backup, RMM, monitoramento preditivo, telemetria 100% real (Zero-Mock Strict), modelo visual oficial **Modern UI (UnoCSS)** e resposta cibernética a incidentes.
 
 ---
 
@@ -99,6 +100,18 @@ Integrado com os 5 principais ecossistemas globais de segurança:
 ## 🛡️ Resiliência a Longos Intervalos (Auto-Heal & Lock Prune)
 
 - **Rotina Preventiva para Falhas por Inatividade**: Quando uma tarefa fica mais de 3 dias sem executar, o GBOC executa automaticamente o Auto-Heal: higieniza travas obsoletas (`.lock`), valida o banco do repositório (`repair`) e garante a execução transparente do backup sem desincronizações.
+
+## 📜 Histórico de Mudanças (Changelog v14.3.0 Enterprise)
+
+- **Auto-Diagnóstico de IA com Telemetria Real e Respostas Precisas ("O Que Fazer Exatamente")**:
+  - Eliminação de respostas genéricas estáticas (*"Erro detectado: 'Diagnóstico geral...'"*).
+  - Coleta em tempo real de telemetria física do host operacional (`CPU`, `RAM`, `Disco`, `Status BD`, `Locks em Repositório`) via `psutil`.
+  - Diagnósticos estruturados em 3 seções obrigatórias: 🔍 **Causa Raiz Técnica**, 🛠️ **O Que Fazer Exatamente (Passo a Passo numerado)** e ⚡ **Executar Correção Automática (Auto-Heal)** (botão 1-click integrado a `/api/v2/system/auto-heal`).
+- **Ativação Dinâmica em Tempo Real dos 4 Estilos de Componentes UI/UX**:
+  - Correção dos seletores globais em `gboc-themes.css` vinculando cards, painéis, estatísticas, inputs, botões e modais às variáveis de design tokens (`--card-radius`, `--card-border`, `--card-shadow`, `--card-backdrop`, `--card-bg`).
+  - Alternância imediata no navegador entre os 4 estilos visuais: **SaaS Minimal**, **Neumorphism (Soft UI)**, **3D Claymorphism** e **Fluent Design (Microsoft Acrylic Glass)**.
+- **Padronização Estrita da API v2 (`/api/v2/`)**:
+  - Endpoints oficiais `/api/v2/system/ui-config`, `/api/v2/system/version`, `/api/v2/ai/diagnose` e `/api/v2/system/auto-heal` envelopados com `build_v2_response`.
 
 ## 📜 Histórico de Mudanças (Changelog v14.2.0 Enterprise)
 

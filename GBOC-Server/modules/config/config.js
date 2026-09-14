@@ -220,13 +220,14 @@ async function testAiConnection() {
         // Save temporarily to backend config to test
         await saveAiSettings(true); 
 
-        const r = await fetch(window.GBOC_API_BASE + '/api/v1/ai/diagnose', {
+        const r = await fetch(window.GBOC_API_BASE + '/api/v2/ai/diagnose', {
             method: 'POST',
             headers: {'Content-Type':'application/json'},
             body: JSON.stringify({error_context: 'Teste de conexão configurada.', provider: provider})
         });
         
-        const data = await r.json();
+        const resData = await r.json();
+        const data = resData.data || resData;
         const msgDiv = document.createElement('div');
         msgDiv.id = 'cfg-ai-msg-toast';
         msgDiv.style.marginTop = '15px';

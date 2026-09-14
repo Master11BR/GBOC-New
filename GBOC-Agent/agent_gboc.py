@@ -380,9 +380,32 @@ app = FastAPI(
 
 @app.get("/api/v1/version", tags=["System"])
 @app.get("/api/v1/system/version", tags=["System"])
+@app.get("/api/system/info", tags=["System"])
 async def get_agent_version_endpoint():
-    """Retorna informações detalhadas do versionamento semântico 2.0."""
-    return get_version_info()
+    """Retorna informações detalhadas do versionamento semântico 2.0 e contrato de UI Model."""
+    info = get_version_info()
+    if isinstance(info, dict):
+        info["gboc_version"] = info.get("semver") or AGENT_VERSION
+        info["version"] = info.get("semver") or AGENT_VERSION
+        info["status"] = "success"
+        info["UI_MODEL"] = "modern"
+        info["ACTIVE_UI_MODEL"] = "modern"
+        info["DEFAULT_UI_MODEL"] = "modern"
+    return info
+
+@app.get("/api/v1/system/ui-config", tags=["System"])
+async def get_agent_ui_config_endpoint():
+    """Retorna a configuração oficial estrita do Modelo UI/UX Moderno."""
+    return {
+        "UI_MODEL": "modern",
+        "ACTIVE_UI_MODEL": "modern",
+        "DEFAULT_UI_MODEL": "modern",
+        "AVAILABLE_MODELS": ["modern"],
+        "DEFAULT_THEME": "dark",
+        "AVAILABLE_THEMES": ["dark", "light", "purple", "ocean"],
+        "DEFAULT_UI_STYLE": "minimal",
+        "AVAILABLE_UI_STYLES": ["minimal", "neumorphism", "claymorphism", "fluent"]
+    }
 
 _allowed_origins_raw = os.getenv("AGENT_CORS_ORIGINS", "http://localhost:9200,http://127.0.0.1:9200")
 _allowed_origins = [o.strip() for o in _allowed_origins_raw.split(",") if o.strip()]

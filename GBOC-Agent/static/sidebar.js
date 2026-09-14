@@ -66,12 +66,11 @@ class UnifiedSidebar {
     }
 
     /**
-     * Inicializa o sidebar na página atual
+     * Inicializa o sidebar na página atual de forma instantânea (< 5ms)
      * @returns {Promise<void>}
      */
     async initialize() {
         try {
-            // Evita corrida entre auto-init e init manual por página
             if (window.__gbocSidebarInitializing) return;
             if (window.__gbocSidebarInitialized) {
                 this._updateActiveLink();
@@ -79,7 +78,7 @@ class UnifiedSidebar {
             }
             window.__gbocSidebarInitializing = true;
 
-            // Injetar Layout Manager (GUI Horizontal/Vertical + Botão Paleta de Cores)
+            // Injetar Layout Manager se necessário
             if (!window.GBOCLayout && !document.getElementById('gboc-layout-manager-script')) {
                 const lmScript = document.createElement('script');
                 lmScript.id = 'gboc-layout-manager-script';
@@ -87,10 +86,28 @@ class UnifiedSidebar {
                 document.head.appendChild(lmScript);
             }
 
-            // Renderização instantânea do cache da sessão para evitar que o menu desapareça
-            const cachedHtml = sessionStorage.getItem('gboc_sidebar_html');
+            // Se o sidebar já está presente no HTML estático da página, apenas inicializar interações
+            const existingSidebar = document.querySelector(SIDEBAR_CONFIG.SELECTORS.SIDEBAR);
+            if (existingSidebar) {
+                if (typeof window.initNavGroups === 'function') {
+                    window.initNavGroups();
+                }
+                this._updateActiveLink();
+                this._setupEventListeners();
+                this._setupSidebarRuntime();
+                this._isLoaded = true;
+                window.__gbocSidebarInitialized = true;
+                if (typeof window.gbocSetupSidebarAuth === 'function') {
+                    window.gbocSetupSidebarAuth();
+                }
+                return;
+            }
+
+            // Renderização instantânea do cache da memória/sessão
+            const cachedHtml = window.__gbocSidebarMemoryCache || sessionStorage.getItem('gboc_sidebar_html');
             if (cachedHtml) {
                 this._sidebarHtml = cachedHtml;
+                window.__gbocSidebarMemoryCache = cachedHtml;
                 this._injectSidebar();
                 if (typeof window.initNavGroups === 'function') {
                     window.initNavGroups();
@@ -98,11 +115,11 @@ class UnifiedSidebar {
                 this._updateActiveLink();
             }
 
-            // Carregar HTML do sidebar (e atualizar cache se houver alterações)
-            await this._loadSidebarHtml();
-
-            // Se não estava em cache, injetar agora no DOM
-            if (!cachedHtml) {
+            // Atualização assíncrona em background para não bloquear o carregamento
+            if (cachedHtml) {
+                this._loadSidebarHtml().catch(() => {});
+            } else {
+                await this._loadSidebarHtml();
                 this._injectSidebar();
                 if (typeof window.initNavGroups === 'function') {
                     window.initNavGroups();
@@ -110,14 +127,12 @@ class UnifiedSidebar {
                 this._updateActiveLink();
             }
 
-            // Configurar event listeners e runtime
             this._setupEventListeners();
             this._setupSidebarRuntime();
 
             this._isLoaded = true;
             window.__gbocSidebarInitialized = true;
 
-            // Setup sidebar auth (user info + logout button)
             if (typeof window.gbocSetupSidebarAuth === 'function') {
                 window.gbocSetupSidebarAuth();
             }
@@ -143,7 +158,7 @@ class UnifiedSidebar {
     }
 
     /**
-     * Carrega o HTML do sidebar da API/Assets e mantém cache da sessão
+     * Carrega o HTML do sidebar da API/Assets com cache agressivo
      * @private
      * @returns {Promise<void>}
      */
@@ -155,8 +170,9 @@ class UnifiedSidebar {
             }
             const html = await response.text();
             if (html) {
-                const prev = sessionStorage.getItem('gboc_sidebar_html');
+                const prev = window.__gbocSidebarMemoryCache || sessionStorage.getItem('gboc_sidebar_html');
                 this._sidebarHtml = html;
+                window.__gbocSidebarMemoryCache = html;
                 sessionStorage.setItem('gboc_sidebar_html', html);
                 if (prev && prev !== html) {
                     this._injectSidebar();

@@ -230,9 +230,12 @@
             <div class="card-header-badge" style="margin: 0 auto 12px auto;">
                 <i class="fas fa-magic"></i> GBOC Dynamic Design Engine
             </div>
+            <div class="card-header-badge" style="margin: 0 auto 16px auto; background: rgba(99, 102, 241, 0.2); color: var(--primary-color); border: 1px solid var(--primary-color);">
+                <i class="fas fa-shield-check"></i> ACTIVE_UI_MODEL = "modern" (Padrão Oficial)
+            </div>
             <h1>Seletor de Estilos & UX/UI Framework</h1>
             <p>
-                Alterne dinamicamente entre os 4 modos de componentes de interface e 2 modos de iluminação. 
+                Alterne dinamicamente entre os 4 modos de componentes de interface e 4 modos de iluminação sob o modelo oficial <strong>Modern UI</strong>.
                 As variáveis CSS cruzam e recalculam sombras, bordas, backdrop-filter e volumes em tempo real.
             </p>
         </header>
@@ -240,33 +243,54 @@
         <!-- Dynamic Control Selectors -->
         <section class="controls-grid">
             <!-- Illumination Control -->
-            <div class="control-group">
-                <h3><i class="fas fa-sun"></i> 1. Modo de Iluminação</h3>
-                <div class="btn-grid">
+            <div class="control-group" style="grid-column: span 2;">
+                <h3><i class="fas fa-sun"></i> 1. Modo de Iluminação & Tema de Cor</h3>
+                <div class="btn-grid" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));">
                     <button class="selector-btn" id="btn-theme-dark" onclick="setIllumination('dark')">
-                        <i class="fas fa-moon"></i> Escuro (Carbon #121212)
+                        <i class="fas fa-moon"></i> Escuro (Carbon)
                     </button>
                     <button class="selector-btn" id="btn-theme-light" onclick="setIllumination('light')">
                         <i class="fas fa-sun"></i> Claro (High Contrast)
+                    </button>
+                    <button class="selector-btn" id="btn-theme-purple" onclick="setIllumination('purple')">
+                        <i class="fas fa-heart"></i> Púrpura (Purple)
+                    </button>
+                    <button class="selector-btn" id="btn-theme-ocean" onclick="setIllumination('ocean')">
+                        <i class="fas fa-water"></i> Oceano (Cyan)
+                    </button>
+                    <button class="selector-btn" id="btn-theme-red" onclick="setIllumination('red')">
+                        <i class="fas fa-fire" style="color:#ef4444"></i> Vermelho (Red Sentinel)
                     </button>
                 </div>
             </div>
 
             <!-- UX/UI Component Style Selector -->
             <div class="control-group" style="grid-column: span 2;">
-                <h3><i class="fas fa-cubes"></i> 2. Formato de Componentes UX/UI</h3>
+                <h3><i class="fas fa-cubes"></i> 2. Formato de Componentes UX/UI (8 Estilos Oficiais)</h3>
                 <div class="btn-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
                     <button class="selector-btn active" id="btn-style-minimal" onclick="setUiFormat('minimal')">
-                        <i class="fas fa-square"></i> Opção 1: SaaS Minimal
+                        <i class="fas fa-square"></i> 1. SaaS Minimal
                     </button>
                     <button class="selector-btn" id="btn-style-neumorphism" onclick="setUiFormat('neumorphism')">
-                        <i class="fas fa-circle-dot"></i> Opção 2: Neumorphism
+                        <i class="fas fa-circle-dot"></i> 2. Neumorphism
                     </button>
                     <button class="selector-btn" id="btn-style-claymorphism" onclick="setUiFormat('claymorphism')">
-                        <i class="fas fa-cubes-stacked"></i> Opção 3: 3D Claymorphism
+                        <i class="fas fa-cubes-stacked"></i> 3. 3D Claymorphism
                     </button>
                     <button class="selector-btn" id="btn-style-fluent" onclick="setUiFormat('fluent')">
-                        <i class="fas fa-window-restore"></i> Opção 4: Fluent Acrylic
+                        <i class="fas fa-window-restore"></i> 4. Fluent Acrylic
+                    </button>
+                    <button class="selector-btn" id="btn-style-nexus-widgets" onclick="setUiFormat('nexus-widgets')">
+                        <i class="fas fa-th-large" style="color:var(--primary-color)"></i> 5. Cartões Modulares
+                    </button>
+                    <button class="selector-btn" id="btn-style-nexus-glass" onclick="setUiFormat('nexus-glass')">
+                        <i class="fas fa-gem" style="color:var(--primary-color)"></i> 6. Glassmorphism Técnico
+                    </button>
+                    <button class="selector-btn" id="btn-style-command-sentinel" onclick="setUiFormat('command-sentinel')">
+                        <i class="fas fa-terminal" style="color:var(--primary-color)"></i> 7. Command Sentinel
+                    </button>
+                    <button class="selector-btn" id="btn-style-cyber-3d" onclick="setUiFormat('cyber-3d')">
+                        <i class="fas fa-wand-magic-sparkles" style="color:var(--primary-color)"></i> 8. Cyber 3D Glass (Animado)
                     </button>
                 </div>
             </div>

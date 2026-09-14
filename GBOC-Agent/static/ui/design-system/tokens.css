@@ -1,0 +1,139 @@
+/* ============================================================================
+   GBOC System v14.2.0 — Official Modern Design System Tokens (Agent)
+   ============================================================================ */
+
+:root {
+    /* Explicit Active UI Model contract */
+    --ui-model: "modern";
+    --active-ui-model: "modern";
+    --default-ui-model: "modern";
+
+    /* Global Typography Tokens */
+    --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+
+    /* Global Transition Motion Principles (Kyle Zantos Motion Principles) */
+    --transition-fast: 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+    --transition-normal: 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    --transition-slow: 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+
+    /* Compatibility Aliases */
+    --bg-dark: var(--bg-main);
+    --border: var(--border-color);
+    --text: var(--text-primary);
+    --card-hover: var(--bg-input);
+    --accent-gradient: linear-gradient(135deg, var(--primary-color), #a855f7);
+}
+
+/* Dark Mode Tokens (Default) */
+[data-theme="dark"], [data-color-theme="dark"], :root {
+    --bg-main: #121212;
+    --bg-card: #1e1e20;
+    --bg-input: #18181a;
+    --sidebar-bg: #121212;
+    --topbar-bg: #18181a;
+
+    --text-primary: #f8fafc;
+    --text-secondary: #a1a1aa;
+    --text-muted: #71717a;
+
+    --border-color: rgba(255, 255, 255, 0.08);
+    --primary-color: #6366f1;
+    --primary-hover: #4f46e5;
+    --primary-glow: rgba(99, 102, 241, 0.35);
+
+    --success-color: #10b981;
+    --danger-color: #ef4444;
+    --warning-color: #f59e0b;
+    --info-color: #06b6d4;
+
+    --nm-bg: #121212;
+    --nm-shadow-dark: rgba(0, 0, 0, 0.75);
+    --nm-shadow-light: rgba(255, 255, 255, 0.04);
+
+    --clay-bg: #1c1c20;
+    --clay-shadow-drop: 0 16px 36px rgba(0, 0, 0, 0.65);
+    --clay-shadow-inset: inset -6px -6px 14px rgba(0, 0, 0, 0.55), inset 6px 6px 14px rgba(255, 255, 255, 0.08);
+
+    --fluent-glass-bg: rgba(26, 26, 28, 0.65);
+    --fluent-border: 1px solid rgba(255, 255, 255, 0.14);
+
+    --bg-dark: var(--bg-main);
+    --border: var(--border-color);
+    --text: var(--text-primary);
+    --card-hover: var(--bg-input);
+    --primary: var(--primary-color);
+    --success: var(--success-color);
+    --danger: var(--danger-color);
+    --warning: var(--warning-color);
+}
+
+/* Light Mode Tokens */
+[data-theme="light"], [data-color-theme="light"] {
+    --bg-main: #f8fafc;
+    --bg-card: #ffffff;
+    --bg-input: #f1f5f9;
+    --sidebar-bg: #ffffff;
+    --topbar-bg: #ffffff;
+
+    --text-primary: #0f172a !important;
+    --text-secondary: #334155 !important;
+    --text-muted: #64748b !important;
+
+    --border-color: #cbd5e1;
+    --primary-color: #2563eb;
+    --primary-hover: #1d4ed8;
+    --primary-glow: rgba(37, 99, 235, 0.25);
+
+    --success-color: #10b981;
+    --danger-color: #ef4444;
+    --warning-color: #f59e0b;
+    --info-color: #0284c7;
+
+    --nm-bg: #f8fafc;
+    --nm-shadow-dark: rgba(163, 177, 198, 0.55);
+    --nm-shadow-light: rgba(255, 255, 255, 0.85);
+
+    --clay-bg: #ffffff;
+    --clay-shadow-drop: 0 14px 28px rgba(0, 0, 0, 0.12);
+    --clay-shadow-inset: inset -6px -6px 12px rgba(0, 0, 0, 0.08), inset 6px 6px 12px rgba(255, 255, 255, 0.85);
+
+    --fluent-glass-bg: rgba(255, 255, 255, 0.85);
+    --fluent-border: 1px solid rgba(0, 0, 0, 0.12);
+
+    --bg-dark: var(--bg-main);
+    --border: var(--border-color);
+    --text: var(--text-primary);
+    --card-hover: var(--bg-input);
+    --primary: var(--primary-color);
+    --success: var(--success-color);
+    --danger: var(--danger-color);
+    --warning: var(--warning-color);
+}
+
+/* Purple Theme Accent */
+[data-color-theme="purple"] {
+    --primary-color: #8b5cf6 !important;
+    --primary-hover: #7c3aed !important;
+    --primary-glow: rgba(139, 92, 246, 0.4) !important;
+    --primary: #8b5cf6 !important;
+    --accent-gradient: linear-gradient(135deg, #8b5cf6 0%, #d946ef 100%) !important;
+}
+
+/* Ocean Theme Accent */
+[data-color-theme="ocean"] {
+    --primary-color: #06b6d4 !important;
+    --primary-hover: #0891b2 !important;
+    --primary-glow: rgba(6, 182, 212, 0.4) !important;
+    --primary: #06b6d4 !important;
+    --accent-gradient: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%) !important;
+}
+
+/* Red Sentinel Theme Accent */
+[data-color-theme="red"], [data-color-theme="crimson"] {
+    --primary-color: #ef4444 !important;
+    --primary-hover: #dc2626 !important;
+    --primary-glow: rgba(239, 68, 68, 0.4) !important;
+    --primary: #ef4444 !important;
+    --accent-gradient: linear-gradient(135deg, #ef4444 0%, #991b1b 100%) !important;
+}

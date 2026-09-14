@@ -75,6 +75,23 @@ def _get_agent_telemetry():
         "disks": disk_data
     }
 
+@router.get("/ui-config")
+async def get_agent_ui_config_v2(request: Request):
+    """Retorna a configuração oficial estrita do Modelo UI/UX Moderno (API v2)."""
+    t0 = time.perf_counter()
+    ui_data = {
+        "UI_MODEL": "modern",
+        "ACTIVE_UI_MODEL": "modern",
+        "DEFAULT_UI_MODEL": "modern",
+        "AVAILABLE_MODELS": ["modern"],
+        "DEFAULT_THEME": "dark",
+        "AVAILABLE_THEMES": ["dark", "light", "purple", "ocean"],
+        "DEFAULT_UI_STYLE": "minimal",
+        "AVAILABLE_UI_STYLES": ["minimal", "neumorphism", "claymorphism", "fluent"]
+    }
+    elapsed = (time.perf_counter() - t0) * 1000
+    return build_v2_response(data=ui_data, execution_time_ms=elapsed)
+
 @router.get("/version")
 async def get_agent_version_v2():
     """Retorna metadados completos de versão SemVer 2.0 do Agente."""

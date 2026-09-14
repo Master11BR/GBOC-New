@@ -1,15 +1,12 @@
 /* ============================================================================
-   GBOC System v14.1.0 — Dynamic UI Style & Illumination Engine
-   Author: Senior Frontend Engineer (Panda CSS, Tailwind, UnoCSS, Bootstrap 5, CSS)
-   Modes: 
-     - Light Mode (Claro)
-     - Dark Mode (Escuro - Carbon/Graphite #121212)
-   UI Component Formats:
-     1. minimal     - SaaS Minimal / Clean UI (Stripe / Vercel flat style)
-     2. neumorphism - Soft UI extruded 3D (Dual soft shadows)
-     3. claymorphism - 3D Clay/Plastic (Volumetric, 24px radius, inset + drop shadows)
-     4. fluent      - Microsoft Fluent Design (Acrylic frosted glass, blur, saturate)
+   GBOC System v14.2.0 — Dynamic UI Style & Illumination Engine (Modern UI Official Agent)
+   Model: modern (DEFAULT / ACTIVE)
    ============================================================================ */
+
+@import url('/static/ui/design-system/tokens.css');
+@import url('/static/ui/design-system/unocss-ds.css');
+@import url('/static/ui/models/modern/model.css');
+@import url('/static/ui/models/modern/components.css');
 
 /* ── 1. ILLUMINATION MODES (Light / Dark) ────────────────────────────────── */
 
@@ -168,6 +165,82 @@
     --btn-transform-active: translateY(0);
 }
 
+/* Format 5: Ultra-Modern Cyber 3D Glassmorphism (Fluid Animations & Holographic Glow) */
+[data-ui-style="cyber-3d"] {
+    --card-radius:          16px;
+    --btn-radius:           10px;
+    --input-radius:         10px;
+    --card-bg:              linear-gradient(135deg, rgba(30, 41, 59, 0.78) 0%, rgba(15, 23, 42, 0.88) 100%);
+    --card-border:          1px solid var(--primary-glow, rgba(99, 102, 241, 0.4));
+    --card-shadow:          0 16px 40px rgba(0, 0, 0, 0.5), 0 0 24px var(--primary-glow, rgba(99, 102, 241, 0.25));
+    --card-backdrop:        blur(20px) saturate(180%);
+    --btn-shadow:           0 6px 24px var(--primary-glow, rgba(99, 102, 241, 0.4)), inset 0 1px 1px rgba(255, 255, 255, 0.3);
+    --input-bg:             rgba(255, 255, 255, 0.06);
+    --input-border:         1px solid var(--primary-glow, rgba(99, 102, 241, 0.3));
+    --input-shadow:         inset 0 2px 6px rgba(0, 0, 0, 0.3);
+    --btn-transform-hover:  translateY(-3px) scale(1.03);
+    --btn-transform-active: translateY(1px) scale(0.97);
+}
+
+[data-theme="light"][data-ui-style="cyber-3d"], [data-color-theme="light"][data-ui-style="cyber-3d"] {
+    --card-bg:              linear-gradient(135deg, rgba(255, 255, 255, 0.92) 0%, rgba(241, 245, 249, 0.96) 100%);
+    --card-border:          1px solid rgba(37, 99, 235, 0.3);
+    --card-shadow:          0 12px 30px rgba(0, 0, 0, 0.08), 0 0 18px rgba(37, 99, 235, 0.15);
+    --input-bg:             rgba(241, 245, 249, 0.9);
+    --input-border:         1px solid rgba(37, 99, 235, 0.3);
+}
+
+/* Format 6: Cartões Modulares Dinâmicos (Nexus Widgets) */
+[data-ui-style="nexus-widgets"] {
+    --card-radius:          14px;
+    --btn-radius:           8px;
+    --input-radius:         8px;
+    --card-bg:              var(--bg-card);
+    --card-border:          1px solid var(--border-color);
+    --card-shadow:          0 6px 20px rgba(0, 0, 0, 0.22);
+    --card-backdrop:        none;
+    --btn-shadow:           0 2px 8px var(--primary-glow);
+    --input-bg:             var(--bg-input);
+    --input-border:         1px solid var(--border-color);
+    --input-shadow:         none;
+    --btn-transform-hover:  translateY(-2px);
+    --btn-transform-active: translateY(0);
+}
+
+/* Format 7: Glassmorphism Técnico Corporativo (Nexus Glass) */
+[data-ui-style="nexus-glass"] {
+    --card-radius:          20px;
+    --btn-radius:           10px;
+    --input-radius:         10px;
+    --card-bg:              rgba(30, 41, 59, 0.58);
+    --card-border:          1px solid rgba(255, 255, 255, 0.16);
+    --card-shadow:          0 20px 48px rgba(0, 0, 0, 0.45);
+    --card-backdrop:        blur(18px) saturate(180%);
+    --btn-shadow:           0 4px 16px rgba(99, 102, 241, 0.3);
+    --input-bg:             rgba(255, 255, 255, 0.05);
+    --input-border:         1px solid rgba(255, 255, 255, 0.18);
+    --input-shadow:         none;
+    --btn-transform-hover:  translateY(-2px);
+    --btn-transform-active: translateY(0);
+}
+
+/* Format 8: Command Center Sentinel */
+[data-ui-style="command-sentinel"] {
+    --card-radius:          8px;
+    --btn-radius:           6px;
+    --input-radius:         6px;
+    --card-bg:              #0f172a;
+    --card-border:          1px solid var(--primary-glow, rgba(99, 102, 241, 0.3));
+    --card-shadow:          0 8px 24px rgba(0, 0, 0, 0.5);
+    --card-backdrop:        none;
+    --btn-shadow:           0 2px 10px var(--primary-glow);
+    --input-bg:             #020617;
+    --input-border:         1px solid #1e293b;
+    --input-shadow:         inset 0 1px 3px rgba(0,0,0,0.5);
+    --btn-transform-hover:  translateY(-1px);
+    --btn-transform-active: translateY(0);
+}
+
 /* ── 3. GLOBAL BASE OVERRIDES ────────────────────────────────────────────── */
 body {
     background-color: var(--bg-main) !important;
@@ -175,54 +248,112 @@ body {
     transition: background-color 0.3s cubic-bezier(0.16, 1, 0.3, 1), color 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Dynamic Card Selector Class */
-.theme-showcase-card {
-    background: var(--card-bg);
-    border-radius: var(--card-radius);
-    border: var(--card-border);
-    box-shadow: var(--card-shadow);
-    backdrop-filter: var(--card-backdrop);
-    -webkit-backdrop-filter: var(--card-backdrop);
-    transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+/* Dynamic Card & Panel Component Enforcers */
+.card, .panel, .stat-card, .kpi-card, .dashboard-card, .data-card, 
+.quick-action-card, .modal-card, .widget, .theme-showcase-card,
+.gboc-card, .card-panel, .chart-panel, .table-container {
+    background: var(--card-bg) !important;
+    border-radius: var(--card-radius) !important;
+    border: var(--card-border) !important;
+    box-shadow: var(--card-shadow) !important;
+    backdrop-filter: var(--card-backdrop) !important;
+    -webkit-backdrop-filter: var(--card-backdrop) !important;
+    transition: background 0.35s cubic-bezier(0.16, 1, 0.3, 1), 
+                border 0.35s cubic-bezier(0.16, 1, 0.3, 1), 
+                box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1), 
+                border-radius 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+                backdrop-filter 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.modal-backdrop > div, .modal-dialog > div, #agent-ai-modal .modal-content, #agent-reports-modal > div {
+    border-radius: var(--card-radius, 12px) !important;
+    border: var(--card-border, 1px solid var(--border-color)) !important;
+    box-shadow: var(--card-shadow, 0 10px 30px rgba(0,0,0,0.3)) !important;
+    backdrop-filter: var(--card-backdrop, none) !important;
+    -webkit-backdrop-filter: var(--card-backdrop, none) !important;
 }
 
 /* Dynamic Input Selector Class */
-.theme-showcase-input {
-    background: var(--input-bg);
-    border-radius: var(--input-radius);
-    border: var(--input-border);
-    box-shadow: var(--input-shadow);
-    color: var(--text-primary);
-    padding: 12px 16px;
-    outline: none;
-    width: 100%;
-    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+.form-control, .input, .theme-showcase-input, input[type="text"], input[type="password"], input[type="email"], select, textarea {
+    background: var(--input-bg) !important;
+    border-radius: var(--input-radius) !important;
+    border: var(--input-border) !important;
+    box-shadow: var(--input-shadow) !important;
+    color: var(--text-primary) !important;
+    transition: border-radius 0.3s ease, box-shadow 0.3s ease, border 0.3s ease !important;
 }
-.theme-showcase-input:focus {
+.form-control:focus, .input:focus, .theme-showcase-input:focus, input:focus, select:focus, textarea:focus {
     border-color: var(--primary-color) !important;
     box-shadow: 0 0 0 3px var(--primary-glow), var(--input-shadow) !important;
 }
 
 /* Dynamic Button Selector Class */
-.theme-showcase-btn {
-    background: var(--primary-color);
-    border-radius: var(--btn-radius);
-    box-shadow: var(--btn-shadow);
-    color: #ffffff;
-    border: none;
-    padding: 12px 24px;
-    font-weight: 600;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+.btn:not(.btn-link), button.btn, .theme-showcase-btn {
+    border-radius: var(--btn-radius) !important;
+    box-shadow: var(--btn-shadow) !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-radius 0.2s ease !important;
 }
-.theme-showcase-btn:hover {
-    background: var(--primary-hover);
-    transform: var(--btn-transform-hover);
+.btn:not(.btn-link):hover, button.btn:hover, .theme-showcase-btn:hover {
+    transform: var(--btn-transform-hover) !important;
 }
-.theme-showcase-btn:active {
-    transform: var(--btn-transform-active);
+.btn:not(.btn-link):active, button.btn:active, .theme-showcase-btn:active {
+    transform: var(--btn-transform-active) !important;
 }
+
+/* ── 4. LIGHT MODE HIGH CONTRAST TYPOGRAPHY ENFORCEMENT ─────────────────── */
+[data-theme="light"], [data-color-theme="light"] {
+    color-scheme: light !important;
+}
+
+[data-theme="light"] body, [data-color-theme="light"] body,
+[data-theme="light"] .card, [data-color-theme="light"] .card,
+[data-theme="light"] .panel, [data-color-theme="light"] .panel,
+[data-theme="light"] .stat-card, [data-color-theme="light"] .stat-card,
+[data-theme="light"] .kpi-card, [data-color-theme="light"] .kpi-card,
+[data-theme="light"] .dashboard-card, [data-color-theme="light"] .dashboard-card,
+[data-theme="light"] .quick-action-card, [data-color-theme="light"] .quick-action-card,
+[data-theme="light"] .widget, [data-color-theme="light"] .widget,
+[data-theme="light"] table, [data-color-theme="light"] table,
+[data-theme="light"] .modal-backdrop > div, [data-color-theme="light"] .modal-backdrop > div,
+[data-theme="light"] .modal-dialog > div, [data-color-theme="light"] .modal-dialog > div {
+    color: var(--text-primary, #0f172a) !important;
+}
+
+[data-theme="light"] h1, [data-color-theme="light"] h1,
+[data-theme="light"] h2, [data-color-theme="light"] h2,
+[data-theme="light"] h3, [data-color-theme="light"] h3,
+[data-theme="light"] h4, [data-color-theme="light"] h4,
+[data-theme="light"] h5, [data-color-theme="light"] h5,
+[data-theme="light"] h6, [data-color-theme="light"] h6,
+[data-theme="light"] strong, [data-color-theme="light"] strong,
+[data-theme="light"] b, [data-color-theme="light"] b,
+[data-theme="light"] th, [data-color-theme="light"] th,
+[data-theme="light"] td, [data-color-theme="light"] td,
+[data-theme="light"] label, [data-color-theme="light"] label,
+[data-theme="light"] p, [data-color-theme="light"] p,
+[data-theme="light"] .card-title, [data-color-theme="light"] .card-title,
+[data-theme="light"] .stat-value, [data-color-theme="light"] .stat-value,
+[data-theme="light"] .kpi-value, [data-color-theme="light"] .kpi-value {
+    color: var(--text-primary, #0f172a);
+}
+
+[data-theme="light"] .text-muted, [data-color-theme="light"] .text-muted,
+[data-theme="light"] small, [data-color-theme="light"] small,
+[data-theme="light"] .card-subtitle, [data-color-theme="light"] .card-subtitle,
+[data-theme="light"] .stat-label, [data-color-theme="light"] .stat-label,
+[data-theme="light"] .kpi-label, [data-color-theme="light"] .kpi-label {
+    color: var(--text-secondary, #334155) !important;
+}
+
+[data-theme="light"] input:not([type="submit"]):not([type="button"]), 
+[data-theme="light"] select, 
+[data-theme="light"] textarea,
+[data-color-theme="light"] input:not([type="submit"]):not([type="button"]), 
+[data-color-theme="light"] select, 
+[data-color-theme="light"] textarea {
+    color: var(--text-primary, #0f172a) !important;
+    background-color: var(--bg-input, #f1f5f9) !important;
+    border: 1px solid #cbd5e1 !important;
+}
+
+.lp-theme-swatch[data-theme="red"] { background: linear-gradient(135deg, #991b1b, #ef4444) !important; }

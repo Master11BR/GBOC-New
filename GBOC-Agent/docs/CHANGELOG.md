@@ -1,4 +1,4 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.1.0 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.3.0 Enterprise. Todos os direitos reservados. -->
 
 # GBOC — Changelog de Atualizações
 
@@ -6,7 +6,58 @@
 
 ---
 
-## 14.1.0 — 2026-09-02 (Major Release — Layout Engine, Storage Breakdown, Logging Resilience & Local Replication Fix)
+## 14.3.0 — 2026-09-14 (Major UI/UX Model Release — Official Modern Model, Design System Tokens, UnoCSS & Menu Acceleration)
+
+### 🎨 Modelo Visual Oficial Moderno (`modern`) & Backend Contract
+- **Contrato Explícito de UI Model (`server_gboc.py`, `agent_gboc.py` & `gboc-layout-manager.js`)**:
+  - Definição estrita das constantes globais `UI_MODEL = "modern"`, `ACTIVE_UI_MODEL = "modern"` e `DEFAULT_UI_MODEL = "modern"`.
+  - Implementação de fallback determinístico no motor JS: requisições a modelos inexistentes ou legados desativados revertem automaticamente para `modern` e registram alerta no console.
+  - Disponibilização do endpoint `/api/v1/system/ui-config` no Servidor e no Agente com estado estruturado dos modelos, temas e estilos de componentes.
+- **Desativação de Opções Legadas Quebradas**:
+  - Remoção de seletores ou links para modelos legados inconsistentes do painel "Personalizar Interface", exibindo o selo inequívoco **MODELO UI ATIVO: Modern UI (Padrão Oficial)**.
+
+### 📐 Arquitetura Modular CSS & Infraestrutura UnoCSS
+- **Estrutura de Arquivos Modular (`static/ui/`)**:
+  - `tokens.css`: Centralização de variáveis globais de iluminação (`dark`, `light`, `purple`, `ocean`), tipografia, raios de borda e aliases de compatibilidade (`--border`, `--text`, `--bg-dark`).
+  - `unocss-ds.css`: Utilitários atômicos UnoCSS, shortcuts de cards/botões/inputs e animação skeleton loader conforme os Princípios de Movimento Kyle Zantos.
+  - `model.css`, `components.css`, `layout.css` sob `static/ui/models/modern/`: Isolamento do Modelo UI Moderno com suporte aos 4 formatos de componentes (`minimal`, `neumorphism`, `claymorphism`, `fluent`).
+
+### ⚡ Otimização do Menu Principal do Agente
+- **Performance de Carregamento (< 5ms) (`sidebar.js`)**:
+  - Implementação do cache em memória `__gbocSidebarMemoryCache` para renderização instantânea da barra lateral.
+  - Eliminação de requisições HTTP redundantes e unificação do `MutationObserver` no DOM.
+
+### 🖥️ Padronização das Telas Iniciais
+- **Harmonização do Dashboard & Tela Inicial (`dashboard.html` & `index.html`)**:
+  - Configuração estrita da tag `<html data-ui-model="modern">` e sincronização dos estilos com o Design System central.
+
+### 🤖 Auto-Diagnóstico de IA com Telemetria Real & Ações Passo a Passo ("O que fazer exatamente")
+- **Eliminação de Mensagens Genéricas (`ai_diagnostic_engine.py`, `ai_v2_router.py`)**:
+  - Remoção completa de respostas genéricas estáticas (*"Erro detectado: 'Diagnóstico geral...'"*).
+  - Coleta automática de telemetria 100% real do host operacional (`CPU`, `RAM`, `Disco`, `Status BD`, `Jobs com Trava`) via `psutil`.
+  - Estruturação padronizada das respostas do assistente em 3 seções obrigatórias:
+    1. 🔍 **Causa Raiz Técnica & Telemetria Real**
+    2. 🛠️ **O Que Fazer Exatamente (Passo a Passo)** (instruções operacionais numeradas e claras)
+    3. ⚡ **Executar Correção Automática (Auto-Heal)** (integrado ao endpoint `/api/v2/system/auto-heal` e botão em 1 clique).
+- **Interface dos Modais de Diagnóstico (`dashboard.html` & `index.html`)**:
+  - Modal do assistente de IA atualizado para renderizar badges de saúde por cor, diagnósticos de causa raiz e ações corretivas de Auto-Heal automatizadas.
+
+### 🎨 Troca Dinâmica em Tempo Real dos 4 Estilos de Componentes UI/UX
+- **Vinculação Global de CSS Tokens (`gboc-themes.css`)**:
+  - Correção dos seletores CSS globais `.card`, `.panel`, `.stat-card`, `.kpi-card`, `.dashboard-card`, `.data-card`, `.quick-action-card`, `.modal-card`, `.widget`, `.form-control`, `.input` e `.btn`.
+  - Todos os componentes visuais agora herdam instantaneamente as variáveis CSS de design tokens (`--card-radius`, `--card-border`, `--card-shadow`, `--card-backdrop`, `--card-bg`, `--input-shadow`, `--btn-shadow`).
+  - Permite a alternância imediata em tempo real no navegador entre os 4 estilos visuais: **SaaS Minimal**, **Neumorphism (Soft UI)**, **3D Claymorphism** e **Fluent Design (Microsoft Acrylic Glass)**.
+
+### 🔗 Padronização Estrita da API v2 (`/api/v2/`)
+- **Endpoints de Sistema e IA (`system_v2_router.py`, `ai_v2_router.py`)**:
+  - Inclusão dos endpoints oficiais `/api/v2/system/ui-config`, `/api/v2/system/version`, `/api/v2/ai/diagnose` e `/api/v2/system/auto-heal`.
+  - Todas as respostas envelopadas no padrão `build_v2_response` com metadados de execução (`execution_time_ms`, `timestamp`, `version`).
+
+### 📦 Pacote de Distribuição
+- **Pacote de Instalação (`build_installer_package.ps1`)**:
+  - Atualização do gerador de distribuição mantendo a pasta externa `GBOC-Distribution` 100% sincronizada.
+
+---
 
 ### 💾 Consumo de Armazenamento por Motor (Local vs. Destino)
 - **Detalhamento de Armazenamento por Motor (`storage_monitor.py` & `storage_router.py`)**:

@@ -1,0 +1,72 @@
+/* ============================================================================
+   GBOC System v14.2.0 — Modern UI Component Specifications
+   ============================================================================ */
+
+.card, .stat-card, .data-card, .theme-showcase-card {
+    background: var(--card-bg);
+    border-radius: var(--card-radius);
+    border: var(--card-border);
+    box-shadow: var(--card-shadow);
+    backdrop-filter: var(--card-backdrop);
+    -webkit-backdrop-filter: var(--card-backdrop);
+    transition: all var(--transition-normal);
+}
+
+.btn, .button, .theme-showcase-btn {
+    background: var(--primary-color);
+    border-radius: var(--btn-radius);
+    box-shadow: var(--btn-shadow);
+    color: #ffffff;
+    border: none;
+    padding: 10px 20px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all var(--transition-fast);
+}
+
+.btn:hover, .theme-showcase-btn:hover {
+    background: var(--primary-hover);
+    transform: var(--btn-transform-hover);
+}
+
+.btn:active, .theme-showcase-btn:active {
+    transform: var(--btn-transform-active);
+}
+
+.form-control, .input, .theme-showcase-input {
+    background: var(--input-bg);
+    border-radius: var(--input-radius);
+    border: var(--input-border);
+    box-shadow: var(--input-shadow);
+    color: var(--text-primary);
+    padding: 10px 14px;
+    outline: none;
+    width: 100%;
+    transition: all var(--transition-fast);
+}
+
+.form-control:focus, .input:focus, .theme-showcase-input:focus {
+    border-color: var(--primary-color) !important;
+    box-shadow: 0 0 0 3px var(--primary-glow), var(--input-shadow) !important;
+}
+
+/* Badges & Pills */
+.badge, .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 9999px;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.badge-success { background: rgba(16, 185, 129, 0.15); color: var(--success-color); }
+.badge-danger { background: rgba(239, 68, 68, 0.15); color: var(--danger-color); }
+.badge-warning { background: rgba(245, 158, 11, 0.15); color: var(--warning-color); }
+.badge-info { background: rgba(6, 182, 212, 0.15); color: var(--info-color); }
+.badge-primary { background: rgba(99, 102, 241, 0.15); color: var(--primary-color); }

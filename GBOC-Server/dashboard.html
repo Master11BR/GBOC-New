@@ -6,7 +6,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
 -->
 <!DOCTYPE html>
-<html lang="pt-BR" data-theme="dark">
+<html lang="pt-BR" data-ui-model="modern" data-theme="dark" data-color-theme="dark" data-ui-style="minimal">
 <head>
     <script>
         window.GBOC_API_BASE = (window.location.protocol === 'https:' || window.location.port === '8080' ? 'https:' : window.location.protocol) + '//' + window.location.hostname + ':' + (window.location.port === '8080' ? '8000' : (window.location.port || '8000'));
@@ -15,21 +15,16 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GBOC Server Dashboard</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="/gboc-layout.css">
     <link rel="stylesheet" href="/gboc-themes.css">
+    <link rel="stylesheet" href="/gboc-layout.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="/modules/storage/storage.js"></script>
     <script src="/modules/job_alert/job_alert.js"></script>
     <script src="/static/ai_assistant.js"></script>
     <script src="/static/gboc-layout-manager.js"></script>
     <style>
-        :root,[data-theme="dark"]{--bg-dark:#0e1525;--bg-card:#182035;--bg-input:#111928;--sidebar-bg:#131c30;--text:#dce8f5;--text-muted:#7ea8cc;--border:#2a3f5f;--card-hover:#1e2d47;--primary:#4fa3e8;--success:#4ecb88;--warning:#f0a940;--danger:#f06b6b;--accent-gradient:linear-gradient(135deg,#4fa3e8,#7b5ea8);--nm-shadow-dark:rgba(0,0,0,.55);--nm-shadow-light:rgba(79,163,232,.06);--nm-inset-dark:rgba(0,0,0,.4);--nm-inset-light:rgba(79,163,232,.04)}
-        [data-theme="light"]{--bg-dark:#eef1f7;--bg-card:#ffffff;--bg-input:#f4f6fb;--sidebar-bg:#ffffff;--text:#0f172a;--text-muted:#475569;--border:#cbd5e1;--card-hover:#e8edf5;--primary:#1d6fbf;--success:#1a7a4a;--warning:#b45309;--danger:#be2525;--accent-gradient:linear-gradient(135deg,#1d6fbf,#6d3fa8);--nm-shadow-dark:rgba(163,177,198,.55);--nm-shadow-light:rgba(255,255,255,.9);--nm-inset-dark:rgba(163,177,198,.45);--nm-inset-light:rgba(255,255,255,.7)}
-        [data-theme="neon"]{--bg-dark:#050914;--bg-card:#0b1124;--bg-input:#070d1d;--sidebar-bg:#080e1f;--text:#00f0ff;--text-muted:#70a0c0;--border:#005577;--card-hover:#101a35;--primary:#00f0ff;--success:#00ff66;--warning:#ffaa00;--danger:#ff0055;--accent-gradient:linear-gradient(135deg,#00f0ff,#ff00ff);--nm-shadow-dark:rgba(0,0,0,.9);--nm-shadow-light:rgba(0,240,255,.2);--nm-inset-dark:rgba(0,0,0,.8);--nm-inset-light:rgba(0,240,255,.1)}
-        [data-theme="contrast"]{--bg-dark:#000000;--bg-card:#111111;--bg-input:#222222;--sidebar-bg:#000000;--text:#ffffff;--text-muted:#ffffff;--border:#ffffff;--card-hover:#333333;--primary:#ffff00;--success:#00ff00;--warning:#ffaa00;--danger:#ff0000;--accent-gradient:linear-gradient(135deg,#ffff00,#ffffff);--nm-shadow-dark:rgba(255,255,255,.2);--nm-shadow-light:rgba(255,255,255,.2);--nm-inset-dark:rgba(255,255,255,.2);--nm-inset-light:rgba(255,255,255,.2)}
-        [data-theme="unifi"]{--bg-dark:#0a111e;--bg-card:#101a2d;--bg-input:#0a1424;--sidebar-bg:#08101c;--text:#e2e8f0;--text-muted:#849bb5;--border:#1a2942;--card-hover:#16243d;--primary:#006fff;--success:#00e5a3;--warning:#ffaa00;--danger:#ff3366;--accent-gradient:linear-gradient(135deg,#006fff,#00b4ff);--nm-shadow-dark:rgba(0,0,0,.6);--nm-shadow-light:rgba(0,111,255,.15);--nm-inset-dark:rgba(0,0,0,.5);--nm-inset-light:rgba(0,111,255,.1)}
         *{box-sizing:border-box;margin:0;padding:0}
-        body{font-family:'Segoe UI',Inter,system-ui,sans-serif;background:var(--bg-dark);color:var(--text);min-height:100vh;display:flex;transition:background .3s,color .3s}
+        body{font-family:'Segoe UI',Inter,system-ui,sans-serif;background:var(--bg-main);color:var(--text-primary);min-height:100vh;display:flex;transition:background .3s,color .3s}
 
 
         .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px}
@@ -3372,27 +3367,78 @@ function gbocToggleSidebarCollapse(){
             runAIDiagnostic();
         }
 
+        window.triggerAutoHealAction = async function(action) {
+            if (typeof showToast === 'function') showToast('Executando ação corretiva: ' + action, 'info');
+            try {
+                const res = await fetch((window.GBOC_API_BASE || '') + '/api/v2/system/auto-heal', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: action })
+                });
+                const d = await res.json();
+                const msg = (d.data && d.data.message) || d.message || 'Auto-Heal concluído com sucesso.';
+                if (typeof showToast === 'function') showToast(msg, 'success');
+                runAIDiagnostic();
+            } catch(err) {
+                if (typeof showToast === 'function') showToast('Falha na execução do Auto-Heal: ' + err.message, 'warning');
+            }
+        };
+
         async function runAIDiagnostic(){
             const container = document.getElementById('ai-modal-content');
-            container.innerHTML = '<p style="color:var(--text-muted)"><i class="fas fa-spinner fa-spin"></i> Processando telemetria e consultando Engine IA...</p>';
-            try{
-                const r = await fetch(window.GBOC_API_BASE + '/api/v1/ai/diagnose', {
+            if (!container) return;
+            container.innerHTML = '<p style="color:var(--text-muted)"><i class="fas fa-spinner fa-spin"></i> Coletando telemetria real do sistema e consultando Engine IA...</p>';
+            try {
+                const r = await fetch((window.GBOC_API_BASE || '') + '/api/v2/ai/diagnose', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({disk_percent: 42, ram_percent: 58, cpu_percent: 22})
+                    body: JSON.stringify({ module: 'Servidor Central' })
                 });
-                const d = await r.json();
-                container.innerHTML = `
-                    <div style="background:var(--bg-dark);padding:16px;border-radius:8px;border:1px solid var(--border);margin-bottom:16px">
-                        <div style="display:flex;justify-content:space-between;align-items:center">
-                            <span style="font-weight:700;font-size:1.1em">Score de Saúde do Sistema: <span style="color:${d.health_score >= 85 ? 'var(--success)' : 'var(--danger)'}">${d.health_score}/100</span></span>
-                            <span class="badge ${d.status==='HEALTHY'?'badge-success':'badge-danger'}">${d.status}</span>
+                const res = await r.json();
+                const d = res.data || res;
+                const result = d.result || {};
+                
+                const healthScore = d.health_score ?? 100;
+                const statusText = d.status || (healthScore >= 80 ? 'HEALTHY' : 'WARNING');
+                const insights = d.ai_insights || result.analysis || 'Diagnóstico concluído.';
+                const cause = result.cause || '';
+                const solution = result.solution || '';
+                const recAction = result.recommended_action || 'auto_heal';
+                
+                let html = `
+                    <div style="background:var(--bg-card);padding:16px;border-radius:var(--card-radius, 10px);border:var(--card-border, 1px solid var(--border));box-shadow:var(--card-shadow);margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">
+                        <div>
+                            <span style="font-weight:700;font-size:1.15em">Score de Saúde do Sistema: </span>
+                            <span style="font-size:1.25em;font-weight:800;color:${healthScore >= 85 ? 'var(--success, #10b981)' : healthScore >= 70 ? 'var(--warning, #f59e0b)' : 'var(--danger, #ef4444)'}">${healthScore}/100</span>
                         </div>
+                        <span class="badge ${statusText === 'HEALTHY' ? 'badge-success' : 'badge-danger'}" style="padding:6px 12px;font-size:0.9em;border-radius:20px">${statusText}</span>
                     </div>
-                    <h4 style="margin-bottom:8px">🤖 Insights & Recomendações IA:</h4>
-                    <div style="background:var(--bg-input);padding:14px;border-radius:8px;font-size:0.92em;line-height:1.6;white-space:pre-wrap;border-left:4px solid var(--primary)">${d.ai_insights}</div>
+                    
+                    <div style="background:var(--bg-input);padding:16px;border-radius:var(--card-radius, 10px);border-left:4px solid var(--primary);margin-bottom:16px">
+                        <h4 style="margin:0 0 10px 0;color:var(--text-primary);display:flex;align-items:center;gap:8px">
+                            <i class="fas fa-robot" style="color:var(--primary)"></i> Insights & Recomendações IA GBOC
+                        </h4>
+                        <div style="font-size:0.95em;line-height:1.6;color:var(--text-primary);white-space:pre-wrap">${insights}</div>
+                    </div>
                 `;
-            }catch(e){
+
+                if (cause || solution) {
+                    html += `
+                        <div style="background:var(--bg-card);padding:16px;border-radius:var(--card-radius, 10px);border:var(--card-border, 1px solid var(--border));margin-bottom:16px">
+                            ${cause ? `<div style="margin-bottom:12px"><strong>🔍 CAUSA RAIZ TÉCNICA:</strong><p style="margin:4px 0 0;color:var(--text-muted);font-size:0.92em">${cause}</p></div>` : ''}
+                            ${solution ? `<div><strong>🛠️ O QUE FAZER EXATAMENTE (PASSO A PASSO):</strong><div style="margin:4px 0 0;color:var(--text-primary);font-size:0.92em;line-height:1.5;white-space:pre-wrap">${solution}</div></div>` : ''}
+                        </div>
+                    `;
+                }
+
+                html += `
+                    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
+                        <button class="btn btn-secondary" onclick="runAIDiagnostic()"><i class="fas fa-sync"></i> Reanalisar Agora</button>
+                        <button class="btn btn-primary" onclick="triggerAutoHealAction('${recAction}')"><i class="fas fa-magic"></i> Executar Correção Automática</button>
+                    </div>
+                `;
+                container.innerHTML = html;
+            } catch(e) {
                 container.innerHTML = `<p style="color:var(--danger)">Erro ao executar diagnóstico de IA: ${e.message}</p>`;
             }
         }

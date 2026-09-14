@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GBOC Nexus Core — Novo Sistema UI/UX para Gestão & Backup Operations Center</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --nexus-bg: #0b0f19;
+            --nexus-surface: #131b2e;
+            --nexus-card: #18243c;
+            --nexus-input: #101828;
+            --nexus-border: rgba(255, 255, 255, 0.1);
+            --nexus-text: #f1f5f9;
+            --nexus-muted: #94a3b8;
+            --nexus-primary: #6366f1;
+            --nexus-primary-hover: #4f46e5;
+            --nexus-success: #10b981;
+            --nexus-warning: #f59e0b;
+            --nexus-danger: #ef4444;
+            --nexus-info: #06b6d4;
+            --nexus-radius: 12px;
+            --nexus-glow: rgba(99, 102, 241, 0.25);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { background-color: var(--nexus-bg); color: var(--nexus-text); padding: 24px; }
+
+        .nexus-nav { display: flex; gap: 12px; margin-bottom: 24px; border-bottom: 1px solid var(--nexus-border); padding-bottom: 16px; flex-wrap: wrap; }
+        .nexus-tab { background: var(--nexus-surface); border: 1px solid var(--nexus-border); color: var(--nexus-muted); padding: 10px 18px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.9em; transition: all 0.2s ease; }
+        .nexus-tab.active, .nexus-tab:hover { background: var(--nexus-primary); color: #ffffff; border-color: var(--nexus-primary); box-shadow: 0 4px 14px var(--nexus-glow); }
+
+        .layout-section { display: none; }
+        .layout-section.active { display: block; animation: fadeIn 0.35s ease-out; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Shared Card Component */
+        .card { background: var(--nexus-card); border-radius: var(--nexus-radius); border: 1px solid var(--nexus-border); padding: 20px; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+        .card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+
+        .btn { background: var(--nexus-primary); color: #fff; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: background 0.2s ease, transform 0.15s ease; }
+        .btn:hover { background: var(--nexus-primary-hover); transform: translateY(-1px); }
+        .btn-secondary { background: rgba(255,255,255,0.08); color: var(--nexus-text); border: 1px solid var(--nexus-border); }
+        .btn-secondary:hover { background: rgba(255,255,255,0.15); }
+
+        .badge { padding: 4px 10px; border-radius: 9999px; font-size: 0.78em; font-weight: 700; text-transform: uppercase; }
+        .badge-success { background: rgba(16,185,129,0.18); color: var(--nexus-success); border: 1px solid rgba(16,185,129,0.3); }
+        .badge-warning { background: rgba(245,158,11,0.18); color: var(--nexus-warning); border: 1px solid rgba(245,158,11,0.3); }
+        .badge-danger { background: rgba(239,68,68,0.18); color: var(--nexus-danger); border: 1px solid rgba(239,68,68,0.3); }
+
+        /* Layout 1: Dynamic Modular Cards */
+        .grid-modular { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+        .widget-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+        .widget-title { font-size: 0.95em; font-weight: 700; color: var(--nexus-muted); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 8px; }
+
+        /* Layout 2: Technical Glassmorphism */
+        .glass-container { background: rgba(24, 36, 60, 0.55); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.15); border-radius: 16px; padding: 24px; box-shadow: 0 16px 40px rgba(0,0,0,0.4); }
+
+        /* Layout 3: Command Center Operations */
+        .cc-wrapper { display: grid; grid-template-columns: 240px 1fr; gap: 20px; min-height: 500px; }
+        .cc-sidebar { background: var(--nexus-surface); border-radius: 12px; border: 1px solid var(--nexus-border); padding: 16px; }
+        .cc-nav-item { padding: 10px 14px; border-radius: 8px; color: var(--nexus-muted); margin-bottom: 6px; cursor: pointer; display: flex; align-items: center; gap: 10px; font-weight: 500; }
+        .cc-nav-item.active, .cc-nav-item:hover { background: var(--nexus-card); color: var(--nexus-text); }
+
+        /* Layout 4: Mobile-First Touch */
+        .mobile-hub { max-width: 480px; margin: 0 auto; background: var(--nexus-surface); border-radius: 24px; border: 1px solid var(--nexus-border); overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+        .mobile-content { padding: 20px; max-height: 560px; overflow-y: auto; }
+        .mobile-nav { display: flex; justify-content: space-around; background: var(--nexus-bg); padding: 12px; border-top: 1px solid var(--nexus-border); }
+        .mobile-nav-btn { color: var(--nexus-muted); font-size: 0.8em; display: flex; flex-direction: column; align-items: center; gap: 4px; border: none; background: none; cursor: pointer; }
+        .mobile-nav-btn.active { color: var(--nexus-primary); font-weight: 700; }
+    </style>
+</head>
+<body>
+    <div style="margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap">
+        <div>
+            <h1 style="font-size:1.6em;font-weight:800;color:var(--nexus-text)">GBOC Nexus Core — UI/UX Suite v14.3.0</h1>
+            <p style="color:var(--nexus-muted);font-size:0.92em">Modelos de Interface Avançados para Sistemas de Backup & Orquestração Central</p>
+        </div>
+        <button class="btn btn-secondary" onclick="document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'"><i class="fas fa-adjust"></i> Alternar Modo Claro/Escuro</button>
+    </div>
+
+    <div class="nexus-nav">
+        <button class="nexus-tab active" onclick="switchNexusLayout('l1', this)"><i class="fas fa-th-large"></i> 1. Painel Modular em Cartões</button>
+        <button class="nexus-tab" onclick="switchNexusLayout('l2', this)"><i class="fas fa-glass-water"></i> 2. Glassmorphism Técnico</button>
+        <button class="nexus-tab" onclick="switchNexusLayout('l3', this)"><i class="fas fa-terminal"></i> 3. Command Center Operations</button>
+        <button class="nexus-tab" onclick="switchNexusLayout('l4', this)"><i class="fas fa-mobile-alt"></i> 4. UI Touch / Mobile-First</button>
+    </div>
+
+    <!-- Layout 1: Painel Modular -->
+    <div id="l1" class="layout-section active">
+        <div class="grid-modular">
+            <div class="card">
+                <div class="widget-header">
+                    <span class="widget-title"><i class="fas fa-heartbeat" style="color:var(--nexus-success)"></i> Status Geral do Backup</span>
+                    <span class="badge badge-success">Operacional</span>
+                </div>
+                <div style="font-size:1.8em;font-weight:800;margin-bottom:8px">99.4% SLA</div>
+                <p style="color:var(--nexus-muted);font-size:0.85em">142 backups executados com sucesso nas últimas 24h.</p>
+                <div style="margin-top:14px"><button class="btn"><i class="fas fa-play"></i> Backup Agora</button></div>
+            </div>
+            <div class="card">
+                <div class="widget-header">
+                    <span class="widget-title"><i class="fas fa-list-check" style="color:var(--nexus-info)"></i> Fila de Execução</span>
+                    <span class="badge badge-warning">3 Pendentes</span>
+                </div>
+                <ul style="list-style:none;font-size:0.88em;color:var(--nexus-muted)">
+                    <li style="padding:6px 0;border-bottom:1px solid var(--nexus-border);display:flex;justify-content:space-between"><span>DB-PostgreSQL-Prod</span><strong>Em 12 min</strong></li>
+                    <li style="padding:6px 0;display:flex;justify-content:space-between"><span>FS-Arquivos-Financeiro</span><strong>Em 45 min</strong></li>
+                </ul>
+            </div>
+            <div class="card">
+                <div class="widget-header">
+                    <span class="widget-title"><i class="fas fa-database" style="color:var(--nexus-warning)"></i> Capacidade Storage</span>
+                    <span class="badge badge-success">72% Uso</span>
+                </div>
+                <div style="font-size:1.5em;font-weight:700;margin-bottom:8px">14.2 TB / 20 TB</div>
+                <div style="background:var(--nexus-input);height:8px;border-radius:4px;overflow:hidden"><div style="background:var(--nexus-primary);width:72%;height:100%"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Layout 2: Glassmorphism -->
+    <div id="l2" class="layout-section">
+        <div class="glass-container">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+                <h2 style="font-size:1.3em;font-weight:700"><i class="fas fa-shield-halved" style="color:var(--nexus-primary)"></i> Central Glassmorphic de Proteção Preditiva</h2>
+                <button class="btn"><i class="fas fa-arrows-rotate"></i> Atualizar Telemetria</button>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:16px">
+                <div class="card" style="background:rgba(255,255,255,0.05)">
+                    <div style="color:var(--nexus-muted);font-size:0.85em">Jobs Concluídos</div>
+                    <div style="font-size:1.6em;font-weight:800;color:var(--nexus-success)">1.284 / 1.286</div>
+                </div>
+                <div class="card" style="background:rgba(255,255,255,0.05)">
+                    <div style="color:var(--nexus-muted);font-size:0.85em">Taxa de Deduplicação</div>
+                    <div style="font-size:1.6em;font-weight:800;color:var(--nexus-info)">4.8x (79% Economia)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Layout 3: Command Center Operations -->
+    <div id="l3" class="layout-section">
+        <div class="cc-wrapper">
+            <div class="cc-sidebar">
+                <div style="font-weight:800;margin-bottom:16px;color:var(--nexus-primary)"><i class="fas fa-satellite"></i> NEXUS SENTINEL</div>
+                <div class="cc-nav-item active"><i class="fas fa-chart-line"></i> Dashboard</div>
+                <div class="cc-nav-item"><i class="fas fa-server"></i> Servidores</div>
+                <div class="cc-nav-item"><i class="fas fa-clock"></i> Agendamentos</div>
+                <div class="cc-nav-item"><i class="fas fa-triangle-exclamation"></i> Alertas (0)</div>
+            </div>
+            <div class="card">
+                <h3 style="margin-bottom:14px">Painel de Controle de Operações de Backup</h3>
+                <p style="color:var(--nexus-muted);font-size:0.9em;margin-bottom:16px">Visão operacional consolidada em tempo real com ações de 1-clique.</p>
+                <div style="display:flex;gap:10px">
+                    <button class="btn"><i class="fas fa-play"></i> Backup Geral</button>
+                    <button class="btn btn-secondary"><i class="fas fa-undo"></i> Testar Restauração</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Layout 4: Mobile-First Touch -->
+    <div id="l4" class="layout-section">
+        <div class="mobile-hub">
+            <div style="background:var(--nexus-card);padding:16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--nexus-border)">
+                <span style="font-weight:800;font-size:1.1em">GBOC Mobile Hub</span>
+                <span class="badge badge-success">Conectado</span>
+            </div>
+            <div class="mobile-content">
+                <div class="card" style="margin-bottom:12px">
+                    <div style="font-size:0.85em;color:var(--nexus-muted)">Status Atual</div>
+                    <div style="font-size:1.4em;font-weight:800;color:var(--nexus-success)">100% Protegido</div>
+                    <button class="btn" style="width:100%;margin-top:12px;justify-content:center"><i class="fas fa-bolt"></i> Executar Backup Imediato</button>
+                </div>
+            </div>
+            <div class="mobile-nav">
+                <button class="mobile-nav-btn active"><i class="fas fa-chart-pie"></i> Início</button>
+                <button class="mobile-nav-btn"><i class="fas fa-tasks"></i> Tarefas</button>
+                <button class="mobile-nav-btn"><i class="fas fa-shield-alt"></i> Alertas</button>
+                <button class="mobile-nav-btn"><i class="fas fa-cog"></i> Ajustes</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function switchNexusLayout(id, btn) {
+            document.querySelectorAll('.layout-section').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nexus-tab').forEach(el => el.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            btn.classList.add('active');
+        }
+    </script>
+</body>
+</html>

@@ -905,13 +905,30 @@ async def get_themes_css():
 @app.get("/api/system/info", tags=["System"])
 @app.get("/api/system/version", tags=["System"])
 async def get_server_version_endpoint():
-    """Retorna informações detalhadas do versionamento semântico 2.0."""
+    """Retorna informações detalhadas do versionamento semântico 2.0 e contrato de UI Model."""
     info = get_version_info()
     if isinstance(info, dict):
         info["gboc_version"] = info.get("semver") or SERVER_VERSION
         info["version"] = info.get("semver") or SERVER_VERSION
         info["status"] = "success"
+        info["UI_MODEL"] = "modern"
+        info["ACTIVE_UI_MODEL"] = "modern"
+        info["DEFAULT_UI_MODEL"] = "modern"
     return info
+
+@app.get("/api/v1/system/ui-config", tags=["System"])
+async def get_ui_config_endpoint():
+    """Retorna a configuração oficial estrita do Modelo UI/UX Moderno."""
+    return {
+        "UI_MODEL": "modern",
+        "ACTIVE_UI_MODEL": "modern",
+        "DEFAULT_UI_MODEL": "modern",
+        "AVAILABLE_MODELS": ["modern"],
+        "DEFAULT_THEME": "dark",
+        "AVAILABLE_THEMES": ["dark", "light", "purple", "ocean"],
+        "DEFAULT_UI_STYLE": "minimal",
+        "AVAILABLE_UI_STYLES": ["minimal", "neumorphism", "claymorphism", "fluent"]
+    }
 
 # Rota estática universal para recursos da pasta /static/
 @app.get("/static/{filename:path}", include_in_schema=False)

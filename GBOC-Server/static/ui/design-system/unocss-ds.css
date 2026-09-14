@@ -1,0 +1,75 @@
+/* ============================================================================
+   GBOC System v14.2.0 — UnoCSS Visual Infrastructure & Design System Shortcuts
+   ============================================================================ */
+
+/* Atomic Layout Utilities */
+.uno-flex-center { display: flex; align-items: center; justify-content: center; }
+.uno-flex-between { display: flex; align-items: center; justify-content: space-between; }
+.uno-flex-col { display: flex; flex-direction: column; }
+.uno-grid-auto { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+
+/* Surface Shortcuts */
+.uno-card {
+    background: var(--card-bg);
+    border-radius: var(--card-radius);
+    border: var(--card-border);
+    box-shadow: var(--card-shadow);
+    backdrop-filter: var(--card-backdrop);
+    -webkit-backdrop-filter: var(--card-backdrop);
+    transition: all var(--transition-normal);
+}
+
+.uno-btn-primary {
+    background: var(--primary-color);
+    border-radius: var(--btn-radius);
+    box-shadow: var(--btn-shadow);
+    color: #ffffff;
+    border: none;
+    padding: 0.625rem 1.25rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    transition: all var(--transition-fast);
+}
+
+.uno-btn-primary:hover {
+    background: var(--primary-hover);
+    transform: var(--btn-transform-hover);
+}
+
+.uno-btn-primary:active {
+    transform: var(--btn-transform-active);
+}
+
+.uno-input {
+    background: var(--input-bg);
+    border-radius: var(--input-radius);
+    border: var(--input-border);
+    box-shadow: var(--input-shadow);
+    color: var(--text-primary);
+    padding: 0.625rem 0.875rem;
+    outline: none;
+    width: 100%;
+    transition: all var(--transition-fast);
+}
+
+.uno-input:focus {
+    border-color: var(--primary-color) !important;
+    box-shadow: 0 0 0 3px var(--primary-glow), var(--input-shadow) !important;
+}
+
+/* Motion Principles (Skeleton Loader & Transitions) */
+.uno-skeleton {
+    background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.12) 37%, rgba(255,255,255,0.05) 63%);
+    background-size: 400% 100%;
+    animation: uno-skeleton-loading 1.4s ease infinite;
+    border-radius: 4px;
+}
+
+@keyframes uno-skeleton-loading {
+    0% { background-position: 100% 50%; }
+    100% { background-position: 0 50%; }
+}
