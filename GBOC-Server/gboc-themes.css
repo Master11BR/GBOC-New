@@ -7,6 +7,7 @@
 @import url('/static/ui/design-system/unocss-ds.css');
 @import url('/static/ui/models/modern/model.css');
 @import url('/static/ui/models/modern/components.css');
+@import url('/static/ui/models/modern/layout.css');
 
 /* ── 1. ILLUMINATION MODES (Light / Dark) ────────────────────────────────── */
 
@@ -241,11 +242,55 @@
     --btn-transform-active: translateY(0);
 }
 
-/* ── 3. GLOBAL BASE OVERRIDES ────────────────────────────────────────────── */
+/* ── 3. KEYFRAME MOTION ANIMATIONS (Kyle Zantos Motion Principles) ───────── */
+
+@keyframes scanline-sweep {
+    0% { transform: translateY(-100%); opacity: 0; }
+    50% { opacity: 0.35; }
+    100% { transform: translateY(1000%); opacity: 0; }
+}
+
+@keyframes cyber-border-glow {
+    0% { border-color: rgba(99, 102, 241, 0.4); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), 0 0 15px rgba(99, 102, 241, 0.2); }
+    50% { border-color: var(--primary-color); box-shadow: 0 16px 45px rgba(0, 0, 0, 0.6), 0 0 30px var(--primary-glow); }
+    100% { border-color: rgba(168, 85, 247, 0.5); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), 0 0 20px rgba(168, 85, 247, 0.3); }
+}
+
+@keyframes clay-bounce {
+    0% { transform: scale(1); }
+    50% { transform: scale(0.96) translateY(2px); }
+    100% { transform: scale(1.02) translateY(-4px); }
+}
+
+@keyframes glass-shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+@keyframes status-pulse {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.15); opacity: 0.7; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+/* ── 4. GLOBAL BASE & STRUCTURAL OVERRIDES ────────────────────────────────── */
 body {
     background-color: var(--bg-main) !important;
     color: var(--text-primary) !important;
-    transition: background-color 0.3s cubic-bezier(0.16, 1, 0.3, 1), color 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: background-color 0.35s cubic-bezier(0.16, 1, 0.3, 1), color 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Sidebar & Topbar Full Structural Color Integration */
+.sidebar, #sidebar, aside, .app-sidebar, .nav-sidebar {
+    background-color: var(--sidebar-bg) !important;
+    border-right: 1px solid var(--border-color) !important;
+    transition: background-color 0.35s ease, border-color 0.35s ease !important;
+}
+
+.topbar, #topbar, header, .app-header, .nav-topbar {
+    background-color: var(--topbar-bg) !important;
+    border-bottom: 1px solid var(--border-color) !important;
+    transition: background-color 0.35s ease, border-color 0.35s ease !important;
 }
 
 /* Dynamic Card & Panel Component Enforcers */
@@ -258,19 +303,83 @@ body {
     box-shadow: var(--card-shadow) !important;
     backdrop-filter: var(--card-backdrop) !important;
     -webkit-backdrop-filter: var(--card-backdrop) !important;
-    transition: background 0.35s cubic-bezier(0.16, 1, 0.3, 1), 
-                border 0.35s cubic-bezier(0.16, 1, 0.3, 1), 
-                box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1), 
-                border-radius 0.35s cubic-bezier(0.16, 1, 0.3, 1),
-                backdrop-filter 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    position: relative;
+    transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, border-radius 0.2s ease, transform 0.2s ease !important;
 }
 
 .modal-backdrop > div, .modal-dialog > div, #ai-modal .modal-content, #reports-modal > div {
+    background: var(--card-bg) !important;
     border-radius: var(--card-radius, 12px) !important;
     border: var(--card-border, 1px solid var(--border-color)) !important;
     box-shadow: var(--card-shadow, 0 10px 30px rgba(0,0,0,0.3)) !important;
     backdrop-filter: var(--card-backdrop, none) !important;
     -webkit-backdrop-filter: var(--card-backdrop, none) !important;
+}
+
+/* ── 5. STRUCTURAL TRANSFORMATIONS PER UX/UI STYLE ────────────────────────── */
+
+/* Style 7: Command Center Operations / Sentinel (Tactical NOC Reticles & Monospace) */
+[data-ui-style="command-sentinel"] {
+    font-family: 'JetBrains Mono', monospace !important;
+}
+
+[data-ui-style="command-sentinel"] .card, 
+[data-ui-style="command-sentinel"] .panel, 
+[data-ui-style="command-sentinel"] .stat-card,
+[data-ui-style="command-sentinel"] .dashboard-card {
+    border-left: 3px solid var(--primary-color) !important;
+    overflow: hidden;
+}
+
+[data-ui-style="command-sentinel"] .card::before,
+[data-ui-style="command-sentinel"] .panel::before,
+[data-ui-style="command-sentinel"] .stat-card::before {
+    content: "+" !important;
+    position: absolute !important;
+    top: 4px !important;
+    right: 8px !important;
+    font-size: 0.75rem !important;
+    font-weight: 800 !important;
+    color: var(--primary-color) !important;
+    opacity: 0.7 !important;
+}
+
+[data-ui-style="command-sentinel"] .card::after,
+[data-ui-style="command-sentinel"] .panel::after,
+[data-ui-style="command-sentinel"] .stat-card::after {
+    content: "" !important;
+    position: absolute !important;
+    top: 0; left: 0; right: 0; height: 3px !important;
+    background: linear-gradient(90deg, transparent, var(--primary-color), transparent) !important;
+    animation: scanline-sweep 4s infinite linear !important;
+    pointer-events: none !important;
+}
+
+/* Style 8: Cyber 3D Glass (Holographic Perspective 3D Tilt) */
+[data-ui-style="cyber-3d"] .card:hover,
+[data-ui-style="cyber-3d"] .panel:hover,
+[data-ui-style="cyber-3d"] .stat-card:hover,
+[data-ui-style="cyber-3d"] .dashboard-card:hover {
+    transform: perspective(1000px) rotateX(2deg) rotateY(-2deg) translateY(-6px) !important;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 35px var(--primary-glow) !important;
+    animation: cyber-border-glow 3s infinite alternate !important;
+}
+
+/* Style 3: 3D Claymorphism Tactile Bounce */
+[data-ui-style="claymorphism"] .btn:hover,
+[data-ui-style="claymorphism"] button.btn:hover {
+    animation: clay-bounce 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+}
+
+/* Style 6: Glassmorphism Shimmer */
+[data-ui-style="nexus-glass"] .card::before,
+[data-ui-style="fluent"] .card::before {
+    content: "" !important;
+    position: absolute !important;
+    top: 0; left: 0; right: 0; bottom: 0 !important;
+    background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 50%, rgba(255,255,255,0.03) 100%) !important;
+    pointer-events: none !important;
+    border-radius: inherit !important;
 }
 
 /* Dynamic Input Selector Class */
@@ -300,7 +409,7 @@ body {
     transform: var(--btn-transform-active) !important;
 }
 
-/* ── 4. LIGHT MODE HIGH CONTRAST TYPOGRAPHY ENFORCEMENT ─────────────────── */
+/* ── 6. LIGHT MODE HIGH CONTRAST TYPOGRAPHY ENFORCEMENT ─────────────────── */
 [data-theme="light"], [data-color-theme="light"] {
     color-scheme: light !important;
 }
@@ -357,3 +466,4 @@ body {
 }
 
 .lp-theme-swatch[data-theme="red"] { background: linear-gradient(135deg, #991b1b, #ef4444) !important; }
+

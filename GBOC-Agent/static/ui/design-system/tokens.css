@@ -27,35 +27,36 @@
 
 /* Dark Mode Tokens (Default) */
 [data-theme="dark"], [data-color-theme="dark"], :root {
-    --bg-main: #121212;
-    --bg-card: #1e1e20;
-    --bg-input: #18181a;
-    --sidebar-bg: #121212;
-    --topbar-bg: #18181a;
+    --bg-main: #0f172a;
+    --bg-card: #1e293b;
+    --bg-input: #0f172a;
+    --sidebar-bg: #0b1329;
+    --topbar-bg: #0b1329;
 
     --text-primary: #f8fafc;
-    --text-secondary: #a1a1aa;
-    --text-muted: #71717a;
+    --text-secondary: #cbd5e1;
+    --text-muted: #94a3b8;
 
-    --border-color: rgba(255, 255, 255, 0.08);
+    --border-color: rgba(255, 255, 255, 0.1);
     --primary-color: #6366f1;
     --primary-hover: #4f46e5;
     --primary-glow: rgba(99, 102, 241, 0.35);
+    --primary-soft: rgba(99, 102, 241, 0.16);
 
     --success-color: #10b981;
     --danger-color: #ef4444;
     --warning-color: #f59e0b;
     --info-color: #06b6d4;
 
-    --nm-bg: #121212;
+    --nm-bg: #0f172a;
     --nm-shadow-dark: rgba(0, 0, 0, 0.75);
     --nm-shadow-light: rgba(255, 255, 255, 0.04);
 
-    --clay-bg: #1c1c20;
+    --clay-bg: #1e293b;
     --clay-shadow-drop: 0 16px 36px rgba(0, 0, 0, 0.65);
     --clay-shadow-inset: inset -6px -6px 14px rgba(0, 0, 0, 0.55), inset 6px 6px 14px rgba(255, 255, 255, 0.08);
 
-    --fluent-glass-bg: rgba(26, 26, 28, 0.65);
+    --fluent-glass-bg: rgba(30, 41, 59, 0.75);
     --fluent-border: 1px solid rgba(255, 255, 255, 0.14);
 
     --bg-dark: var(--bg-main);
@@ -84,6 +85,7 @@
     --primary-color: #2563eb;
     --primary-hover: #1d4ed8;
     --primary-glow: rgba(37, 99, 235, 0.25);
+    --primary-soft: rgba(37, 99, 235, 0.12);
 
     --success-color: #10b981;
     --danger-color: #ef4444;
@@ -111,29 +113,110 @@
     --warning: var(--warning-color);
 }
 
-/* Purple Theme Accent */
+/* Purple Theme — Full Amethyst Royal Palette */
 [data-color-theme="purple"] {
-    --primary-color: #8b5cf6 !important;
-    --primary-hover: #7c3aed !important;
-    --primary-glow: rgba(139, 92, 246, 0.4) !important;
-    --primary: #8b5cf6 !important;
-    --accent-gradient: linear-gradient(135deg, #8b5cf6 0%, #d946ef 100%) !important;
+    --bg-main:          #0b0614 !important;
+    --bg-card:          rgba(26, 15, 42, 0.92) !important;
+    --bg-input:         #190c2e !important;
+    --sidebar-bg:       #08040f !important;
+    --topbar-bg:        #120921 !important;
+    --text-primary:     #faf5ff !important;
+    --text-secondary:   #e9d5ff !important;
+    --text-muted:       #c084fc !important;
+    --border-color:     rgba(168, 85, 247, 0.25) !important;
+
+    --primary-color:    #a855f7 !important;
+    --primary-hover:    #9333ea !important;
+    --primary-glow:     rgba(168, 85, 247, 0.45) !important;
+    --primary-soft:     rgba(168, 85, 247, 0.18) !important;
+    --primary:          #a855f7 !important;
+    --accent-gradient:  linear-gradient(135deg, #a855f7 0%, #ec4899 100%) !important;
+
+    --nm-bg:            #0b0614 !important;
+    --nm-shadow-dark:   rgba(0, 0, 0, 0.85) !important;
+    --nm-shadow-light:  rgba(168, 85, 247, 0.12) !important;
+
+    --clay-bg:          #1b0d30 !important;
+    --clay-shadow-drop: 0 16px 36px rgba(0, 0, 0, 0.75) !important;
+    --clay-shadow-inset: inset -6px -6px 14px rgba(0, 0, 0, 0.65), inset 6px 6px 14px rgba(168, 85, 247, 0.2) !important;
+
+    --fluent-glass-bg:  rgba(26, 15, 42, 0.75) !important;
+    --fluent-border:    1px solid rgba(168, 85, 247, 0.3) !important;
+
+    --bg-dark: var(--bg-main) !important;
+    --border: var(--border-color) !important;
+    --text: var(--text-primary) !important;
+    --card-hover: var(--bg-input) !important;
 }
 
-/* Ocean Theme Accent */
+/* Ocean Theme — Full Abyssal Teal/Cyan Palette */
 [data-color-theme="ocean"] {
-    --primary-color: #06b6d4 !important;
-    --primary-hover: #0891b2 !important;
-    --primary-glow: rgba(6, 182, 212, 0.4) !important;
-    --primary: #06b6d4 !important;
-    --accent-gradient: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%) !important;
+    --bg-main:          #03111b !important;
+    --bg-card:          rgba(10, 32, 48, 0.92) !important;
+    --bg-input:         #0a2233 !important;
+    --sidebar-bg:       #020b12 !important;
+    --topbar-bg:        #061a27 !important;
+    --text-primary:     #f0fdfa !important;
+    --text-secondary:   #a5f3fc !important;
+    --text-muted:       #22d3ee !important;
+    --border-color:     rgba(6, 182, 212, 0.25) !important;
+
+    --primary-color:    #06b6d4 !important;
+    --primary-hover:    #0891b2 !important;
+    --primary-glow:     rgba(6, 182, 212, 0.45) !important;
+    --primary-soft:     rgba(6, 182, 212, 0.18) !important;
+    --primary:          #06b6d4 !important;
+    --accent-gradient:  linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%) !important;
+
+    --nm-bg:            #03111b !important;
+    --nm-shadow-dark:   rgba(0, 0, 0, 0.85) !important;
+    --nm-shadow-light:  rgba(6, 182, 212, 0.12) !important;
+
+    --clay-bg:          #0a2233 !important;
+    --clay-shadow-drop: 0 16px 36px rgba(0, 0, 0, 0.75) !important;
+    --clay-shadow-inset: inset -6px -6px 14px rgba(0, 0, 0, 0.65), inset 6px 6px 14px rgba(6, 182, 212, 0.2) !important;
+
+    --fluent-glass-bg:  rgba(10, 32, 48, 0.75) !important;
+    --fluent-border:    1px solid rgba(6, 182, 212, 0.3) !important;
+
+    --bg-dark: var(--bg-main) !important;
+    --border: var(--border-color) !important;
+    --text: var(--text-primary) !important;
+    --card-hover: var(--bg-input) !important;
 }
 
-/* Red Sentinel Theme Accent */
+/* Red Sentinel Theme — Full Crimson Ruby Palette */
 [data-color-theme="red"], [data-color-theme="crimson"] {
-    --primary-color: #ef4444 !important;
-    --primary-hover: #dc2626 !important;
-    --primary-glow: rgba(239, 68, 68, 0.4) !important;
-    --primary: #ef4444 !important;
-    --accent-gradient: linear-gradient(135deg, #ef4444 0%, #991b1b 100%) !important;
+    --bg-main:          #180507 !important;
+    --bg-card:          rgba(45, 14, 18, 0.92) !important;
+    --bg-input:         #2b0b10 !important;
+    --sidebar-bg:       #120305 !important;
+    --topbar-bg:        #1f060a !important;
+    --text-primary:     #fff1f2 !important;
+    --text-secondary:   #fecdd3 !important;
+    --text-muted:       #f87171 !important;
+    --border-color:     rgba(239, 68, 68, 0.25) !important;
+
+    --primary-color:    #ef4444 !important;
+    --primary-hover:    #dc2626 !important;
+    --primary-glow:     rgba(239, 68, 68, 0.45) !important;
+    --primary-soft:     rgba(239, 68, 68, 0.18) !important;
+    --primary:          #ef4444 !important;
+    --accent-gradient:  linear-gradient(135deg, #ef4444 0%, #f97316 100%) !important;
+
+    --nm-bg:            #180507 !important;
+    --nm-shadow-dark:   rgba(0, 0, 0, 0.88) !important;
+    --nm-shadow-light:  rgba(239, 68, 68, 0.12) !important;
+
+    --clay-bg:          #2b0b10 !important;
+    --clay-shadow-drop: 0 16px 36px rgba(0, 0, 0, 0.8) !important;
+    --clay-shadow-inset: inset -6px -6px 14px rgba(0, 0, 0, 0.7), inset 6px 6px 14px rgba(239, 68, 68, 0.2) !important;
+
+    --fluent-glass-bg:  rgba(45, 14, 18, 0.75) !important;
+    --fluent-border:    1px solid rgba(239, 68, 68, 0.3) !important;
+
+    --bg-dark: var(--bg-main) !important;
+    --border: var(--border-color) !important;
+    --text: var(--text-primary) !important;
+    --card-hover: var(--bg-input) !important;
 }

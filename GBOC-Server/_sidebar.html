@@ -60,7 +60,7 @@
         <!-- 3. Backup & Orquestração -->
         <div class="nav-group" id="sgrp-backup">
             <button class="nav-group-header" onclick="toggleNavGroup('sgrp-backup')">
-                <span><i class="fas fa-box-open nav-icon" style="color:#6366f1"></i> Backup & Orquestração</span>
+                <span><i class="fas fa-box-open nav-icon"></i> Backup & Orquestração</span>
                 <i class="fas fa-chevron-down nav-group-arrow" id="arrow-sgrp-backup"></i>
             </button>
             <div class="nav-group-items open" id="items-sgrp-backup">
@@ -73,7 +73,7 @@
         <!-- 4. Segurança -->
         <div class="nav-group" id="sgrp-security">
             <button class="nav-group-header" onclick="toggleNavGroup('sgrp-security')">
-                <span><i class="fas fa-shield-alt nav-icon" style="color:#ef4444"></i> Segurança</span>
+                <span><i class="fas fa-shield-alt nav-icon"></i> Segurança</span>
                 <i class="fas fa-chevron-down nav-group-arrow" id="arrow-sgrp-security"></i>
             </button>
             <div class="nav-group-items open" id="items-sgrp-security">
@@ -85,12 +85,12 @@
         <!-- 5. Analytics & Monitoramento -->
         <div class="nav-group" id="sgrp-analytics">
             <button class="nav-group-header" onclick="toggleNavGroup('sgrp-analytics')">
-                <span><i class="fas fa-chart-line nav-icon" style="color:#10b981"></i> Analytics & Monitoramento</span>
+                <span><i class="fas fa-chart-line nav-icon"></i> Analytics & Monitoramento</span>
                 <i class="fas fa-chevron-down nav-group-arrow" id="arrow-sgrp-analytics"></i>
             </button>
             <div class="nav-group-items open" id="items-sgrp-analytics">
                 <div class="nav-link nav-sub" onclick="switchTab('alerts',this)"><i class="fas fa-bell"></i> <span>Central de Alertas</span></div>
-                <div class="nav-link nav-sub" onclick="switchTab('job-alert',this)" style="color:var(--danger)"><i class="fas fa-exclamation-triangle"></i> <span>Jobs com Falha</span></div>
+                <div class="nav-link nav-sub" onclick="switchTab('job-alert',this)" style="color:var(--danger-color, #ef4444)"><i class="fas fa-exclamation-triangle"></i> <span>Jobs com Falha</span></div>
                 <div class="nav-link nav-sub" onclick="switchTab('logs',this)"><i class="fas fa-file-alt"></i> <span>Logs Globais</span></div>
                 <div class="nav-link nav-sub" onclick="switchTab('reports',this)"><i class="fas fa-chart-pie"></i> <span>Central de Relatórios</span></div>
             </div>
@@ -99,13 +99,13 @@
         <!-- 6. Sistema -->
         <div class="nav-group" id="sgrp-system">
             <button class="nav-group-header" onclick="toggleNavGroup('sgrp-system')">
-                <span><i class="fas fa-cogs nav-icon" style="color:#f59e0b"></i> Sistema</span>
+                <span><i class="fas fa-cogs nav-icon"></i> Sistema</span>
                 <i class="fas fa-chevron-down nav-group-arrow" id="arrow-sgrp-system"></i>
             </button>
             <div class="nav-group-items open" id="items-sgrp-system">
                 <div class="nav-link nav-sub" onclick="switchTab('users',this)"><i class="fas fa-users-cog"></i> <span>Usuários & Permissões</span></div>
                 <div class="nav-link nav-sub" onclick="switchTab('config',this)"><i class="fas fa-cog"></i> <span>Configurações Gerais</span></div>
-                <div class="nav-link nav-sub" onclick="if(window.GBOC_AI_Assistant){window.GBOC_AI_Assistant.toggle();}" style="color:var(--primary);font-weight:700"><i class="fas fa-brain"></i> <span>GBOC AI Copilot</span></div>
+                <div class="nav-link nav-sub" onclick="if(window.GBOC_AI_Assistant){window.GBOC_AI_Assistant.toggle();}" style="color:var(--primary-color);font-weight:700"><i class="fas fa-brain"></i> <span>GBOC AI Copilot</span></div>
             </div>
         </div>
     </nav>

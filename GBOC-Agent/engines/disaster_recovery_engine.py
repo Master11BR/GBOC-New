@@ -34,6 +34,15 @@ class DisasterRecoveryEngine:
         except Exception:
             pass
 
+        # Thread-safe TTL Caches para evitar travamento da UI
+        self._cache_ttl = 30.0  # 30 segundos
+        self._disks_cache: Optional[List[Dict[str, Any]]] = None
+        self._disks_cache_time = 0.0
+        self._sys_info_cache: Optional[Dict[str, Any]] = None
+        self._sys_info_cache_time = 0.0
+        self._readiness_cache: Optional[Dict[str, Any]] = None
+        self._readiness_cache_time = 0.0
+
     def _append_log(self, job_id: str, message: str):
         with self.lock:
             if job_id in self.active_jobs:
@@ -44,44 +53,50 @@ class DisasterRecoveryEngine:
                 if len(self.active_jobs[job_id]["logs"]) > 300:
                     self.active_jobs[job_id]["logs"] = self.active_jobs[job_id]["logs"][-300:]
 
-    def get_physical_disks(self) -> List[Dict[str, Any]]:
+    def get_physical_disks(self, force_refresh: bool = False) -> List[Dict[str, Any]]:
         """
         Retorna informações 100% reais sobre os discos físicos e partições do sistema.
+        Utiliza cache TTL de 30s e uma única consulta em lote PowerShell para máxima velocidade.
         """
+        now = time.time()
+        with self.lock:
+            if not force_refresh and self._disks_cache is not None and (now - self._disks_cache_time) < self._cache_ttl:
+                return self._disks_cache
+
         disks = []
         if sys.platform == "win32":
-            ps_cmd = (
-                "Get-Disk | Select-Object Number, FriendlyName, SerialNumber, Size, "
-                "PartitionStyle, BusType, OperationalStatus | ConvertTo-Json -Depth 2"
+            # Consulta única em lote para todos os discos e partições de uma vez só
+            ps_batch_cmd = (
+                "$ErrorActionPreference = 'SilentlyContinue'; "
+                "$dList = @(Get-Disk | Select-Object Number, FriendlyName, SerialNumber, Size, PartitionStyle, BusType, OperationalStatus); "
+                "$pList = @(Get-Partition | Select-Object DiskNumber, PartitionNumber, DriveLetter, Size, Type); "
+                "[PSCustomObject]@{ Disks = $dList; Partitions = $pList } | ConvertTo-Json -Depth 3"
             )
             try:
                 res = subprocess.run(
-                    ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd],
+                    ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_batch_cmd],
                     capture_output=True, text=True, timeout=12
                 )
                 if res.returncode == 0 and res.stdout.strip():
-                    raw = json.loads(res.stdout.strip())
-                    items = raw if isinstance(raw, list) else [raw]
-                    for item in items:
+                    data = json.loads(res.stdout.strip())
+                    raw_disks = data.get("Disks", [])
+                    raw_parts = data.get("Partitions", [])
+                    
+                    if isinstance(raw_disks, dict):
+                        raw_disks = [raw_disks]
+                    if isinstance(raw_parts, dict):
+                        raw_parts = [raw_parts]
+
+                    for item in raw_disks:
                         num = item.get("Number", 0)
                         size_bytes = item.get("Size") or 0
                         size_gb = round(size_bytes / (1024 ** 3), 2)
-                        
-                        # Buscar partições e letras de unidade do disco
-                        part_cmd = (
-                            f"Get-Partition -DiskNumber {num} -ErrorAction SilentlyContinue | "
-                            "Select-Object PartitionNumber, DriveLetter, Size, Type | ConvertTo-Json -Depth 2"
-                        )
-                        part_res = subprocess.run(
-                            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", part_cmd],
-                            capture_output=True, text=True, timeout=8
-                        )
+
+                        # Filtrar partições pertencentes a este disco físico
                         partitions = []
                         drive_letters = []
-                        if part_res.returncode == 0 and part_res.stdout.strip():
-                            p_raw = json.loads(part_res.stdout.strip())
-                            p_items = p_raw if isinstance(p_raw, list) else [p_raw]
-                            for p in p_items:
+                        for p in raw_parts:
+                            if p.get("DiskNumber") == num:
                                 letter = p.get("DriveLetter")
                                 if letter:
                                     drive_letters.append(f"{letter}:")
@@ -131,13 +146,23 @@ class DisasterRecoveryEngine:
             except Exception:
                 pass
 
+        with self.lock:
+            self._disks_cache = disks
+            self._disks_cache_time = time.time()
+
         return disks
 
-    def get_system_dr_info(self) -> Dict[str, Any]:
+    def get_system_dr_info(self, force_refresh: bool = False) -> Dict[str, Any]:
         """
         Retorna diagnóstico em tempo real do sistema para Disaster Recovery,
         incluindo detecção de Active Directory e integridade dos VSS Writers.
+        Utiliza cache TTL de 30s e validação de registro NTDS para máxima agilidade.
         """
+        now = time.time()
+        with self.lock:
+            if not force_refresh and self._sys_info_cache is not None and (now - self._sys_info_cache_time) < self._cache_ttl:
+                return self._sys_info_cache
+
         info = {
             "os_name": sys.platform,
             "is_windows": sys.platform == "win32",
@@ -153,26 +178,18 @@ class DisasterRecoveryEngine:
         }
 
         if sys.platform == "win32":
-            # 1. Verificar se é Active Directory Domain Controller
+            # 1. Verificar se é Active Directory Domain Controller via winreg nativo (sub-milissegundo)
             try:
-                ps_dc = (
-                    "try { "
-                    "  $cs = Get-CimInstance Win32_ComputerSystem; "
-                    "  $isDc = ($cs.DomainRole -ge 4); "
-                    "  $domain = $cs.Domain; "
-                    "  [PSCustomObject]@{ IsDC = $isDc; Domain = $domain } | ConvertTo-Json "
-                    "} catch { @{ IsDC = $false; Domain = $null } | ConvertTo-Json }"
-                )
-                res = subprocess.run(
-                    ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_dc],
-                    capture_output=True, text=True, timeout=8
-                )
-                if res.returncode == 0 and res.stdout.strip():
-                    dc_data = json.loads(res.stdout.strip())
-                    info["is_domain_controller"] = bool(dc_data.get("IsDC"))
-                    info["domain_name"] = dc_data.get("Domain")
-                    if info["is_domain_controller"]:
+                import winreg
+                try:
+                    with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Services\NTDS"):
+                        info["is_domain_controller"] = True
                         info["ad_roles"].append("Active Directory Domain Services (AD DS)")
+                except FileNotFoundError:
+                    info["is_domain_controller"] = False
+
+                domain = os.environ.get("USERDNSDOMAIN") or os.environ.get("USERDOMAIN")
+                info["domain_name"] = domain
             except Exception as e:
                 logger.debug(f"Erro ao verificar Domain Controller: {e}")
 
@@ -208,14 +225,24 @@ class DisasterRecoveryEngine:
             except Exception as e:
                 logger.warning(f"Erro ao consultar vssadmin list writers: {e}")
 
+        with self.lock:
+            self._sys_info_cache = info
+            self._sys_info_cache_time = time.time()
+
         return info
 
-    def calculate_dr_readiness(self) -> Dict[str, Any]:
+    def calculate_dr_readiness(self, force_refresh: bool = False) -> Dict[str, Any]:
         """
         Calcula o Disaster Recovery Readiness Score (0-100%) com checklist de conformidade.
+        Aproveita os dados em cache de system_info e physical_disks para execução instantânea.
         """
-        sys_info = self.get_system_dr_info()
-        disks = self.get_physical_disks()
+        now = time.time()
+        with self.lock:
+            if not force_refresh and self._readiness_cache is not None and (now - self._readiness_cache_time) < self._cache_ttl:
+                return self._readiness_cache
+
+        sys_info = self.get_system_dr_info(force_refresh=force_refresh)
+        disks = self.get_physical_disks(force_refresh=force_refresh)
         
         checks = []
         score = 100
@@ -255,7 +282,7 @@ class DisasterRecoveryEngine:
             checks.append({"name": "Espaço Livre para VSS & Imagens", "status": "WARNING", "weight": 25, "detail": f"Apenas {free_gb} GB livres. Risco de estouro de storage durante VSS."})
 
         score = max(0, min(100, score))
-        return {
+        res = {
             "score": score,
             "status": "EXCELLENT" if score >= 85 else ("GOOD" if score >= 70 else "NEEDS_ATTENTION"),
             "checks": checks,
@@ -263,6 +290,12 @@ class DisasterRecoveryEngine:
             "estimated_rpo": "Último snapshot consistente",
             "timestamp": datetime.now().isoformat()
         }
+
+        with self.lock:
+            self._readiness_cache = res
+            self._readiness_cache_time = time.time()
+
+        return res
 
     # ==========================================================================
     # WORKER: CLONAGEM P2V (PHYSICAL-TO-VIRTUAL) VHDX

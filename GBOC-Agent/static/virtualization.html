@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GBOC Agent 14.2.0 - Gestão de Máquinas Virtuais (VMware, Hyper-V & Proxmox)</title>
-    <link rel="stylesheet" href="/static/style.css">
-    <link rel="stylesheet" href="/static/gboc-themes.css">
-    <link rel="stylesheet" href="/static/gboc-layout.css">
+    <link rel="stylesheet" href="/static/style.css?v=14.2.0">
+    <link rel="stylesheet" href="/static/gboc-themes.css?v=14.2.0">
+    <link rel="stylesheet" href="/static/gboc-layout.css?v=14.2.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="/static/gboc-layout-manager.js"></script>
     <script src="/static/sidebar.js"></script>
@@ -120,25 +120,54 @@
         </main>
     </div>
 
-    <script src="/static/sidebar.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            new UnifiedSidebar().initialize();
             loadHyperVInventory();
         });
 
         async function loadHyperVInventory() {
+            const tbody = document.getElementById('vm-inventory-list');
+            if (tbody) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted)">
+                            <i class="fas fa-spinner fa-spin" style="font-size:1.8em;margin-bottom:10px;display:block;color:var(--primary)"></i>
+                            Detectando máquinas virtuais Hyper-V no host...
+                        </td>
+                    </tr>
+                `;
+            }
             try {
                 const res = await fetch('/api/v1/virtualization/hyperv/vms');
                 if (res.ok) {
                     const data = await res.json();
-                    document.getElementById('hyperv-count').textContent = data.count || 0;
+                    const countEl = document.getElementById('hyperv-count');
+                    if (countEl) countEl.textContent = data.count || 0;
                     if (data.vms && data.vms.length > 0) {
                         renderVmList(data.vms);
+                    } else if (tbody) {
+                        tbody.innerHTML = `
+                            <tr>
+                                <td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted)">
+                                    <i class="fas fa-info-circle" style="font-size:1.8em;margin-bottom:10px;display:block;color:var(--text-muted)"></i>
+                                    ${data.message || 'Nenhuma VM Hyper-V ativa ou configurada no momento.'}
+                                </td>
+                            </tr>
+                        `;
                     }
                 }
             } catch (e) {
                 console.warn('Falha ao consultar Hyper-V local:', e);
+                if (tbody) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted)">
+                                <i class="fas fa-exclamation-triangle" style="font-size:1.8em;margin-bottom:10px;display:block;color:#eab308"></i>
+                                Não foi possível obter a lista de VMs locais.
+                            </td>
+                        </tr>
+                    `;
+                }
             }
         }
 

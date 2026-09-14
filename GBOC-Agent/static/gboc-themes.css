@@ -7,6 +7,7 @@
 @import url('/static/ui/design-system/unocss-ds.css');
 @import url('/static/ui/models/modern/model.css');
 @import url('/static/ui/models/modern/components.css');
+@import url('/static/ui/models/modern/layout.css');
 
 /* ── 1. ILLUMINATION MODES (Light / Dark) ────────────────────────────────── */
 
@@ -251,18 +252,14 @@ body {
 /* Dynamic Card & Panel Component Enforcers */
 .card, .panel, .stat-card, .kpi-card, .dashboard-card, .data-card, 
 .quick-action-card, .modal-card, .widget, .theme-showcase-card,
-.gboc-card, .card-panel, .chart-panel, .table-container {
+.gboc-card, .card-panel, .chart-panel, .table-container, .dr-hud-card {
     background: var(--card-bg) !important;
     border-radius: var(--card-radius) !important;
     border: var(--card-border) !important;
     box-shadow: var(--card-shadow) !important;
     backdrop-filter: var(--card-backdrop) !important;
     -webkit-backdrop-filter: var(--card-backdrop) !important;
-    transition: background 0.35s cubic-bezier(0.16, 1, 0.3, 1), 
-                border 0.35s cubic-bezier(0.16, 1, 0.3, 1), 
-                box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1), 
-                border-radius 0.35s cubic-bezier(0.16, 1, 0.3, 1),
-                backdrop-filter 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, border-radius 0.2s ease !important;
 }
 
 .modal-backdrop > div, .modal-dialog > div, #agent-ai-modal .modal-content, #agent-reports-modal > div {
@@ -274,13 +271,13 @@ body {
 }
 
 /* Dynamic Input Selector Class */
-.form-control, .input, .theme-showcase-input, input[type="text"], input[type="password"], input[type="email"], select, textarea {
+.form-control, .input, .theme-showcase-input, input[type="text"], input[type="password"], input[type="email"], select, textarea, .dr-console-box {
     background: var(--input-bg) !important;
     border-radius: var(--input-radius) !important;
     border: var(--input-border) !important;
     box-shadow: var(--input-shadow) !important;
     color: var(--text-primary) !important;
-    transition: border-radius 0.3s ease, box-shadow 0.3s ease, border 0.3s ease !important;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
 }
 .form-control:focus, .input:focus, .theme-showcase-input:focus, input:focus, select:focus, textarea:focus {
     border-color: var(--primary-color) !important;
@@ -288,15 +285,15 @@ body {
 }
 
 /* Dynamic Button Selector Class */
-.btn:not(.btn-link), button.btn, .theme-showcase-btn {
+.btn:not(.btn-link), button.btn, .theme-showcase-btn, .dr-tab-btn {
     border-radius: var(--btn-radius) !important;
     box-shadow: var(--btn-shadow) !important;
-    transition: transform 0.2s ease, box-shadow 0.2s ease, border-radius 0.2s ease !important;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, color 0.15s ease !important;
 }
-.btn:not(.btn-link):hover, button.btn:hover, .theme-showcase-btn:hover {
+.btn:not(.btn-link):hover, button.btn:hover, .theme-showcase-btn:hover, .dr-tab-btn:hover {
     transform: var(--btn-transform-hover) !important;
 }
-.btn:not(.btn-link):active, button.btn:active, .theme-showcase-btn:active {
+.btn:not(.btn-link):active, button.btn:active, .theme-showcase-btn:active, .dr-tab-btn:active {
     transform: var(--btn-transform-active) !important;
 }
 
