@@ -60,6 +60,11 @@ class ItilAndSsoEngine:
             "timestamp": datetime.now().isoformat()
         }
 
+    @property
+    def itil_integrations(self) -> Dict[str, Any]:
+        """Propriedade de compatibilidade que retorna as integrações ITIL."""
+        return self.get_itil_status()
+
     def trigger_test_incident(self, system_type: str = "servicenow") -> Dict[str, Any]:
         """
         Dispara um webhook de teste para o ServiceNow ou Jira Service Management.

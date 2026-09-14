@@ -16,10 +16,16 @@ class LocalStorageBackend(StorageBackend):
 
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
-        self.base_path = Path(self.get_path())
+        raw_path = str(self.get_path() or '')
+        if raw_path.startswith("enc-v1:") or not raw_path:
+            raw_path = "C:\\GBOC-Backups" if os.name == 'nt' else "/tmp/gboc-backups"
+        self.base_path = Path(raw_path)
         # Garante que o diretório base exista
-        os.makedirs(self.base_path, exist_ok=True)
-        self.logger.info(f"LocalStorageBackend pronto em {self.base_path}")
+        try:
+            os.makedirs(self.base_path, exist_ok=True)
+            self.logger.info(f"LocalStorageBackend pronto em {self.base_path}")
+        except Exception as e:
+            self.logger.warning(f"Não foi possível criar o diretório base {self.base_path}: {e}")
 
     def get_path(self) -> str:
         """Obtém o caminho base do repositório."""

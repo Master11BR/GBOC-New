@@ -43,6 +43,7 @@ class InstantVmBootEngine:
         if not os.path.exists(source_vhdx_path):
             raise FileNotFoundError(f"Arquivo VHDX '{source_vhdx_path}' não encontrado.")
 
+        start_ts = time.time()
         instance_id = f"ivm_{int(time.time())}"
         name = vm_name or f"GBOC-InstantVM-{instance_id[-6:]}"
         
@@ -98,11 +99,13 @@ create vdisk file="{diff_vhdx_path}" parent="{source_vhdx_path}"
                     capture_output=True, text=True, timeout=20
                 )
                 if "HYPERV_VM_STARTED" in vm_res.stdout:
-                    logs.append(f"🚀 Máquina Virtual '{name}' inicializada com sucesso no Hyper-V (Boot em < 10s)!")
+                    logs.append(f"🚀 Máquina Virtual '{name}' inicializada com sucesso no Hyper-V!")
                 else:
                     logs.append(f"Descritor de VM provisionado com sucesso ({memory_mb} MB RAM, {cpu_cores} vCPUs).")
             except Exception as e:
                 logs.append(f"Nota Hyper-V: {e}")
+
+        elapsed_boot = max(0.1, round(time.time() - start_ts, 2))
 
         instance_data = {
             "instance_id": instance_id,
@@ -113,7 +116,7 @@ create vdisk file="{diff_vhdx_path}" parent="{source_vhdx_path}"
             "cpu_cores": cpu_cores,
             "hypervisor": hypervisor,
             "status": "RUNNING",
-            "boot_time_seconds": round(time.time() % 3 + 4.2, 1),
+            "boot_time_seconds": elapsed_boot,
             "started_at": datetime.now().isoformat(),
             "logs": logs
         }

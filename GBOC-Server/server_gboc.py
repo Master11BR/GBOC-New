@@ -27,6 +27,48 @@ from psycopg2.extras import RealDictCursor
 from psycopg2 import pool
 
 import uvicorn
+import socket
+import sys
+
+# ── Patch para Windows Proactor EventLoop (Python 3.14) ──────────────────────
+# No Windows, quando o cliente encerra a conexão abruptamente (RST), o Python 3.14
+# chama self._sock.shutdown() sem try/except em _call_connection_lost, gerando
+# ConnectionResetError: [WinError 10054] como exceção não tratada no callback.
+if sys.platform == "win32":
+    try:
+        from asyncio.proactor_events import _ProactorBasePipeTransport
+        _orig_call_conn_lost = _ProactorBasePipeTransport._call_connection_lost
+
+        def _safe_call_connection_lost(self, exc):
+            if getattr(self, '_called_connection_lost', False):
+                return
+            try:
+                if hasattr(self, '_protocol') and self._protocol is not None:
+                    self._protocol.connection_lost(exc)
+            finally:
+                if hasattr(self, '_sock') and self._sock is not None:
+                    if hasattr(self._sock, 'shutdown') and self._sock.fileno() != -1:
+                        try:
+                            self._sock.shutdown(socket.SHUT_RDWR)
+                        except (OSError, ConnectionResetError, BrokenPipeError):
+                            pass
+                    try:
+                        self._sock.close()
+                    except Exception:
+                        pass
+                    self._sock = None
+                server = getattr(self, '_server', None)
+                if server is not None:
+                    try:
+                        server._detach(self)
+                    except Exception:
+                        pass
+                    self._server = None
+                self._called_connection_lost = True
+
+        _ProactorBasePipeTransport._call_connection_lost = _safe_call_connection_lost
+    except Exception:
+        pass
 
 # ===========================
 # CONFIGURAÇÃO
@@ -37,7 +79,7 @@ try:
     from version_control import __version__ as SERVER_VERSION, get_version_info, auto_increment_build
     auto_increment_build()
 except Exception:
-    SERVER_VERSION = "14.1.0"
+    SERVER_VERSION = "14.2.0"
     def get_version_info():
         return {"raw_version": SERVER_VERSION, "semver": SERVER_VERSION}
 
@@ -4388,14 +4430,24 @@ if __name__ == "__main__":
             except Exception:
                 pass  # Se a estrutura interna mudar, ignora o patch
 
-            # Suprimir ruídos benignos de SSL no loop asyncio (Python 3.14 + Hypercorn)
+            # Suprimir ruídos benignos de SSL e encerramento de conexão no loop asyncio (Python 3.14 + Hypercorn)
             def _install_asyncio_ssl_ignore(loop: asyncio.AbstractEventLoop):
                 prev_handler = loop.get_exception_handler()
 
                 def _handler(current_loop, context):
                     exc = context.get("exception")
+                    msg = str(context.get("message", ""))
+                    # 1. Suprimir timeout de SSL shutdown benigno
                     if isinstance(exc, TimeoutError) and "SSL shutdown timed out" in str(exc):
                         return
+                    # 2. Suprimir encerramento forçado de socket no Windows (WinError 10054 / WSAECONNRESET)
+                    if isinstance(exc, (ConnectionResetError, ConnectionAbortedError, BrokenPipeError)):
+                        return
+                    if isinstance(exc, OSError) and getattr(exc, "winerror", None) in (10054, 10053, 10038):
+                        return
+                    if "_call_connection_lost" in msg or "_ProactorBasePipeTransport" in msg:
+                        return
+
                     if prev_handler is not None:
                         prev_handler(current_loop, context)
                     else:

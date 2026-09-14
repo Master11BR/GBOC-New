@@ -1,13 +1,13 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.1.0 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.2.0 Enterprise. Todos os direitos reservados. -->
 
-# 🚀 GBOC - Gestão & Backup Operations Center (v14.1.0 Enterprise Edition)
+# 🚀 GBOC - Gestão & Backup Operations Center (v14.2.0 Enterprise Edition)
 
-[![GBOC System Version](https://img.shields.io/badge/version-14.1.0--Enterprise-blue.svg)](https://github.com/Master11BR/GBOC-New)
+[![GBOC System Version](https://img.shields.io/badge/version-14.2.0--Enterprise-blue.svg)](https://github.com/Master11BR/GBOC-New)
 [![Python Version](https://img.shields.io/badge/python-3.11%2B%20%7C%203.14-green.svg)](https://www.python.org/)
 [![PostgreSQL](https://img.shields.io/badge/postgresql-16-blue.svg)](https://www.postgresql.org/)
 [![Status](https://img.shields.io/badge/status-production--ready-brightgreen.svg)]()
 
-> **GBOC (Gestão & Backup Operations Center v14.1.0 Enterprise Edition)** é a mais avançada plataforma corporativa de orquestração de backup, RMM, monitoramento preditivo, telemetria 100% real (Zero-Mock Strict) e resposta cibernética a incidentes. 10x mais potente que soluções do mercado pago e open-source.
+> **GBOC (Gestão & Backup Operations Center v14.2.0 Enterprise Edition)** é a mais avançada plataforma corporativa de orquestração de backup, RMM, monitoramento preditivo, telemetria 100% real (Zero-Mock Strict) e resposta cibernética a incidentes. 10x mais potente que soluções do mercado pago e open-source.
 
 ---
 
@@ -99,6 +99,15 @@ Integrado com os 5 principais ecossistemas globais de segurança:
 ## 🛡️ Resiliência a Longos Intervalos (Auto-Heal & Lock Prune)
 
 - **Rotina Preventiva para Falhas por Inatividade**: Quando uma tarefa fica mais de 3 dias sem executar, o GBOC executa automaticamente o Auto-Heal: higieniza travas obsoletas (`.lock`), valida o banco do repositório (`repair`) e garante a execução transparente do backup sem desincronizações.
+
+## 📜 Histórico de Mudanças (Changelog v14.2.0 Enterprise)
+
+- **Backup Agentless de Máquinas Virtuais (VMware ESXi & Hyper-V)**: Motor `vmware_hypervisor_engine.py` com integração ao vSphere REST & SOAP SDK (CBT) e Hyper-V WMI nativo (RCT), com criação de checkpoints de produção consistentes via VSS sem instalar agentes no SO convidado.
+- **Instant VM Recovery Local (Boot Instantâneo < 60s)**: Motor `instant_recovery_engine.py` com exportador de Datastore SMB/NFS local e camada diferencial Copy-on-Write (CoW) para inicialização direta do storage de backup sem cópia prévia.
+- **Backup Nativo Microsoft 365 e Google Workspace (SaaS)**: Motor `saas_protection_engine.py` com cliente OAuth2 Microsoft Graph API para backup de Exchange Online, OneDrive, SharePoint e Teams.
+- **Restauração Granular de Itens (Item-Level Recovery)**: Motor `sql_granular_explorer.py` com inspeção de Table of Contents (TOC) em dumps PostgreSQL (`pg_restore -l`), extração cirúrgica de tabela única, e exploração de tabelas no Microsoft SQL Server e SQLite.
+- **Seletor Dinâmico de Estilos UX/UI & Iluminação**: Suporte dinâmico a 2 Modos de Iluminação (Light e Dark Carbon `#121212`) e 4 Formatos de Componentes (SaaS Minimal, Neumorphism Soft UI 3D, 3D Claymorphism e Fluent Design Acrylic Glass).
+- **Migrador Cross-Database Zero-Data-Loss**: Motor `database_cross_migrator.py` com sincronização bidirecional completa entre SQLite (WAL) e PostgreSQL.
 
 ## 📜 Histórico de Mudanças (Changelog v14.1.0 Enterprise)
 

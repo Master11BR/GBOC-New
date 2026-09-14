@@ -28,7 +28,11 @@ param (
     [switch]$CreateShortcuts = $true,
 
     [Parameter(Mandatory = $false)]
-    [switch]$RegisterStartupTask = $false
+    [switch]$RegisterStartupTask = $false,
+
+    [Parameter(Mandatory = $false)]
+    [ValidateSet("postgresql", "sqlite")]
+    [string]$DatabaseEngine = "postgresql"
 )
 
 $ErrorActionPreference = "Stop"
@@ -174,9 +178,20 @@ if ($InstallMode -eq "Interactive") {
     if (-not [string]::IsNullOrWhiteSpace($customTarget)) {
         $TargetDir = $customTarget
     }
+
+    Write-Host ""
+    Write-Host "Selecione o motor de banco de dados principal:" -ForegroundColor White
+    Write-Host "  [1] PostgreSQL (Padrao Corporativo - Recomendado)" -ForegroundColor Green
+    Write-Host "  [2] SQLite (Armazenamento Local Apenas em Arquivo)" -ForegroundColor Yellow
+    $dbChoice = Read-Host "Digite a opcao de banco desejada [1-2, Padrao: 1]"
+    if ($dbChoice -eq "2") {
+        $DatabaseEngine = "sqlite"
+    } else {
+        $DatabaseEngine = "postgresql"
+    }
 }
 
-Write-Header "INICIANDO INSTALACAO: MODO [$InstallMode] EM [$TargetDir]"
+Write-Header "INICIANDO INSTALACAO: MODO [$InstallMode] | BANCO [$DatabaseEngine] EM [$TargetDir]"
 
 # 1. Criacao das Pastas Base
 Write-Step "Criando estrutura de diretorios em $TargetDir..."
@@ -199,6 +214,29 @@ foreach ($dir in $dirsToCreate) {
         Write-Success "Diretorio pronto: $dir"
     }
 }
+
+# Configurar selecao de banco de dados (.env e system_config.json)
+Write-Step "Gravando configuracao do banco de dados ($DatabaseEngine)..."
+$envContent = @(
+    "GBOC_DB_ENGINE=$DatabaseEngine",
+    "DB_ENGINE=$DatabaseEngine"
+)
+[System.IO.File]::WriteAllLines((Join-Path $TargetDir ".env"), $envContent)
+
+$cfgObj = @{
+    db_engine = $DatabaseEngine
+    database_engine = $DatabaseEngine
+} | ConvertTo-Json
+
+if ($InstallMode -in @("Agent", "Both")) {
+    $agentDataDir = Join-Path $AgentDir "data"
+    New-Item -ItemType Directory -Path $agentDataDir -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $agentDataDir "system_config.json"), $cfgObj)
+}
+if ($InstallMode -in @("Server", "Both")) {
+    [System.IO.File]::WriteAllText((Join-Path $ServerDir "system_config.json"), $cfgObj)
+}
+Write-Success "Configuracao de banco ($DatabaseEngine) gravada com sucesso!"
 
 # 2. Localizar ou Instalar Python
 Write-Step "Verificando interpretador Python..."

@@ -38,6 +38,7 @@ Zero-Overflow & Smart Sidebar Presence Detection.
     // ── Constants ─────────────────────────────────────────────────────────────
     const LS_LAYOUT = 'gboc-layout';          // 'vertical' | 'horizontal'
     const LS_COLOR  = 'gboc-color-theme';     // 'dark' | 'light' | 'purple' | 'ocean'
+    const LS_UI_STYLE = 'gboc-ui-style';       // 'minimal' | 'neumorphism' | 'claymorphism' | 'fluent'
     const LS_COLLAPSED = 'gboc-sidebar-collapsed';
     const TOPBAR_URL = '/static/_topbar.html';
 
@@ -48,9 +49,17 @@ Zero-Overflow & Smart Sidebar Presence Detection.
         { id: 'ocean',  label: 'Ocean',  icon: '🌊' }
     ];
 
+    const UI_STYLES = [
+        { id: 'minimal',     label: 'Minimal Clean UI', icon: '✨' },
+        { id: 'neumorphism', label: 'Neumorphism 3D',   icon: '🔘' },
+        { id: 'claymorphism',label: '3D Claymorphism',  icon: '🧱' },
+        { id: 'fluent',      label: 'Fluent Acrylic',   icon: '🪟' }
+    ];
+
     // ── State ─────────────────────────────────────────────────────────────────
     let _currentLayout = localStorage.getItem(LS_LAYOUT) || 'vertical';
     let _currentColorTheme = localStorage.getItem(LS_COLOR) || localStorage.getItem('gboc-theme') || 'dark';
+    let _currentUiStyle = localStorage.getItem(LS_UI_STYLE) || 'minimal';
     let _panelOpen = false;
     let _topbarHtml = null;
 
@@ -59,6 +68,14 @@ Zero-Overflow & Smart Sidebar Presence Detection.
         const hasSidebar = !!document.querySelector('.sidebar, aside.sidebar');
         document.body.classList.toggle('has-sidebar', hasSidebar);
         return hasSidebar;
+    }
+
+    // ── Apply UI Component Style to <html> ───────────────────────────────────
+    function _applyUiStyle(style) {
+        document.documentElement.setAttribute('data-ui-style', style);
+        _currentUiStyle = style;
+        localStorage.setItem(LS_UI_STYLE, style);
+        _updatePanelActiveStates();
     }
 
     // ── Apply color theme to <html> ───────────────────────────────────────────
@@ -179,7 +196,7 @@ Zero-Overflow & Smart Sidebar Presence Detection.
                 const badge = document.getElementById('serverVersionBadge');
                 if (badge && data.raw_version) {
                     badge.textContent = `v${data.raw_version}`;
-                    badge.title = data.semver || `GBOC Server v${data.raw_version}`;
+                    badge.title = data.semver || `GBOC Agent v${data.raw_version}`;
                 }
             }
         } catch (e) {}
@@ -330,6 +347,15 @@ Zero-Overflow & Smart Sidebar Presence Detection.
             </div>
         `).join('');
 
+        const uiStylesHtml = UI_STYLES.map(s => `
+            <button class="lp-layout-btn ${_currentUiStyle === s.id ? 'active' : ''}"
+                    data-uistyle="${s.id}"
+                    onclick="window.GBOCLayout.setUiStyle('${s.id}')"
+                    style="font-size:0.78em;padding:6px 10px;margin-bottom:4px">
+                <span>${s.icon} ${s.label}</span>
+            </button>
+        `).join('');
+
         const panel = document.createElement('div');
         panel.id = 'gboc-layout-panel';
         panel.className = 'gboc-layout-panel';
@@ -357,10 +383,15 @@ Zero-Overflow & Smart Sidebar Presence Detection.
                 </button>
             </div>
 
-            <div class="lp-title">Tema de Cor</div>
+            <div class="lp-title">Modo de Iluminação</div>
             <div class="lp-themes" id="lp-theme-swatches">${themesHtml}</div>
-            <div style="display:flex;gap:12px;flex-wrap:wrap">
+            <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px">
                 ${THEMES.map(t => `<div style="font-size:0.7em;color:var(--text-muted, #94a3b8);text-align:center;min-width:34px">${t.icon}<br>${t.label}</div>`).join('')}
+            </div>
+
+            <div class="lp-title">Estilo de Componentes (UX/UI)</div>
+            <div class="lp-ui-styles" style="display:flex;flex-direction:column;gap:4px">
+                ${uiStylesHtml}
             </div>
 
             <div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--border, rgba(255,255,255,0.1));font-size:0.73em;color:var(--text-muted, #94a3b8)">
@@ -388,6 +419,9 @@ Zero-Overflow & Smart Sidebar Presence Detection.
         document.querySelectorAll('.lp-theme-swatch').forEach(sw => {
             sw.classList.toggle('active', sw.getAttribute('data-theme') === _currentColorTheme);
         });
+        document.querySelectorAll('[data-uistyle]').forEach(btn => {
+            btn.classList.toggle('active', btn.getAttribute('data-uistyle') === _currentUiStyle);
+        });
     }
 
     // ── Inject stylesheets if not already present ─────────────────────────────
@@ -413,6 +447,9 @@ Zero-Overflow & Smart Sidebar Presence Detection.
         setTheme(theme) {
             _applyColorTheme(theme);
         },
+        setUiStyle(style) {
+            _applyUiStyle(style);
+        },
         togglePanel() {
             _panelOpen = !_panelOpen;
             const panel = document.getElementById('gboc-layout-panel');
@@ -420,6 +457,7 @@ Zero-Overflow & Smart Sidebar Presence Detection.
         },
         getLayout() { return _currentLayout; },
         getTheme()  { return _currentColorTheme; },
+        getUiStyle() { return _currentUiStyle; },
         refreshSidebarPresence() { _checkSidebarPresence(); }
     };
 
@@ -429,6 +467,7 @@ Zero-Overflow & Smart Sidebar Presence Detection.
         _ensureAiAssistantLoaded();
         _ensureHardwareHudLoaded();
         _applyColorTheme(_currentColorTheme);
+        _applyUiStyle(_currentUiStyle);
         _applyLayout(_currentLayout);
         _createFAB();
         _createPanel();
@@ -446,6 +485,7 @@ Zero-Overflow & Smart Sidebar Presence Detection.
     if (document.readyState === 'loading') {
         _injectStylesheets();
         _applyColorTheme(_currentColorTheme);
+        _applyUiStyle(_currentUiStyle);
         document.addEventListener('DOMContentLoaded', () => {
             _ensureAiAssistantLoaded();
             _ensureHardwareHudLoaded();
@@ -465,5 +505,5 @@ Zero-Overflow & Smart Sidebar Presence Detection.
         _bootstrap();
     }
 
-    console.log('[GBOCLayout] ✅ Motor de Layout Ativo (Zero-Overflow) — Layout:', _currentLayout, '| Tema:', _currentColorTheme);
+    console.log('[GBOCLayout] ✅ Motor de Layout Ativo (Zero-Overflow) — Layout:', _currentLayout, '| Tema:', _currentColorTheme, '| Style:', _currentUiStyle);
 })();

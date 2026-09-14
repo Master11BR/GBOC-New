@@ -91,7 +91,7 @@ def _run_check(force: bool = False):
                     COUNT(*) FILTER (WHERE te.status = 'failed') as failed
                 FROM task_executions te
                 JOIN tasks t ON te.task_id = t.id
-                WHERE te.started_at >= %s AND t.active = true
+                WHERE te.started_at >= %s AND COALESCE(t.enabled, true) = true
             """, ((datetime.now() - timedelta(days=7)).isoformat(),))
             row = cursor.fetchone()
             total_7d = row[0] or 0
@@ -113,7 +113,7 @@ def _run_check(force: bool = False):
             cursor.execute("""
                 SELECT t.id, t.name, t.engine
                 FROM tasks t
-                WHERE t.active = true
+                WHERE COALESCE(t.enabled, true) = true
                   AND NOT EXISTS (
                       SELECT 1 FROM task_executions te
                       WHERE te.task_id = t.id AND te.status IN ('completed', 'repaired')
@@ -142,7 +142,7 @@ def _run_check(force: bool = False):
                 SELECT t.name, MAX(te.started_at) as last_run
                 FROM tasks t
                 JOIN task_executions te ON t.id = te.task_id
-                WHERE t.active = true
+                WHERE COALESCE(t.enabled, true) = true
                 GROUP BY t.id, t.name
                 HAVING MAX(te.started_at) < %s
             """, ((datetime.now() - timedelta(hours=48)).isoformat(),))
