@@ -14,6 +14,7 @@ import logging
 import urllib.request
 import urllib.error
 import subprocess
+import threading
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 
@@ -205,63 +206,113 @@ class HyperVHypervisorEngine:
     Zero-Mock: Checa se a role Hyper-V está realmente instalada no SO host.
     """
 
-    def check_hyperv_installed(self) -> Dict[str, Any]:
-        """Verifica se o serviço Hyper-V (vmms) está instalado e ativo no host."""
+    def __init__(self):
+        self._cache_lock = threading.Lock()
+        self._cache_ttl = 25.0  # 25 segundos
+        self._installed_cache: Optional[Dict[str, Any]] = None
+        self._installed_cache_time = 0.0
+        self._vms_cache: Optional[Dict[str, Any]] = None
+        self._vms_cache_time = 0.0
+
+    def check_hyperv_installed(self, force_refresh: bool = False) -> Dict[str, Any]:
+        """
+        Verifica se o serviço Hyper-V (vmms) está instalado e ativo no host.
+        Execução ultra-rápida nativa via winreg e sc.exe (~25ms) com cache TTL.
+        """
+        now = time.time()
+        with self._cache_lock:
+            if not force_refresh and self._installed_cache is not None and (now - self._installed_cache_time) < self._cache_ttl:
+                return self._installed_cache
+
         if sys.platform != "win32":
-            return {
+            res = {
                 "installed": False,
                 "running": False,
                 "message": "Hyper-V requer Windows Server ou Windows 10/11 Pro/Enterprise."
             }
+            with self._cache_lock:
+                self._installed_cache = res
+                self._installed_cache_time = now
+            return res
 
-        ps_check = """
-            $service = Get-Service vmms -ErrorAction SilentlyContinue
-            if ($service) {
-                [PSCustomObject]@{
-                    Installed = $true
-                    Status = $service.Status.ToString()
-                } | ConvertTo-Json
-            } else {
-                [PSCustomObject]@{
-                    Installed = $false
-                    Status = 'NotFound'
-                } | ConvertTo-Json
-            }
-        """
+        installed = False
+        running = False
+        service_status = "NotFound"
+
         try:
-            res = subprocess.run(
-                ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_check],
-                capture_output=True, text=True, timeout=8
-            )
-            if res.returncode == 0 and res.stdout.strip():
-                data = json.loads(res.stdout.strip())
-                is_inst = bool(data.get("Installed"))
-                is_run = data.get("Status") == "Running"
-                return {
-                    "installed": is_inst,
-                    "running": is_run,
-                    "service_status": data.get("Status"),
-                    "message": "Hyper-V operacional no host." if (is_inst and is_run) else "Serviço Hyper-V (vmms) parado ou não instalado."
-                }
+            import winreg
+            try:
+                with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Services\vmms"):
+                    installed = True
+            except FileNotFoundError:
+                installed = False
+
+            if installed:
+                sc_res = subprocess.run(["sc.exe", "query", "vmms"], capture_output=True, text=True, timeout=5)
+                if sc_res.returncode == 0:
+                    out = sc_res.stdout.upper()
+                    if "RUNNING" in out:
+                        running = True
+                        service_status = "Running"
+                    elif "STOPPED" in out:
+                        running = False
+                        service_status = "Stopped"
+                    else:
+                        service_status = "Other"
+                else:
+                    service_status = "Error"
         except Exception as e:
-            logger.warning(f"[Hyper-V] Erro ao checar serviço vmms: {e}")
+            logger.debug(f"[Hyper-V] Erro no check rápido via winreg/sc: {e}")
+            # Fallback seguro para PowerShell se winreg falhar
+            try:
+                ps_res = subprocess.run(
+                    ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "Get-Service vmms -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Status"],
+                    capture_output=True, text=True, timeout=6
+                )
+                if ps_res.returncode == 0 and ps_res.stdout.strip():
+                    installed = True
+                    running = (ps_res.stdout.strip().lower() == "running")
+                    service_status = ps_res.stdout.strip()
+            except Exception:
+                pass
 
-        return {"installed": False, "running": False, "message": "Não foi possível validar Hyper-V via PowerShell."}
+        res = {
+            "installed": installed,
+            "running": running,
+            "service_status": service_status,
+            "message": "Hyper-V operacional no host." if (installed and running) else ("Serviço Hyper-V (vmms) instalado mas parado." if installed else "Hyper-V não instalado neste host.")
+        }
 
-    def list_hyperv_vms(self) -> Dict[str, Any]:
+        with self._cache_lock:
+            self._installed_cache = res
+            self._installed_cache_time = now
+
+        return res
+
+    def list_hyperv_vms(self, force_refresh: bool = False) -> Dict[str, Any]:
         """
         Lista todas as máquinas virtuais Hyper-V reais no host local.
         Retorna nome, GUID, estado, caminho dos VHDX e suporte a RCT.
+        Utiliza cache TTL para evitar travamento do servidor.
         """
-        status = self.check_hyperv_installed()
-        if not status.get("installed"):
-            return {
+        now = time.time()
+        with self._cache_lock:
+            if not force_refresh and self._vms_cache is not None and (now - self._vms_cache_time) < self._cache_ttl:
+                return self._vms_cache
+
+        status = self.check_hyperv_installed(force_refresh=force_refresh)
+        if not status.get("installed") or not status.get("running"):
+            res = {
                 "status": "unavailable",
                 "hypervisor": "Microsoft Hyper-V",
                 "vms": [],
                 "count": 0,
                 "message": status.get("message")
             }
+            with self._cache_lock:
+                self._vms_cache = res
+                self._vms_cache_time = now
+            return res
 
         ps_vms = """
             $ErrorActionPreference = 'Stop'
@@ -304,13 +355,17 @@ class HyperVHypervisorEngine:
                         "rct_enabled": True,
                         "hypervisor_type": "Microsoft Hyper-V"
                     })
-                return {
+                res = {
                     "status": "success",
                     "hypervisor": "Microsoft Hyper-V",
                     "vms": formatted_vms,
                     "count": len(formatted_vms),
                     "timestamp": datetime.now().isoformat()
                 }
+                with self._cache_lock:
+                    self._vms_cache = res
+                    self._vms_cache_time = time.time()
+                return res
         except Exception as e:
             logger.error(f"[Hyper-V] Erro ao listar VMs: {e}")
             return {
@@ -321,13 +376,17 @@ class HyperVHypervisorEngine:
                 "count": 0
             }
 
-        return {
+        empty_res = {
             "status": "success",
             "hypervisor": "Microsoft Hyper-V",
             "vms": [],
             "count": 0,
             "message": "Nenhuma máquina virtual Hyper-V encontrada no host."
         }
+        with self._cache_lock:
+            self._vms_cache = empty_res
+            self._vms_cache_time = time.time()
+        return empty_res
 
     def create_agentless_rct_checkpoint(self, vm_name: str) -> Dict[str, Any]:
         """

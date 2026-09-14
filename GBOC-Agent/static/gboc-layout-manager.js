@@ -148,18 +148,26 @@ Zero-Overflow & Smart Sidebar Presence Detection.
 
     let _sidebarHtml = null;
     const SIDEBAR_URL = '/static/_sidebar.html';
+    let _isInjectingSidebar = false;
+    let _isInjectingTopbar = false;
 
     async function _injectSidebar() {
-        if (_currentLayout !== 'vertical') return;
+        if (_currentLayout !== 'vertical' || _isInjectingSidebar) return;
         if (!document.querySelector('.sidebar, aside.sidebar')) {
+            _isInjectingSidebar = true;
             try {
+                if (!_sidebarHtml) {
+                    _sidebarHtml = window.__gbocSidebarMemoryCache || sessionStorage.getItem('gboc_sidebar_html');
+                }
                 if (!_sidebarHtml) {
                     const r = await fetch(SIDEBAR_URL);
                     if (r.ok) {
                         _sidebarHtml = await r.text();
+                        window.__gbocSidebarMemoryCache = _sidebarHtml;
+                        try { sessionStorage.setItem('gboc_sidebar_html', _sidebarHtml); } catch(e) {}
                     }
                 }
-                if (_sidebarHtml) {
+                if (_sidebarHtml && !document.querySelector('.sidebar, aside.sidebar')) {
                     const topbar = document.getElementById('gboc-topbar');
                     if (topbar) {
                         topbar.insertAdjacentHTML('afterend', _sidebarHtml);
@@ -170,42 +178,55 @@ Zero-Overflow & Smart Sidebar Presence Detection.
                 }
             } catch (e) {
                 console.warn('[GBOCLayout] Falha ao injetar sidebar:', e);
+            } finally {
+                _isInjectingSidebar = false;
             }
         }
     }
 
     // ── Fetch & inject topbar & hero backdrop ─────────────────────────────────
     async function _injectTopbar() {
-        if (!document.getElementById('gboc-hero-bg')) {
-            const hero = document.createElement('div');
-            hero.id = 'gboc-hero-bg';
-            hero.className = 'gboc-hero-bg';
-            document.body.appendChild(hero);
-        }
-
-        if (!document.getElementById('gboc-topbar')) {
-            try {
-                if (!_topbarHtml) {
-                    const r = await fetch(TOPBAR_URL);
-                    if (r.ok) {
-                        _topbarHtml = await r.text();
-                    }
-                }
-                if (_topbarHtml) {
-                    document.body.insertAdjacentHTML('afterbegin', _topbarHtml);
-                }
-            } catch (e) {
-                console.warn('[GBOCLayout] Falha ao injetar topbar:', e);
+        if (_isInjectingTopbar) return;
+        _isInjectingTopbar = true;
+        try {
+            if (!document.getElementById('gboc-hero-bg')) {
+                const hero = document.createElement('div');
+                hero.id = 'gboc-hero-bg';
+                hero.className = 'gboc-hero-bg';
+                document.body.appendChild(hero);
             }
-        }
 
-        await _injectSidebar();
-        _checkSidebarPresence();
-        _markActiveTopbarLink();
-        _setupTopbarAuth();
-        _setupToggleButtons();
-        _checkFailedJobsBadge();
-        _updateDynamicVersion();
+            if (!document.getElementById('gboc-topbar')) {
+                try {
+                    if (!_topbarHtml) {
+                        _topbarHtml = window.__gbocTopbarMemoryCache || sessionStorage.getItem('gboc_topbar_html');
+                    }
+                    if (!_topbarHtml) {
+                        const r = await fetch(TOPBAR_URL);
+                        if (r.ok) {
+                            _topbarHtml = await r.text();
+                            window.__gbocTopbarMemoryCache = _topbarHtml;
+                            try { sessionStorage.setItem('gboc_topbar_html', _topbarHtml); } catch(e) {}
+                        }
+                    }
+                    if (_topbarHtml && !document.getElementById('gboc-topbar')) {
+                        document.body.insertAdjacentHTML('afterbegin', _topbarHtml);
+                    }
+                } catch (e) {
+                    console.warn('[GBOCLayout] Falha ao injetar topbar:', e);
+                }
+            }
+
+            await _injectSidebar();
+            _checkSidebarPresence();
+            _markActiveTopbarLink();
+            _setupTopbarAuth();
+            _setupToggleButtons();
+            _checkFailedJobsBadge();
+            _updateDynamicVersion();
+        } finally {
+            _isInjectingTopbar = false;
+        }
     }
 
     function _setupToggleButtons() {

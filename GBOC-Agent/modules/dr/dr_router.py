@@ -4,7 +4,9 @@
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================
 
+import asyncio
 import logging
+from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException, Request, Query
@@ -80,10 +82,10 @@ class VirtualLabTestRequest(BaseModel):
 # ── Discos & Diagnóstico ──────────────────────────────────────────────────────
 
 @router.get("/disks")
-async def list_physical_disks():
-    """Retorna a lista de discos físicos e partições reais do host."""
+async def list_physical_disks(refresh: bool = False):
+    """Retorna a lista de discos físicos e partições reais do host de forma não-bloqueante."""
     try:
-        disks = dr_engine.get_physical_disks()
+        disks = await asyncio.to_thread(dr_engine.get_physical_disks, force_refresh=refresh)
         return JSONResponse({"status": "success", "disks": disks, "total": len(disks)})
     except Exception as e:
         logger.error(f"Erro ao listar discos físicos: {e}", exc_info=True)
@@ -91,10 +93,10 @@ async def list_physical_disks():
 
 
 @router.get("/system-info")
-async def get_system_dr_info():
-    """Retorna diagnóstico de Disaster Recovery, Active Directory e status de VSS Writers."""
+async def get_system_dr_info(refresh: bool = False):
+    """Retorna diagnóstico de Disaster Recovery, Active Directory e status de VSS Writers de forma não-bloqueante."""
     try:
-        info = dr_engine.get_system_dr_info()
+        info = await asyncio.to_thread(dr_engine.get_system_dr_info, force_refresh=refresh)
         return JSONResponse({"status": "success", "data": info})
     except Exception as e:
         logger.error(f"Erro ao obter informações de DR do sistema: {e}", exc_info=True)
@@ -102,10 +104,10 @@ async def get_system_dr_info():
 
 
 @router.get("/readiness")
-async def get_dr_readiness():
-    """Retorna o DR Readiness Score e auditoria de conformidade."""
+async def get_dr_readiness(refresh: bool = False):
+    """Retorna o DR Readiness Score e auditoria de conformidade de forma não-bloqueante."""
     try:
-        readiness = dr_engine.calculate_dr_readiness()
+        readiness = await asyncio.to_thread(dr_engine.calculate_dr_readiness, force_refresh=refresh)
         return JSONResponse({"status": "success", "readiness": readiness})
     except Exception as e:
         logger.error(f"Erro ao calcular prontidão de DR: {e}", exc_info=True)
@@ -338,9 +340,9 @@ async def run_virtual_lab_test(req: VirtualLabTestRequest):
 @router.post("/export")
 async def export_dr_plan(request: Request):
     """Exporta o plano consolidado de Disaster Recovery do agente."""
-    readiness = dr_engine.calculate_dr_readiness()
-    disks = dr_engine.get_physical_disks()
-    sys_info = dr_engine.get_system_dr_info()
+    readiness = await asyncio.to_thread(dr_engine.calculate_dr_readiness)
+    disks = await asyncio.to_thread(dr_engine.get_physical_disks)
+    sys_info = await asyncio.to_thread(dr_engine.get_system_dr_info)
     return JSONResponse({
         "status": "success",
         "message": "Plano de DR exportado com sucesso.",

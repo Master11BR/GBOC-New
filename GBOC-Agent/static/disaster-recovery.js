@@ -8,9 +8,6 @@ let _activeDrPolling = null;
 let _currentJobId = null;
 
 document.addEventListener('DOMContentLoaded', () => {
-    if (typeof UnifiedSidebar === 'function') {
-        new UnifiedSidebar().initialize();
-    }
     loadDisasterRecoveryOverview();
     loadPhysicalDisks();
     loadDrReadiness();

@@ -111,29 +111,108 @@
     --warning: var(--warning-color);
 }
 
-/* Purple Theme Accent */
+/* Purple Theme — Full Amethyst Royal Palette */
 [data-color-theme="purple"] {
-    --primary-color: #8b5cf6 !important;
-    --primary-hover: #7c3aed !important;
-    --primary-glow: rgba(139, 92, 246, 0.4) !important;
-    --primary: #8b5cf6 !important;
-    --accent-gradient: linear-gradient(135deg, #8b5cf6 0%, #d946ef 100%) !important;
+    --bg-main:          #0b0614 !important;
+    --bg-card:          rgba(26, 15, 42, 0.88) !important;
+    --bg-input:         #190c2e !important;
+    --sidebar-bg:       #08040f !important;
+    --topbar-bg:        #120921 !important;
+    --text-primary:     #f5f3ff !important;
+    --text-secondary:   #c084fc !important;
+    --text-muted:       #9333ea !important;
+    --border-color:     rgba(168, 85, 247, 0.22) !important;
+
+    --primary-color:    #a855f7 !important;
+    --primary-hover:    #9333ea !important;
+    --primary-glow:     rgba(168, 85, 247, 0.45) !important;
+    --primary:          #a855f7 !important;
+    --accent-gradient:  linear-gradient(135deg, #a855f7 0%, #ec4899 100%) !important;
+
+    --nm-bg:            #0b0614 !important;
+    --nm-shadow-dark:   rgba(0, 0, 0, 0.85) !important;
+    --nm-shadow-light:  rgba(168, 85, 247, 0.12) !important;
+
+    --clay-bg:          #1b0d30 !important;
+    --clay-shadow-drop: 0 16px 36px rgba(0, 0, 0, 0.75) !important;
+    --clay-shadow-inset: inset -6px -6px 14px rgba(0, 0, 0, 0.65), inset 6px 6px 14px rgba(168, 85, 247, 0.2) !important;
+
+    --fluent-glass-bg:  rgba(26, 15, 42, 0.75) !important;
+    --fluent-border:    1px solid rgba(168, 85, 247, 0.3) !important;
+
+    --bg-dark: var(--bg-main) !important;
+    --border: var(--border-color) !important;
+    --text: var(--text-primary) !important;
+    --card-hover: var(--bg-input) !important;
 }
 
-/* Ocean Theme Accent */
+/* Ocean Theme — Full Abyssal Teal/Cyan Palette */
 [data-color-theme="ocean"] {
-    --primary-color: #06b6d4 !important;
-    --primary-hover: #0891b2 !important;
-    --primary-glow: rgba(6, 182, 212, 0.4) !important;
-    --primary: #06b6d4 !important;
-    --accent-gradient: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%) !important;
+    --bg-main:          #03111b !important;
+    --bg-card:          rgba(10, 32, 48, 0.88) !important;
+    --bg-input:         #0a2233 !important;
+    --sidebar-bg:       #020b12 !important;
+    --topbar-bg:        #061a27 !important;
+    --text-primary:     #ecfeff !important;
+    --text-secondary:   #67e8f9 !important;
+    --text-muted:       #0891b2 !important;
+    --border-color:     rgba(6, 182, 212, 0.22) !important;
+
+    --primary-color:    #06b6d4 !important;
+    --primary-hover:    #0891b2 !important;
+    --primary-glow:     rgba(6, 182, 212, 0.45) !important;
+    --primary:          #06b6d4 !important;
+    --accent-gradient:  linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%) !important;
+
+    --nm-bg:            #03111b !important;
+    --nm-shadow-dark:   rgba(0, 0, 0, 0.85) !important;
+    --nm-shadow-light:  rgba(6, 182, 212, 0.12) !important;
+
+    --clay-bg:          #0a2233 !important;
+    --clay-shadow-drop: 0 16px 36px rgba(0, 0, 0, 0.75) !important;
+    --clay-shadow-inset: inset -6px -6px 14px rgba(0, 0, 0, 0.65), inset 6px 6px 14px rgba(6, 182, 212, 0.2) !important;
+
+    --fluent-glass-bg:  rgba(10, 32, 48, 0.75) !important;
+    --fluent-border:    1px solid rgba(6, 182, 212, 0.3) !important;
+
+    --bg-dark: var(--bg-main) !important;
+    --border: var(--border-color) !important;
+    --text: var(--text-primary) !important;
+    --card-hover: var(--bg-input) !important;
 }
 
-/* Red Sentinel Theme Accent */
+/* Red Sentinel Theme — Full Crimson Ruby Palette */
 [data-color-theme="red"], [data-color-theme="crimson"] {
-    --primary-color: #ef4444 !important;
-    --primary-hover: #dc2626 !important;
-    --primary-glow: rgba(239, 68, 68, 0.4) !important;
-    --primary: #ef4444 !important;
-    --accent-gradient: linear-gradient(135deg, #ef4444 0%, #991b1b 100%) !important;
+    --bg-main:          #160406 !important;
+    --bg-card:          rgba(42, 12, 16, 0.88) !important;
+    --bg-input:         #2b0b10 !important;
+    --sidebar-bg:       #100304 !important;
+    --topbar-bg:        #1c0609 !important;
+    --text-primary:     #fef2f2 !important;
+    --text-secondary:   #fca5a5 !important;
+    --text-muted:       #dc2626 !important;
+    --border-color:     rgba(239, 68, 68, 0.22) !important;
+
+    --primary-color:    #ef4444 !important;
+    --primary-hover:    #dc2626 !important;
+    --primary-glow:     rgba(239, 68, 68, 0.45) !important;
+    --primary:          #ef4444 !important;
+    --accent-gradient:  linear-gradient(135deg, #ef4444 0%, #f97316 100%) !important;
+
+    --nm-bg:            #160406 !important;
+    --nm-shadow-dark:   rgba(0, 0, 0, 0.88) !important;
+    --nm-shadow-light:  rgba(239, 68, 68, 0.12) !important;
+
+    --clay-bg:          #2b0b10 !important;
+    --clay-shadow-drop: 0 16px 36px rgba(0, 0, 0, 0.8) !important;
+    --clay-shadow-inset: inset -6px -6px 14px rgba(0, 0, 0, 0.7), inset 6px 6px 14px rgba(239, 68, 68, 0.2) !important;
+
+    --fluent-glass-bg:  rgba(42, 12, 16, 0.75) !important;
+    --fluent-border:    1px solid rgba(239, 68, 68, 0.3) !important;
+
+    --bg-dark: var(--bg-main) !important;
+    --border: var(--border-color) !important;
+    --text: var(--text-primary) !important;
+    --card-hover: var(--bg-input) !important;
 }
+

@@ -4,6 +4,7 @@
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================
 
+import asyncio
 import logging
 from typing import Optional, List
 from pydantic import BaseModel
@@ -31,7 +32,8 @@ class HypervCheckpointRequest(BaseModel):
 @router.post("/vmware/connect")
 async def connect_vmware(req: VmwareConnectRequest):
     """Testa autenticação real com VMware vCenter ou ESXi."""
-    res = vmware_engine.test_vmware_connection(
+    res = await asyncio.to_thread(
+        vmware_engine.test_vmware_connection,
         host=req.host,
         user=req.user,
         password=req.password,
@@ -46,7 +48,8 @@ async def connect_vmware(req: VmwareConnectRequest):
 @router.post("/vmware/vms")
 async def list_vmware_vms(req: VmwareConnectRequest):
     """Lista o inventário real de máquinas virtuais do host VMware vCenter / ESXi."""
-    res = vmware_engine.list_vmware_vms(
+    res = await asyncio.to_thread(
+        vmware_engine.list_vmware_vms,
         host=req.host,
         user=req.user,
         password=req.password,
@@ -59,35 +62,40 @@ async def list_vmware_vms(req: VmwareConnectRequest):
 
 
 @router.get("/hyperv/status")
-async def get_hyperv_status():
-    """Verifica se o Hyper-V (vmms) está operacional no host."""
-    return JSONResponse(hyperv_engine.check_hyperv_installed())
+async def get_hyperv_status(refresh: bool = False):
+    """Verifica se o Hyper-V (vmms) está operacional no host de forma não-bloqueante."""
+    status = await asyncio.to_thread(hyperv_engine.check_hyperv_installed, force_refresh=refresh)
+    return JSONResponse(status)
 
 
 @router.get("/hyperv/vms")
-async def list_hyperv_vms():
-    """Lista todas as máquinas virtuais Hyper-V reais no host com discos e RCT."""
-    res = hyperv_engine.list_hyperv_vms()
+async def list_hyperv_vms(refresh: bool = False):
+    """Lista todas as máquinas virtuais Hyper-V reais no host com discos e RCT de forma não-bloqueante."""
+    res = await asyncio.to_thread(hyperv_engine.list_hyperv_vms, force_refresh=refresh)
     return JSONResponse(res)
 
 
 @router.post("/hyperv/checkpoint")
 async def create_hyperv_checkpoint(req: HypervCheckpointRequest):
     """Cria Production Checkpoint consistente no Hyper-V sem instalar agente na VM."""
-    res = hyperv_engine.create_agentless_rct_checkpoint(req.vm_name)
+    res = await asyncio.to_thread(hyperv_engine.create_agentless_rct_checkpoint, req.vm_name)
     if res.get("status") != "success":
         return JSONResponse(status_code=400, content=res)
     return JSONResponse(res)
 
 
 @router.get("/inventory")
-async def get_consolidated_inventory():
+async def get_consolidated_inventory(refresh: bool = False):
     """
     Retorna o inventário consolidado de hipervisores ativos no ambiente local.
-    Zero-Mock: Consulta o estado real do Hyper-V local.
+    Zero-Mock: Consulta o estado real do Hyper-V local de forma assíncrona.
     """
-    hv_status = hyperv_engine.check_hyperv_installed()
-    hv_vms = hyperv_engine.list_hyperv_vms().get("vms", []) if hv_status.get("installed") else []
+    hv_status = await asyncio.to_thread(hyperv_engine.check_hyperv_installed, force_refresh=refresh)
+    if hv_status.get("installed") and hv_status.get("running"):
+        vms_resp = await asyncio.to_thread(hyperv_engine.list_hyperv_vms, force_refresh=refresh)
+        hv_vms = vms_resp.get("vms", [])
+    else:
+        hv_vms = []
 
     return JSONResponse({
         "status": "success",
