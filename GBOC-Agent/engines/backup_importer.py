@@ -197,7 +197,7 @@ class RealBackupImporter:
                         if raw_target.startswith("enc-v1:"):
                             raw_target = "C:\\GBOC-Backups"
 
-                    # Normalizar caminho e determinar se é nuvem ou local
+                    # Normalizar caminho e determinar tipo específico de repositório
                     is_cloud = any(proto in raw_target.lower() for proto in ["s3://", "wasabi", "b2://", "azure", "sftp://"])
                     if raw_target.lower().startswith("file://"):
                         clean_path = raw_target[7:]
@@ -214,32 +214,70 @@ class RealBackupImporter:
                         except Exception:
                             pass
 
+                    target_lower = raw_target.lower()
+                    if "wasabi" in target_lower:
+                        repo_type = "wasabi"
+                    elif "b2://" in target_lower or "backblaze" in target_lower:
+                        repo_type = "b2"
+                    elif "azure" in target_lower:
+                        repo_type = "azure"
+                    elif "s3://" in target_lower:
+                        repo_type = "s3"
+                    elif is_cloud:
+                        repo_type = "s3"
+                    else:
+                        repo_type = "local"
+
+                    repo_config = {}
+                    if is_cloud and "://" in raw_target:
+                        try:
+                            from urllib.parse import urlparse, parse_qs
+                            u = urlparse(raw_target)
+                            qs = parse_qs(u.query)
+                            repo_config["bucket"] = u.netloc
+                            if u.path:
+                                repo_config["prefix"] = u.path.strip("/")
+                            if qs.get("s3-server-name"):
+                                repo_config["endpoint"] = qs["s3-server-name"][0]
+                            if qs.get("auth-username"):
+                                repo_config["access_key"] = qs["auth-username"][0]
+                                repo_config["aws_access_key"] = qs["auth-username"][0]
+                            if qs.get("auth-password"):
+                                repo_config["secret_key"] = qs["auth-password"][0]
+                                repo_config["aws_secret_key"] = qs["auth-password"][0]
+                        except Exception:
+                            pass
+                    config_json = json.dumps(repo_config) if repo_config else None
+
                     # Criar ou obter repositório correspondente
                     repo_name = f"Repo_Duplicati_{job['name']}"
                     cur.execute("SELECT id FROM repositories WHERE name = %s OR path = %s", (repo_name, clean_path))
                     existing_repo = cur.fetchone()
                     if existing_repo:
                         repo_id = existing_repo[0]
-                        cur.execute("UPDATE repositories SET path = %s, type = %s WHERE id = %s AND (path LIKE 'enc-v1%%' OR path IS NULL)", (clean_path, 'cloud' if is_cloud else 'local', repo_id))
+                        cur.execute("""
+                            UPDATE repositories 
+                            SET path = %s, type = %s, config = COALESCE(%s, config), updated_at = %s 
+                            WHERE id = %s AND (path LIKE 'enc-v1%%' OR path IS NULL OR type = 'cloud')
+                        """, (clean_path, repo_type, config_json, now_str, repo_id))
                     else:
-                        repo_type = "cloud" if is_cloud else "local"
                         try:
                             cur.execute("""
-                                INSERT INTO repositories (name, type, path, engine, status, enabled, initialized, created_at, updated_at)
-                                VALUES (%s, %s, %s, 'duplicati', 'active', true, true, %s, %s)
+                                INSERT INTO repositories (name, type, path, engine, status, enabled, initialized, config, created_at, updated_at)
+                                VALUES (%s, %s, %s, 'duplicati', 'active', true, true, %s, %s, %s)
                                 RETURNING id
-                            """, (repo_name, repo_type, clean_path, now_str, now_str))
+                            """, (repo_name, repo_type, clean_path, config_json, now_str, now_str))
                             repo_id = cur.fetchone()[0]
                         except Exception:
                             cur.execute("""
-                                INSERT INTO repositories (name, type, path, engine, status, enabled, initialized, created_at, updated_at)
-                                VALUES (%s, %s, %s, 'duplicati', 'active', 1, 1, %s, %s)
-                            """, (repo_name, repo_type, clean_path, now_str, now_str))
+                                INSERT INTO repositories (name, type, path, engine, status, enabled, initialized, config, created_at, updated_at)
+                                VALUES (%s, %s, %s, 'duplicati', 'active', 1, 1, %s, %s, %s)
+                            """, (repo_name, repo_type, clean_path, config_json, now_str, now_str))
                             repo_id = getattr(cur, 'lastrowid', None) or 1
                         
                         imported_repos += 1
                         conn.commit()
-                        logs.append(f"✓ Criado repositório '{repo_name}' ({'Nuvem' if is_cloud else 'Local: ' + clean_path}) para Duplicati.")
+                        logs.append(f"✓ Criado repositório '{repo_name}' ({repo_type.upper()}: {clean_path}) para Duplicati.")
 
                     # Verificar se tarefa já existe e atualizar / inserir
                     cur.execute("SELECT id, repository_id FROM tasks WHERE name = %s OR name = %s", (job_name, job['name']))

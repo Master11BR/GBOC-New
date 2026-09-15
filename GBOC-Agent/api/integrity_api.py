@@ -92,9 +92,24 @@ def _build_kopia_connect_cmd(repo: Dict[str, Any], kopia: str, config_path: str)
 
 
 def _build_duplicati_url(repo: Dict[str, Any]) -> str:
-    repo_type = (repo.get('type') or 'local').lower()
-    repo_path = str(repo.get('path') or repo.get('bucket') or '')
+    repo_path = str(repo.get('path') or repo.get('bucket') or '').strip()
     prefix = str(repo.get('prefix') or '').strip('/')
+
+    # Se o caminho já for uma URL completa do Duplicati, retornar diretamente
+    if repo_path.startswith(('s3://', 'b2://', 'file://', 'azure://', 'webdav://', 'googledrive://', 'onedrive://', 'mega://')):
+        return repo_path
+
+    repo_type = (repo.get('type') or 'local').lower()
+    if repo_type in ('cloud', 'remote'):
+        endpoint = str(repo.get('endpoint') or '').lower()
+        if 'wasabi' in endpoint or 'wasabi' in repo_path.lower():
+            repo_type = 'wasabi'
+        elif 'b2' in endpoint or 'backblaze' in endpoint or 'b2' in repo_path.lower():
+            repo_type = 'b2'
+        elif 'azure' in endpoint or 'azure' in repo_path.lower():
+            repo_type = 'azure'
+        else:
+            repo_type = 's3'
 
     if repo_type == 'local':
         if not repo_path:
@@ -118,6 +133,19 @@ def _build_duplicati_url(repo: Dict[str, Any]) -> str:
 
 def _build_duplicati_auth_args(repo: Dict[str, Any]) -> List[str]:
     repo_type = (repo.get('type') or 'local').lower()
+    repo_path = str(repo.get('path') or repo.get('bucket') or '').strip()
+
+    if repo_type in ('cloud', 'remote'):
+        endpoint = str(repo.get('endpoint') or '').lower()
+        if 'wasabi' in endpoint or 'wasabi' in repo_path.lower():
+            repo_type = 'wasabi'
+        elif 'b2' in endpoint or 'backblaze' in endpoint or 'b2' in repo_path.lower():
+            repo_type = 'b2'
+        elif 'azure' in endpoint or 'azure' in repo_path.lower():
+            repo_type = 'azure'
+        else:
+            repo_type = 's3'
+
     args: List[str] = []
 
     password = _get_repo_password(repo)

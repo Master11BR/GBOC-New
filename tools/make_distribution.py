@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v13.3.0 Enterprise Edition
+# GBOC System v14.4.0 Enterprise Edition
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # Propriedade Intelectual & Direitos Autorais Registrados.
 # ==============================================================================
@@ -50,7 +50,7 @@ def create_unified_requirements(server_req_path: Path, agent_req_path: Path, out
                         
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as f:
-        f.write("# GBOC System v14.2.0 - Dependencias Consolidadas (Server + Agent)\n")
+        f.write("# GBOC System v14.4.0 - Dependencias Consolidadas (Server + Agent)\n")
         for dep in sorted(dependencies):
             f.write(f"{dep}\n")
     print(f"  [OK] Dependencias consolidadas criadas em: {output_path}")
@@ -69,7 +69,7 @@ def copy_component(source_dir: Path, target_dir: Path, component_name: str):
     print(f"  [OK] {component_name} copiado com sucesso!")
     return True
 
-def generate_manifest(output_dir: Path, version: str = "14.2.0 Full Stable Enterprise"):
+def generate_manifest(output_dir: Path, version: str = "14.4.0 Full Stable Enterprise"):
     """Gera um arquivo de manifesto com metadados do pacote gerado."""
     manifest = {
         "system": "GBOC System",
@@ -142,7 +142,7 @@ def build_package(source_root: Path, output_dir: Path, clean: bool = False):
     generate_manifest(output_dir)
 
     # 5. Gerar LEIAME_INSTALACAO.md
-    readme_content = """# GBOC System v14.2.0 Enterprise — Pacote de Instalacao
+    readme_content = """# GBOC System v14.4.0 Enterprise — Pacote de Instalacao
 
 Este pacote contem todos os arquivos e dependencias para instalar o GBOC Server, o GBOC Agent ou Ambos.
 
