@@ -154,11 +154,26 @@ class TaskManager:
             env["B2_ACCOUNT_ID"] = str(task.get('b2_account_id') or '')
             env["B2_ACCOUNT_KEY"] = str(task.get('b2_account_key') or '')
 
-    def _build_duplicati_url(self, repo: Dict, password: str) -> str:
-        """Constrói URL do Duplicati baseada no tipo de repositório (sem credenciais na URL)"""
-        repo_type = (repo.get('repo_type') or repo.get('type') or 'local')
-        repo_path = repo.get('repo_path', '')
-        prefix = repo.get('prefix', '')
+    def _build_duplicati_url(self, repo: Dict, password: str = None) -> str:
+        """Constrói URL do Duplicati baseada no tipo de repositório"""
+        repo_path = str(repo.get('repo_path') or repo.get('path') or repo.get('bucket') or '').strip()
+        prefix = str(repo.get('prefix') or '').strip('/')
+
+        # Se o caminho já for uma URL completa do Duplicati, retornar diretamente
+        if repo_path.startswith(('s3://', 'b2://', 'file://', 'azure://', 'webdav://', 'googledrive://', 'onedrive://', 'mega://')):
+            return repo_path
+
+        repo_type = str(repo.get('repo_type') or repo.get('type') or 'local').lower()
+        if repo_type in ('cloud', 'remote'):
+            endpoint = str(repo.get('endpoint') or '').lower()
+            if 'wasabi' in endpoint or 'wasabi' in repo_path.lower():
+                repo_type = 'wasabi'
+            elif 'b2' in endpoint or 'backblaze' in endpoint or 'b2' in repo_path.lower():
+                repo_type = 'b2'
+            elif 'azure' in endpoint or 'azure' in repo_path.lower():
+                repo_type = 'azure'
+            else:
+                repo_type = 's3'
 
         if repo_type == 'local':
             return f"file://{repo_path}"
@@ -166,11 +181,7 @@ class TaskManager:
             bucket = repo_path
             url_path = f"{bucket}/{prefix}" if prefix else bucket
             return f"b2://{url_path}"
-        elif repo_type == 's3':
-            bucket = repo_path
-            url_path = f"{bucket}/{prefix}" if prefix else bucket
-            return f"s3://{url_path}"
-        elif repo_type == 'wasabi':
+        elif repo_type in ('s3', 'wasabi'):
             bucket = repo_path
             url_path = f"{bucket}/{prefix}" if prefix else bucket
             return f"s3://{url_path}"
@@ -183,12 +194,25 @@ class TaskManager:
 
     def _build_duplicati_auth_args(self, repo: Dict) -> list:
         """Constrói argumentos de autenticação para Duplicati CLI"""
-        repo_type = (repo.get('repo_type') or repo.get('type') or 'local')
+        repo_type = str(repo.get('repo_type') or repo.get('type') or 'local').lower()
+        repo_path = str(repo.get('repo_path') or repo.get('path') or repo.get('bucket') or '').strip()
+
+        if repo_type in ('cloud', 'remote'):
+            endpoint = str(repo.get('endpoint') or '').lower()
+            if 'wasabi' in endpoint or 'wasabi' in repo_path.lower():
+                repo_type = 'wasabi'
+            elif 'b2' in endpoint or 'backblaze' in endpoint or 'b2' in repo_path.lower():
+                repo_type = 'b2'
+            elif 'azure' in endpoint or 'azure' in repo_path.lower():
+                repo_type = 'azure'
+            else:
+                repo_type = 's3'
+
         args = []
 
         if repo_type in ('s3', 'wasabi'):
-            access_key = repo.get('aws_access_key', '')
-            secret_key = repo.get('aws_secret_key', '')
+            access_key = repo.get('aws_access_key') or repo.get('access_key', '')
+            secret_key = repo.get('aws_secret_key') or repo.get('secret_key', '')
             endpoint = repo.get('endpoint', '')
             region = repo.get('region', '')
 
@@ -204,22 +228,39 @@ class TaskManager:
                 args.append(f"--s3-server-name=s3.{region}.amazonaws.com")
 
         elif repo_type == 'b2':
-            account_id = repo.get('b2_account_id', '')
-            account_key = repo.get('b2_account_key', '')
+            account_id = repo.get('b2_account_id') or repo.get('access_key', '')
+            account_key = repo.get('b2_account_key') or repo.get('secret_key', '')
             if account_id:
                 args.append(f"--b2-accountid={account_id}")
             if account_key:
                 args.append(f"--b2-applicationkey={account_key}")
 
         elif repo_type == 'azure':
-            account_name = repo.get('azure_account_name', '')
-            account_key = repo.get('azure_account_key', '')
+            account_name = repo.get('azure_account_name') or repo.get('access_key', '')
+            account_key = repo.get('azure_account_key') or repo.get('secret_key', '')
             if account_name:
                 args.append(f"--azure-account-name={account_name}")
             if account_key:
                 args.append(f"--azure-accesskey={account_key}")
 
         return args
+
+    def _heal_duplicati_db_if_needed(self, local_db: str):
+        """Detecta e limpa base local do Duplicati se estiver corrompida ou com repair-in-progress"""
+        if not os.path.exists(local_db):
+            return
+        try:
+            import sqlite3
+            conn = sqlite3.connect(local_db, timeout=2)
+            cur = conn.cursor()
+            cur.execute("SELECT Value FROM Configuration WHERE Key = 'repair-in-progress'")
+            row = cur.fetchone()
+            conn.close()
+            if row and str(row[0]).strip().lower() == 'true':
+                logger.warning(f"🧹 Base Duplicati travada em repair-in-progress detectada: {local_db}. Purgando para recriação limpa...")
+                os.remove(local_db)
+        except Exception as e:
+            logger.debug(f"Aviso ao verificar banco SQLite do Duplicati {local_db}: {e}")
 
     def _mark_repository_initialized(self, repository_id: int):
         """Marca o repositório como inicializado no banco de dados"""
@@ -977,29 +1018,98 @@ class TaskManager:
     def _run_duplicati_backup(self, task: Dict, execution_id: int) -> Dict:
         """Executa backup com Duplicati"""
         try:
-            # Se for um backup gerenciado pelo Duplicati Native Server (sem repositório GBOC CLI)
-            if not task.get('repository_id') or not task.get('repo_type'):
-                try:
-                    from core.integrations.duplicati_native import get_duplicati_native_service
-                    dup_service = get_duplicati_native_service()
+            # 1. Execução via Duplicati Native Server quando o serviço estiver ativo e a tarefa for nativa
+            try:
+                from core.integrations.duplicati_native import get_duplicati_native_service
+                dup_service = get_duplicati_native_service()
+                probe = dup_service.probe()
+                if probe.get("ok"):
                     b_list = dup_service.list_backups().get("items", [])
+                    matched_item = None
+                    task_name = str(task.get('name') or '')
                     for item in b_list:
                         b_obj = item.get("Backup", {}) if isinstance(item, dict) else {}
                         b_id = str(item.get("id") or b_obj.get("ID") or "")
-                        b_name = item.get("name") or b_obj.get("Name") or ""
-                        if b_id and (b_name in task.get('name', '') or b_id in task.get('name', '') or len(b_list) == 1):
-                            logger.info(f"▶️ Disparando backup no Duplicati Native Server (ID: {b_id}, Nome: {b_name})")
-                            res = dup_service.run_backup(b_id)
+                        b_name = str(item.get("name") or b_obj.get("Name") or "")
+                        if b_id and (
+                            b_name == task_name or
+                            f"Nativo_Duplicati_{b_name}" == task_name or
+                            b_name in task_name or
+                            (b_id in task_name and "duplicati" in task_name.lower())
+                        ):
+                            matched_item = (b_id, b_name, b_obj)
+                            break
+
+                    if matched_item:
+                        b_id, b_name, b_obj = matched_item
+                        logger.info(f"▶️ Executando backup via Duplicati Native Server (ID: {b_id}, Nome: {b_name})")
+                        run_res = dup_service.run_backup(b_id)
+                        if run_res.get("status") == "success":
+                            start_wait = time.time()
+                            timeout = 86400
+                            time.sleep(2)
+                            while time.time() - start_wait < timeout:
+                                try:
+                                    prog_resp = dup_service.get_progress()
+                                    prog_data = prog_resp.get("progress") or {}
+                                    srv_state = dup_service.get_server_state().get("state") or {}
+
+                                    proc_files = int(prog_data.get("ProcessedFileCount") or 0)
+                                    tot_files = int(prog_data.get("TotalFileCount") or 0)
+                                    proc_bytes = int(prog_data.get("ProcessedFileSize") or 0)
+                                    tot_bytes = int(prog_data.get("TotalFileSize") or 0)
+                                    cur_file = prog_data.get("CurrentFilename")
+                                    phase = str(prog_data.get("Phase") or "")
+
+                                    if proc_files > 0 or tot_files > 0:
+                                        self.monitor.update_progress(
+                                            task.get('id'),
+                                            files_processed=proc_files,
+                                            files_total=tot_files,
+                                            bytes_processed=proc_bytes,
+                                            bytes_total=tot_bytes,
+                                            current_file=cur_file
+                                        )
+
+                                    active_task = srv_state.get("ActiveTask")
+                                    if active_task is None and (phase in ("Backup_Complete", "Error", "") or prog_data.get("OverallProgress") == 1):
+                                        break
+                                except Exception as _ep:
+                                    logger.debug(f"Erro na telemetria Duplicati Native: {_ep}")
+
+                                time.sleep(1.5)
+
                             dup_service.sync_to_gboc(self.core)
-                            meta = b_obj.get("Metadata", {}) if isinstance(b_obj, dict) else (item.get("Metadata") or {})
-                            return {
-                                "success": True,
-                                "files": int(meta.get("SourceFilesCount") or 0),
-                                "bytes": int(meta.get("SourceFilesSize") or 0),
-                                "snapshot_id": f"dup_{b_id}"
-                            }
-                except Exception as e_nat:
-                    logger.warning(f"Fallback DuplicatiNative falhou: {e_nat}")
+
+                            cfg = dup_service.load_config()
+                            b_detail_resp = dup_service._api_get(cfg, f"api/v1/backup/{b_id}")
+                            if b_detail_resp.status_code == 200:
+                                b_detail = b_detail_resp.json().get("Backup", {})
+                                meta = b_detail.get("Metadata", {}) or {}
+                                last_result = meta.get("LastBackupResult", "OK")
+                                if last_result in ("Error", "Fatal"):
+                                    log_resp = dup_service.get_backup_log(b_id, 1)
+                                    err_detail = "Erro reportado pelo Duplicati Native"
+                                    try:
+                                        log_items = log_resp.get("log") or []
+                                        if log_items and isinstance(log_items, list):
+                                            err_detail = log_items[0].get("Message") or err_detail
+                                    except Exception:
+                                        pass
+                                    return {"success": False, "error": f"Duplicati Native falhou ({last_result}): {err_detail}"}
+
+                                self._mark_repository_initialized(task.get('repository_id'))
+                                return {
+                                    "success": True,
+                                    "files": int(meta.get("SourceFilesCount") or 0),
+                                    "bytes": int(meta.get("SourceFilesSize") or 0),
+                                    "snapshot_id": f"dup_{b_id}"
+                                }
+                            else:
+                                self._mark_repository_initialized(task.get('repository_id'))
+                                return {"success": True, "files": 0, "bytes": 0, "snapshot_id": f"dup_{b_id}"}
+            except Exception as e_nat:
+                logger.warning(f"Execução Duplicati Native indisponível ou em fallback CLI: {e_nat}")
 
             dup_exe = get_engine_path('duplicati')
             if not dup_exe:
@@ -1027,25 +1137,22 @@ class TaskManager:
             os.makedirs(db_dir, exist_ok=True)
             local_db = os.path.join(db_dir, f"task_{task['id']}.sqlite")
 
-            password = self._get_password(task) or "gboc"
+            # Auto-healing: verificar e remover base SQLite corrompida ou travada em repair-in-progress
+            self._heal_duplicati_db_if_needed(local_db)
+
+            password = self._get_password(task)
             target_url = self._build_duplicati_url(task, password)
             auth_args = self._build_duplicati_auth_args(task)
 
-            if os.path.exists(local_db):
-                repair_cmd = [dup_exe, "repair", target_url, f"--dbpath={local_db}", "--encryption-module=aes", f"--passphrase={password}", *auth_args]
-                try:
-                    subprocess.run(repair_cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore', timeout=300)
-                except Exception:
-                    pass
+            enc_args = ["--encryption-module=aes", f"--passphrase={password}"] if password else ["--no-encryption=true"]
 
             cmd = [
                 dup_exe, "backup", target_url, *valid_sources,
                 f"--dbpath={local_db}",
                 "--backup-name=gboc-backup",
-                "--encryption-module=aes",
-                f"--passphrase={password}",
                 "--disable-module=console-log-output",
                 "--console-log-level=information",
+                *enc_args,
                 *auth_args
             ]
 
@@ -1094,6 +1201,14 @@ class TaskManager:
 
             if fatal_error:
                 error_msg = stderr or stdout or "Erro desconhecido no Duplicati"
+                # Auto-healing: se for erro DatabaseRepairInProgress, purgar banco local para recuperação limpa
+                if "DatabaseRepairInProgress" in error_msg or "The database was attempted repaired" in error_msg:
+                    try:
+                        if os.path.exists(local_db):
+                            os.remove(local_db)
+                            logger.info(f"🧹 Base Duplicati {local_db} purgada com sucesso após DatabaseRepairInProgress.")
+                    except Exception as _e_rm:
+                        logger.warning(f"Erro ao remover base corrompida {local_db}: {_e_rm}")
                 return {"success": False, "error": error_msg}
 
             self._mark_repository_initialized(task.get('repository_id'))

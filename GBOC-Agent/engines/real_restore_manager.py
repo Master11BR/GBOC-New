@@ -1786,43 +1786,103 @@ class RestoreManager:
     
     def _build_duplicati_url(self, repo: Dict, password: str = None) -> str:
         """Constrói URL de storage para Duplicati usando campos do banco de dados"""
-        repo_type = repo.get('type', 'local').lower()
+        repo_path = str(repo.get('path') or repo.get('bucket') or '').strip()
+        prefix = str(repo.get('prefix') or '').strip('/')
+
+        # Se o caminho já for uma URL completa do Duplicati, retornar diretamente
+        if repo_path.startswith(('s3://', 'b2://', 'file://', 'azure://', 'webdav://', 'googledrive://', 'onedrive://', 'mega://')):
+            return repo_path
+
+        repo_type = str(repo.get('type', 'local')).lower()
+        if repo_type in ('cloud', 'remote'):
+            endpoint = str(repo.get('endpoint') or '').lower()
+            if 'wasabi' in endpoint or 'wasabi' in repo_path.lower():
+                repo_type = 'wasabi'
+            elif 'b2' in endpoint or 'backblaze' in endpoint or 'b2' in repo_path.lower():
+                repo_type = 'b2'
+            elif 'azure' in endpoint or 'azure' in repo_path.lower():
+                repo_type = 'azure'
+            else:
+                repo_type = 's3'
 
         if repo_type == 'local':
             return f"file://{repo.get('path', '/backups')}"
         elif repo_type == 'b2':
-            app_id = repo.get('access_key') or repo.get('b2_account_id', '')
             bucket = repo.get('bucket') or repo.get('path', '')
             if not bucket:
                 raise ValueError("B2: Bucket obrigatório")
-            return f"b2://{bucket}"
-        elif repo_type == 's3':
-            bucket = repo.get('bucket') or repo.get('path', '')
-            endpoint = repo.get('endpoint', '')
-            region = repo.get('region', 'us-east-1')
-            prefix = repo.get('prefix', '')
-            if not bucket:
-                raise ValueError("S3: Bucket obrigatório")
-            server = endpoint or f"s3.{region}.amazonaws.com"
             url_path = f"{bucket}/{prefix}" if prefix else bucket
-            return f"s3://{url_path}"
-        elif repo_type == 'wasabi':
+            return f"b2://{url_path}"
+        elif repo_type in ('s3', 'wasabi'):
             bucket = repo.get('bucket') or repo.get('path', '')
-            endpoint = repo.get('endpoint', '')
-            region = repo.get('region', 'us-east-1')
-            prefix = repo.get('prefix', '')
             if not bucket:
-                raise ValueError("Wasabi: Bucket obrigatório")
+                raise ValueError("Bucket S3/Wasabi obrigatório")
             url_path = f"{bucket}/{prefix}" if prefix else bucket
             return f"s3://{url_path}"
         elif repo_type == 'azure':
-            account = repo.get('access_key') or repo.get('azure_account_name', '')
             container = repo.get('bucket') or repo.get('path', '')
-            if not all([account, container]):
-                raise ValueError("Azure: Account e Container obrigatórios")
-            return f"azure://{container}"
+            if not container:
+                raise ValueError("Azure: Container obrigatório")
+            url_path = f"{container}/{prefix}" if prefix else container
+            return f"azure://{url_path}"
         else:
             raise ValueError(f"Storage type '{repo_type}' não suportado para Duplicati")
+
+    def _build_duplicati_cli_args(self, repo: Dict) -> list:
+        """Constrói argumentos CLI/autenticação para Duplicati Restore"""
+        repo_type = str(repo.get('type', 'local')).lower()
+        repo_path = str(repo.get('path') or repo.get('bucket') or '').strip()
+
+        if repo_type in ('cloud', 'remote'):
+            endpoint = str(repo.get('endpoint') or '').lower()
+            if 'wasabi' in endpoint or 'wasabi' in repo_path.lower():
+                repo_type = 'wasabi'
+            elif 'b2' in endpoint or 'backblaze' in endpoint or 'b2' in repo_path.lower():
+                repo_type = 'b2'
+            elif 'azure' in endpoint or 'azure' in repo_path.lower():
+                repo_type = 'azure'
+            else:
+                repo_type = 's3'
+
+        args = []
+        password = repo.get('password') or repo.get('motor_password') or repo.get('cloud_password')
+        if password:
+            args.append(f"--passphrase={password}")
+
+        if repo_type in ('s3', 'wasabi'):
+            access_key = repo.get('aws_access_key') or repo.get('access_key', '')
+            secret_key = repo.get('aws_secret_key') or repo.get('secret_key', '')
+            endpoint = repo.get('endpoint', '')
+            region = repo.get('region', '')
+
+            if access_key:
+                args.append(f"--aws-access-key-id={access_key}")
+            if secret_key:
+                args.append(f"--aws-secret-access-key={secret_key}")
+            if endpoint:
+                args.append(f"--s3-server-name={endpoint}")
+            elif repo_type == 'wasabi' and region:
+                args.append(f"--s3-server-name=s3.{region}.wasabisys.com")
+            elif repo_type == 's3' and region:
+                args.append(f"--s3-server-name=s3.{region}.amazonaws.com")
+
+        elif repo_type == 'b2':
+            account_id = repo.get('b2_account_id') or repo.get('access_key', '')
+            account_key = repo.get('b2_account_key') or repo.get('secret_key', '')
+            if account_id:
+                args.append(f"--b2-accountid={account_id}")
+            if account_key:
+                args.append(f"--b2-applicationkey={account_key}")
+
+        elif repo_type == 'azure':
+            account_name = repo.get('azure_account_name') or repo.get('access_key', '')
+            account_key = repo.get('azure_account_key') or repo.get('secret_key', '')
+            if account_name:
+                args.append(f"--azure-account-name={account_name}")
+            if account_key:
+                args.append(f"--azure-accesskey={account_key}")
+
+        return args
     
     def _load_repository(self, repo_id: Any) -> Optional[Dict]:
         """Carrega repositório do banco ou do Duplicati Native"""
