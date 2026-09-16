@@ -1,26 +1,26 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.4.0 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.5.0 Enterprise. Todos os direitos reservados. -->
 
-# 🚀 GBOC - Gestão & Backup Operations Center (v14.4.0 Enterprise Edition)
+# 🚀 GBOC - Gestão & Backup Operations Center (v14.5.0 Enterprise Edition)
 
-[![GBOC System Version](https://img.shields.io/badge/version-14.4.0--Enterprise-blue.svg)](https://github.com/Master11BR/GBOC-New)
+[![GBOC System Version](https://img.shields.io/badge/version-14.5.0--Enterprise-blue.svg)](https://github.com/Master11BR/GBOC-New)
 [![Python Version](https://img.shields.io/badge/python-3.11%2B%20%7C%203.14-green.svg)](https://www.python.org/)
 [![PostgreSQL](https://img.shields.io/badge/postgresql-16-blue.svg)](https://www.postgresql.org/)
 [![UI Model](https://img.shields.io/badge/UI__MODEL-modern%20(Official)-indigo.svg)]()
 [![Status](https://img.shields.io/badge/status-production--ready-brightgreen.svg)]()
 
-> **GBOC (Gestão & Backup Operations Center v14.4.0 Enterprise Edition)** é a mais avançada plataforma corporativa de orquestração de backup, RMM, monitoramento preditivo, telemetria 100% real (Zero-Mock Strict), modelo visual oficial **Modern UI (UnoCSS)** e resposta cibernética a incidentes.
+> **GBOC (Gestão & Backup Operations Center v14.5.0 Enterprise Edition)** é a mais avançada plataforma corporativa de orquestração de backup, RMM, monitoramento preditivo, telemetria 100% real (Zero-Mock Strict), modelo visual oficial **Modern UI (UnoCSS)** e resposta cibernética a incidentes.
 
 ---
 
 ## 📌 Sumário
 1. [Visão Geral e Arquitetura](#-visão-geral-e-arquitetura)
-2. [Recursos de Destaque (v14.4.0 Enterprise)](#-recursos-de-destaque-v1440-enterprise)
+2. [Recursos de Destaque (v14.5.0 Enterprise)](#-recursos-de-destaque-v1450-enterprise)
 3. [Cyber Security Sentinel (ClamAV, YARA, Maltrail, Wazuh, Defender)](#-cyber-security-sentinel)
 4. [Assistente de Inteligência Artificial & LLMs (Ollama & Nuvem)](#-assistente-de-inteligência-artificial--llms)
 5. [Disaster Recovery (DR) & Sync em Nuvem 1-Click](#-disaster-recovery-dr--sync-em-nuvem-1-click)
 6. [Resiliência a Longos Intervalos (Auto-Heal & Lock Prune)](#-resiliência-a-longos-intervalos-auto-heal--lock-prune)
 7. [Instalação & Configuração Rápida](#-instalação--configuração-rápida)
-8. [Histórico de Mudanças (Changelog v14.4.0 Enterprise)](#-histórico-de-mudanças)
+8. [Histórico de Mudanças (Changelog v14.5.0 Enterprise)](#-histórico-de-mudanças)
 
 ---
 
@@ -55,19 +55,38 @@
 
 ---
 
-## ⚡ Recursos de Destaque (v14.4.0 Full Stable Enterprise)
+## ⚡ Recursos de Destaque (v14.5.0 Full Stable Enterprise)
 
+- **Nova Interface Visual de Autenticação V7 (Dark Glassmorphism)**: Tela de login e registro corporativo com degradês dourados/âmbar, efeitos de desfoque de fundo (backdrop blur), animações suaves e alternância dinâmica entre Login e Criação de Conta.
+- **Primeiro Acesso / Setup Automatizado**: Detecção inteligente de primeiro uso sem administrador cadastrado, acionando o formulário de provisionamento inicial do Admin mestre com auto-login instantâneo tanto no Servidor quanto no Agente.
+- **Resolução de Importação Duplicati Cloud & Reparos de Banco**: Suporte nativo completo para repositórios Cloud (`s3`, `azure`, `googledrive`, `onedrive`, `dropbox`, `webdav`, `sftp`) e autocorreção do erro `DatabaseRepairInProgress` via deleção e reparo seguro do banco local Duplicati.
 - **Motion Principles UX Engine (Kyle Zantos)**: Interface 100% dinâmica com Skeleton Loaders, Lazy Loading inteligente via Intersection Observer, animações de entrada/saída suaves e barras de progresso contínuas e fluidas.
 - **Storage Usage & Growth Monitor GUI**: Módulo centralizado (`modules/storage`) para monitoramento em tempo real de volumes de armazenamento, capacidade utilizada/livre e tendência de crescimento com gráficos dinâmicos Chart.js.
 - **Job Failure & Alert Monitor GUI**: Módulo centralizado (`modules/job_alert`) para consolidação de falhas de jobs ativas, fluxo de resolução com 1-clique e testes de disparo de alertas em múltiplos canais.
 - **GBOC Native Engine v4**: FastCDC (Content-Defined Chunking 4KB-4MB), compressão Zstd, encriptação autenticada AES-256-GCM e WORM Immutability.
 - **Direct-to-Cloud Memory Streaming**: Envio contínuo via RAM buffer (< 100MB) diretamente para repositórios Cloud (S3, MinIO, Azure, SFTP) sem criar arquivos staging no disco local.
 - **RMM Proxy & Espelho Web do Agente**: Execute PowerShell/Bash remotos com o terminal interativo do servidor e controle a interface web do agente via proxy em tempo real.
-- **SureRestore Sandbox**: Testes automatizados de restauração em máquinas virtuais isoladas com reporte de tempo de boot e teste de pulso de SO (*os_heartbeat*).
-- **Stack de Observabilidade & APM**: Telemetria corporativa integrada com **Sentry**, **OpenTelemetry (OTel)**, **Datadog APM**, **NewRelic** e métricas Prometheus nativas.
-- **Governança & Linting de Código**: Qualidade de código mantida via **Arch-contract**, **Biome Linter**, **Commitlint**, **Knip** (detector de código morto) e **Stryker** (testes de mutação).
-- **Suíte de Testes & Cobertura**: Testes End-to-End automatizados com **Playwright**, testes de integração com **Pytest** e relatórios de cobertura **Codecov**.
-- **Gestão Multi-Tenant MSP**: Estruturação completa por Organizações, Clientes e Quotas de armazenamento.
+
+---
+
+## 🛡️ Resiliência a Longos Intervalos (Auto-Heal & Lock Prune)
+
+- **Rotina Preventiva para Falhas por Inatividade**: Quando uma tarefa fica mais de 3 dias sem executar, o GBOC executa automaticamente o Auto-Heal: higieniza travas obsoletas (`.lock`), valida o banco do repositório (`repair`) e garante a execução transparente do backup sem desincronizações.
+
+## 📜 Histórico de Mudanças (Changelog v14.5.0 Enterprise)
+
+- **Design de Autenticação Enterprise V7 (Login / Create Account)**:
+  - Implementação da nova interface visual moderna baseada em Tailwind CSS, Glassmorphism escuro (`zinc-900/70`) e realces dourados/âmbar (`amber-500` / `yellow-500`).
+  - Unificação da experiência visual entre o GBOC Server (`GBOC-Server/login.html`) e o GBOC Agent (`GBOC-Agent/static/login.html`).
+  - Alternância de visualização de senhas (*Eye Toggle*), opção *Lembrar credencial* persistida no `localStorage`, e banners de status dinâmicos animados.
+  - Modo Primeiro Acesso (Setup): Quando não existem administradores cadastrados no banco de dados, a interface ativa automaticamente o fluxo de criação de conta master (`/setup`) com login automático subsequente.
+  - Cumprimento rigoroso da política *Zero-Mock*: remoção de botões sociais falsos e inclusão de badges de segurança real (*Criptografia SHA-256/PBKDF2* e *Auditoria Ativa*).
+- **Resolução de Erros Críticos no Motor de Importação Duplicati**:
+  - Correção do erro `Tipo de repositório Duplicati não suportado: cloud`: normalização de esquemas de storage cloud em `task_manager.py`, `repository_manager.py`, `real_restore_manager.py` e `integrity_api.py`.
+  - Tratamento determinístico para `DatabaseRepairInProgress`: eliminação de bancos locais SQLite corrompidos antes de reexecutar o `repair` do Duplicati nativo.
+- **Atualização SemVer e Pacote de Distribuição**:
+  - Incremento global de versão para **v14.5.0 Full Stable Enterprise**.
+  - Reconstrução completa do pacote de distribuição em `GBOC-Distribution`.
 
 ---
 

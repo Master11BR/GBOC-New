@@ -354,3 +354,110 @@ body {
 }
 
 .lp-theme-swatch[data-theme="red"] { background: linear-gradient(135deg, #991b1b, #ef4444) !important; }
+.lp-theme-swatch[data-theme="amber"], .lp-theme-swatch[data-theme="orange"] { background: linear-gradient(135deg, #b45309, #f59e0b) !important; }
+
+/* ── AMBIENT ANIMATED BACKGROUND (System-wide default) ─────────────── */
+:root {
+    --ambient-glow-1: rgba(245, 158, 11, 0.16);
+    --ambient-glow-2: rgba(217, 119, 6, 0.14);
+    --curve-color-1: #f59e0b;
+    --curve-color-2: #d97706;
+}
+
+[data-color-theme="amber"], [data-color-theme="orange"] {
+    --ambient-glow-1: rgba(245, 158, 11, 0.22);
+    --ambient-glow-2: rgba(217, 119, 6, 0.20);
+    --curve-color-1: #f59e0b;
+    --curve-color-2: #d97706;
+}
+
+[data-color-theme="dark"] {
+    --ambient-glow-1: rgba(99, 102, 241, 0.15);
+    --ambient-glow-2: rgba(79, 70, 229, 0.12);
+    --curve-color-1: #6366f1;
+    --curve-color-2: #4f46e5;
+}
+
+[data-color-theme="light"] {
+    --ambient-glow-1: rgba(59, 130, 246, 0.08);
+    --ambient-glow-2: rgba(14, 165, 233, 0.06);
+    --curve-color-1: #3b82f6;
+    --curve-color-2: #2563eb;
+}
+
+[data-color-theme="purple"] {
+    --ambient-glow-1: rgba(168, 85, 247, 0.18);
+    --ambient-glow-2: rgba(147, 51, 234, 0.14);
+    --curve-color-1: #a855f7;
+    --curve-color-2: #9333ea;
+}
+
+[data-color-theme="ocean"] {
+    --ambient-glow-1: rgba(6, 182, 212, 0.18);
+    --ambient-glow-2: rgba(14, 116, 144, 0.14);
+    --curve-color-1: #06b6d4;
+    --curve-color-2: #0891b2;
+}
+
+[data-color-theme="red"] {
+    --ambient-glow-1: rgba(239, 68, 68, 0.18);
+    --ambient-glow-2: rgba(185, 28, 28, 0.14);
+    --curve-color-1: #ef4444;
+    --curve-color-2: #dc2626;
+}
+
+@keyframes pulseGlow {
+    0%, 100% { opacity: 0.35; transform: scale(1); }
+    50% { opacity: 0.65; transform: scale(1.08); }
+}
+
+.glow-pulse {
+    animation: pulseGlow 8s ease-in-out infinite;
+}
+
+.glow-pulse-delayed {
+    animation: pulseGlow 10s ease-in-out infinite;
+    animation-delay: 2.5s;
+}
+
+@keyframes drawLine {
+    0% { stroke-dashoffset: 240; }
+    100% { stroke-dashoffset: 0; }
+}
+
+.path-animate-1 {
+    stroke-dasharray: 240;
+    animation: drawLine 14s linear infinite alternate;
+}
+.path-animate-2 {
+    stroke-dasharray: 240;
+    animation: drawLine 18s linear infinite alternate-reverse;
+}
+.path-animate-3 {
+    stroke-dasharray: 240;
+    animation: drawLine 24s linear infinite alternate;
+}
+
+.gboc-ambient-background {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+    transition: opacity 0.4s ease;
+}
+
+.gboc-ambient-background svg {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    opacity: 0.45;
+}
+
+.main-content, .sidebar, aside, .topbar, header, nav, 
+.dashboard-container, .app-container, .modal, .modal-backdrop {
+    position: relative;
+    z-index: 1;
+}
+
+

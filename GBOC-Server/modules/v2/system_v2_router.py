@@ -84,7 +84,7 @@ async def get_system_ui_config_v2(request: Request):
         "DEFAULT_UI_MODEL": "modern",
         "AVAILABLE_MODELS": ["modern"],
         "DEFAULT_THEME": "dark",
-        "AVAILABLE_THEMES": ["dark", "light", "purple", "ocean", "red"],
+        "AVAILABLE_THEMES": ["dark", "light", "amber", "purple", "ocean", "red"],
         "DEFAULT_UI_STYLE": "minimal",
         "AVAILABLE_UI_STYLES": ["minimal", "neumorphism", "claymorphism", "fluent", "nexus-widgets", "nexus-glass", "command-sentinel", "cyber-3d"]
     }

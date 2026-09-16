@@ -1,354 +1,855 @@
 <!--
 ==============================================================================
-GBOC System v14.1.0 Enterprise Edition
+GBOC System Enterprise Edition - V7 Modern Login & Security Core
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
 -->
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-theme="amber" data-color-theme="amber" data-ui-style="cyber-3d">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - GBOC Server</title>
+    <title>GBOC Server - Login Enterprise V7</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome para ícones -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Design System Tokens & GBOC Themes -->
+    <link rel="stylesheet" href="/static/gboc-themes.css?v=14.4.0">
     <style>
-        /* ======================== NEUMORPHIC LOGIN ======================== */
-        *{margin:0;padding:0;box-sizing:border-box}
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
-        /* --- Theme tokens --- */
-        :root,[data-theme="dark"]{
-            --nm-bg:#2b2b3d;
-            --nm-surface:#32324a;
-            --nm-shadow-dark:rgba(0,0,0,.55);
-            --nm-shadow-light:rgba(255,255,255,.05);
-            --nm-inset-dark:rgba(0,0,0,.45);
-            --nm-inset-light:rgba(255,255,255,.04);
-            --nm-text:#e8e8f0;
-            --nm-text-muted:#9a9ab0;
-            --nm-accent:#667eea;
-            --nm-accent-hover:#7c8ff2;
-            --nm-input-bg:#2b2b3d;
-            --nm-icon:#7a7a95;
-            --nm-error-bg:rgba(245,101,101,.12);
-            --nm-error-border:rgba(245,101,101,.35);
-            --nm-error-text:#f56565;
-            --nm-info-bg:rgba(102,126,234,.12);
-            --nm-info-border:rgba(102,126,234,.35);
-            --nm-info-text:#667eea;
-        }
-        [data-theme="light"]{
-            --nm-bg:#e0e5ec;
-            --nm-surface:#e0e5ec;
-            --nm-shadow-dark:rgba(163,177,198,.6);
-            --nm-shadow-light:rgba(255,255,255,.8);
-            --nm-inset-dark:rgba(163,177,198,.5);
-            --nm-inset-light:rgba(255,255,255,.7);
-            --nm-text:#2d3748;
-            --nm-text-muted:#718096;
-            --nm-accent:#3b5fc0;
-            --nm-accent-hover:#4b6fd0;
-            --nm-input-bg:#e0e5ec;
-            --nm-icon:#8a9ab5;
-            --nm-error-bg:rgba(229,62,62,.08);
-            --nm-error-border:rgba(229,62,62,.3);
-            --nm-error-text:#c53030;
-            --nm-info-bg:rgba(59,95,192,.08);
-            --nm-info-border:rgba(59,95,192,.3);
-            --nm-info-text:#3b5fc0;
+        :root {
+            --ambient-glow-1: rgba(245, 158, 11, 0.22);
+            --ambient-glow-2: rgba(217, 119, 6, 0.20);
+            --curve-color-1: #f59e0b;
+            --curve-color-2: #d97706;
+            --card-glass-bg: rgba(18, 18, 20, 0.65);
+            --card-glass-border: rgba(255, 255, 255, 0.08);
+            --card-glass-shadow: 0 16px 40px rgba(0, 0, 0, 0.65);
         }
 
-        body{
-            font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
-            background:var(--nm-bg);
-            color:var(--nm-text);
-            display:flex;align-items:center;justify-content:center;
-            min-height:100vh;
-            transition:background .3s,color .3s;
+        /* Iluminação Amber (Laranja / Preto) */
+        [data-color-theme="amber"], [data-color-theme="orange"] {
+            --ambient-glow-1: rgba(245, 158, 11, 0.24);
+            --ambient-glow-2: rgba(217, 119, 6, 0.22);
+            --curve-color-1: #f59e0b;
+            --curve-color-2: #d97706;
+            --card-glass-bg: rgba(14, 12, 10, 0.72);
+            --card-glass-border: rgba(245, 158, 11, 0.22);
+            --card-glass-shadow: 0 16px 45px rgba(0, 0, 0, 0.75), 0 0 25px rgba(245, 158, 11, 0.15);
         }
 
-        .login-container{width:100%;max-width:420px;padding:20px}
-        .login-card{
-            background:var(--nm-surface);
-            border-radius:24px;
-            padding:44px 36px 38px;
-            box-shadow:
-                8px 8px 20px var(--nm-shadow-dark),
-                -8px -8px 20px var(--nm-shadow-light);
+        /* Iluminação Dark (Grafite / Índigo) */
+        [data-color-theme="dark"] {
+            --ambient-glow-1: rgba(99, 102, 241, 0.22);
+            --ambient-glow-2: rgba(79, 70, 229, 0.18);
+            --curve-color-1: #6366f1;
+            --curve-color-2: #4f46e5;
+            --card-glass-bg: rgba(20, 20, 24, 0.75);
+            --card-glass-border: rgba(255, 255, 255, 0.09);
+            --card-glass-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
         }
 
-        .login-logo{text-align:center;margin-bottom:30px}
-        .login-logo .logo-icon-wrap{
-            display:inline-flex;align-items:center;justify-content:center;
-            width:68px;height:68px;border-radius:20px;margin-bottom:16px;
-            background:var(--nm-surface);
-            box-shadow:
-                6px 6px 14px var(--nm-shadow-dark),
-                -6px -6px 14px var(--nm-shadow-light);
-        }
-        .login-logo .logo-icon-wrap i{font-size:1.8rem;color:var(--nm-accent)}
-        .login-logo h1{color:var(--nm-text);font-size:1.45rem;font-weight:700;letter-spacing:-.3px}
-        .login-logo p{color:var(--nm-text-muted);font-size:.82rem;margin-top:4px;font-weight:400}
-
-        .login-form .form-group{margin-bottom:20px}
-        .login-form label{
-            display:block;color:var(--nm-text-muted);
-            font-size:.78rem;font-weight:600;
-            margin-bottom:8px;padding-left:16px;
-            text-transform:uppercase;letter-spacing:.5px;
-        }
-        .input-wrapper{position:relative}
-        .input-wrapper i.field-icon{
-            position:absolute;left:18px;top:50%;transform:translateY(-50%);
-            color:var(--nm-icon);font-size:.9rem;
-            transition:color .25s;pointer-events:none;
-        }
-        .login-form input[type="text"],
-        .login-form input[type="password"]{
-            width:100%;padding:14px 18px 14px 48px;
-            border:none;outline:none;
-            border-radius:50px;
-            background:var(--nm-input-bg);
-            color:var(--nm-text);
-            font-size:.92rem;font-weight:500;
-            box-shadow:
-                inset 4px 4px 8px var(--nm-inset-dark),
-                inset -4px -4px 8px var(--nm-inset-light);
-            transition:box-shadow .25s;
-        }
-        .login-form input::placeholder{color:var(--nm-text-muted);opacity:.65}
-        .login-form input:focus{
-            box-shadow:
-                inset 4px 4px 8px var(--nm-inset-dark),
-                inset -4px -4px 8px var(--nm-inset-light),
-                0 0 0 2px var(--nm-accent);
-        }
-        .input-wrapper:focus-within i.field-icon{color:var(--nm-accent)}
-
-        .login-btn{
-            width:100%;padding:14px 20px;margin-top:6px;
-            border:none;outline:none;cursor:pointer;
-            border-radius:50px;
-            background:var(--nm-surface);
-            color:var(--nm-text-muted);
-            font-size:.92rem;font-weight:700;
-            display:flex;align-items:center;justify-content:center;gap:10px;
-            box-shadow:
-                6px 6px 16px var(--nm-shadow-dark),
-                -6px -6px 16px var(--nm-shadow-light);
-            transition:box-shadow .2s,color .2s,transform .15s;
-        }
-        .login-btn:hover{
-            color:var(--nm-accent);
-            box-shadow:
-                4px 4px 10px var(--nm-shadow-dark),
-                -4px -4px 10px var(--nm-shadow-light);
-        }
-        .login-btn:active{
-            box-shadow:
-                inset 3px 3px 8px var(--nm-inset-dark),
-                inset -3px -3px 8px var(--nm-inset-light);
-            transform:scale(.98);
-        }
-        .login-btn:disabled{
-            opacity:.5;cursor:not-allowed;
-            box-shadow:
-                4px 4px 10px var(--nm-shadow-dark),
-                -4px -4px 10px var(--nm-shadow-light);
-        }
-        .login-btn.accent-fill{
-            background:linear-gradient(135deg,var(--nm-accent),var(--nm-accent-hover));
-            color:#fff;
-            box-shadow:
-                4px 4px 14px var(--nm-shadow-dark),
-                -4px -4px 14px var(--nm-shadow-light),
-                0 4px 18px rgba(102,126,234,.3);
-        }
-        .login-btn.accent-fill:hover{
-            box-shadow:
-                2px 2px 8px var(--nm-shadow-dark),
-                -2px -2px 8px var(--nm-shadow-light),
-                0 6px 24px rgba(102,126,234,.4);
-        }
-        .login-btn.accent-fill:active{
-            box-shadow:
-                inset 3px 3px 8px rgba(0,0,0,.3),
-                inset -3px -3px 8px rgba(255,255,255,.08);
+        /* Iluminação Light (Claro / Alto Contraste) */
+        [data-color-theme="light"] {
+            --ambient-glow-1: rgba(59, 130, 246, 0.12);
+            --ambient-glow-2: rgba(14, 165, 233, 0.10);
+            --curve-color-1: #3b82f6;
+            --curve-color-2: #2563eb;
+            --card-glass-bg: rgba(255, 255, 255, 0.88);
+            --card-glass-border: rgba(15, 23, 42, 0.12);
+            --card-glass-shadow: 0 20px 45px rgba(0, 0, 0, 0.12);
         }
 
-        .login-error{
-            background:var(--nm-error-bg);
-            border:1px solid var(--nm-error-border);
-            border-radius:14px;padding:12px 16px;
-            color:var(--nm-error-text);font-size:.83rem;
-            margin-bottom:18px;display:none;
-            box-shadow:inset 2px 2px 5px var(--nm-inset-dark),inset -2px -2px 5px var(--nm-inset-light);
-        }
-        .login-error.visible{display:flex;align-items:center;gap:8px}
-        .login-error i{flex-shrink:0}
-        .setup-info{
-            background:var(--nm-info-bg);
-            border:1px solid var(--nm-info-border);
-            border-radius:14px;padding:12px 16px;
-            color:var(--nm-info-text);font-size:.83rem;
-            margin-bottom:18px;text-align:center;
-            box-shadow:inset 2px 2px 5px var(--nm-inset-dark),inset -2px -2px 5px var(--nm-inset-light);
+        /* Iluminação Purple (Ametista) */
+        [data-color-theme="purple"] {
+            --ambient-glow-1: rgba(168, 85, 247, 0.25);
+            --ambient-glow-2: rgba(147, 51, 234, 0.20);
+            --curve-color-1: #a855f7;
+            --curve-color-2: #9333ea;
+            --card-glass-bg: rgba(20, 12, 32, 0.72);
+            --card-glass-border: rgba(168, 85, 247, 0.25);
+            --card-glass-shadow: 0 16px 45px rgba(0, 0, 0, 0.75), 0 0 25px rgba(168, 85, 247, 0.15);
         }
 
-        .version-badge{
-            text-align:center;margin-top:22px;
-            color:var(--nm-text-muted);font-size:.72rem;
-            letter-spacing:.3px;opacity:.6;
+        /* Iluminação Ocean (Abyssal Teal / Cyan) */
+        [data-color-theme="ocean"] {
+            --ambient-glow-1: rgba(6, 182, 212, 0.24);
+            --ambient-glow-2: rgba(14, 116, 144, 0.20);
+            --curve-color-1: #06b6d4;
+            --curve-color-2: #0891b2;
+            --card-glass-bg: rgba(8, 22, 34, 0.72);
+            --card-glass-border: rgba(6, 182, 212, 0.25);
+            --card-glass-shadow: 0 16px 45px rgba(0, 0, 0, 0.75), 0 0 25px rgba(6, 182, 212, 0.15);
         }
 
-        @keyframes nmFloat{
-            0%,100%{transform:translateY(0)}
-            50%{transform:translateY(-4px)}
+        /* Iluminação Red (Sentinel Crimson) */
+        [data-color-theme="red"] {
+            --ambient-glow-1: rgba(239, 68, 68, 0.24);
+            --ambient-glow-2: rgba(185, 28, 28, 0.20);
+            --curve-color-1: #ef4444;
+            --curve-color-2: #dc2626;
+            --card-glass-bg: rgba(28, 10, 14, 0.75);
+            --card-glass-border: rgba(239, 68, 68, 0.25);
+            --card-glass-shadow: 0 16px 45px rgba(0, 0, 0, 0.75), 0 0 25px rgba(239, 68, 68, 0.15);
         }
-        .login-logo .logo-icon-wrap{animation:nmFloat 4s ease-in-out infinite}
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-main, #0a0a0a);
+            transition: background-color 0.4s ease, color 0.4s ease;
+        }
+
+        /* Animações de fundo (Pulso e Movimento das linhas SVG) */
+        @keyframes pulseGlow {
+            0%, 100% { opacity: 0.35; transform: scale(1); }
+            50% { opacity: 0.65; transform: scale(1.08); }
+        }
+
+        .glow-pulse {
+            animation: pulseGlow 8s ease-in-out infinite;
+        }
+
+        .glow-pulse-delayed {
+            animation: pulseGlow 10s ease-in-out infinite;
+            animation-delay: 2.5s;
+        }
+
+        @keyframes drawLine {
+            0% { stroke-dashoffset: 240; }
+            100% { stroke-dashoffset: 0; }
+        }
+
+        .path-animate-1 {
+            stroke-dasharray: 240;
+            animation: drawLine 14s linear infinite alternate;
+        }
+        .path-animate-2 {
+            stroke-dasharray: 240;
+            animation: drawLine 18s linear infinite alternate-reverse;
+        }
+        .path-animate-3 {
+            stroke-dasharray: 240;
+            animation: drawLine 24s linear infinite alternate;
+        }
+
+        /* Perspectiva 3D e Transições Fluidas */
+        .perspective-1000 {
+            perspective: 1000px;
+        }
+
+        .card-wrapper {
+            background: var(--card-glass-bg);
+            border: 1px solid var(--card-glass-border);
+            box-shadow: var(--card-glass-shadow);
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .form-section {
+            backface-visibility: hidden;
+            will-change: transform, opacity;
+        }
+
+        /* Swatches de Iluminação na barra superior */
+        .theme-pill-btn {
+            transition: all 0.2s ease;
+        }
+        .theme-pill-btn:hover {
+            transform: scale(1.15);
+        }
+        .theme-pill-btn.active {
+            box-shadow: 0 0 0 2px #fff, 0 0 12px var(--primary-glow);
+        }
+
+        /* Suporte a Light Mode nos textos e inputs */
+        [data-color-theme="light"] .light-card-text {
+            color: #0f172a !important;
+        }
+        [data-color-theme="light"] .light-card-muted {
+            color: #475569 !important;
+        }
+        [data-color-theme="light"] .light-card-input {
+            background-color: #f1f5f9 !important;
+            color: #0f172a !important;
+            border-color: #cbd5e1 !important;
+        }
+        [data-color-theme="light"] .light-card-input::placeholder {
+            color: #94a3b8 !important;
+        }
+        [data-color-theme="light"] .light-card-social {
+            background-color: #f8fafc !important;
+            border-color: #e2e8f0 !important;
+            color: #0f172a !important;
+        }
+        [data-color-theme="light"] .light-card-social:hover {
+            background-color: #f1f5f9 !important;
+            border-color: #cbd5e1 !important;
+        }
+
+        /* Autofill seguro e estilizado */
+        input:-webkit-autofill,
+        input:-webkit-autofill:hover, 
+        input:-webkit-autofill:focus, 
+        input:-webkit-autofill:active {
+            -webkit-box-shadow: 0 0 0 30px #09090b inset !important;
+            -webkit-text-fill-color: white !important;
+            transition: background-color 5000s ease-in-out 0s;
+        }
+        [data-color-theme="light"] input:-webkit-autofill,
+        [data-color-theme="light"] input:-webkit-autofill:hover, 
+        [data-color-theme="light"] input:-webkit-autofill:focus, 
+        [data-color-theme="light"] input:-webkit-autofill:active {
+            -webkit-box-shadow: 0 0 0 30px #f1f5f9 inset !important;
+            -webkit-text-fill-color: #0f172a !important;
+        }
     </style>
 </head>
-<body>
-    <div class="login-container">
-        <div class="login-card">
-            <div class="login-logo">
-                <div class="logo-icon-wrap">
-                    <i class="fas fa-server"></i>
-                </div>
-                <h1>GBOC Server</h1>
-                <p>Central de Gerenciamento de Backup</p>
-            </div>
+<body class="min-h-screen flex flex-col justify-between text-white relative overflow-x-hidden selection:bg-amber-500 selection:text-black">
 
-            <div id="setupInfo" class="setup-info" style="display:none;">
-                <i class="fas fa-info-circle"></i>
-                Primeiro acesso! Crie sua conta de administrador.
-            </div>
+    <!-- Fundo animado com gradientes radiais dinâmicos e curvas SVG tecnológicas -->
+    <div class="background-container fixed inset-0 z-0 pointer-events-none overflow-hidden">
+        <!-- Gradientes radiais adaptados ao padrão de iluminação ativo -->
+        <div id="glow-ambient-1" class="absolute -top-36 -left-36 w-[32rem] h-[32rem] rounded-full blur-[130px] mix-blend-screen glow-pulse" style="background-color: var(--ambient-glow-1);"></div>
+        <div id="glow-ambient-2" class="absolute top-1/2 -right-36 w-[42rem] h-[42rem] rounded-full blur-[160px] mix-blend-screen glow-pulse-delayed" style="background-color: var(--ambient-glow-2);"></div>
+        <div id="glow-ambient-3" class="absolute -bottom-24 left-1/4 w-[28rem] h-[28rem] rounded-full blur-[140px] mix-blend-screen glow-pulse" style="background-color: var(--ambient-glow-1); animation-delay: 4s;"></div>
 
-            <div id="loginError" class="login-error">
-                <i class="fas fa-exclamation-circle"></i>
-                <span id="errorText"></span>
-            </div>
-
-            <form class="login-form" id="loginForm" onsubmit="handleSubmit(event)">
-                <div class="form-group" id="displayNameGroup" style="display:none;">
-                    <label for="displayName">Nome de Exibição</label>
-                    <div class="input-wrapper">
-                        <input type="text" id="displayName" placeholder="Administrador" autocomplete="name">
-                        <i class="fas fa-id-card field-icon"></i>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="username">Usuário</label>
-                    <div class="input-wrapper">
-                        <input type="text" id="username" placeholder="admin" required autocomplete="username">
-                        <i class="fas fa-user field-icon"></i>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="password">Senha</label>
-                    <div class="input-wrapper">
-                        <input type="password" id="password" placeholder="••••••••" required autocomplete="current-password">
-                        <i class="fas fa-lock field-icon"></i>
-                    </div>
-                </div>
-                <button type="submit" class="login-btn" id="submitBtn">
-                    <i class="fas fa-sign-in-alt" id="submitIcon"></i>
-                    <span id="submitText">Entrar</span>
-                </button>
-            </form>
-
-            <div class="version-badge">GBOC Server 14.4.0</div>
-        </div>
+        <!-- Curvas SVG de Tecnologia com Animação Fluida -->
+        <svg class="absolute w-full h-full opacity-60" viewBox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M0,50 C30,30 70,80 100,40" fill="none" stroke="url(#grad1)" stroke-width="0.25" class="path-animate-1" />
+            <path d="M0,60 C40,20 60,90 100,50" fill="none" stroke="url(#grad2)" stroke-width="0.18" class="path-animate-2" />
+            <path d="M-10,80 C30,90 80,20 110,30" fill="none" stroke="url(#grad1)" stroke-width="0.14" class="path-animate-3" />
+            <defs>
+                <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop id="grad1-stop1" offset="0%" style="stop-color: var(--curve-color-2); stop-opacity: 0" />
+                    <stop id="grad1-stop2" offset="50%" style="stop-color: var(--curve-color-1); stop-opacity: 0.85" />
+                    <stop id="grad1-stop3" offset="100%" style="stop-color: var(--curve-color-2); stop-opacity: 0" />
+                </linearGradient>
+                <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop id="grad2-stop1" offset="0%" style="stop-color: var(--curve-color-1); stop-opacity: 0" />
+                    <stop id="grad2-stop2" offset="50%" style="stop-color: var(--curve-color-2); stop-opacity: 0.7" />
+                    <stop id="grad2-stop3" offset="100%" style="stop-color: var(--curve-color-1); stop-opacity: 0" />
+                </linearGradient>
+            </defs>
+        </svg>
     </div>
 
+    <!-- Cabeçalho com Identidade GBOC, Seletor de Iluminação e Navegação -->
+    <header class="w-full p-6 flex flex-wrap justify-between items-center z-10 max-w-7xl mx-auto gap-4 relative">
+        <div class="flex items-center gap-3">
+            <span class="relative flex h-2.5 w-2.5">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style="background-color: var(--primary-color, #f59e0b);"></span>
+                <span class="relative inline-flex rounded-full h-2.5 w-2.5" style="background-color: var(--primary-color, #f59e0b);"></span>
+            </span>
+            <span id="app-badge-title" class="text-[11px] uppercase tracking-[0.25em] text-zinc-400 font-semibold light-card-muted">GBOC CENTRAL SERVER</span>
+        </div>
+
+        <div class="flex items-center gap-2 text-2xl font-black tracking-wider drop-shadow-md">
+            <span class="bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 bg-clip-text text-transparent font-extrabold" id="brand-logo-text">GBOC</span>
+            <span class="text-xs font-bold px-2 py-0.5 rounded border border-white/10 bg-white/5 tracking-wider text-zinc-300" id="brand-edition-tag">V7 ENTERPRISE</span>
+        </div>
+
+        <div class="flex items-center gap-5 text-xs font-semibold tracking-wide">
+            <!-- Seletor Rápido de Iluminação / Padrão de Luz -->
+            <div class="flex items-center gap-1.5 p-1 rounded-full bg-zinc-900/60 border border-zinc-800/80 backdrop-blur-md" title="Padrão de Iluminação do Sistema">
+                <button type="button" onclick="setIllumination('amber')" class="theme-pill-btn w-5 h-5 rounded-full bg-gradient-to-tr from-amber-600 to-yellow-400 border border-white/20" title="Âmbar (Solaris Gold)"></button>
+                <button type="button" onclick="setIllumination('dark')" class="theme-pill-btn w-5 h-5 rounded-full bg-gradient-to-tr from-zinc-800 to-indigo-600 border border-white/20" title="Escuro (Carbon Graphite)"></button>
+                <button type="button" onclick="setIllumination('light')" class="theme-pill-btn w-5 h-5 rounded-full bg-gradient-to-tr from-slate-200 to-white border border-zinc-400" title="Claro (High Contrast)"></button>
+                <button type="button" onclick="setIllumination('purple')" class="theme-pill-btn w-5 h-5 rounded-full bg-gradient-to-tr from-purple-800 to-purple-500 border border-white/20" title="Púrpura (Royal Amethyst)"></button>
+                <button type="button" onclick="setIllumination('ocean')" class="theme-pill-btn w-5 h-5 rounded-full bg-gradient-to-tr from-teal-800 to-cyan-500 border border-white/20" title="Oceano (Abyssal Teal)"></button>
+                <button type="button" onclick="setIllumination('red')" class="theme-pill-btn w-5 h-5 rounded-full bg-gradient-to-tr from-red-800 to-red-500 border border-white/20" title="Vermelho (Sentinel Ruby)"></button>
+            </div>
+
+            <span class="text-zinc-700">|</span>
+
+            <!-- Abas de alternância de tela -->
+            <button type="button" id="tab-login-btn" class="cursor-pointer transition-colors duration-300 font-bold flex items-center gap-1.5" style="color: var(--primary-color, #f59e0b);" onclick="switchForm('login')">
+                <i class="fa-solid fa-arrow-right-to-bracket text-[11px]"></i>
+                <span>ENTRAR</span>
+            </button>
+            <span class="text-zinc-700">|</span>
+            <button type="button" id="tab-register-btn" class="cursor-pointer text-zinc-400 hover:text-yellow-400 transition-colors duration-300 font-semibold flex items-center gap-1.5 light-card-muted" onclick="switchForm('register')">
+                <i class="fa-solid fa-user-plus text-[11px]"></i>
+                <span id="tab-register-label">PRIMEIRO ACESSO</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Conteúdo Principal / Card Central com Efeito Glassmorphic 3D -->
+    <main class="flex-grow flex items-center justify-center p-4 z-10 relative perspective-1000 my-4">
+        <div class="w-full max-w-[440px] rounded-[26px] p-8 sm:p-9 relative overflow-hidden card-wrapper backdrop-blur-2xl">
+            
+            <!-- Brilho reflexivo interno do card -->
+            <div class="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent pointer-events-none rounded-[26px]"></div>
+
+            <!-- Banner Informativo de Setup Inicial / Primeiro Acesso -->
+            <div id="setup-banner" class="hidden mb-6 p-3.5 bg-amber-500/10 border border-amber-500/40 rounded-2xl text-amber-300 text-xs flex items-center gap-3">
+                <i class="fa-solid fa-shield-halved text-amber-400 text-lg shrink-0"></i>
+                <div>
+                    <span class="font-bold block">Primeira Inicialização Detectada</span>
+                    <span class="text-amber-200/80 text-[11px]">Crie a conta de Administrador Geral para assumir o controle seguro do servidor.</span>
+                </div>
+            </div>
+
+            <!-- Alerta de Erro Visual -->
+            <div id="auth-alert" class="hidden mb-5 p-3.5 bg-rose-950/60 border border-rose-500/50 rounded-2xl text-rose-200 text-xs flex items-start gap-2.5 shadow-lg shadow-rose-950/30 transition-all">
+                <i class="fa-solid fa-triangle-exclamation text-rose-400 text-sm mt-0.5 shrink-0"></i>
+                <span id="auth-alert-text" class="leading-relaxed font-medium"></span>
+            </div>
+
+            <!-- Alerta de Sucesso -->
+            <div id="auth-success" class="hidden mb-5 p-3.5 bg-emerald-950/60 border border-emerald-500/50 rounded-2xl text-emerald-200 text-xs flex items-start gap-2.5 shadow-lg shadow-emerald-950/30 transition-all">
+                <i class="fa-solid fa-circle-check text-emerald-400 text-sm mt-0.5 shrink-0"></i>
+                <span id="auth-success-text" class="leading-relaxed font-medium"></span>
+            </div>
+
+            <!-- FORMULÁRIO DE LOGIN -->
+            <div id="login-form" class="form-section transition-all duration-500 ease-out">
+                <div class="text-center mb-7">
+                    <h1 class="text-[30px] font-black text-white tracking-tight mb-2 light-card-text">
+                        Welcome <span class="text-transparent bg-clip-text" style="background-image: var(--accent-gradient, linear-gradient(135deg, #f59e0b, #ea580c));">Back</span>
+                    </h1>
+                    <p class="text-[13px] text-zinc-400 light-card-muted">Digite suas credenciais para acessar seu ambiente seguro</p>
+                </div>
+
+                <form onsubmit="handleAuth(event, 'login')" class="space-y-4">
+                    <div class="space-y-1.5">
+                        <label class="block text-[11px] font-semibold text-zinc-400 uppercase tracking-wider light-card-muted">Usuário ou E-mail</label>
+                        <div class="relative group">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-zinc-500 group-focus-within:text-amber-500 transition-colors">
+                                <i class="fa-regular fa-envelope text-sm"></i>
+                            </span>
+                            <input type="text" id="login-username" required placeholder="admin" autocomplete="username"
+                                class="w-full bg-zinc-950/50 border border-zinc-800/80 rounded-xl py-3 pl-10 pr-4 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/60 transition-all light-card-input">
+                        </div>
+                    </div>
+
+                    <div class="space-y-1.5">
+                        <label class="block text-[11px] font-semibold text-zinc-400 uppercase tracking-wider light-card-muted">Senha</label>
+                        <div class="relative group">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-zinc-500 group-focus-within:text-amber-500 transition-colors">
+                                <i class="fa-solid fa-lock text-sm"></i>
+                            </span>
+                            <input type="password" id="login-password" required placeholder="••••••••" autocomplete="current-password"
+                                class="w-full bg-zinc-950/50 border border-zinc-800/80 rounded-xl py-3 pl-10 pr-10 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/60 transition-all light-card-input">
+                            <button type="button" onclick="togglePassword('login-password')" class="absolute inset-y-0 right-0 flex items-center pr-3.5 text-zinc-500 hover:text-zinc-300 transition-colors focus:outline-none" aria-label="Alternar visibilidade da senha">
+                                <i class="fa-regular fa-eye text-sm"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between text-xs text-zinc-400 pt-1 pb-2 light-card-muted">
+                        <label class="flex items-center gap-2 cursor-pointer group select-none">
+                            <div class="relative flex items-center justify-center w-4 h-4 rounded bg-zinc-950/70 border border-zinc-700 group-hover:border-amber-500/60 transition-colors">
+                                <input type="checkbox" id="remember-me" class="peer appearance-none absolute w-full h-full cursor-pointer">
+                                <i class="fa-solid fa-check text-[10px] text-amber-500 opacity-0 peer-checked:opacity-100 transition-opacity"></i>
+                            </div>
+                            <span class="group-hover:text-zinc-200 transition-colors light-card-muted">Lembrar credencial</span>
+                        </label>
+                        <a href="javascript:void(0)" onclick="handleForgotPassword()" class="hover:text-amber-400 transition-colors light-card-muted">Esqueceu a senha?</a>
+                    </div>
+
+                    <button type="submit" id="login-submit-btn" class="w-full relative group overflow-hidden rounded-xl shadow-lg transition-transform active:scale-[0.98]">
+                        <div class="absolute inset-0 transition-transform duration-300 group-hover:scale-[1.02]" style="background: var(--accent-gradient, linear-gradient(135deg, #f59e0b 0%, #ea580c 100%));"></div>
+                        <div class="relative py-3.5 rounded-xl text-zinc-950 font-bold transition-all flex items-center justify-center gap-2 text-[13px] uppercase tracking-wider" style="background: var(--accent-gradient, linear-gradient(135deg, #f59e0b 0%, #ea580c 100%));">
+                            <span id="login-btn-text">Entrar no Sistema</span>
+                            <i id="login-btn-icon" class="fa-solid fa-arrow-right text-xs group-hover:translate-x-1 transition-transform"></i>
+                        </div>
+                    </button>
+                </form>
+
+                <!-- Divisor OAuth Social -->
+                <div class="relative flex py-6 items-center">
+                    <div class="flex-grow border-t border-zinc-800/80"></div>
+                    <span class="flex-shrink mx-4 text-zinc-500 text-[10px] uppercase tracking-[0.2em] font-semibold light-card-muted">Or continue with</span>
+                    <div class="flex-grow border-t border-zinc-800/80"></div>
+                </div>
+
+                <!-- Botões Google e Apple (com Flags de Ativação do Sistema) -->
+                <div class="grid grid-cols-2 gap-3">
+                    <button type="button" id="btn-oauth-google" onclick="handleOAuth('google')" class="flex items-center justify-center gap-2 py-2.5 px-4 bg-zinc-950/50 hover:bg-zinc-800/80 border border-zinc-800/80 rounded-xl text-xs font-semibold text-zinc-200 transition-all hover:border-zinc-600 active:scale-[0.98] light-card-social relative group">
+                        <i class="fa-brands fa-google text-sm text-amber-500 group-hover:scale-110 transition-transform"></i>
+                        <span>Google</span>
+                        <span id="google-status-dot" class="w-1.5 h-1.5 rounded-full bg-zinc-600 absolute top-2 right-2" title="Status OAuth"></span>
+                    </button>
+
+                    <button type="button" id="btn-oauth-apple" onclick="handleOAuth('apple')" class="flex items-center justify-center gap-2 py-2.5 px-4 bg-zinc-950/50 hover:bg-zinc-800/80 border border-zinc-800/80 rounded-xl text-xs font-semibold text-zinc-200 transition-all hover:border-zinc-600 active:scale-[0.98] light-card-social relative group">
+                        <i class="fa-brands fa-apple text-base text-zinc-100 group-hover:scale-110 transition-transform mb-0.5"></i>
+                        <span>Apple</span>
+                        <span id="apple-status-dot" class="w-1.5 h-1.5 rounded-full bg-zinc-600 absolute top-2 right-2" title="Status OAuth"></span>
+                    </button>
+                </div>
+
+                <p class="text-center text-[13px] text-zinc-500 mt-7 light-card-muted">
+                    Não possui credenciais? <span onclick="switchForm('register')" class="font-bold cursor-pointer hover:underline transition-colors" style="color: var(--primary-color, #f59e0b);">Primeiro Acesso</span>
+                </p>
+            </div>
+
+            <!-- FORMULÁRIO DE CADASTRO / PRIMEIRO ACESSO (Setup Inicial) -->
+            <div id="register-form" class="form-section hidden opacity-0 translate-x-8 absolute top-8 left-8 right-8 transition-all duration-500 ease-out pointer-events-none">
+                <div class="text-center mb-7">
+                    <h1 class="text-[30px] font-black text-white tracking-tight mb-2 light-card-text">
+                        Create <span class="text-transparent bg-clip-text" style="background-image: var(--accent-gradient, linear-gradient(135deg, #f59e0b, #ea580c));">Account</span>
+                    </h1>
+                    <p class="text-[13px] text-zinc-400 light-card-muted">Configure o Administrador Geral para proteger sua infraestrutura</p>
+                </div>
+
+                <form onsubmit="handleAuth(event, 'register')" class="space-y-4">
+                    <div class="space-y-1.5">
+                        <label class="block text-[11px] font-semibold text-zinc-400 uppercase tracking-wider light-card-muted">Nome de Exibição</label>
+                        <div class="relative group">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-zinc-500 group-focus-within:text-amber-500 transition-colors">
+                                <i class="fa-regular fa-user text-sm"></i>
+                            </span>
+                            <input type="text" id="reg-display-name" placeholder="Administrador Principal" autocomplete="name"
+                                class="w-full bg-zinc-950/50 border border-zinc-800/80 rounded-xl py-2.5 pl-10 pr-4 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/60 transition-all light-card-input">
+                        </div>
+                    </div>
+
+                    <div class="space-y-1.5">
+                        <label class="block text-[11px] font-semibold text-zinc-400 uppercase tracking-wider light-card-muted">Usuário ou E-mail</label>
+                        <div class="relative group">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-zinc-500 group-focus-within:text-amber-500 transition-colors">
+                                <i class="fa-regular fa-envelope text-sm"></i>
+                            </span>
+                            <input type="text" id="reg-username" required placeholder="admin" autocomplete="username"
+                                class="w-full bg-zinc-950/50 border border-zinc-800/80 rounded-xl py-2.5 pl-10 pr-4 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/60 transition-all light-card-input">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="space-y-1.5">
+                            <label class="block text-[11px] font-semibold text-zinc-400 uppercase tracking-wider light-card-muted">Senha</label>
+                            <div class="relative group">
+                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-zinc-500 group-focus-within:text-amber-500 transition-colors">
+                                    <i class="fa-solid fa-lock text-xs"></i>
+                                </span>
+                                <input type="password" id="reg-password" required placeholder="••••••••" autocomplete="new-password"
+                                    class="w-full bg-zinc-950/50 border border-zinc-800/80 rounded-xl py-2.5 pl-9 pr-8 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-amber-500/60 transition-all light-card-input">
+                                <button type="button" onclick="togglePassword('reg-password')" class="absolute inset-y-0 right-0 flex items-center pr-2.5 text-zinc-500 hover:text-zinc-300 focus:outline-none" aria-label="Ver senha">
+                                    <i class="fa-regular fa-eye text-xs"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="space-y-1.5">
+                            <label class="block text-[11px] font-semibold text-zinc-400 uppercase tracking-wider light-card-muted">Confirmar</label>
+                            <div class="relative group">
+                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-zinc-500 group-focus-within:text-amber-500 transition-colors">
+                                    <i class="fa-solid fa-lock text-xs"></i>
+                                </span>
+                                <input type="password" id="reg-confirm" required placeholder="••••••••" autocomplete="new-password"
+                                    class="w-full bg-zinc-950/50 border border-zinc-800/80 rounded-xl py-2.5 pl-9 pr-8 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-amber-500/60 transition-all light-card-input">
+                                <button type="button" onclick="togglePassword('reg-confirm')" class="absolute inset-y-0 right-0 flex items-center pr-2.5 text-zinc-500 hover:text-zinc-300 focus:outline-none" aria-label="Ver confirmação">
+                                    <i class="fa-regular fa-eye text-xs"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center text-xs text-zinc-400 pt-2 pb-1 light-card-muted">
+                        <label class="flex items-center gap-2 cursor-pointer group select-none">
+                            <div class="relative flex items-center justify-center w-4 h-4 rounded bg-zinc-950/70 border border-zinc-700 group-hover:border-amber-500/60 transition-colors">
+                                <input type="checkbox" required checked class="peer appearance-none absolute w-full h-full cursor-pointer">
+                                <i class="fa-solid fa-check text-[10px] text-amber-500 opacity-0 peer-checked:opacity-100 transition-opacity"></i>
+                            </div>
+                            <span class="text-[11px] light-card-muted">Concordo com os <a href="javascript:void(0)" onclick="showPolicy()" class="hover:underline font-medium" style="color: var(--primary-color, #f59e0b);">Termos e Política de Segurança</a></span>
+                        </label>
+                    </div>
+
+                    <button type="submit" id="register-submit-btn" class="w-full relative group overflow-hidden rounded-xl shadow-lg transition-transform active:scale-[0.98] mt-2">
+                        <div class="absolute inset-0 transition-transform duration-300 group-hover:scale-[1.02]" style="background: var(--accent-gradient, linear-gradient(135deg, #f59e0b 0%, #ea580c 100%));"></div>
+                        <div class="relative py-3.5 rounded-xl text-zinc-950 font-bold transition-all flex items-center justify-center gap-2 text-[13px] uppercase tracking-wider" style="background: var(--accent-gradient, linear-gradient(135deg, #f59e0b 0%, #ea580c 100%));">
+                            <span id="reg-btn-text">Criar Conta de Administrador</span>
+                            <i id="reg-btn-icon" class="fa-solid fa-arrow-right text-xs group-hover:translate-x-1 transition-transform"></i>
+                        </div>
+                    </button>
+                </form>
+
+                <p class="text-center text-[13px] text-zinc-500 mt-7 light-card-muted">
+                    Já possui uma conta configurada? <span onclick="switchForm('login')" class="font-bold cursor-pointer hover:underline transition-colors" style="color: var(--primary-color, #f59e0b);">Fazer Login</span>
+                </p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Rodapé Corporativo -->
+    <footer class="w-full p-4 text-center text-zinc-500 text-[11px] uppercase tracking-widest z-10 relative light-card-muted flex flex-col sm:flex-row items-center justify-center gap-2">
+        <span>GBOC System v14.4 Enterprise Edition</span>
+        <span class="hidden sm:inline text-zinc-700">•</span>
+        <span>&copy; 2026 Master11BR - Propriedade Intelectual & Direitos Reservados.</span>
+    </footer>
+
+    <!-- Lógica de Interface, Animações e Conexão Zero-Mock com o Backend -->
     <script>
-    let isSetupMode = false;
-    const API = '/api/v1/auth';
+        const API_BASE = '/api/v1/auth';
+        let isSetupMode = false;
+        let oauthConfig = {
+            google: { enabled: false },
+            apple: { enabled: false }
+        };
 
-    async function checkAuthStatus() {
-        try {
-            const res = await fetch(API + '/status');
-            const data = await res.json();
-            if (!data.auth_enabled) {
-                isSetupMode = true;
-                document.getElementById('setupInfo').style.display = 'block';
-                document.getElementById('displayNameGroup').style.display = 'block';
-                document.getElementById('submitText').textContent = 'Criar Conta';
-                document.getElementById('submitIcon').className = 'fas fa-user-plus';
-                document.getElementById('submitBtn').classList.add('accent-fill');
-            } else if (data.authenticated) {
-                window.location.href = '/';
+        // ── 1. Integração com o Padrão de Iluminação do Sistema ──────────────
+        function setIllumination(theme) {
+            const validThemes = ['amber', 'dark', 'light', 'purple', 'ocean', 'red'];
+            if (!validThemes.includes(theme)) theme = 'amber';
+
+            document.documentElement.setAttribute('data-theme', theme);
+            document.documentElement.setAttribute('data-color-theme', theme);
+            localStorage.setItem('gboc-color-theme', theme);
+            localStorage.setItem('gboc-theme', theme);
+
+            // Marca botão ativo no seletor
+            document.querySelectorAll('.theme-pill-btn').forEach(btn => {
+                const title = btn.getAttribute('title') || '';
+                const match = (theme === 'amber' && title.includes('Âmbar')) ||
+                              (theme === 'dark' && title.includes('Escuro')) ||
+                              (theme === 'light' && title.includes('Claro')) ||
+                              (theme === 'purple' && title.includes('Púrpura')) ||
+                              (theme === 'ocean' && title.includes('Oceano')) ||
+                              (theme === 'red' && title.includes('Vermelho'));
+                btn.classList.toggle('active', match);
+            });
+
+            // Sincroniza GBOCLayout se ativo
+            if (window.GBOCLayout && typeof window.GBOCLayout.setTheme === 'function') {
+                window.GBOCLayout.setTheme(theme);
             }
-        } catch (e) {
-            console.error('Auth status check failed:', e);
-        }
-    }
-
-    async function handleSubmit(e) {
-        e.preventDefault();
-        const btn = document.getElementById('submitBtn');
-        const errorDiv = document.getElementById('loginError');
-        const errorText = document.getElementById('errorText');
-        btn.disabled = true;
-        errorDiv.classList.remove('visible');
-
-        const username = document.getElementById('username').value.trim();
-        const password = document.getElementById('password').value;
-
-        if (!username || !password) {
-            errorText.textContent = 'Preencha todos os campos';
-            errorDiv.classList.add('visible');
-            btn.disabled = false;
-            return;
         }
 
-        try {
-            if (isSetupMode) {
-                const displayName = document.getElementById('displayName').value.trim() || username;
-                const res = await fetch(API + '/setup', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({username, password, display_name: displayName})
-                });
+        // ── 2. Alternância de Formulário com Transição Suave e Perspectiva ──
+        function switchForm(type) {
+            clearAlerts();
+            const loginForm = document.getElementById('login-form');
+            const registerForm = document.getElementById('register-form');
+            const tabLoginBtn = document.getElementById('tab-login-btn');
+            const tabRegBtn = document.getElementById('tab-register-btn');
+
+            if (type === 'register') {
+                // Esconde Login (desliza para a esquerda)
+                loginForm.classList.add('opacity-0', '-translate-x-8', 'pointer-events-none');
+                loginForm.classList.remove('opacity-100', 'translate-x-0', 'pointer-events-auto');
+
+                setTimeout(() => {
+                    loginForm.classList.add('hidden', 'absolute', 'top-8', 'left-8', 'right-8');
+
+                    // Mostra Cadastro (vem da direita)
+                    registerForm.classList.remove('hidden', 'absolute');
+                    setTimeout(() => {
+                        registerForm.classList.remove('opacity-0', 'translate-x-8', 'pointer-events-none');
+                        registerForm.classList.add('opacity-100', 'translate-x-0', 'pointer-events-auto');
+                    }, 50);
+                }, 300);
+
+                tabRegBtn.style.color = 'var(--primary-color, #f59e0b)';
+                tabLoginBtn.style.color = '';
+                tabLoginBtn.classList.add('text-zinc-400');
+            } else {
+                // Esconde Cadastro (desliza para a direita)
+                registerForm.classList.add('opacity-0', 'translate-x-8', 'pointer-events-none');
+                registerForm.classList.remove('opacity-100', 'translate-x-0', 'pointer-events-auto');
+
+                setTimeout(() => {
+                    registerForm.classList.add('hidden', 'absolute', 'top-8', 'left-8', 'right-8');
+
+                    // Mostra Login (vem da esquerda)
+                    loginForm.classList.remove('hidden', 'absolute', '-translate-x-8');
+                    loginForm.classList.add('translate-x-8');
+
+                    setTimeout(() => {
+                        loginForm.classList.remove('opacity-0', 'translate-x-8', 'pointer-events-none');
+                        loginForm.classList.add('opacity-100', 'translate-x-0', 'pointer-events-auto');
+                    }, 50);
+                }, 300);
+
+                tabLoginBtn.style.color = 'var(--primary-color, #f59e0b)';
+                tabLoginBtn.classList.remove('text-zinc-400');
+                tabRegBtn.style.color = '';
+                tabRegBtn.classList.add('text-zinc-400');
+            }
+        }
+
+        // ── 3. Alternador de Visibilidade de Senha ──────────────────────────
+        function togglePassword(inputId) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            const btn = input.nextElementSibling;
+            const icon = btn ? btn.querySelector('i') : null;
+
+            if (input.type === 'password') {
+                input.type = 'text';
+                if (icon) {
+                    icon.classList.remove('fa-eye');
+                    icon.classList.add('fa-eye-slash');
+                }
+            } else {
+                input.type = 'password';
+                if (icon) {
+                    icon.classList.remove('fa-eye-slash');
+                    icon.classList.add('fa-eye');
+                }
+            }
+        }
+
+        // ── 4. Alertas Visuais de Feedback ─────────────────────────────────
+        function showAlert(message, isError = true) {
+            const errBox = document.getElementById('auth-alert');
+            const errText = document.getElementById('auth-alert-text');
+            const succBox = document.getElementById('auth-success');
+            const succText = document.getElementById('auth-success-text');
+
+            if (isError) {
+                succBox.classList.add('hidden');
+                errText.textContent = message;
+                errBox.classList.remove('hidden');
+            } else {
+                errBox.classList.add('hidden');
+                succText.textContent = message;
+                succBox.classList.remove('hidden');
+            }
+        }
+
+        function clearAlerts() {
+            document.getElementById('auth-alert').classList.add('hidden');
+            document.getElementById('auth-success').classList.add('hidden');
+        }
+
+        function handleForgotPassword() {
+            showAlert('Para redefinir sua senha, contate o Administrador Geral da organização ou execute o utilitário de redefinição no terminal do servidor.', false);
+        }
+
+        function showPolicy() {
+            showAlert('Acesso exclusivo a operadores autorizados. Todas as tentativas de autenticação e ações administrativas são auditadas pelo GBOC Sentinel.', false);
+        }
+
+        // ── 5. Tratamento de Autenticação Google e Apple por Flag ───────────
+        function handleOAuth(provider) {
+            clearAlerts();
+            const provConfig = oauthConfig[provider];
+
+            if (!provConfig || !provConfig.enabled) {
+                const provName = provider === 'google' ? 'Google Workspace' : 'Apple ID';
+                showAlert(`A autenticação via ${provName} está implementada no GBOC, mas no momento encontra-se desativada pelo administrador aguardando autorização de API corporativa. Utilize suas credenciais corporativas normais.`);
+                return;
+            }
+
+            // Se habilitado pela flag no servidor, redireciona para a URL do provedor
+            const authUrl = provConfig.auth_url || `/api/v1/auth/oauth/${provider}`;
+            showAlert(`Redirecionando para autenticação ${provider}...`, false);
+            setTimeout(() => {
+                window.location.href = authUrl;
+            }, 600);
+        }
+
+        // ── 6. Verificação de Status Inicial e Provedores OAuth ────────────
+        async function checkAuthStatus() {
+            try {
+                const res = await fetch(API_BASE + '/status');
+                if (!res.ok) return;
                 const data = await res.json();
-                if (!res.ok || data.status !== 'success') {
-                    errorText.textContent = data.detail || data.message || 'Erro ao criar conta';
-                    errorDiv.classList.add('visible');
-                    btn.disabled = false;
+
+                if (data.authenticated) {
+                    window.location.href = '/';
                     return;
                 }
-                isSetupMode = false;
-            }
 
-            const res = await fetch(API + '/login', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({username, password})
-            });
-            const data = await res.json();
+                // Armazena configuração dos provedores OAuth
+                if (data.oauth_providers) {
+                    oauthConfig = data.oauth_providers;
+                    const googleDot = document.getElementById('google-status-dot');
+                    const appleDot = document.getElementById('apple-status-dot');
 
-            if (res.ok && data.status === 'success') {
-                localStorage.setItem('gboc_server_token', data.token);
-                localStorage.setItem('gboc_server_user', JSON.stringify(data.user));
-                window.location.href = '/';
-            } else {
-                errorText.textContent = data.detail || data.message || 'Credenciais inválidas';
-                errorDiv.classList.add('visible');
+                    if (googleDot) {
+                        googleDot.className = oauthConfig.google?.enabled
+                            ? 'w-1.5 h-1.5 rounded-full bg-emerald-500 absolute top-2 right-2'
+                            : 'w-1.5 h-1.5 rounded-full bg-amber-500/70 absolute top-2 right-2';
+                        googleDot.title = oauthConfig.google?.enabled ? 'Google OAuth Ativo' : 'Google OAuth Desativado (Aguardando API)';
+                    }
+                    if (appleDot) {
+                        appleDot.className = oauthConfig.apple?.enabled
+                            ? 'w-1.5 h-1.5 rounded-full bg-emerald-500 absolute top-2 right-2'
+                            : 'w-1.5 h-1.5 rounded-full bg-amber-500/70 absolute top-2 right-2';
+                        appleDot.title = oauthConfig.apple?.enabled ? 'Apple OAuth Ativo' : 'Apple OAuth Desativado (Aguardando API)';
+                    }
+                }
+
+                if (!data.auth_enabled) {
+                    // Sem administrador cadastrado: ativa modo setup automático
+                    isSetupMode = true;
+                    document.getElementById('setup-banner').classList.remove('hidden');
+                    document.getElementById('tab-register-label').textContent = 'CONFIGURAR AGORA';
+                    switchForm('register');
+                }
+            } catch (err) {
+                console.warn('Verificação de status do servidor falhou:', err);
             }
-        } catch (err) {
-            errorText.textContent = 'Erro de conexão com o servidor';
-            errorDiv.classList.add('visible');
         }
-        btn.disabled = false;
-    }
 
-    (function(){
-        const saved = localStorage.getItem('gboc-theme') || 'dark';
-        document.documentElement.setAttribute('data-theme', saved);
-    })();
+        // ── 7. Processamento Real de Login e Cadastro (Zero-Mock) ───────────
+        async function handleAuth(event, formType) {
+            event.preventDefault();
+            clearAlerts();
 
-    checkAuthStatus();
+            if (formType === 'login') {
+                const username = document.getElementById('login-username').value.trim();
+                const password = document.getElementById('login-password').value;
+                const btn = document.getElementById('login-submit-btn');
+                const btnText = document.getElementById('login-btn-text');
+                const btnIcon = document.getElementById('login-btn-icon');
+
+                if (!username || !password) {
+                    showAlert('Por favor, informe seu usuário ou e-mail e sua senha.');
+                    return;
+                }
+
+                btn.disabled = true;
+                btnText.textContent = 'Autenticando...';
+                btnIcon.className = 'fa-solid fa-circle-notch fa-spin text-xs';
+
+                try {
+                    const res = await fetch(API_BASE + '/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username, password })
+                    });
+
+                    const data = await res.json();
+
+                    if (res.ok && data.status === 'success') {
+                        localStorage.setItem('gboc_server_token', data.token);
+                        if (data.user) {
+                            localStorage.setItem('gboc_server_user', JSON.stringify(data.user));
+                        }
+                        const remBox = document.getElementById('remember-me');
+                        if (remBox && remBox.checked) {
+                            localStorage.setItem('gboc_remember_user', username);
+                        } else {
+                            localStorage.removeItem('gboc_remember_user');
+                        }
+
+                        showAlert('Autenticado com sucesso! Redirecionando...', false);
+                        setTimeout(() => {
+                            window.location.href = '/';
+                        }, 450);
+                    } else {
+                        showAlert(data.detail || data.message || 'Credenciais inválidas. Verifique seu usuário e senha.');
+                    }
+                } catch (err) {
+                    showAlert('Erro de comunicação com o servidor GBOC. Verifique o serviço ou a rede.');
+                } finally {
+                    btn.disabled = false;
+                    btnText.textContent = 'Entrar no Sistema';
+                    btnIcon.className = 'fa-solid fa-arrow-right text-xs';
+                }
+
+            } else if (formType === 'register') {
+                const displayName = document.getElementById('reg-display-name').value.trim();
+                const username = document.getElementById('reg-username').value.trim();
+                const password = document.getElementById('reg-password').value;
+                const confirmPassword = document.getElementById('reg-confirm').value;
+                const btn = document.getElementById('register-submit-btn');
+                const btnText = document.getElementById('reg-btn-text');
+                const btnIcon = document.getElementById('reg-btn-icon');
+
+                if (!username || !password) {
+                    showAlert('Nome de usuário e senha são obrigatórios.');
+                    return;
+                }
+
+                if (password !== confirmPassword) {
+                    showAlert('As senhas digitadas não coincidem.');
+                    return;
+                }
+
+                if (password.length < 6) {
+                    showAlert('A senha deve conter no mínimo 6 caracteres.');
+                    return;
+                }
+
+                btn.disabled = true;
+                btnText.textContent = 'Configurando Administrador...';
+                btnIcon.className = 'fa-solid fa-circle-notch fa-spin text-xs';
+
+                try {
+                    const res = await fetch(API_BASE + '/setup', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            username,
+                            password,
+                            display_name: displayName || username
+                        })
+                    });
+
+                    const data = await res.json();
+
+                    if (res.ok && data.status === 'success') {
+                        showAlert('Conta de administrador criada com sucesso! Conectando...', false);
+                        isSetupMode = false;
+                        document.getElementById('setup-banner').classList.add('hidden');
+
+                        // Auto-login imediato
+                        const loginRes = await fetch(API_BASE + '/login', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ username, password })
+                        });
+                        const loginData = await loginRes.json();
+                        if (loginRes.ok && loginData.status === 'success') {
+                            localStorage.setItem('gboc_server_token', loginData.token);
+                            if (loginData.user) {
+                                localStorage.setItem('gboc_server_user', JSON.stringify(loginData.user));
+                            }
+                            setTimeout(() => {
+                                window.location.href = '/';
+                            }, 500);
+                            return;
+                        }
+
+                        setTimeout(() => {
+                            document.getElementById('login-username').value = username;
+                            switchForm('login');
+                        }, 1200);
+                    } else {
+                        showAlert(data.detail || data.message || 'Falha ao registrar conta de administrador.');
+                    }
+                } catch (err) {
+                    showAlert('Erro de comunicação ao criar conta de administrador.');
+                } finally {
+                    btn.disabled = false;
+                    btnText.textContent = 'Criar Conta de Administrador';
+                    btnIcon.className = 'fa-solid fa-arrow-right text-xs';
+                }
+            }
+        }
+
+        // ── 8. Inicialização ────────────────────────────────────────────────
+        (function init() {
+            // Restaura iluminação salva ou assume amber/laranja e preto
+            const savedTheme = localStorage.getItem('gboc-color-theme') || localStorage.getItem('gboc-theme') || 'amber';
+            setIllumination(savedTheme);
+
+            // Ajusta branding se executado no GBOC-Agent
+            const isAgent = window.location.port === '9200' || window.location.port === '8081';
+            if (isAgent) {
+                const badge = document.getElementById('app-badge-title');
+                if (badge) badge.textContent = 'GBOC AGENT NODE';
+                const tag = document.getElementById('brand-edition-tag');
+                if (tag) tag.textContent = 'V7 AGENT';
+                document.title = 'GBOC Agent - Login Enterprise V7';
+            }
+
+            // Preenche credencial lembrada se existir
+            const remembered = localStorage.getItem('gboc_remember_user');
+            if (remembered) {
+                const userInput = document.getElementById('login-username');
+                if (userInput) userInput.value = remembered;
+                const remBox = document.getElementById('remember-me');
+                if (remBox) remBox.checked = true;
+            }
+
+            checkAuthStatus();
+        })();
     </script>
 </body>
 </html>
-

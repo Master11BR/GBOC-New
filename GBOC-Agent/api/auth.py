@@ -445,6 +445,48 @@ async def login(req: LoginRequest, request: Request):
         raise HTTPException(status_code=500, detail="Erro interno no login")
 
 
+@router.post("/setup")
+async def auth_setup(req: RegisterRequest, request: Request):
+    """Criação da primeira conta de administrador (primeiro acesso)"""
+    client_ip = request.client.host if request.client else "unknown"
+    _check_rate_limit(client_ip)
+
+    if not req.username or not req.password:
+        raise HTTPException(status_code=400, detail="Usuário e senha são obrigatórios")
+
+    try:
+        from shared_core import get_shared_core
+        core = get_shared_core()
+        with core.get_db_connection() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT COUNT(*) FROM auth_users")
+            count = cur.fetchone()[0]
+            if count > 0:
+                raise HTTPException(status_code=400, detail="Já existem usuários cadastrados. Utilize o login.")
+
+            valid, pwd_errors = validate_password(req.password)
+            if not valid:
+                raise HTTPException(status_code=400, detail="Senha não atende aos requisitos: " + "; ".join(pwd_errors))
+
+            password_hash, salt = _hash_password(req.password)
+            now = datetime.now().isoformat()
+            cur.execute("""
+                INSERT INTO auth_users (username, password_hash, password_salt, display_name, role, is_active, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, 'admin', TRUE, %s, %s) RETURNING id
+            """, (req.username.strip(), password_hash, salt,
+                  req.display_name or req.username.strip(), now, now))
+            new_id = cur.fetchone()[0]
+            conn.commit()
+
+        audit_security_event('admin_setup_complete', username=req.username.strip(), ip=client_ip, detail={'user_id': new_id})
+        return {"status": "success", "message": "Conta de Administrador criada com sucesso!", "user_id": new_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Setup error: {e}")
+        raise HTTPException(status_code=500, detail="Erro interno no setup inicial")
+
+
 @router.post("/logout")
 async def logout(request: Request):
     token = request.cookies.get('gboc_token')

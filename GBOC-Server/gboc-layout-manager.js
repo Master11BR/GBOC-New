@@ -53,6 +53,7 @@ Zero-Overflow & Smart Sidebar Presence Detection.
     const THEMES = [
         { id: 'dark',   label: 'Dark',   icon: '🌙' },
         { id: 'light',  label: 'Light',  icon: '☀️' },
+        { id: 'amber',  label: 'Amber',  icon: '⚡' },
         { id: 'purple', label: 'Purple', icon: '💜' },
         { id: 'ocean',  label: 'Ocean',  icon: '🌊' },
         { id: 'red',    label: 'Red',    icon: '🔴' }
@@ -76,7 +77,7 @@ Zero-Overflow & Smart Sidebar Presence Detection.
         _currentUiModel = DEFAULT_MODEL;
     }
     let _currentLayout = localStorage.getItem(LS_LAYOUT) || 'vertical';
-    let _currentColorTheme = localStorage.getItem(LS_COLOR) || localStorage.getItem('gboc-theme') || 'dark';
+    let _currentColorTheme = localStorage.getItem(LS_COLOR) || localStorage.getItem('gboc-theme') || 'amber';
     let _currentUiStyle = localStorage.getItem(LS_UI_STYLE) || 'minimal';
     let _panelOpen = false;
     let _topbarHtml = null;
@@ -119,12 +120,23 @@ Zero-Overflow & Smart Sidebar Presence Detection.
             document.documentElement.setAttribute('data-theme', theme);
             localStorage.setItem('gboc-theme', theme);
         } else {
-            // Purple and ocean are dark-ish base
-            document.documentElement.setAttribute('data-theme', theme === 'ocean' ? 'light' : 'dark');
+            // Amber, purple, red, ocean are dark-ish base
+            document.documentElement.setAttribute('data-theme', 'dark');
+            localStorage.setItem('gboc-theme', theme);
         }
         _currentColorTheme = theme;
         localStorage.setItem(LS_COLOR, theme);
         _updatePanelActiveStates();
+        _updateSvgGradients();
+    }
+
+    function _updateSvgGradients() {
+        const g1 = document.getElementById('glow-ambient-1');
+        const g2 = document.getElementById('glow-ambient-2');
+        const g3 = document.getElementById('glow-ambient-3');
+        if (g1) g1.style.backgroundColor = 'var(--ambient-glow-1)';
+        if (g2) g2.style.backgroundColor = 'var(--ambient-glow-2)';
+        if (g3) g3.style.backgroundColor = 'var(--ambient-glow-1)';
     }
 
     // ── Apply layout mode to <body> ───────────────────────────────────────────
@@ -359,6 +371,41 @@ Zero-Overflow & Smart Sidebar Presence Detection.
         }
     }
 
+    // ── Inject System-Wide Ambient Animated Background ──────────────────────
+    function _ensureAnimatedBackgroundLoaded() {
+        if (document.getElementById('gboc-ambient-background')) return;
+
+        const bg = document.createElement('div');
+        bg.id = 'gboc-ambient-background';
+        bg.className = 'gboc-ambient-background';
+        bg.innerHTML = `
+            <div id="glow-ambient-1" class="glow-pulse" style="position:fixed;top:-130px;left:-130px;width:32rem;height:32rem;border-radius:9999px;filter:blur(130px);mix-blend-mode:screen;background-color:var(--ambient-glow-1,rgba(245,158,11,0.2));pointer-events:none;"></div>
+            <div id="glow-ambient-2" class="glow-pulse-delayed" style="position:fixed;top:50%;right:-130px;width:40rem;height:40rem;border-radius:9999px;filter:blur(160px);mix-blend-mode:screen;background-color:var(--ambient-glow-2,rgba(217,119,6,0.18));pointer-events:none;"></div>
+            <div id="glow-ambient-3" class="glow-pulse" style="position:fixed;bottom:-120px;left:25%;width:28rem;height:28rem;border-radius:9999px;filter:blur(140px);mix-blend-mode:screen;background-color:var(--ambient-glow-1,rgba(245,158,11,0.2));animation-delay:4s;pointer-events:none;"></div>
+            <svg viewBox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M0,50 C30,30 70,80 100,40" fill="none" stroke="url(#gboc-grad1)" stroke-width="0.22" class="path-animate-1" />
+                <path d="M0,60 C40,20 60,90 100,50" fill="none" stroke="url(#gboc-grad2)" stroke-width="0.16" class="path-animate-2" />
+                <path d="M-10,80 C30,90 80,20 110,30" fill="none" stroke="url(#gboc-grad1)" stroke-width="0.12" class="path-animate-3" />
+                <defs>
+                    <linearGradient id="gboc-grad1" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" style="stop-color: var(--curve-color-2, #d97706); stop-opacity: 0;" />
+                        <stop offset="50%" style="stop-color: var(--curve-color-1, #f59e0b); stop-opacity: 0.85;" />
+                        <stop offset="100%" style="stop-color: var(--curve-color-2, #d97706); stop-opacity: 0;" />
+                    </linearGradient>
+                    <linearGradient id="gboc-grad2" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" style="stop-color: var(--curve-color-1, #f59e0b); stop-opacity: 0;" />
+                        <stop offset="50%" style="stop-color: var(--curve-color-2, #d97706); stop-opacity: 0.7;" />
+                        <stop offset="100%" style="stop-color: var(--curve-color-1, #f59e0b); stop-opacity: 0;" />
+                    </linearGradient>
+                </defs>
+            </svg>
+        `;
+
+        if (document.body) {
+            document.body.insertBefore(bg, document.body.firstChild);
+        }
+    }
+
     // ── Badge: check failed jobs ──────────────────────────────────────────────
     async function _checkFailedJobsBadge() {
         try {
@@ -525,6 +572,7 @@ Zero-Overflow & Smart Sidebar Presence Detection.
     // ── Bootstrap ─────────────────────────────────────────────────────────────
     function _bootstrap() {
         _injectStylesheets();
+        _ensureAnimatedBackgroundLoaded();
         _ensureAiAssistantLoaded();
         _ensureHardwareHudLoaded();
         _applyUiModel(_currentUiModel);
@@ -549,6 +597,7 @@ Zero-Overflow & Smart Sidebar Presence Detection.
         _applyColorTheme(_currentColorTheme);
         _applyUiStyle(_currentUiStyle);
         document.addEventListener('DOMContentLoaded', () => {
+            _ensureAnimatedBackgroundLoaded();
             _ensureAiAssistantLoaded();
             _ensureHardwareHudLoaded();
             _applyLayout(_currentLayout);

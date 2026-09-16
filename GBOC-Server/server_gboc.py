@@ -18,7 +18,7 @@ import threading
 import time
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request, Response
-from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -925,9 +925,9 @@ async def get_ui_config_endpoint():
         "DEFAULT_UI_MODEL": "modern",
         "AVAILABLE_MODELS": ["modern"],
         "DEFAULT_THEME": "dark",
-        "AVAILABLE_THEMES": ["dark", "light", "purple", "ocean"],
+        "AVAILABLE_THEMES": ["dark", "light", "amber", "purple", "ocean", "red"],
         "DEFAULT_UI_STYLE": "minimal",
-        "AVAILABLE_UI_STYLES": ["minimal", "neumorphism", "claymorphism", "fluent"]
+        "AVAILABLE_UI_STYLES": ["minimal", "neumorphism", "claymorphism", "fluent", "nexus-widgets", "nexus-glass", "command-sentinel", "cyber-3d"]
     }
 
 # Rota estática universal para recursos da pasta /static/
@@ -969,6 +969,7 @@ async def serve_any_html_page(page_name: str):
 # AUTH ENDPOINTS
 # ===========================
 
+@app.get("/login", include_in_schema=False)
 @app.get("/login.html", include_in_schema=False)
 async def login_page():
     candidates = [
@@ -986,11 +987,45 @@ async def login_page():
 async def server_auth_status(request: Request):
     enabled = _is_server_auth_enabled()
     user = _get_server_user_from_request(request)
+    google_enabled = os.getenv("AUTH_GOOGLE_ENABLED", "false").lower() in ("true", "1", "yes")
+    apple_enabled = os.getenv("AUTH_APPLE_ENABLED", "false").lower() in ("true", "1", "yes")
     return {
         "status": "success",
         "auth_enabled": enabled,
         "authenticated": user is not None,
-        "user": {"username": user["username"], "display_name": user["display_name"], "role": user["role"]} if user else None
+        "user": {"username": user["username"], "display_name": user["display_name"], "role": user["role"]} if user else None,
+        "oauth_providers": {
+            "google": {"enabled": google_enabled, "name": "Google", "auth_url": "/api/v1/auth/oauth/google"},
+            "apple": {"enabled": apple_enabled, "name": "Apple", "auth_url": "/api/v1/auth/oauth/apple"}
+        }
+    }
+
+@app.get("/api/v1/auth/oauth/{provider}")
+async def server_auth_oauth_provider(provider: str):
+    prov = provider.lower().strip()
+    if prov == "google":
+        enabled = os.getenv("AUTH_GOOGLE_ENABLED", "false").lower() in ("true", "1", "yes")
+        name = "Google"
+    elif prov == "apple":
+        enabled = os.getenv("AUTH_APPLE_ENABLED", "false").lower() in ("true", "1", "yes")
+        name = "Apple"
+    else:
+        raise HTTPException(400, f"Provedor OAuth '{provider}' não suportado.")
+
+    if not enabled:
+        return JSONResponse(
+            status_code=501,
+            content={
+                "status": "disabled",
+                "code": "OAUTH_PROVIDER_DISABLED",
+                "provider": name,
+                "message": f"Autenticação via {name} desativada por configuração corporativa. Aguardando credenciais de API."
+            }
+        )
+    return {
+        "status": "enabled",
+        "provider": name,
+        "message": f"Provedor {name} pronto para autenticação."
     }
 
 @app.post("/api/v1/auth/setup")

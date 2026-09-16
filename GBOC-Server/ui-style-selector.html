@@ -252,6 +252,9 @@
                     <button class="selector-btn" id="btn-theme-light" onclick="setIllumination('light')">
                         <i class="fas fa-sun"></i> Claro (High Contrast)
                     </button>
+                    <button class="selector-btn" id="btn-theme-amber" onclick="setIllumination('amber')">
+                        <i class="fas fa-bolt" style="color:#f59e0b"></i> Âmbar (Solaris Gold)
+                    </button>
                     <button class="selector-btn" id="btn-theme-purple" onclick="setIllumination('purple')">
                         <i class="fas fa-heart"></i> Púrpura (Purple)
                     </button>
@@ -404,6 +407,10 @@
 
             document.getElementById('btn-theme-dark')?.classList.toggle('active', currentTheme === 'dark');
             document.getElementById('btn-theme-light')?.classList.toggle('active', currentTheme === 'light');
+            document.getElementById('btn-theme-amber')?.classList.toggle('active', currentTheme === 'amber' || currentTheme === 'orange');
+            document.getElementById('btn-theme-purple')?.classList.toggle('active', currentTheme === 'purple');
+            document.getElementById('btn-theme-ocean')?.classList.toggle('active', currentTheme === 'ocean');
+            document.getElementById('btn-theme-red')?.classList.toggle('active', currentTheme === 'red');
 
             document.getElementById('btn-style-minimal')?.classList.toggle('active', currentUi === 'minimal');
             document.getElementById('btn-style-neumorphism')?.classList.toggle('active', currentUi === 'neumorphism');
