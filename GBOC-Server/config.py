@@ -72,6 +72,15 @@ CORS_ALLOW_METHODS = ["*"]
 CORS_ALLOW_HEADERS = ["*"]
 
 # ===========================
+# OAUTH / SOCIAL LOGIN FLAGS
+# ===========================
+AUTH_GOOGLE_ENABLED = os.getenv("AUTH_GOOGLE_ENABLED", "false").lower() in ("true", "1", "yes")
+AUTH_APPLE_ENABLED = os.getenv("AUTH_APPLE_ENABLED", "false").lower() in ("true", "1", "yes")
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+APPLE_CLIENT_ID = os.getenv("APPLE_CLIENT_ID", "")
+
+
+# ===========================
 # RATE LIMITING
 # ===========================
 RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"

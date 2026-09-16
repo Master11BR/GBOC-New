@@ -220,3 +220,40 @@
     --text: var(--text-primary) !important;
     --card-hover: var(--bg-input) !important;
 }
+
+/* Amber / Solaris Theme — Deep Black & Golden Tech Amber Palette */
+[data-color-theme="amber"], [data-color-theme="orange"] {
+    --bg-main:          #0a0a0a !important;
+    --bg-card:          rgba(20, 18, 14, 0.90) !important;
+    --bg-input:         #14120e !important;
+    --sidebar-bg:       #080705 !important;
+    --topbar-bg:        #120f0a !important;
+    --text-primary:     #fffbeb !important;
+    --text-secondary:   #fcd34d !important;
+    --text-muted:       #b45309 !important;
+    --border-color:     rgba(245, 158, 11, 0.22) !important;
+
+    --primary-color:    #f59e0b !important;
+    --primary-hover:    #d97706 !important;
+    --primary-glow:     rgba(245, 158, 11, 0.45) !important;
+    --primary-soft:     rgba(245, 158, 11, 0.18) !important;
+    --primary:          #f59e0b !important;
+    --accent-gradient:  linear-gradient(135deg, #f59e0b 0%, #ea580c 100%) !important;
+
+    --nm-bg:            #0a0a0a !important;
+    --nm-shadow-dark:   rgba(0, 0, 0, 0.9) !important;
+    --nm-shadow-light:  rgba(245, 158, 11, 0.12) !important;
+
+    --clay-bg:          #1f1a10 !important;
+    --clay-shadow-drop: 0 16px 36px rgba(0, 0, 0, 0.8) !important;
+    --clay-shadow-inset: inset -6px -6px 14px rgba(0, 0, 0, 0.7), inset 6px 6px 14px rgba(245, 158, 11, 0.2) !important;
+
+    --fluent-glass-bg:  rgba(26, 20, 10, 0.75) !important;
+    --fluent-border:    1px solid rgba(245, 158, 11, 0.3) !important;
+
+    --bg-dark: var(--bg-main) !important;
+    --border: var(--border-color) !important;
+    --text: var(--text-primary) !important;
+    --card-hover: var(--bg-input) !important;
+}
+

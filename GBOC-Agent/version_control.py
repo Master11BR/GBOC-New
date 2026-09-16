@@ -22,7 +22,7 @@ VERSION_FILE = os.path.join(BASE_DIR, "data", "version_info.json")
 
 # Configuração Base SemVer
 MAJOR = 14
-MINOR = 4
+MINOR = 5
 PATCH = 0
 PRERELEASE = "full-stable"
 

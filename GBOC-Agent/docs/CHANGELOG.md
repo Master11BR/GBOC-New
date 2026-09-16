@@ -1,8 +1,39 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.4.0 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.5.0 Enterprise. Todos os direitos reservados. -->
 
 # GBOC — Changelog de Atualizações
 
 > Histórico completo de versões, correções e melhorias do sistema GBOC (Agente + Servidor).
+
+---
+
+## 14.5.0 — 2026-09-15 (Enterprise V7 Authentication UI, Duplicati Cloud & Database Repair Stabilization)
+
+### 🔐 Interface Visual de Autenticação V7 (Dark Glassmorphism)
+- **Novo Design Unificado (`GBOC-Server/login.html` e `GBOC-Agent/static/login.html`)**:
+  - Implementação de layout sofisticado em Tailwind CSS com fundo dark (`zinc-900/70`), blur de vidro de alta definição (`backdrop-blur-2xl`) e paleta dourada/âmbar (`amber-500` / `yellow-500`).
+  - Navegação suave por abas entre **Sign In (Login)** e **Create Account (Setup / Primeiro Acesso)**.
+  - Alternador dinâmico de visibilidade de senhas (*Eye Toggle*) em tempo real.
+  - Suporte à persistência de usuário com caixa de seleção *"Lembrar credencial"* via `localStorage`.
+- **Modo Setup / Provisionamento Inicial Automático**:
+  - Detecção no frontend de instâncias sem administradores cadastrados (`/status`).
+  - Redirecionamento automático e exibição de banner informativo para a criação da credencial master do administrador (`/setup`).
+  - Auto-login transparente logo após a conclusão do cadastro inicial com persistência dos tokens corporativos (`gboc_server_token` / `gboc_token`).
+- **Política Zero-Mock & Conformidade LGPD**:
+  - Eliminação de botões de login social simulados (Google/Apple).
+  - Adição de badges de segurança real com base nas capacidades criptográficas ativas do sistema (*Criptografia SHA-256 / PBKDF2* e *Auditoria Ativa*).
+
+### 🛠️ Correções Críticas no Motor de Importação Duplicati
+- **Suporte Total a Repositórios Cloud (`task_manager.py`, `repository_manager.py`, `real_restore_manager.py`, `integrity_api.py`)**:
+  - Normalização completa para tipos de repositório `cloud` suportados pelo Duplicati nativo (`s3`, `azure`, `googledrive`, `onedrive`, `dropbox`, `webdav`, `sftp`).
+  - Eliminação da exceção `Tipo de repositório Duplicati não suportado: cloud`.
+- **Auto-Recuperação de Banco Duplicati Corrompido (`DatabaseRepairInProgress`)**:
+  - Detecção preventiva e deleção segura de bancos SQLite locais corrompidos ou com reparo incompleto antes de acionar a rotina `repair` do executável nativo do Duplicati.
+  - Garantia de recriação limpa do catálogo de metadados sem interrupção do pipeline de backup ou importação.
+
+### 📦 Distribuição & Versionamento
+- **Atualização SemVer 2.0 Global**:
+  - Elevação do versionamento canônico para **v14.5.0 Full Stable Enterprise** em todos os módulos centrais.
+  - Atualização automática do manifesto `package_manifest.json` e dos instaladores `Setup.bat` / `Setup.ps1`.
 
 ---
 
