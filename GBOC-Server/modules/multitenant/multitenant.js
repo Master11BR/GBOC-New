@@ -169,9 +169,15 @@ async function saveOrganization() {
 }
 
 async function deleteOrganization(orgId) {
-    if (!confirm(`Tem certeza de que deseja excluir a organização '${orgId}'? Todos os usuários e agentes associados serão desvinculados.`)) {
-        return;
-    }
+    const ok = window.gbocConfirm ? await window.gbocConfirm(`Tem certeza de que deseja excluir a organização '${orgId}'? Todos os usuários e agentes associados serão desvinculados.`, {
+        title: 'Excluir Organização',
+        icon: 'fas fa-building-circle-xmark',
+        type: 'danger',
+        confirmText: 'Excluir Organização',
+        danger: true
+    }) : confirm(`Tem certeza de que deseja excluir a organização '${orgId}'? Todos os usuários e agentes associados serão desvinculados.`);
+
+    if (!ok) return;
 
     try {
         const r = await fetch((window.GBOC_API_BASE || '') + TENANT_API + '/organizations/' + orgId, {

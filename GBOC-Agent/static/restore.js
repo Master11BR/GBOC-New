@@ -501,7 +501,15 @@ async function startRestore() {
     const filesToRestore = selectedFiles.size > 0 ? Array.from(selectedFiles) : [currentPath || '/'];
     const label = selectedFiles.size > 0 ? `${selectedFiles.size} item(s) selecionado(s)` : `pasta "${currentPath || '/'}"`;
 
-    if (!confirm(`Restaurar ${label} para:\n${targetPath}`)) return;
+    const ok = window.gbocConfirm ? await window.gbocConfirm(`Confirmar restauração de ${label} para o destino:\n${targetPath}`, {
+        title: 'Confirmar Restauração',
+        icon: 'fas fa-clock-rotate-left',
+        type: 'primary',
+        confirmText: 'Restaurar Dados',
+        details: `Origem: ${filesToRestore.slice(0, 5).join(', ')}${filesToRestore.length > 5 ? '... (+ outros)' : ''}\nDestino: ${targetPath}`
+    }) : confirm(`Restaurar ${label} para:\n${targetPath}`);
+
+    if (!ok) return;
 
     try {
         hideRestoreDiagnostic();

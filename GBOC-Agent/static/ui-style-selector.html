@@ -325,11 +325,11 @@
 
                 <!-- Action Button Component -->
                 <div class="action-row">
-                    <button class="theme-showcase-btn" id="mainActionButton" onclick="simulateAction()">
-                        <i class="fas fa-rocket"></i> Iniciar Sincronização
+                    <button class="theme-showcase-btn" id="mainActionButton" onclick="applyAndPersistStyle()">
+                        <i class="fas fa-floppy-disk"></i> Salvar & Aplicar Estilo
                     </button>
-                    <button class="theme-showcase-btn" style="background: transparent; color: var(--text-primary); border: 1px solid var(--border-color); box-shadow: none;" onclick="alert('Ajuda: Selecione um modo no painel superior para testar as transições de CSS.')">
-                        <i class="fas fa-circle-question"></i> Saiba Mais
+                    <button class="theme-showcase-btn" style="background: transparent; color: var(--text-primary); border: 1px solid var(--border-color); box-shadow: none;" onclick="window.location.href='/'">
+                        <i class="fas fa-arrow-left"></i> Voltar ao Dashboard
                     </button>
                 </div>
             </div>
@@ -346,27 +346,27 @@
                 </div>
                 <div class="token-line">
                     <span class="token-name">--card-radius</span>
-                    <span class="token-val" id="tok-card-radius">8px</span>
+                    <span class="token-val" id="tok-card-radius">12px</span>
                 </div>
                 <div class="token-line">
                     <span class="token-name">--card-border</span>
-                    <span class="token-val" id="tok-card-border">1px solid rgba(255, 255, 255, 0.08)</span>
+                    <span class="token-val" id="tok-card-border">1px solid ...</span>
                 </div>
                 <div class="token-line">
                     <span class="token-name">--card-shadow</span>
-                    <span class="token-val" id="tok-card-shadow">0 1px 3px rgba(0, 0, 0, 0.05)</span>
+                    <span class="token-val" id="tok-card-shadow">none</span>
                 </div>
                 <div class="token-line">
                     <span class="token-name">--card-backdrop</span>
-                    <span class="token-val" id="tok-card-backdrop">none</span>
+                    <span class="token-val" id="tok-card-backdrop">blur(12px)</span>
                 </div>
                 <div class="token-line">
                     <span class="token-name">--btn-radius</span>
-                    <span class="token-val" id="tok-btn-radius">6px</span>
+                    <span class="token-val" id="tok-btn-radius">8px</span>
                 </div>
                 <div class="token-line">
                     <span class="token-name">--input-radius</span>
-                    <span class="token-val" id="tok-input-radius">6px</span>
+                    <span class="token-val" id="tok-input-radius">8px</span>
                 </div>
                 <div class="token-line">
                     <span class="token-name">--input-shadow</span>
@@ -380,42 +380,42 @@
     <script src="/static/gboc-layout-manager.js"></script>
 
     <script>
-        function setIllumination(theme) {
-            if (window.GBOCLayout) {
-                window.GBOCLayout.setTheme(theme);
-            } else {
-                document.documentElement.setAttribute('data-theme', theme);
-                document.documentElement.setAttribute('data-color-theme', theme);
-            }
+        function setStyle(style) {
+            document.documentElement.setAttribute('data-ui-style', style);
+            localStorage.setItem('gboc_ui_style', style);
             updateActiveButtons();
             updateInspectorTokens();
+        }
+
+        function setTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            document.documentElement.setAttribute('data-color-theme', theme);
+            localStorage.setItem('gboc_color_theme', theme);
+            updateActiveButtons();
+            updateInspectorTokens();
+        }
+
+        function setIllumination(theme) {
+            setTheme(theme);
         }
 
         function setUiFormat(style) {
-            if (window.GBOCLayout) {
-                window.GBOCLayout.setUiStyle(style);
-            } else {
-                document.documentElement.setAttribute('data-ui-style', style);
-            }
-            updateActiveButtons();
-            updateInspectorTokens();
+            setStyle(style);
         }
 
         function updateActiveButtons() {
-            const currentTheme = document.documentElement.getAttribute('data-color-theme') || 'dark';
-            const currentUi = document.documentElement.getAttribute('data-ui-style') || 'minimal';
+            const currentStyle = document.documentElement.getAttribute('data-ui-style') || 'minimal';
+            const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
 
-            document.getElementById('btn-theme-dark')?.classList.toggle('active', currentTheme === 'dark');
-            document.getElementById('btn-theme-light')?.classList.toggle('active', currentTheme === 'light');
-            document.getElementById('btn-theme-amber')?.classList.toggle('active', currentTheme === 'amber' || currentTheme === 'orange');
-            document.getElementById('btn-theme-purple')?.classList.toggle('active', currentTheme === 'purple');
-            document.getElementById('btn-theme-ocean')?.classList.toggle('active', currentTheme === 'ocean');
-            document.getElementById('btn-theme-red')?.classList.toggle('active', currentTheme === 'red');
+            ['minimal', 'neumorphism', 'claymorphism', 'fluent', 'nexus-widgets', 'nexus-glass', 'command-sentinel', 'cyber-3d'].forEach(s => {
+                const btn = document.getElementById(`btn-style-${s}`);
+                if (btn) btn.classList.toggle('active', s === currentStyle);
+            });
 
-            document.getElementById('btn-style-minimal')?.classList.toggle('active', currentUi === 'minimal');
-            document.getElementById('btn-style-neumorphism')?.classList.toggle('active', currentUi === 'neumorphism');
-            document.getElementById('btn-style-claymorphism')?.classList.toggle('active', currentUi === 'claymorphism');
-            document.getElementById('btn-style-fluent')?.classList.toggle('active', currentUi === 'fluent');
+            ['dark', 'light', 'amber', 'purple', 'ocean', 'red'].forEach(t => {
+                const btn = document.getElementById(`btn-theme-${t}`);
+                if (btn) btn.classList.toggle('active', t === currentTheme || (t === 'amber' && (currentTheme === 'amber' || currentTheme === 'orange')));
+            });
         }
 
         function updateInspectorTokens() {
@@ -432,20 +432,38 @@
             }, 50);
         }
 
-        function simulateAction() {
+        async function applyAndPersistStyle() {
             const btn = document.getElementById('mainActionButton');
             const originalText = btn.innerHTML;
-            btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Processando...';
+            btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Salvando Preferências...';
             btn.style.opacity = '0.85';
+            
+            const currentStyle = document.documentElement.getAttribute('data-ui-style') || 'minimal';
+            const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+            
+            localStorage.setItem('gboc_ui_style', currentStyle);
+            localStorage.setItem('gboc_color_theme', currentTheme);
+            localStorage.setItem('gboc_theme', currentTheme);
+
+            try {
+                await fetch('/api/v2/system/ui-config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ui_style: currentStyle, theme: currentTheme })
+                });
+            } catch (e) {
+                // Fallback para persistência local
+            }
+
             setTimeout(() => {
-                btn.innerHTML = '<i class="fas fa-check"></i> Concluído com Sucesso!';
-                btn.style.background = 'var(--success-color)';
+                btn.innerHTML = '<i class="fas fa-check"></i> Estilo Aplicado & Salvo!';
+                btn.style.background = 'var(--success-color, #10b981)';
                 setTimeout(() => {
                     btn.innerHTML = originalText;
                     btn.style.background = '';
                     btn.style.opacity = '1';
                 }, 2000);
-            }, 1000);
+            }, 400);
         }
 
         document.addEventListener('DOMContentLoaded', () => {

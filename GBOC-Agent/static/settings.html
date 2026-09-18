@@ -17,6 +17,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="/static/auth_interceptor.js"></script>
     <script src="/static/gboc-layout-manager.js"></script>
+    <script src="/static/gboc-modal.js"></script>
 </head>
 <body>
     <div class="app">
@@ -912,9 +913,14 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         }
 
         async function resetStuckBackups() {
-            if (!confirm('Tem certeza que deseja resetar todos os backups presos no status "running"? Esta ação não pode ser desfeita.')) {
-                return;
-            }
+            const ok = window.gbocConfirm ? await window.gbocConfirm('Tem certeza que deseja resetar todos os backups presos no status "running"? Esta ação não pode ser desfeita.', {
+                title: 'Resetar Backups Travados',
+                icon: 'fas fa-rotate-left',
+                type: 'warning',
+                confirmText: 'Resetar Backups'
+            }) : confirm('Tem certeza que deseja resetar todos os backups presos no status "running"? Esta ação não pode ser desfeita.');
+
+            if (!ok) return;
             
             try {
                 const response = await fetch('/api/tasks/reset-stuck', {
@@ -924,13 +930,20 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 const result = await response.json();
                 
                 if (result.status === 'success') {
-                    alert(`Backups resetados com sucesso! ${result.reset_count || 0} tarefas foram afetadas.`);
+                    if (window.gbocAlert) {
+                        await gbocAlert(`Backups resetados com sucesso! ${result.reset_count || 0} tarefas foram afetadas.`, { title: 'Reset Concluído', type: 'success' });
+                    } else {
+                        alert(`Backups resetados com sucesso! ${result.reset_count || 0} tarefas foram afetadas.`);
+                    }
                     loadBackupStatus(); // Recarregar status
                 } else {
-                    alert('Erro ao resetar backups: ' + (result.message || 'Erro desconhecido'));
+                    const msg = result.message || 'Erro desconhecido';
+                    if (window.gbocAlert) await gbocAlert(msg, { title: 'Erro ao Resetar', type: 'error' });
+                    else alert('Erro ao resetar backups: ' + msg);
                 }
             } catch (e) {
-                alert('Erro na requisição: ' + e.message);
+                if (window.gbocAlert) await gbocAlert(e.message, { title: 'Erro de Conexão', type: 'error' });
+                else alert('Erro na requisição: ' + e.message);
             }
         }
 
@@ -999,10 +1012,27 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         document.getElementById('btn-reset-install').addEventListener('click', resetInstall);
 
         async function resetInstall() {
-            const step1 = confirm('⚠️ ATENÇÃO: Isso vai APAGAR todos os repositórios, tarefas, execuções e resetar configurações.\n\nDeseja continuar?');
+            const step1 = window.gbocConfirm ? await window.gbocConfirm('⚠️ ATENÇÃO: Isso vai APAGAR todos os repositórios, tarefas, execuções e resetar as configurações de fábrica.\n\nDeseja continuar?', {
+                title: 'Reset de Fábrica Completo',
+                icon: 'fas fa-triangle-exclamation',
+                type: 'danger',
+                confirmText: 'Sim, Continuar',
+                danger: true
+            }) : confirm('⚠️ ATENÇÃO: Isso vai APAGAR todos os repositórios, tarefas, execuções e resetar configurações.\n\nDeseja continuar?');
+
             if (!step1) return;
-            const step2 = prompt('Para confirmar, digite "RESET" em maiúsculas:');
-            if (step2 !== 'RESET') { alert('Operação cancelada.'); return; }
+
+            const step2 = window.gbocPrompt ? await window.gbocPrompt('Para confirmar a exclusão de tudo, digite "RESET" em maiúsculas:', '', {
+                title: 'Confirmação de Segurança',
+                placeholder: 'RESET',
+                badge: 'Ação Crítica'
+            }) : prompt('Para confirmar, digite "RESET" em maiúsculas:');
+
+            if (step2 !== 'RESET') {
+                if (window.gbocAlert) await gbocAlert('Operação de reset cancelada pelo usuário.', { title: 'Cancelado', type: 'info' });
+                else alert('Operação cancelada.');
+                return;
+            }
 
             try {
                 const response = await fetch('/api/settings/reset-install', {
@@ -1013,13 +1043,21 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 
                 if (result.status === 'success') {
                     const d = result.deleted || {};
-                    alert(`✅ Reset concluído!\n\n• ${d.executions || 0} execuções removidas\n• ${d.tasks || 0} tarefas removidas\n• ${d.repositories || 0} repositórios removidos\n• ${d.settings_reset || 0} configurações resetadas`);
+                    const summary = `• ${d.executions || 0} execuções removidas\n• ${d.tasks || 0} tarefas removidas\n• ${d.repositories || 0} repositórios removidos\n• ${d.settings_reset || 0} configurações resetadas`;
+                    if (window.gbocAlert) {
+                        await gbocAlert('Reset concluído com sucesso!', { title: 'Reset de Fábrica Concluído', type: 'success', details: summary });
+                    } else {
+                        alert(`✅ Reset concluído!\n\n${summary}`);
+                    }
                     window.location.reload();
                 } else {
-                    alert('Erro ao resetar: ' + (result.detail || result.message || 'Erro desconhecido'));
+                    const msg = result.detail || result.message || 'Erro desconhecido';
+                    if (window.gbocAlert) await gbocAlert(msg, { title: 'Erro no Reset', type: 'error' });
+                    else alert('Erro ao resetar: ' + msg);
                 }
             } catch (e) {
-                alert('Erro na requisição: ' + e.message);
+                if (window.gbocAlert) await gbocAlert(e.message, { title: 'Erro de Conexão', type: 'error' });
+                else alert('Erro na requisição: ' + e.message);
             }
         }
 
@@ -1227,17 +1265,29 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         }
 
         async function deleteUser(id, username) {
-            if (!confirm('Tem certeza que deseja excluir o usuário "' + username + '"?\n\nEsta ação é irreversível.')) return;
+            const ok = window.gbocConfirm ? await window.gbocConfirm('Tem certeza que deseja excluir o usuário "' + username + '"?\n\nEsta ação é irreversível.', {
+                title: 'Excluir Usuário',
+                icon: 'fas fa-user-xmark',
+                type: 'danger',
+                confirmText: 'Excluir Usuário',
+                danger: true
+            }) : confirm('Tem certeza que deseja excluir o usuário "' + username + '"?\n\nEsta ação é irreversível.');
+
+            if (!ok) return;
+
             try {
                 const res = await fetch('/api/auth/users/' + id, { method: 'DELETE' });
                 const data = await res.json();
                 if (res.ok && data.status === 'success') {
                     loadUsers();
                 } else {
-                    alert(data.detail || data.message || 'Erro ao excluir usuário.');
+                    const msg = data.detail || data.message || 'Erro ao excluir usuário.';
+                    if (window.gbocAlert) await gbocAlert(msg, { title: 'Erro', type: 'error' });
+                    else alert(msg);
                 }
             } catch(e) {
-                alert('Erro de conexão: ' + e.message);
+                if (window.gbocAlert) await gbocAlert(e.message, { title: 'Erro de Conexão', type: 'error' });
+                else alert('Erro de conexão: ' + e.message);
             }
         }
 
@@ -1369,7 +1419,14 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 
         async function pullOllamaModel(modelName) {
             const host = document.getElementById('ai-ollama-host').value || 'http://localhost:11434';
-            if(!confirm(`Deseja iniciar o download do modelo "${modelName}" no Ollama?\nIsso será feito em segundo plano pelo agente.`)) return;
+            const ok = window.gbocConfirm ? await window.gbocConfirm(`Deseja iniciar o download do modelo "${modelName}" no Ollama?\nIsso será feito em segundo plano pelo agente.`, {
+                title: 'Baixar Modelo Ollama',
+                icon: 'fas fa-brain',
+                type: 'primary',
+                confirmText: 'Baixar Modelo'
+            }) : confirm(`Deseja iniciar o download do modelo "${modelName}" no Ollama?\nIsso será feito em segundo plano pelo agente.`);
+
+            if(!ok) return;
             
             const btn = document.querySelector(`button[onclick="pullOllamaModel('${modelName}')"]`);
             if(btn) {
@@ -1385,12 +1442,19 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 });
                 const data = await res.json();
                 if(data.status === 'downloading' || data.status === 'success') {
-                    alert(`✅ Instalação iniciada em segundo plano!\n\nVocê pode clicar em "Detectar IA Local" em alguns instantes para conferir se o download terminou.`);
+                    if (window.gbocAlert) {
+                        await gbocAlert('Instalação iniciada em segundo plano!\n\nVocê pode clicar em "Detectar IA Local" em alguns instantes para conferir se o download terminou.', { title: 'Download Iniciado', type: 'success' });
+                    } else {
+                        alert(`✅ Instalação iniciada em segundo plano!\n\nVocê pode clicar em "Detectar IA Local" em alguns instantes para conferir se o download terminou.`);
+                    }
                 } else {
-                    alert(`❌ Erro ao solicitar download: ${data.message || 'Erro desconhecido'}`);
+                    const msg = data.message || 'Erro desconhecido';
+                    if (window.gbocAlert) await gbocAlert(msg, { title: 'Erro no Download', type: 'error' });
+                    else alert(`❌ Erro ao solicitar download: ${msg}`);
                 }
             } catch(e) {
-                alert(`❌ Falha na comunicação com a API: ${e.message}`);
+                if (window.gbocAlert) await gbocAlert(e.message, { title: 'Erro de Conexão', type: 'error' });
+                else alert(`Erro: ${e.message}`);
             } finally {
                 if(btn) {
                     btn.innerHTML = '<i class="fas fa-download"></i> Instalar Modelo Automaticamente';

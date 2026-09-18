@@ -148,7 +148,14 @@ function onModelSelectChanged(val) {
 
 async function pullOllamaModel(modelName) {
     const host = document.getElementById('ai-ollama-host').value || 'http://localhost:11434';
-    if(!confirm(`Deseja iniciar o download do modelo "${modelName}" no Ollama do Servidor?\nIsso será feito em segundo plano pelo servidor central.`)) return;
+    const ok = window.gbocConfirm ? await window.gbocConfirm(`Deseja iniciar o download do modelo "${modelName}" no Ollama do Servidor?\nIsso será feito em segundo plano pelo servidor central.`, {
+        title: 'Baixar Modelo Ollama (Server)',
+        icon: 'fas fa-brain',
+        type: 'primary',
+        confirmText: 'Baixar Modelo'
+    }) : confirm(`Deseja iniciar o download do modelo "${modelName}" no Ollama do Servidor?\nIsso será feito em segundo plano pelo servidor central.`);
+
+    if(!ok) return;
     
     const btn = document.querySelector(`button[onclick="pullOllamaModel('${modelName}')"]`);
     if(btn) {

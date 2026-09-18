@@ -109,7 +109,15 @@ async function loadRMMProcesses() {
 
 async function killRMMProcess(pid) {
     const agentId = document.getElementById('rmm-agent-select')?.value || 'agente-local';
-    if(!confirm(`Confirma encerrar processo PID ${pid} no agente [${agentId}]?`)) return;
+    const ok = window.gbocConfirm ? await window.gbocConfirm(`Confirma encerrar o processo PID ${pid} no agente [${agentId}]?`, {
+        title: 'Finalizar Processo Remoto',
+        icon: 'fas fa-rectangle-xmark',
+        type: 'danger',
+        confirmText: 'Encerrar Processo',
+        danger: true
+    }) : confirm(`Confirma encerrar processo PID ${pid} no agente [${agentId}]?`);
+
+    if(!ok) return;
     try {
         const r = await fetch(window.GBOC_API_BASE + '/api/v1/rmm/process/kill', {
             method: 'POST',
@@ -132,7 +140,15 @@ async function killRMMProcess(pid) {
 
 async function toggleRMMIsolation() {
     const agentId = document.getElementById('rmm-agent-select')?.value || 'agente-local';
-    if(!confirm(`⚠️ APOSTA DE SEGURANÇA: Deseja ativar o ISOLAMENTO DE REDE de emergência do agente [${agentId}]?`)) return;
+    const ok = window.gbocConfirm ? await window.gbocConfirm(`⚠️ APOSTA DE SEGURANÇA: Deseja ativar o ISOLAMENTO DE REDE de emergência do agente [${agentId}]?`, {
+        title: 'Isolamento de Rede',
+        icon: 'fas fa-shield-virus',
+        type: 'danger',
+        confirmText: 'Ativar Isolamento',
+        danger: true
+    }) : confirm(`⚠️ APOSTA DE SEGURANÇA: Deseja ativar o ISOLAMENTO DE REDE de emergência do agente [${agentId}]?`);
+
+    if(!ok) return;
     try {
         const r = await fetch(window.GBOC_API_BASE + `/api/v1/rmm/proxy/${encodeURIComponent(agentId)}/api/v1/rmm/isolation`, {
             method: 'POST',

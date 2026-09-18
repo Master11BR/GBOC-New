@@ -16,6 +16,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     <link rel="stylesheet" href="/static/gboc-layout.css?v=14.4.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="/static/gboc-layout-manager.js"></script>
+    <script src="/static/gboc-modal.js"></script>
     <style>
         .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
         .empty-icon { font-size: 3em; margin-bottom: 15px; opacity: 0.5; }
@@ -675,10 +676,18 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 
         async function initializeRepository(repoId, repoName, alreadyInitialized = false) {
             const actionLabel = alreadyInitialized ? 'reinicializar' : 'inicializar';
-            const confirmText = alreadyInitialized
-                ? `Reinicializar o repositório "${repoName}"?\n\nIsso irá reconfirmar/recriar a estrutura do motor no destino configurado.`
-                : `Inicializar o repositório "${repoName}"?\n\nIsso irá criar a estrutura do motor de backup no destino configurado.`;
-            if (!confirm(confirmText)) return;
+            const confirmMsg = alreadyInitialized
+                ? `Deseja reinicializar o repositório "${repoName}"?\n\nIsso irá reconfirmar e recriar a estrutura do motor de backup no destino configurado.`
+                : `Deseja inicializar o repositório "${repoName}"?\n\nIsso irá criar a estrutura do motor de backup no destino configurado.`;
+
+            const ok = window.gbocConfirm ? await window.gbocConfirm(confirmMsg, {
+                title: alreadyInitialized ? 'Reinicializar Repositório' : 'Inicializar Repositório',
+                icon: 'fas fa-rocket',
+                type: 'primary',
+                confirmText: alreadyInitialized ? 'Reinicializar' : 'Inicializar Agora'
+            }) : confirm(confirmMsg);
+
+            if (!ok) return;
 
             const btn = event?.target?.closest('button');
             try {
@@ -741,7 +750,15 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         }
 
         async function deleteRepository(repoId) {
-            if (!confirm('Tem certeza que quer deletar este repositório?')) return;
+            const ok = window.gbocConfirm ? await window.gbocConfirm('Tem certeza que deseja deletar este repositório?', {
+                title: 'Excluir Repositório',
+                icon: 'fas fa-trash-alt',
+                type: 'danger',
+                confirmText: 'Deletar Repositório',
+                danger: true
+            }) : confirm('Tem certeza que quer deletar este repositório?');
+
+            if (!ok) return;
             
             try {
                 const response = await fetch(`/api/repositories/${repoId}`, { method: 'DELETE' });

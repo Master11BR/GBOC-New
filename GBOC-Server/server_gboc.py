@@ -753,6 +753,28 @@ def _hash_password(password: str) -> str:
     salt = "gboc_server_salt_2025"
     return hashlib.sha256(f"{salt}{password}".encode()).hexdigest()
 
+def _verify_server_password(password: str, stored_hash: str) -> bool:
+    if not stored_hash or not password:
+        return False
+    # 1. SHA-256 com salt gboc_server_salt_2025 (padrão do servidor)
+    if _hash_password(password) == stored_hash:
+        return True
+    # 2. PBKDF2 com salts padrão do sistema
+    for sys_salt in ["gboc_secure_salt_2025", "gboc_server_salt_2025"]:
+        try:
+            h = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), sys_salt.encode('utf-8'), 100000).hex()
+            if h == stored_hash:
+                return True
+        except Exception:
+            pass
+    # 3. SHA-256 simples
+    if hashlib.sha256(password.encode('utf-8')).hexdigest() == stored_hash:
+        return True
+    # 4. Texto puro (fallback)
+    if password == stored_hash:
+        return True
+    return False
+
 def _generate_token() -> str:
     return secrets.token_hex(32)
 
@@ -936,6 +958,9 @@ async def serve_static_asset(filename: str):
     clean_fn = (filename or '').lstrip("/\\")
     if clean_fn.startswith("static/") or clean_fn.startswith("static\\"):
         clean_fn = clean_fn[7:]
+    srv_static = os.path.join(os.path.dirname(__file__), "static", clean_fn)
+    if os.path.isfile(srv_static):
+        return FileResponse(srv_static)
     srv_file = os.path.join(os.path.dirname(__file__), clean_fn)
     if os.path.isfile(srv_file):
         return FileResponse(srv_file)
@@ -943,6 +968,42 @@ async def serve_static_asset(filename: str):
     if os.path.isfile(agt_file):
         return FileResponse(agt_file)
     raise HTTPException(404, f"Arquivo estático '{filename}' não encontrado.")
+
+# Rota dinâmica universal para arquivos JavaScript
+@app.get("/{file:path}.js", include_in_schema=False)
+async def serve_any_js_page(file: str):
+    clean_p = (file or '').lstrip("/\\")
+    if clean_p.startswith("static/") or clean_p.startswith("static\\"):
+        clean_p = clean_p[7:]
+    fname = f"{clean_p}.js" if not clean_p.endswith(".js") else clean_p
+    srv_static = os.path.join(os.path.dirname(__file__), "static", fname)
+    if os.path.isfile(srv_static):
+        return FileResponse(srv_static, media_type="application/javascript")
+    srv_file = os.path.join(os.path.dirname(__file__), fname)
+    if os.path.isfile(srv_file):
+        return FileResponse(srv_file, media_type="application/javascript")
+    agt_file = os.path.join(os.path.dirname(__file__), "..", "GBOC-Agent", "static", fname)
+    if os.path.isfile(agt_file):
+        return FileResponse(agt_file, media_type="application/javascript")
+    raise HTTPException(404, f"Script '{fname}' não encontrado.")
+
+# Rota dinâmica universal para arquivos CSS
+@app.get("/{file:path}.css", include_in_schema=False)
+async def serve_any_css_page(file: str):
+    clean_p = (file or '').lstrip("/\\")
+    if clean_p.startswith("static/") or clean_p.startswith("static\\"):
+        clean_p = clean_p[7:]
+    fname = f"{clean_p}.css" if not clean_p.endswith(".css") else clean_p
+    srv_static = os.path.join(os.path.dirname(__file__), "static", fname)
+    if os.path.isfile(srv_static):
+        return FileResponse(srv_static, media_type="text/css")
+    srv_file = os.path.join(os.path.dirname(__file__), fname)
+    if os.path.isfile(srv_file):
+        return FileResponse(srv_file, media_type="text/css")
+    agt_file = os.path.join(os.path.dirname(__file__), "..", "GBOC-Agent", "static", fname)
+    if os.path.isfile(agt_file):
+        return FileResponse(agt_file, media_type="text/css")
+    raise HTTPException(404, f"Estilo '{fname}' não encontrado.")
 
 # Rota dinâmica universal para páginas HTML (resolve erro 404 {"detail":"Not Found"})
 @app.get("/{page_name:path}.html", include_in_schema=False)
@@ -1059,28 +1120,41 @@ async def server_auth_setup(req: ServerSetupRequest):
 async def server_auth_login(req: ServerLoginRequest, request: Request, response: Response):
     conn = None
     ip = request.client.host if request.client else "unknown"
+    uname = (req.username or "").strip()
+    pwd = req.password or ""
     try:
         conn = get_db()
         cur = conn.cursor()
-        pw_hash = _hash_password(req.password)
         cur.execute(
-            "SELECT id, username, display_name, role FROM server_auth_users WHERE username = %s AND password_hash = %s",
-            (req.username, pw_hash)
+            "SELECT id, username, display_name, role, password_hash, status FROM server_auth_users WHERE LOWER(username) = LOWER(%s)",
+            (uname,)
         )
         row = cur.fetchone()
-        if not row:
+        if not row or not _verify_server_password(pwd, row[4]):
             # Registrar tentativa falha na auditoria
             try:
                 cur.execute(
                     "INSERT INTO server_auth_audit (username, action, ip_address) VALUES (%s, 'auth.login_fail', %s)",
-                    (req.username, ip)
+                    (uname, ip)
                 )
                 conn.commit()
             except Exception:
                 conn.rollback()
             cur.close()
             raise HTTPException(401, "Credenciais inválidas")
-        user_id, username, display_name, role = row
+
+        user_id, username, display_name, role, stored_hash, status = row
+        if status and status.lower() == 'inactive':
+            raise HTTPException(403, "Conta desativada. Contate o administrador.")
+
+        # Self-heal hash se estivesse em formato legado
+        standard_hash = _hash_password(pwd)
+        if stored_hash != standard_hash:
+            try:
+                cur.execute("UPDATE server_auth_users SET password_hash = %s WHERE id = %s", (standard_hash, user_id))
+            except Exception:
+                pass
+
         token = _generate_token()
         expires = _dt.now(timezone.utc) + timedelta(hours=24)
         cur.execute(
@@ -1095,10 +1169,11 @@ async def server_auth_login(req: ServerLoginRequest, request: Request, response:
         conn.commit()
         cur.close()
         response.set_cookie("gboc_server_token", token, httponly=False, max_age=86400, path="/")
+        response.set_cookie("gboc_token", token, httponly=False, max_age=86400, path="/")
         return {
             "status": "success",
             "token": token,
-            "user": {"username": username, "display_name": display_name, "role": role}
+            "user": {"username": username, "display_name": display_name or username, "role": role or "admin"}
         }
     except HTTPException:
         raise

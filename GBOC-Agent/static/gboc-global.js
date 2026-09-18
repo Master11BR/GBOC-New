@@ -10,15 +10,42 @@ Propriedade Intelectual & Direitos Autorais Registrados.
  * Funções utilitárias globais para todas as páginas
  */
 
-console.log('✅ GBOC Global Functions carregado - 14.1.0');
+console.log('✅ GBOC Global Functions carregado - 14.4.0');
 
-// Logout function
-function handleLogout() {
+// Auto-inject modal framework if not present
+(function autoInjectModalSystem() {
+    if (!window.GBOCModal && !document.getElementById('gboc-modal-script')) {
+        const m = document.createElement('script');
+        m.id = 'gboc-modal-script';
+        m.src = '/static/gboc-modal.js';
+        if (document.head) {
+            document.head.appendChild(m);
+        } else {
+            document.addEventListener('DOMContentLoaded', () => document.head.appendChild(m));
+        }
+    }
+})();
+
+// Modern Logout function
+async function handleLogout() {
     console.log('🚪 handleLogout chamado');
-    if (confirm('Deseja realmente sair do sistema?')) {
+    const ok = window.gbocConfirm ? await window.gbocConfirm('Deseja realmente encerrar sua sessão e sair do sistema?', {
+        title: 'Encerrar Sessão',
+        icon: 'fas fa-right-from-bracket',
+        type: 'warning',
+        confirmText: 'Sair do Sistema'
+    }) : confirm('Deseja realmente sair do sistema?');
+
+    if (ok) {
         console.log('✅ Confirmação de logout aceita');
+        try {
+            if (window.fetch) await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+        } catch (e) {}
         localStorage.removeItem('gboc_token');
+        localStorage.removeItem('gboc_server_token');
         localStorage.removeItem('gboc_user');
+        document.cookie = 'gboc_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+        document.cookie = 'gboc_server_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
         console.log('🔄 Redirecionando para login...');
         window.location.href = '/login.html';
     } else {

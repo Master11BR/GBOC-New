@@ -730,9 +730,28 @@ window.updateRepository = async function(event) {
 };
 
 window.deleteRepo = async function(id, name) {
-    if (!confirm(`Tem certeza que deseja excluir o repositório "${name}"?`)) return;
+    const ok = window.gbocConfirm ? await window.gbocConfirm(`Tem certeza que deseja excluir o repositório "${name}"?`, {
+        title: 'Excluir Repositório',
+        icon: 'fas fa-trash-alt',
+        type: 'danger',
+        confirmText: 'Excluir Repositório',
+        danger: true
+    }) : confirm(`Tem certeza que deseja excluir o repositório "${name}"?`);
+
+    if (!ok) return;
     
-    const keepFolder = confirm(`Deseja MANTER a pasta de dados local?\n\nClique "OK" para manter os arquivos.\nClique "Cancelar" para excluir tudo.`);
+    let keepFolder = true;
+    if (window.gbocConfirm) {
+        keepFolder = await window.gbocConfirm(`Deseja MANTER a pasta de dados local no disco?\n\nEscolha "Manter Arquivos" para preservar os dados gravados ou "Excluir Tudo" para apagar a pasta.`, {
+            title: 'Manter Dados Locais?',
+            icon: 'fas fa-folder-tree',
+            type: 'info',
+            confirmText: 'Manter Arquivos',
+            cancelText: 'Excluir Tudo'
+        });
+    } else {
+        keepFolder = confirm(`Deseja MANTER a pasta de dados local?\n\nClique "OK" para manter os arquivos.\nClique "Cancelar" para excluir tudo.`);
+    }
 
     try {
         const response = await fetch(`/api/repositories/${id}?keep_folder=${keepFolder}`, { method: 'DELETE' });
