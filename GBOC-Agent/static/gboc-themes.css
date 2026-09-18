@@ -1,5 +1,5 @@
 /* ============================================================================
-   GBOC System v14.2.0 — Dynamic UI Style & Illumination Engine (Modern UI Official Agent)
+   GBOC System v14.5.0 Enterprise — Dynamic UI Style & Illumination Engine (Modern UI Official)
    Model: modern (DEFAULT / ACTIVE)
    ============================================================================ */
 
@@ -242,119 +242,36 @@
     --btn-transform-active: translateY(0);
 }
 
-/* ── 3. GLOBAL BASE OVERRIDES ────────────────────────────────────────────── */
-body {
-    background-color: var(--bg-main) !important;
-    color: var(--text-primary) !important;
-    transition: background-color 0.3s cubic-bezier(0.16, 1, 0.3, 1), color 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+/* ── 3. KEYFRAME MOTION ANIMATIONS (Kyle Zantos Motion Principles) ───────── */
+
+@keyframes scanline-sweep {
+    0% { transform: translateY(-100%); opacity: 0; }
+    50% { opacity: 0.35; }
+    100% { transform: translateY(1000%); opacity: 0; }
 }
 
-/* Dynamic Card & Panel Component Enforcers */
-.card, .panel, .stat-card, .kpi-card, .dashboard-card, .data-card, 
-.quick-action-card, .modal-card, .widget, .theme-showcase-card,
-.gboc-card, .card-panel, .chart-panel, .table-container, .dr-hud-card {
-    background: var(--card-bg) !important;
-    border-radius: var(--card-radius) !important;
-    border: var(--card-border) !important;
-    box-shadow: var(--card-shadow) !important;
-    backdrop-filter: var(--card-backdrop) !important;
-    -webkit-backdrop-filter: var(--card-backdrop) !important;
-    transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, border-radius 0.2s ease !important;
+@keyframes cyber-border-glow {
+    0% { border-color: rgba(99, 102, 241, 0.4); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), 0 0 15px rgba(99, 102, 241, 0.2); }
+    50% { border-color: var(--primary-color); box-shadow: 0 16px 45px rgba(0, 0, 0, 0.6), 0 0 30px var(--primary-glow); }
+    100% { border-color: rgba(168, 85, 247, 0.5); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), 0 0 20px rgba(168, 85, 247, 0.3); }
 }
 
-.modal-backdrop > div, .modal-dialog > div, #agent-ai-modal .modal-content, #agent-reports-modal > div {
-    border-radius: var(--card-radius, 12px) !important;
-    border: var(--card-border, 1px solid var(--border-color)) !important;
-    box-shadow: var(--card-shadow, 0 10px 30px rgba(0,0,0,0.3)) !important;
-    backdrop-filter: var(--card-backdrop, none) !important;
-    -webkit-backdrop-filter: var(--card-backdrop, none) !important;
+@keyframes clay-bounce {
+    0% { transform: scale(1); }
+    50% { transform: scale(0.96) translateY(2px); }
+    100% { transform: scale(1.02) translateY(-4px); }
 }
 
-/* Dynamic Input Selector Class */
-.form-control, .input, .theme-showcase-input, input[type="text"], input[type="password"], input[type="email"], select, textarea, .dr-console-box {
-    background: var(--input-bg) !important;
-    border-radius: var(--input-radius) !important;
-    border: var(--input-border) !important;
-    box-shadow: var(--input-shadow) !important;
-    color: var(--text-primary) !important;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
-}
-.form-control:focus, .input:focus, .theme-showcase-input:focus, input:focus, select:focus, textarea:focus {
-    border-color: var(--primary-color) !important;
-    box-shadow: 0 0 0 3px var(--primary-glow), var(--input-shadow) !important;
+@keyframes glass-shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
 }
 
-/* Dynamic Button Selector Class */
-.btn:not(.btn-link), button.btn, .theme-showcase-btn, .dr-tab-btn {
-    border-radius: var(--btn-radius) !important;
-    box-shadow: var(--btn-shadow) !important;
-    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, color 0.15s ease !important;
+@keyframes status-pulse {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.15); opacity: 0.7; }
+    100% { transform: scale(1); opacity: 1; }
 }
-.btn:not(.btn-link):hover, button.btn:hover, .theme-showcase-btn:hover, .dr-tab-btn:hover {
-    transform: var(--btn-transform-hover) !important;
-}
-.btn:not(.btn-link):active, button.btn:active, .theme-showcase-btn:active, .dr-tab-btn:active {
-    transform: var(--btn-transform-active) !important;
-}
-
-/* ── 4. LIGHT MODE HIGH CONTRAST TYPOGRAPHY ENFORCEMENT ─────────────────── */
-[data-theme="light"], [data-color-theme="light"] {
-    color-scheme: light !important;
-}
-
-[data-theme="light"] body, [data-color-theme="light"] body,
-[data-theme="light"] .card, [data-color-theme="light"] .card,
-[data-theme="light"] .panel, [data-color-theme="light"] .panel,
-[data-theme="light"] .stat-card, [data-color-theme="light"] .stat-card,
-[data-theme="light"] .kpi-card, [data-color-theme="light"] .kpi-card,
-[data-theme="light"] .dashboard-card, [data-color-theme="light"] .dashboard-card,
-[data-theme="light"] .quick-action-card, [data-color-theme="light"] .quick-action-card,
-[data-theme="light"] .widget, [data-color-theme="light"] .widget,
-[data-theme="light"] table, [data-color-theme="light"] table,
-[data-theme="light"] .modal-backdrop > div, [data-color-theme="light"] .modal-backdrop > div,
-[data-theme="light"] .modal-dialog > div, [data-color-theme="light"] .modal-dialog > div {
-    color: var(--text-primary, #0f172a) !important;
-}
-
-[data-theme="light"] h1, [data-color-theme="light"] h1,
-[data-theme="light"] h2, [data-color-theme="light"] h2,
-[data-theme="light"] h3, [data-color-theme="light"] h3,
-[data-theme="light"] h4, [data-color-theme="light"] h4,
-[data-theme="light"] h5, [data-color-theme="light"] h5,
-[data-theme="light"] h6, [data-color-theme="light"] h6,
-[data-theme="light"] strong, [data-color-theme="light"] strong,
-[data-theme="light"] b, [data-color-theme="light"] b,
-[data-theme="light"] th, [data-color-theme="light"] th,
-[data-theme="light"] td, [data-color-theme="light"] td,
-[data-theme="light"] label, [data-color-theme="light"] label,
-[data-theme="light"] p, [data-color-theme="light"] p,
-[data-theme="light"] .card-title, [data-color-theme="light"] .card-title,
-[data-theme="light"] .stat-value, [data-color-theme="light"] .stat-value,
-[data-theme="light"] .kpi-value, [data-color-theme="light"] .kpi-value {
-    color: var(--text-primary, #0f172a);
-}
-
-[data-theme="light"] .text-muted, [data-color-theme="light"] .text-muted,
-[data-theme="light"] small, [data-color-theme="light"] small,
-[data-theme="light"] .card-subtitle, [data-color-theme="light"] .card-subtitle,
-[data-theme="light"] .stat-label, [data-color-theme="light"] .stat-label,
-[data-theme="light"] .kpi-label, [data-color-theme="light"] .kpi-label {
-    color: var(--text-secondary, #334155) !important;
-}
-
-[data-theme="light"] input:not([type="submit"]):not([type="button"]), 
-[data-theme="light"] select, 
-[data-theme="light"] textarea,
-[data-color-theme="light"] input:not([type="submit"]):not([type="button"]), 
-[data-color-theme="light"] select, 
-[data-color-theme="light"] textarea {
-    color: var(--text-primary, #0f172a) !important;
-    background-color: var(--bg-input, #f1f5f9) !important;
-    border: 1px solid #cbd5e1 !important;
-}
-
-.lp-theme-swatch[data-theme="red"] { background: linear-gradient(135deg, #991b1b, #ef4444) !important; }
-.lp-theme-swatch[data-theme="amber"], .lp-theme-swatch[data-theme="orange"] { background: linear-gradient(135deg, #b45309, #f59e0b) !important; }
 
 /* ── AMBIENT ANIMATED BACKGROUND (System-wide default) ─────────────── */
 :root {
@@ -460,4 +377,199 @@ body {
     z-index: 1;
 }
 
+
+/* ── 4. GLOBAL BASE & STRUCTURAL OVERRIDES ────────────────────────────────── */
+body {
+    background-color: var(--bg-main) !important;
+    color: var(--text-primary) !important;
+    transition: background-color 0.35s cubic-bezier(0.16, 1, 0.3, 1), color 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Sidebar & Topbar Full Structural Color Integration */
+.sidebar, #sidebar, aside, .app-sidebar, .nav-sidebar {
+    background-color: var(--sidebar-bg) !important;
+    border-right: 1px solid var(--border-color) !important;
+    transition: background-color 0.35s ease, border-color 0.35s ease !important;
+}
+
+.topbar, #topbar, header, .app-header, .nav-topbar {
+    background-color: var(--topbar-bg) !important;
+    border-bottom: 1px solid var(--border-color) !important;
+    transition: background-color 0.35s ease, border-color 0.35s ease !important;
+}
+
+/* Dynamic Card & Panel Component Enforcers */
+.card, .panel, .stat-card, .kpi-card, .dashboard-card, .data-card, 
+.quick-action-card, .modal-card, .widget, .theme-showcase-card,
+.gboc-card, .card-panel, .chart-panel, .table-container {
+    background: var(--card-bg) !important;
+    border-radius: var(--card-radius) !important;
+    border: var(--card-border) !important;
+    box-shadow: var(--card-shadow) !important;
+    backdrop-filter: var(--card-backdrop) !important;
+    -webkit-backdrop-filter: var(--card-backdrop) !important;
+    position: relative;
+    transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, border-radius 0.2s ease, transform 0.2s ease !important;
+}
+
+.modal-backdrop > div, .modal-dialog > div, #ai-modal .modal-content, #reports-modal > div {
+    background: var(--card-bg) !important;
+    border-radius: var(--card-radius, 12px) !important;
+    border: var(--card-border, 1px solid var(--border-color)) !important;
+    box-shadow: var(--card-shadow, 0 10px 30px rgba(0,0,0,0.3)) !important;
+    backdrop-filter: var(--card-backdrop, none) !important;
+    -webkit-backdrop-filter: var(--card-backdrop, none) !important;
+}
+
+/* ── 5. STRUCTURAL TRANSFORMATIONS PER UX/UI STYLE ────────────────────────── */
+
+/* Style 7: Command Center Operations / Sentinel (Tactical NOC Reticles & Monospace) */
+[data-ui-style="command-sentinel"] {
+    font-family: 'JetBrains Mono', monospace !important;
+}
+
+[data-ui-style="command-sentinel"] .card, 
+[data-ui-style="command-sentinel"] .panel, 
+[data-ui-style="command-sentinel"] .stat-card,
+[data-ui-style="command-sentinel"] .dashboard-card {
+    border-left: 3px solid var(--primary-color) !important;
+    overflow: hidden;
+}
+
+[data-ui-style="command-sentinel"] .card::before,
+[data-ui-style="command-sentinel"] .panel::before,
+[data-ui-style="command-sentinel"] .stat-card::before {
+    content: "+" !important;
+    position: absolute !important;
+    top: 4px !important;
+    right: 8px !important;
+    font-size: 0.75rem !important;
+    font-weight: 800 !important;
+    color: var(--primary-color) !important;
+    opacity: 0.7 !important;
+}
+
+[data-ui-style="command-sentinel"] .card::after,
+[data-ui-style="command-sentinel"] .panel::after,
+[data-ui-style="command-sentinel"] .stat-card::after {
+    content: "" !important;
+    position: absolute !important;
+    top: 0; left: 0; right: 0; height: 3px !important;
+    background: linear-gradient(90deg, transparent, var(--primary-color), transparent) !important;
+    animation: scanline-sweep 4s infinite linear !important;
+    pointer-events: none !important;
+}
+
+/* Style 8: Cyber 3D Glass (Holographic Perspective 3D Tilt) */
+[data-ui-style="cyber-3d"] .card:hover,
+[data-ui-style="cyber-3d"] .panel:hover,
+[data-ui-style="cyber-3d"] .stat-card:hover,
+[data-ui-style="cyber-3d"] .dashboard-card:hover {
+    transform: perspective(1000px) rotateX(2deg) rotateY(-2deg) translateY(-6px) !important;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 35px var(--primary-glow) !important;
+    animation: cyber-border-glow 3s infinite alternate !important;
+}
+
+/* Style 3: 3D Claymorphism Tactile Bounce */
+[data-ui-style="claymorphism"] .btn:hover,
+[data-ui-style="claymorphism"] button.btn:hover {
+    animation: clay-bounce 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+}
+
+/* Style 6: Glassmorphism Shimmer */
+[data-ui-style="nexus-glass"] .card::before,
+[data-ui-style="fluent"] .card::before {
+    content: "" !important;
+    position: absolute !important;
+    top: 0; left: 0; right: 0; bottom: 0 !important;
+    background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 50%, rgba(255,255,255,0.03) 100%) !important;
+    pointer-events: none !important;
+    border-radius: inherit !important;
+}
+
+/* Dynamic Input Selector Class */
+.form-control, .input, .theme-showcase-input, input[type="text"], input[type="password"], input[type="email"], select, textarea {
+    background: var(--input-bg) !important;
+    border-radius: var(--input-radius) !important;
+    border: var(--input-border) !important;
+    box-shadow: var(--input-shadow) !important;
+    color: var(--text-primary) !important;
+    transition: border-radius 0.3s ease, box-shadow 0.3s ease, border 0.3s ease !important;
+}
+.form-control:focus, .input:focus, .theme-showcase-input:focus, input:focus, select:focus, textarea:focus {
+    border-color: var(--primary-color) !important;
+    box-shadow: 0 0 0 3px var(--primary-glow), var(--input-shadow) !important;
+}
+
+/* Dynamic Button Selector Class */
+.btn:not(.btn-link), button.btn, .theme-showcase-btn {
+    border-radius: var(--btn-radius) !important;
+    box-shadow: var(--btn-shadow) !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-radius 0.2s ease !important;
+}
+.btn:not(.btn-link):hover, button.btn:hover, .theme-showcase-btn:hover {
+    transform: var(--btn-transform-hover) !important;
+}
+.btn:not(.btn-link):active, button.btn:active, .theme-showcase-btn:active {
+    transform: var(--btn-transform-active) !important;
+}
+
+/* ── 6. LIGHT MODE HIGH CONTRAST TYPOGRAPHY ENFORCEMENT ─────────────────── */
+[data-theme="light"], [data-color-theme="light"] {
+    color-scheme: light !important;
+}
+
+[data-theme="light"] body, [data-color-theme="light"] body,
+[data-theme="light"] .card, [data-color-theme="light"] .card,
+[data-theme="light"] .panel, [data-color-theme="light"] .panel,
+[data-theme="light"] .stat-card, [data-color-theme="light"] .stat-card,
+[data-theme="light"] .kpi-card, [data-color-theme="light"] .kpi-card,
+[data-theme="light"] .dashboard-card, [data-color-theme="light"] .dashboard-card,
+[data-theme="light"] .quick-action-card, [data-color-theme="light"] .quick-action-card,
+[data-theme="light"] .widget, [data-color-theme="light"] .widget,
+[data-theme="light"] table, [data-color-theme="light"] table,
+[data-theme="light"] .modal-backdrop > div, [data-color-theme="light"] .modal-backdrop > div,
+[data-theme="light"] .modal-dialog > div, [data-color-theme="light"] .modal-dialog > div {
+    color: var(--text-primary, #0f172a) !important;
+}
+
+[data-theme="light"] h1, [data-color-theme="light"] h1,
+[data-theme="light"] h2, [data-color-theme="light"] h2,
+[data-theme="light"] h3, [data-color-theme="light"] h3,
+[data-theme="light"] h4, [data-color-theme="light"] h4,
+[data-theme="light"] h5, [data-color-theme="light"] h5,
+[data-theme="light"] h6, [data-color-theme="light"] h6,
+[data-theme="light"] strong, [data-color-theme="light"] strong,
+[data-theme="light"] b, [data-color-theme="light"] b,
+[data-theme="light"] th, [data-color-theme="light"] th,
+[data-theme="light"] td, [data-color-theme="light"] td,
+[data-theme="light"] label, [data-color-theme="light"] label,
+[data-theme="light"] p, [data-color-theme="light"] p,
+[data-theme="light"] .card-title, [data-color-theme="light"] .card-title,
+[data-theme="light"] .stat-value, [data-color-theme="light"] .stat-value,
+[data-theme="light"] .kpi-value, [data-color-theme="light"] .kpi-value {
+    color: var(--text-primary, #0f172a);
+}
+
+[data-theme="light"] .text-muted, [data-color-theme="light"] .text-muted,
+[data-theme="light"] small, [data-color-theme="light"] small,
+[data-theme="light"] .card-subtitle, [data-color-theme="light"] .card-subtitle,
+[data-theme="light"] .stat-label, [data-color-theme="light"] .stat-label,
+[data-theme="light"] .kpi-label, [data-color-theme="light"] .kpi-label {
+    color: var(--text-secondary, #334155) !important;
+}
+
+[data-theme="light"] input:not([type="submit"]):not([type="button"]), 
+[data-theme="light"] select, 
+[data-theme="light"] textarea,
+[data-color-theme="light"] input:not([type="submit"]):not([type="button"]), 
+[data-color-theme="light"] select, 
+[data-color-theme="light"] textarea {
+    color: var(--text-primary, #0f172a) !important;
+    background-color: var(--bg-input, #f1f5f9) !important;
+    border: 1px solid #cbd5e1 !important;
+}
+
+.lp-theme-swatch[data-theme="red"] { background: linear-gradient(135deg, #991b1b, #ef4444) !important; }
+.lp-theme-swatch[data-theme="amber"], .lp-theme-swatch[data-theme="orange"] { background: linear-gradient(135deg, #b45309, #f59e0b) !important; }
 

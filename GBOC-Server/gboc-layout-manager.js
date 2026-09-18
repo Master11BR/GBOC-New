@@ -1,6 +1,6 @@
 /*
 ==============================================================================
-GBOC System v14.1.0 Enterprise Edition
+GBOC System v14.3.0 Enterprise Edition
 Layout & Navigation Manager — Controls Dual Layout Engine (Vertical/Horizontal)
 and Color Themes across all resolutions (1024px, 720p HD, 1080p FHD, 4K UHD).
 Zero-Overflow & Smart Sidebar Presence Detection.
@@ -9,6 +9,22 @@ Zero-Overflow & Smart Sidebar Presence Detection.
 
 (function () {
     'use strict';
+
+    // Auto-inject Enterprise Modal & Dialog Framework se ainda não estiver presente na página
+    if (!window.GBOCModal && !document.getElementById('gboc-modal-script')) {
+        const m = document.createElement('script');
+        m.id = 'gboc-modal-script';
+        m.src = '/static/gboc-modal.js?v=14.5.0';
+        if (document.head) {
+            document.head.appendChild(m);
+        } else {
+            document.addEventListener('DOMContentLoaded', function () {
+                if (document.head && !document.getElementById('gboc-modal-script')) {
+                    document.head.appendChild(m);
+                }
+            });
+        }
+    }
 
     if (typeof window.GBOC_API_BASE === 'undefined') {
         const isAgent = window.location.port === '9200' ||
@@ -583,7 +599,6 @@ Zero-Overflow & Smart Sidebar Presence Detection.
         _createPanel();
         _checkSidebarPresence();
 
-        // Observe dynamic DOM changes for sidebar injection
         if (window.MutationObserver) {
             const observer = new MutationObserver(() => {
                 _checkSidebarPresence();

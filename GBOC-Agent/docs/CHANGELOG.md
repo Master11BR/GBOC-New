@@ -6,7 +6,25 @@
 
 ---
 
-## 14.5.0 — 2026-09-15 (Enterprise V7 Authentication UI, Duplicati Cloud & Database Repair Stabilization)
+## 14.5.0 — 2026-09-18 (Universal CSS Architecture, Enterprise Modal System, V7 Authentication UI & Duplicati Cloud Stabilization)
+
+### 🎨 Arquitetura Universal de CSS (100% Shared Stack & Zero CSS Isolado)
+- **Unificação Estrita de Folhas de Estilo (`GBOC-Server` & `GBOC-Agent/static/`)**:
+  - Sincronização e padronização dos 5 arquivos centrais da stack universal:
+    1. `style.css`: Framework de componentes universais (Reset, Cards, Botões, Tabelas, Badges, Formulários, Toasts e Modais).
+    2. `gboc-themes.css`: Design tokens globais, 8 Estilos de UI (`minimal`, `neumorphism`, `claymorphism`, `fluent`, `nexus-widgets`, `nexus-glass`, `command-sentinel`, `cyber-3d`), 6 Temas de Iluminação (`dark`, `light`, `amber`, `purple`, `ocean`, `red`), Presets Bacula/Fiorilli e tokens de alto contraste para Light Mode.
+    3. `gboc-layout.css`: Layout responsivo universal (Sidebar Vertical + Topbar Horizontal).
+    4. `gboc-hardware-hud.css`: HUD de telemetria física de hardware em tempo real.
+    5. `gboc-file-picker.css`: Explorador universal de arquivos e diretórios.
+  - Varredura e padronização automatizada de todas as **53 páginas HTML** do ecossistema para carregar a stack canônica compartilhada.
+  - Eliminação completa de arquivos CSS órfãos, regras divergentes ou estilos embutidos sem tokenização.
+
+### 💬 Sistema Corporativo Universal de Modais & Caixas de Diálogo (`gboc-modal.js`)
+- **Interceptador Global e Transparente para `alert()`, `confirm()` e `prompt()`**:
+  - Substituição automática das caixas de diálogo nativas e síncronas do navegador por modais modernos baseados em DOM e Promises assíncronas.
+  - Design sofisticado com fundo translúcido (`backdrop-blur-md`), elevação de card, bordas sutis e tipografia padronizada.
+  - Detecção inteligente de contexto e severidade com base em palavras-chave e emojis (*sucesso, erro, falha, atenção, aviso, info*).
+  - Acessibilidade integral com navegação por teclado (`Enter` para confirmar, `Escape` para fechar) e foco inteligente em campos de input.
 
 ### 🔐 Interface Visual de Autenticação V7 (Dark Glassmorphism)
 - **Novo Design Unificado (`GBOC-Server/login.html` e `GBOC-Agent/static/login.html`)**:

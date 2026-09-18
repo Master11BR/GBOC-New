@@ -11,11 +11,12 @@ Modulo: Duplicati Nativo Completo no Layout GBOC
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GBOC Agent - Duplicati Nativo Completo</title>
-    <link rel="stylesheet" href="/static/style.css?v=14.4.0">
-    <link rel="stylesheet" href="/static/gboc-themes.css?v=14.4.0">
-    <link rel="stylesheet" href="/static/gboc-layout.css?v=14.4.0">
+    <link rel="stylesheet" href="/static/style.css?v=14.5.0">
+    <link rel="stylesheet" href="/static/gboc-themes.css?v=14.5.0">
+    <link rel="stylesheet" href="/static/gboc-layout.css?v=14.5.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="/static/gboc-layout-manager.js"></script>
+    <script src="/static/gboc-modal.js"></script>
     <script src="/static/auth_interceptor.js"></script>
     <style>
         .dup-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
@@ -355,39 +356,60 @@ async function loadBackups() {
 async function runBackup(id) {
     try {
         await apiCall(`/api/duplicati-native/backups/${id}/run`, { method: 'POST' });
-        alert('🚀 Job de backup disparado com sucesso!');
+        if (window.gbocAlert) {
+            await gbocAlert('Job de backup disparado com sucesso no Duplicati!', { title: 'Backup Iniciado', type: 'success', icon: 'fas fa-rocket' });
+        } else {
+            alert('🚀 Job de backup disparado com sucesso!');
+        }
         loadAll();
     } catch(e) {
-        alert('Erro ao iniciar backup: ' + e.message);
+        if (window.gbocAlert) await gbocAlert('Erro ao iniciar backup: ' + e.message, { title: 'Erro de Execução', type: 'error' });
+        else alert('Erro ao iniciar backup: ' + e.message);
     }
 }
 
 async function verifyBackup(id) {
     try {
         const res = await apiCall(`/api/duplicati-native/backups/${id}/verify`, { method: 'POST' });
-        alert('⚡ ' + (res.message || 'Verificação de conexão concluída!'));
+        const msg = res.message || 'Verificação de conexão concluída!';
+        if (window.gbocAlert) await gbocAlert(msg, { title: 'Teste de Destino', type: 'success', icon: 'fas fa-bolt' });
+        else alert('⚡ ' + msg);
     } catch(e) {
-        alert('Erro ao testar destino: ' + e.message);
+        if (window.gbocAlert) await gbocAlert('Erro ao testar destino: ' + e.message, { title: 'Falha no Teste', type: 'error' });
+        else alert('Erro ao testar destino: ' + e.message);
     }
 }
 
 async function repairBackup(id) {
     try {
         const res = await apiCall(`/api/duplicati-native/backups/${id}/repair`, { method: 'POST' });
-        alert('🛠️ ' + (res.message || 'Reparo de banco de dados iniciado!'));
+        const msg = res.message || 'Reparo de banco de dados iniciado!';
+        if (window.gbocAlert) await gbocAlert(msg, { title: 'Reparo de Base', type: 'success', icon: 'fas fa-wrench' });
+        else alert('🛠️ ' + msg);
     } catch(e) {
-        alert('Erro no reparo: ' + e.message);
+        if (window.gbocAlert) await gbocAlert('Erro no reparo: ' + e.message, { title: 'Falha no Reparo', type: 'error' });
+        else alert('Erro no reparo: ' + e.message);
     }
 }
 
 async function deleteBackup(id) {
-    if (!confirm('Deseja realmente excluir este job de backup do Duplicati?')) return;
+    const ok = window.gbocConfirm ? await window.gbocConfirm('Deseja realmente excluir este job de backup do Duplicati?', {
+        title: 'Excluir Job Duplicati',
+        icon: 'fas fa-trash-can',
+        type: 'danger',
+        confirmText: 'Excluir Backup',
+        danger: true
+    }) : confirm('Deseja realmente excluir este job de backup do Duplicati?');
+
+    if (!ok) return;
     try {
         await apiCall(`/api/duplicati-native/backups/${id}`, { method: 'DELETE' });
-        alert('🗑️ Backup excluído com sucesso.');
+        if (window.gbocAlert) await gbocAlert('Backup excluído com sucesso.', { title: 'Job Excluído', type: 'success' });
+        else alert('🗑️ Backup excluído com sucesso.');
         loadAll();
     } catch(e) {
-        alert('Erro ao excluir: ' + e.message);
+        if (window.gbocAlert) await gbocAlert('Erro ao excluir: ' + e.message, { title: 'Erro', type: 'error' });
+        else alert('Erro ao excluir: ' + e.message);
     }
 }
 
@@ -421,10 +443,15 @@ async function executeRestore(e) {
             method: 'POST',
             body: JSON.stringify({ restore_path: rPath, time: timeVal, overwrite: overwrite })
         });
-        alert('✅ Restauração de arquivos iniciada com sucesso em ' + rPath);
+        if (window.gbocAlert) {
+            await gbocAlert('Restauração de arquivos iniciada com sucesso em ' + rPath, { title: 'Restauração Iniciada', type: 'success', icon: 'fas fa-history' });
+        } else {
+            alert('✅ Restauração de arquivos iniciada com sucesso em ' + rPath);
+        }
         closeModal('restoreModal');
     } catch(err) {
-        alert('Erro ao disparar restauração: ' + err.message);
+        if (window.gbocAlert) await gbocAlert('Erro ao disparar restauração: ' + err.message, { title: 'Erro de Restauração', type: 'error' });
+        else alert('Erro ao disparar restauração: ' + err.message);
     }
 }
 
@@ -476,22 +503,40 @@ async function saveBackupForm(e) {
 
     try {
         await apiCall('/api/duplicati-native/backups', { method: 'POST', body: JSON.stringify(payload) });
-        alert('✅ Backup criado e configurado com sucesso!');
+        if (window.gbocAlert) {
+            await gbocAlert('Backup criado e configurado com sucesso no Duplicati!', { title: 'Job Salvo', type: 'success' });
+        } else {
+            alert('✅ Backup criado e configurado com sucesso!');
+        }
         closeModal('backupModal');
         loadAll();
     } catch(err) {
-        alert('Erro ao salvar backup: ' + err.message);
+        if (window.gbocAlert) await gbocAlert('Erro ao salvar backup: ' + err.message, { title: 'Erro', type: 'error' });
+        else alert('Erro ao salvar backup: ' + err.message);
     }
 }
 
 async function importToNative() {
-    if (!confirm("Deseja importar e converter todas as tarefas e repositórios do Duplicati para o Motor Nativo GBOC?")) return;
+    const ok = window.gbocConfirm ? await window.gbocConfirm("Deseja importar e converter todas as tarefas e repositórios do Duplicati para o Motor Nativo GBOC?", {
+        title: 'Migração para Motor Nativo GBOC',
+        icon: 'fas fa-file-import',
+        type: 'primary',
+        confirmText: 'Importar e Converter'
+    }) : confirm("Deseja importar e converter todas as tarefas e repositórios do Duplicati para o Motor Nativo GBOC?");
+
+    if (!ok) return;
     try {
         const res = await apiCall('/api/import/execute', { method: 'POST' });
-        alert(`Importação Concluída com Sucesso!\nTarefas Natividades: ${res.imported_tasks || 0}\nRepositórios: ${res.imported_repositories || 0}`);
+        const msg = `Tarefas Nativas: ${res.imported_tasks || 0} | Repositórios: ${res.imported_repositories || 0}`;
+        if (window.gbocAlert) {
+            await gbocAlert(`Importação concluída com sucesso!`, { title: 'Migração Concluída', type: 'success', details: msg });
+        } else {
+            alert(`Importação Concluída com Sucesso!\n${msg}`);
+        }
         loadAll();
     } catch(e) {
-        alert('Erro ao importar para motor nativo: ' + e.message);
+        if (window.gbocAlert) await gbocAlert('Erro ao importar para motor nativo: ' + e.message, { title: 'Erro de Importação', type: 'error' });
+        else alert('Erro ao importar para motor nativo: ' + e.message);
     }
 }
 

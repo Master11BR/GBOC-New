@@ -57,6 +57,8 @@
 
 ## ⚡ Recursos de Destaque (v14.5.0 Full Stable Enterprise)
 
+- **Universal CSS Architecture & Zero Isolated CSS**: Padrão visual 100% compartilhado e sincronizado entre `GBOC-Server` e `GBOC-Agent` em todas as 53 páginas HTML com a stack canônica (`style.css`, `gboc-themes.css`, `gboc-layout.css`, `gboc-hardware-hud.css`, `gboc-file-picker.css`), 8 estilos de componentes e 6 temas de iluminação.
+- **Enterprise Modal & Dialog System (`gboc-modal.js`)**: Interceptador global e transparente para `window.alert`, `window.confirm` e `window.prompt` com animações suaves Kyle Zantos, detecção semântica de status/emojis, suporte a atalhos de teclado (Esc/Enter) e eliminação completa de caixas de diálogo síncronas legadas do navegador.
 - **Nova Interface Visual de Autenticação V7 (Dark Glassmorphism)**: Tela de login e registro corporativo com degradês dourados/âmbar, efeitos de desfoque de fundo (backdrop blur), animações suaves e alternância dinâmica entre Login e Criação de Conta.
 - **Primeiro Acesso / Setup Automatizado**: Detecção inteligente de primeiro uso sem administrador cadastrado, acionando o formulário de provisionamento inicial do Admin mestre com auto-login instantâneo tanto no Servidor quanto no Agente.
 - **Resolução de Importação Duplicati Cloud & Reparos de Banco**: Suporte nativo completo para repositórios Cloud (`s3`, `azure`, `googledrive`, `onedrive`, `dropbox`, `webdav`, `sftp`) e autocorreção do erro `DatabaseRepairInProgress` via deleção e reparo seguro do banco local Duplicati.
@@ -69,12 +71,17 @@
 
 ---
 
-## 🛡️ Resiliência a Longos Intervalos (Auto-Heal & Lock Prune)
-
-- **Rotina Preventiva para Falhas por Inatividade**: Quando uma tarefa fica mais de 3 dias sem executar, o GBOC executa automaticamente o Auto-Heal: higieniza travas obsoletas (`.lock`), valida o banco do repositório (`repair`) e garante a execução transparente do backup sem desincronizações.
-
 ## 📜 Histórico de Mudanças (Changelog v14.5.0 Enterprise)
 
+- **Universalização Completa de CSS & Política Zero CSS Isolado**:
+  - Unificação estrita e bidirecional de todos os arquivos de estilo entre `GBOC-Server` e `GBOC-Agent/static/` (`style.css`, `gboc-themes.css`, `gboc-layout.css`, `gboc-hardware-hud.css`, `gboc-file-picker.css`).
+  - Padronização automatizada de todas as 53 páginas HTML do ecossistema para consumir a stack CSS canônica e o componente global de modais.
+  - Eliminação definitiva de regras CSS fragmentadas, isoladas ou embutidas fora da arquitetura compartilhada.
+  - Adição de tokens de design de alto contraste para o modo claro e suporte contínuo a 8 estilos de UI e 6 temas de iluminação.
+- **Sistema Corporativo Universal de Modais & Caixas de Diálogo (`gboc-modal.js`)**:
+  - Interceptação global e não invasiva das chamadas nativas `alert()`, `confirm()` e `prompt()`.
+  - Renderização assíncrona em DOM com backdrop de desfoque, animação suave de escala e elevação, detecção de emojis e palavras-chave de severidade (*sucesso, erro, falha, atenção, info*).
+  - Acessibilidade completa com suporte a navegação por teclado (`Enter` para confirmar, `Escape` para cancelar), foco automático em inputs de prompt e prevenção de rolagem do body.
 - **Design de Autenticação Enterprise V7 (Login / Create Account)**:
   - Implementação da nova interface visual moderna baseada em Tailwind CSS, Glassmorphism escuro (`zinc-900/70`) e realces dourados/âmbar (`amber-500` / `yellow-500`).
   - Unificação da experiência visual entre o GBOC Server (`GBOC-Server/login.html`) e o GBOC Agent (`GBOC-Agent/static/login.html`).

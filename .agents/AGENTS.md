@@ -87,31 +87,30 @@ Do not use obsolete elements such as:
 
 ## 4. CSS
 
-The frontend must use **modern CSS according to the current CSS specifications and browser-supported standards**.
+The frontend must use **modern CSS according to the current CSS specifications and browser-supported standards** and follow the **Universal CSS Architecture Policy**.
 
 > CSS does not have a single "CSS 4" or "CSS 5" version. Modern CSS is developed as a collection of continuously evolving specifications/modules.
 
-Requirements:
+### Universal CSS Architecture Policy (100% Shared & Zero Isolated CSS)
 
-* Use the latest stable CSS features supported by the project's target browsers.
-* Prefer modern CSS layout systems:
+All stylesheets, layout definitions, theme tokens, and component styles MUST be strictly unified and shared across both `GBOC-Server` and `GBOC-Agent`.
 
-  * Flexbox
-  * CSS Grid
-  * Container Queries
-  * Logical Properties
-  * CSS Custom Properties
-  * modern media queries
-  * modern selectors
-  * modern color functions when appropriate
+**Mandatory Universal CSS Stack:**
+1. **`style.css`**: Universal component framework, reset, cards, buttons, badges, data tables, form controls, toasts, modal base, and responsive layout foundations.
+2. **`gboc-themes.css`**: Universal design tokens, 8 UI styles (`minimal`, `neumorphism`, `claymorphism`, `fluent`, `nexus-widgets`, `nexus-glass`, `command-sentinel`, `cyber-3d`), 6 illumination themes (`dark`, `light`, `amber`, `purple`, `ocean`, `red`), Bacula & Fiorilli presets, high-contrast light mode tokens.
+3. **`gboc-layout.css`**: Dual layout engine (Vertical Sidebar + Horizontal Topbar), dynamic collapse/expand, smart presence detection, zero-overflow multi-resolution support.
+4. **`gboc-hardware-hud.css`**: Real-time hardware telemetry HUD styles (Sensors, CPU, RAM, Disks, SMART).
+5. **`gboc-file-picker.css`**: Universal file/directory tree explorer component styles.
+
+**Rules:**
+* **Zero Orphan/Isolated CSS Rule**: It is strictly forbidden to create divergent, isolated, or un-synchronized CSS files. All CSS files must be identical in `GBOC-Server` and `GBOC-Agent`.
+* **Standard HTML Inclusions**: Every HTML page must include the universal CSS stack in canonical standard order.
+* **Strict Design Token Usage**: All custom components and module templates must strictly consume CSS Custom Properties (`var(--bg-main)`, `var(--bg-card)`, `var(--text)`, `var(--border)`, `var(--primary)`, `var(--card-radius)`, etc.).
+* Use modern layout systems: Flexbox, CSS Grid, Container Queries, Logical Properties, CSS Custom Properties.
 * Avoid obsolete CSS properties and techniques.
 * Do not use table-based layouts.
 * Do not use inline styles unless there is a documented technical reason.
-* Prefer reusable CSS classes and CSS Custom Properties.
-* Maintain responsive design.
-* Support accessibility requirements.
-* Avoid unnecessary JavaScript for functionality that can be implemented reliably using modern CSS.
-* Remove obsolete vendor-prefix workarounds when they are no longer required by supported browsers.
+* Maintain responsive design and accessibility requirements.
 
 ---
 
@@ -572,7 +571,7 @@ The following rules are mandatory:
 * **ALWAYS retrieve system information from the real execution environment.**
 * **ALWAYS validate API responses and system command results.**
 * **ALWAYS maintain the modular architecture defined by `ARCHITECTURE_POLICIES.md`.**
-* **ALWAYS preserve the separation between frontend, backend and system-integration responsibilities.**
+* **ALWAYS enforce Universal CSS Architecture Policy (100% shared standard CSS stack, zero isolated/orphan CSS, universal design tokens).**
 * **ALWAYS update the distribution package (`build_installer_package.ps1`) whenever a new file is added or modified in the workspace.**
 * **ALWAYS apply Motion Principles (Kyle Zantos Motion Principles: Skeleton loaders, lazy loading, smooth entering/exiting and fluid progress animations) on all user interfaces.**
 * **ALWAYS enforce Observability (Sentry, OpenTelemetry, Datadog APM, NewRelic), Code Governance (Arch-contract, Biome, Commitlint, Knip, Stryker) and E2E/Unit Test Integrity (Playwright, Pytest, Codecov).**

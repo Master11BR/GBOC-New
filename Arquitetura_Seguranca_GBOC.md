@@ -1,4 +1,6 @@
-# Arquitetura de Defesa e Segurança: Sistema de Backup GBOC (v14.1.0)
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.5.0 Enterprise. Todos os direitos reservados. -->
+
+# Arquitetura de Defesa e Segurança: Sistema de Backup GBOC (v14.5.0)
 
 Este documento estabelece a arquitetura oficial de segurança, detecção de ameaças e resposta a incidentes para o ecossistema de backup **GBOC (Servidor Central & Agente Local)**. A arquitetura combina uma stack de **7 ferramentas open source de classe mundial** para proteção antivírus, detecção de ransomware e integridade com a automação acelerada por **IA CLI de Codificação (Aider)**.
 

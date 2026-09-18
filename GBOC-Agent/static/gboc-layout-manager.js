@@ -10,6 +10,22 @@ Zero-Overflow & Smart Sidebar Presence Detection.
 (function () {
     'use strict';
 
+    // Auto-inject Enterprise Modal & Dialog Framework se ainda não estiver presente na página
+    if (!window.GBOCModal && !document.getElementById('gboc-modal-script')) {
+        const m = document.createElement('script');
+        m.id = 'gboc-modal-script';
+        m.src = '/static/gboc-modal.js?v=14.5.0';
+        if (document.head) {
+            document.head.appendChild(m);
+        } else {
+            document.addEventListener('DOMContentLoaded', function () {
+                if (document.head && !document.getElementById('gboc-modal-script')) {
+                    document.head.appendChild(m);
+                }
+            });
+        }
+    }
+
     if (typeof window.GBOC_API_BASE === 'undefined') {
         const isAgent = window.location.port === '9200' ||
                         window.location.port === '8081' ||
