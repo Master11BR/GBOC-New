@@ -462,7 +462,16 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     async function cancelActiveRestore(restoreId) {
         const idToCancel = restoreId || _activeMonitoringId;
         if (!idToCancel) return;
-        if (!confirm(`Deseja realmente cancelar/interromper o processo de restauração #${idToCancel}?`)) return;
+
+        const ok = window.gbocConfirm ? await window.gbocConfirm(`Deseja realmente cancelar e interromper o processo de restauração #${idToCancel}?`, {
+            title: 'Cancelar Restauração',
+            icon: 'fas fa-stop-circle',
+            type: 'danger',
+            confirmText: 'Interromper Restauração',
+            danger: true
+        }) : confirm(`Deseja realmente cancelar/interromper o processo de restauração #${idToCancel}?`);
+
+        if (!ok) return;
 
         try {
             const res = await fetch(`/api/restore/cancel/${idToCancel}`, { method: 'POST' });

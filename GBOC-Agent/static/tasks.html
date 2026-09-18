@@ -18,6 +18,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <script src="/static/gboc-layout-manager.js"></script>
+    <script src="/static/gboc-modal.js"></script>
     <script src="/static/sidebar.js"></script>
     <script src="/static/app_v6.js"></script>
     <script src="/static/toast_notifications.js"></script>
@@ -796,7 +797,15 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     }
 
     async function deleteTask(id) {
-        if (!confirm('Excluir esta tarefa?')) return;
+        const ok = window.gbocConfirm ? await window.gbocConfirm('Tem certeza que deseja excluir permanentemente esta tarefa de backup?', {
+            title: 'Excluir Tarefa',
+            icon: 'fas fa-trash-alt',
+            type: 'danger',
+            confirmText: 'Sim, Excluir',
+            danger: true
+        }) : confirm('Excluir esta tarefa?');
+
+        if (!ok) return;
         try {
             const res = await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
             if (!res.ok) {
@@ -934,8 +943,17 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         activeExecutionId = null;
     });
 
-    document.getElementById('btn-stop-monitor-task').addEventListener('click', () => {
-        if (activeExecutionId && confirm('Deseja realmente interromper esta execução?')) {
+    document.getElementById('btn-stop-monitor-task').addEventListener('click', async () => {
+        if (!activeExecutionId) return;
+        const ok = window.gbocConfirm ? await window.gbocConfirm('Deseja realmente interromper e abortar este backup em execução?', {
+            title: 'Interromper Backup',
+            icon: 'fas fa-stop-circle',
+            type: 'danger',
+            confirmText: 'Interromper Execução',
+            danger: true
+        }) : confirm('Deseja realmente interromper esta execução?');
+
+        if (ok) {
             stopTaskExecution(activeExecutionId);
             document.getElementById('modal-monitor').classList.remove('active');
         }
@@ -953,7 +971,14 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     }
 
     async function runTask(id) {
-        if (!confirm('Executar backup agora?')) return;
+        const ok = window.gbocConfirm ? await window.gbocConfirm('Deseja iniciar a execução desta tarefa de backup imediatamente?', {
+            title: 'Executar Backup',
+            icon: 'fas fa-play-circle',
+            type: 'primary',
+            confirmText: 'Executar Agora'
+        }) : confirm('Executar backup agora?');
+
+        if (!ok) return;
         const res = await fetch(`/api/tasks/${id}/run`, { method: 'POST' });
         const contentType = res.headers.get('content-type') || '';
         const data = contentType.includes('application/json') ? await res.json() : { detail: await res.text() };
@@ -1023,7 +1048,14 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     }
 
     async function importHistory(id) {
-        if (!confirm('Importar histórico do repositório? Isso pode demorar alguns minutos.')) return;
+        const ok = window.gbocConfirm ? await window.gbocConfirm('Deseja importar o histórico deste repositório? Isso pode demorar alguns minutos.', {
+            title: 'Importar Histórico',
+            icon: 'fas fa-cloud-arrow-down',
+            type: 'info',
+            confirmText: 'Iniciar Importação'
+        }) : confirm('Importar histórico do repositório? Isso pode demorar alguns minutos.');
+
+        if (!ok) return;
 
         try {
             showToast('Importando histórico...', 'info');
@@ -1051,7 +1083,15 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     }
 
     async function cancelBackup(taskId) {
-        if (!confirm('Cancelar backup em execução?')) return;
+        const ok = window.gbocConfirm ? await window.gbocConfirm('Deseja realmente cancelar e interromper este backup em execução?', {
+            title: 'Cancelar Backup',
+            icon: 'fas fa-stop-circle',
+            type: 'danger',
+            confirmText: 'Cancelar Backup',
+            danger: true
+        }) : confirm('Cancelar backup em execução?');
+
+        if (!ok) return;
 
         try {
             showToast('Cancelando backup...', 'warning');
@@ -1149,9 +1189,22 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 'Erro detalhado:',
                 err
             ].join('\n');
-            alert(txt);
+            if (window.gbocAlert) {
+                await gbocAlert('Detalhes da Execução #' + execId, {
+                    title: 'Detalhes da Execução #' + execId,
+                    type: err ? 'warning' : 'info',
+                    icon: err ? 'fas fa-triangle-exclamation' : 'fas fa-circle-info',
+                    details: txt
+                });
+            } else {
+                alert(txt);
+            }
         } catch (e) {
-            alert(`Falha ao carregar detalhes da execução ${execId}: ${e.message}`);
+            if (window.gbocAlert) {
+                await gbocAlert(e.message, { title: 'Falha na Consulta', type: 'error' });
+            } else {
+                alert(`Falha ao carregar detalhes da execução ${execId}: ${e.message}`);
+            }
         }
     }
 
@@ -1572,7 +1625,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 <div style="margin-bottom:6px;"><strong>Causa Raiz:</strong> ${cause}</div>
                 <div style="margin-bottom:8px;"><strong>Solução Recomendada:</strong> ${solution}</div>
                 <div style="font-size:0.85em;color:var(--text-muted);background:var(--bg-input);padding:8px;border-radius:6px;margin-bottom:8px;">${analysis}</div>
-                <button class="btn btn-sm btn-primary" onclick="alert('Auto-Heal e Higienização acionados com sucesso!')"><i class="fas fa-wrench"></i> Aplicar Correção em 1-Clique</button>
+                <button class="btn btn-sm btn-primary" onclick="window.gbocAlert ? gbocAlert('Procedimento de Auto-Heal, verificação de consistência e higienização do repositório disparados com sucesso!', { title: 'Auto-Heal GBOC', type: 'success', icon: 'fas fa-wrench' }) : alert('Auto-Heal e Higienização acionados com sucesso!')"><i class="fas fa-wrench"></i> Aplicar Correção em 1-Clique</button>
             `;
         } catch(e) {
             box.innerHTML = `<span style="color:var(--danger)">Erro no assistente de IA: ${e.message}</span>`;

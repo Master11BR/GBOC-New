@@ -11,9 +11,9 @@ Propriedade Intelectual & Direitos Autorais Registrados.
  */
 
 // ============================================================================
-// 1. AUTO-INJEÇÃO SÍNCRONA DO LAYOUT MANAGER (GUI HORIZONTAL / VERTICAL)
+// 1. AUTO-INJEÇÃO SÍNCRONA DO LAYOUT MANAGER & MODAL FRAMEWORK
 // ============================================================================
-(function autoInjectLayoutManager() {
+(function autoInjectLayoutManagerAndModal() {
     if (!window.GBOCLayout && !document.getElementById('gboc-layout-manager-script')) {
         const s = document.createElement('script');
         s.id = 'gboc-layout-manager-script';
@@ -22,6 +22,16 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             document.head.appendChild(s);
         } else {
             document.addEventListener('DOMContentLoaded', () => document.head.appendChild(s));
+        }
+    }
+    if (!window.GBOCModal && !document.getElementById('gboc-modal-script')) {
+        const m = document.createElement('script');
+        m.id = 'gboc-modal-script';
+        m.src = '/static/gboc-modal.js';
+        if (document.head) {
+            document.head.appendChild(m);
+        } else {
+            document.addEventListener('DOMContentLoaded', () => document.head.appendChild(m));
         }
     }
 })();
@@ -461,7 +471,15 @@ window.gbocSetupSidebarAuth = function() {
  * Executa o fluxo de logout do usuário
  */
 window.gbocLogout = async function() {
-    if (!confirm('Deseja realmente sair?')) return;
+    const confirmFn = window.gbocConfirm || window.confirm;
+    const ok = window.gbocConfirm ? await window.gbocConfirm('Deseja realmente sair do sistema?', {
+        title: 'Encerrar Sessão',
+        icon: 'fas fa-right-from-bracket',
+        type: 'warning',
+        confirmText: 'Sair do Sistema'
+    }) : confirm('Deseja realmente sair?');
+
+    if (!ok) return;
     try {
         await fetch(SIDEBAR_CONFIG.API.AUTH_LOGOUT, { method: 'POST' });
     } catch (e) {
@@ -470,7 +488,9 @@ window.gbocLogout = async function() {
     
     localStorage.removeItem(SIDEBAR_CONFIG.STORAGE.TOKEN);
     localStorage.removeItem(SIDEBAR_CONFIG.STORAGE.USER);
+    localStorage.removeItem('gboc_server_token');
     document.cookie = `${SIDEBAR_CONFIG.STORAGE.TOKEN}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+    document.cookie = `gboc_server_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
     window.location.href = '/login.html';
 };
 
@@ -616,13 +636,22 @@ function _gbocShowSidebarUser(u){
 }
 
 window.gbocLogout = async function(){
-    if(!confirm('Deseja realmente sair?')) return;
+    const ok = window.gbocConfirm ? await window.gbocConfirm('Deseja realmente sair do sistema?', {
+        title: 'Encerrar Sessão',
+        icon: 'fas fa-right-from-bracket',
+        type: 'warning',
+        confirmText: 'Sair do Sistema'
+    }) : confirm('Deseja realmente sair?');
+
+    if(!ok) return;
     try {
         await fetch('/api/auth/logout', {method:'POST'});
     } catch(e){}
     localStorage.removeItem('gboc_token');
+    localStorage.removeItem('gboc_server_token');
     localStorage.removeItem('gboc_user');
     document.cookie = 'gboc_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+    document.cookie = 'gboc_server_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
     window.location.href = '/login.html';
 };
 

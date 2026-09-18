@@ -716,10 +716,15 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                     const data = await res.json();
 
                     if (res.ok && data.status === 'success') {
+                        localStorage.setItem('gboc_token', data.token);
                         localStorage.setItem('gboc_server_token', data.token);
                         if (data.user) {
+                            localStorage.setItem('gboc_user', JSON.stringify(data.user));
                             localStorage.setItem('gboc_server_user', JSON.stringify(data.user));
                         }
+                        document.cookie = `gboc_server_token=${data.token}; path=/; max-age=86400; SameSite=Lax`;
+                        document.cookie = `gboc_token=${data.token}; path=/; max-age=86400; SameSite=Lax`;
+
                         const remBox = document.getElementById('remember-me');
                         if (remBox && remBox.checked) {
                             localStorage.setItem('gboc_remember_user', username);
@@ -796,10 +801,14 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                         });
                         const loginData = await loginRes.json();
                         if (loginRes.ok && loginData.status === 'success') {
+                            localStorage.setItem('gboc_token', loginData.token);
                             localStorage.setItem('gboc_server_token', loginData.token);
                             if (loginData.user) {
+                                localStorage.setItem('gboc_user', JSON.stringify(loginData.user));
                                 localStorage.setItem('gboc_server_user', JSON.stringify(loginData.user));
                             }
+                            document.cookie = `gboc_server_token=${loginData.token}; path=/; max-age=86400; SameSite=Lax`;
+                            document.cookie = `gboc_token=${loginData.token}; path=/; max-age=86400; SameSite=Lax`;
                             setTimeout(() => {
                                 window.location.href = '/';
                             }, 500);

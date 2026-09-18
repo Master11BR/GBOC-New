@@ -636,7 +636,8 @@ API_MODULES = [
     ("api.advanced_stats_api", "router"),  # ✅ Estatísticas avançadas 14.1.0
     ("api.preemptive_api", "router"),  # ✅ Diagnóstico preemptivo 14.1.0
     ("api.system_api", "router"),  # ✅ Sistema completo 14.1.0
-    ("api.auth", "router"),  # ✅ Autenticação
+    ("api.auth", "router"),  # ✅ Autenticação (/api/auth)
+    ("api.auth", "router_v1"),  # ✅ Autenticação v1 (/api/v1/auth)
     ("api.export_api", "router"),  # ✅ Exportação de relatórios
     ("api.integrity_api", "router"),  # ✅ Verificação de integridade
     ("api.reports_api", "router"),  # ✅ Relatórios
@@ -1187,6 +1188,9 @@ async def serve_static_asset(filename: str):
     clean_fn = (filename or '').lstrip("/\\")
     if clean_fn.startswith("static/") or clean_fn.startswith("static\\"):
         clean_fn = clean_fn[7:]
+    static_file = os.path.join(os.path.dirname(__file__), "static", clean_fn)
+    if os.path.isfile(static_file):
+        return FileResponse(static_file)
     srv_file = os.path.join(os.path.dirname(__file__), clean_fn)
     if os.path.isfile(srv_file):
         return FileResponse(srv_file)

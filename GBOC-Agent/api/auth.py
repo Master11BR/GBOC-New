@@ -19,7 +19,9 @@ from collections import defaultdict
 from api.audit_api import audit_login, audit_security_event
 
 logger = logging.getLogger(__name__)
+_core_router = APIRouter()
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+router_v1 = APIRouter(prefix="/api/v1/auth", tags=["auth_v1"])
 
 # ============================================================================
 # System Permissions Registry
@@ -118,7 +120,7 @@ def validate_password(password: str) -> tuple:
     return (len(errors) == 0, errors)
 
 
-@router.get("/password-policy")
+@_core_router.get("/password-policy")
 async def get_password_policy():
     """Returns the current password policy requirements."""
     return {
@@ -153,16 +155,47 @@ def _get_secret_key():
     return SECRET_KEY
 
 
-def _hash_password(password: str, salt: str = None):
+def _hash_password(password: str, salt: str = None) -> tuple:
     if not salt:
         salt = secrets.token_hex(16)
-    hashed = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000)
+    hashed = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt.encode('utf-8'), 100000)
     return hashed.hex(), salt
 
 
-def _verify_password(password: str, hashed: str, salt: str) -> bool:
-    check_hash, _ = _hash_password(password, salt)
-    return check_hash == hashed
+def _verify_password(password: str, hashed: str, salt: Optional[str] = None) -> bool:
+    if not hashed or not password:
+        return False
+    # 1. PBKDF2 com salt do usuário
+    if salt:
+        try:
+            check_hash, _ = _hash_password(password, salt)
+            if check_hash == hashed:
+                return True
+        except Exception:
+            pass
+    # 2. PBKDF2 com salts padrão do sistema
+    for sys_salt in ["gboc_secure_salt_2025", "gboc_server_salt_2025"]:
+        try:
+            h = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), sys_salt.encode('utf-8'), 100000).hex()
+            if h == hashed:
+                return True
+        except Exception:
+            pass
+    # 3. SHA-256 com prefixo de salt
+    for s in [salt, "gboc_server_salt_2025", "gboc_secure_salt_2025"]:
+        if s:
+            if hashlib.sha256(f"{s}{password}".encode('utf-8')).hexdigest() == hashed:
+                return True
+    # 4. SHA-256 simples
+    if hashlib.sha256(password.encode('utf-8')).hexdigest() == hashed:
+        return True
+    # 5. MD5 legado
+    if hashlib.md5(password.encode('utf-8')).hexdigest() == hashed:
+        return True
+    # 6. Comparação direta de texto simples (fallback)
+    if password == hashed:
+        return True
+    return False
 
 
 def _generate_token(user_id: int, username: str) -> str:
@@ -181,25 +214,69 @@ def _validate_token(token: str) -> Optional[Dict]:
         return None
     info = ACTIVE_TOKENS.get(token)
     if not info:
+        # Tentar recuperar da tabela auth_sessions no banco (ex: após restart do agente)
+        try:
+            from shared_core import get_shared_core
+            core = get_shared_core()
+            with core.get_db_connection() as conn:
+                cur = conn.cursor()
+                cur.execute(
+                    """
+                    SELECT s.user_id, u.username, s.expires_at 
+                    FROM auth_sessions s 
+                    JOIN auth_users u ON s.user_id = u.id 
+                    WHERE s.token = %s
+                    """,
+                    (token,)
+                )
+                row = cur.fetchone()
+                if row:
+                    uid, uname, exp = row
+                    exp_dt = None
+                    if exp:
+                        if isinstance(exp, datetime):
+                            exp_dt = exp
+                        elif isinstance(exp, str):
+                            try:
+                                exp_dt = datetime.fromisoformat(exp.replace('Z', '+00:00'))
+                            except Exception:
+                                exp_dt = None
+                    if exp_dt:
+                        now_comp = datetime.now(timezone.utc) if exp_dt.tzinfo else datetime.now()
+                        if now_comp > exp_dt:
+                            return None
+                    info = {
+                        'user_id': uid,
+                        'username': uname,
+                        'expires_at': exp_dt or (datetime.now() + timedelta(hours=TOKEN_EXPIRY_HOURS))
+                    }
+                    ACTIVE_TOKENS[token] = info
+                    return info
+        except Exception as e:
+            logger.debug(f"DB session check error: {e}")
         return None
+
     expires_at = info.get('expires_at')
     if isinstance(expires_at, (int, float)):
         if time.time() > expires_at:
             del ACTIVE_TOKENS[token]
             return None
     elif isinstance(expires_at, datetime):
-        if datetime.now() > expires_at:
+        now_comp = datetime.now(timezone.utc) if expires_at.tzinfo else datetime.now()
+        if now_comp > expires_at:
             del ACTIVE_TOKENS[token]
             return None
     return info
 
 
 def get_current_user(request: Request) -> Optional[Dict]:
-    token = request.cookies.get('gboc_token')
+    token = request.cookies.get('gboc_token') or request.cookies.get('gboc_server_token')
     if not token:
         auth_header = request.headers.get('Authorization', '')
         if auth_header.startswith('Bearer '):
-            token = auth_header[7:]
+            token = auth_header[7:].strip()
+    if not token:
+        token = request.query_params.get('token')
     if not token:
         return None
     return _validate_token(token)
@@ -342,7 +419,7 @@ class UpdateRoleRequest(BaseModel):
 # Endpoints de Autenticação Básica
 # ============================================================================
 
-@router.get("/status")
+@_core_router.get("/status")
 async def auth_status(request: Request):
     _ensure_auth_tables()
     enabled = is_auth_enabled()
@@ -373,17 +450,24 @@ async def auth_status(request: Request):
         "status": "success",
         "auth_enabled": enabled,
         "authenticated": user is not None,
-        "user": user_data
+        "user": user_data,
+        "oauth_providers": {
+            "google": {"enabled": False, "name": "Google", "auth_url": "/api/auth/oauth/google"},
+            "apple": {"enabled": False, "name": "Apple", "auth_url": "/api/auth/oauth/apple"}
+        }
     }
 
 
-@router.post("/login")
+@_core_router.post("/login")
 async def login(req: LoginRequest, request: Request):
     client_ip = request.client.host if request.client else "unknown"
     _check_rate_limit(client_ip)
 
-    if not req.username or not req.password:
-        audit_login(username=req.username or "empty", success=False, ip=client_ip, reason="dados_incompletos")
+    username_input = (req.username or "").strip()
+    password_input = req.password or ""
+
+    if not username_input or not password_input:
+        audit_login(username=username_input or "empty", success=False, ip=client_ip, reason="dados_incompletos")
         raise HTTPException(status_code=400, detail="Usuário e senha são obrigatórios")
 
     try:
@@ -392,30 +476,36 @@ async def login(req: LoginRequest, request: Request):
         with core.get_db_connection() as conn:
             cur = conn.cursor()
             cur.execute(
-                "SELECT id, username, password_hash, password_salt, display_name, role, is_active FROM auth_users WHERE username = %s",
-                (req.username.strip(),)
+                "SELECT id, username, password_hash, password_salt, display_name, role, is_active FROM auth_users WHERE LOWER(username) = LOWER(%s)",
+                (username_input,)
             )
             user = cur.fetchone()
 
             if not user:
-                audit_login(username=req.username, success=False, ip=client_ip, reason="usuario_nao_encontrado")
+                audit_login(username=username_input, success=False, ip=client_ip, reason="usuario_nao_encontrado")
                 raise HTTPException(status_code=401, detail="Usuário ou senha incorretos")
 
-            user_id, username, pw_hash, pw_salt, display_name, role, is_active = user
+            user_id, db_username, pw_hash, pw_salt, display_name, role, is_active = user
 
             if not is_active:
-                audit_login(username=req.username, success=False, ip=client_ip, reason="usuario_inativo")
+                audit_login(username=db_username, success=False, ip=client_ip, reason="usuario_inativo")
                 raise HTTPException(status_code=403, detail="Conta inativa. Contate o administrador.")
 
-            if not _verify_password(req.password, pw_hash, pw_salt):
-                audit_login(username=req.username, success=False, ip=client_ip, reason="senha_incorreta")
+            if not _verify_password(password_input, pw_hash, pw_salt):
+                audit_login(username=db_username, success=False, ip=client_ip, reason="senha_incorreta")
                 raise HTTPException(status_code=401, detail="Usuário ou senha incorretos")
 
-            # Atualizar last_login
+            # Atualizar last_login e auto-atualizar hash para PBKDF2 com salt caso estivesse em formato legado
             now = datetime.now().isoformat()
-            cur.execute("UPDATE auth_users SET last_login = %s WHERE id = %s", (now, user_id))
+            new_hash, new_salt = _hash_password(password_input, pw_salt)
+            if new_hash != pw_hash or not pw_salt:
+                new_salt = new_salt or secrets.token_hex(16)
+                new_hash, _ = _hash_password(password_input, new_salt)
+                cur.execute("UPDATE auth_users SET password_hash = %s, password_salt = %s, last_login = %s WHERE id = %s", (new_hash, new_salt, now, user_id))
+            else:
+                cur.execute("UPDATE auth_users SET last_login = %s WHERE id = %s", (now, user_id))
 
-            token = _generate_token(user_id, username)
+            token = _generate_token(user_id, db_username)
             expires = datetime.now() + timedelta(hours=TOKEN_EXPIRY_HOURS)
 
             cur.execute(
@@ -424,18 +514,19 @@ async def login(req: LoginRequest, request: Request):
             )
             conn.commit()
 
-        audit_login(username=username, success=True, ip=client_ip)
+        audit_login(username=db_username, success=True, ip=client_ip)
         resp = JSONResponse({
             "status": "success",
             "token": token,
             "user": {
                 "id": user_id,
-                "username": username,
-                "display_name": display_name or username,
+                "username": db_username,
+                "display_name": display_name or db_username,
                 "role": role
             }
         })
         resp.set_cookie(key="gboc_token", value=token, httponly=True, max_age=86400, samesite="lax")
+        resp.set_cookie(key="gboc_server_token", value=token, httponly=False, max_age=86400, samesite="lax")
         return resp
 
     except HTTPException:
@@ -445,7 +536,7 @@ async def login(req: LoginRequest, request: Request):
         raise HTTPException(status_code=500, detail="Erro interno no login")
 
 
-@router.post("/setup")
+@_core_router.post("/setup")
 async def auth_setup(req: RegisterRequest, request: Request):
     """Criação da primeira conta de administrador (primeiro acesso)"""
     client_ip = request.client.host if request.client else "unknown"
@@ -487,13 +578,13 @@ async def auth_setup(req: RegisterRequest, request: Request):
         raise HTTPException(status_code=500, detail="Erro interno no setup inicial")
 
 
-@router.post("/logout")
+@_core_router.post("/logout")
 async def logout(request: Request):
-    token = request.cookies.get('gboc_token')
+    token = request.cookies.get('gboc_token') or request.cookies.get('gboc_server_token')
     if not token:
         auth_header = request.headers.get('Authorization', '')
         if auth_header.startswith('Bearer '):
-            token = auth_header[7:]
+            token = auth_header[7:].strip()
     if token and token in ACTIVE_TOKENS:
         del ACTIVE_TOKENS[token]
     if token:
@@ -508,10 +599,11 @@ async def logout(request: Request):
             pass
     resp = JSONResponse({"status": "success", "message": "Logout realizado"})
     resp.delete_cookie("gboc_token")
+    resp.delete_cookie("gboc_server_token")
     return resp
 
 
-@router.post("/change-password")
+@_core_router.post("/change-password")
 async def change_password(req: ChangePasswordRequest, request: Request):
     user = get_current_user(request)
     if not user:
@@ -551,7 +643,7 @@ async def change_password(req: ChangePasswordRequest, request: Request):
 # ENDPOINTS: ROLES & PERMISSIONS (CRUD DE NÍVEIS DE ACESSO CUSTOMIZADOS)
 # ============================================================================
 
-@router.get("/permissions")
+@_core_router.get("/permissions")
 async def list_available_permissions():
     """Retorna o catálogo de todas as permissões granulares disponíveis no sistema."""
     modules = {}
@@ -569,7 +661,7 @@ async def list_available_permissions():
     }
 
 
-@router.get("/roles")
+@_core_router.get("/roles")
 async def list_roles(request: Request):
     """Lista todos os níveis de acesso (nativos do sistema e customizados) com contagem de usuários."""
     _ensure_auth_tables()
@@ -609,7 +701,7 @@ async def list_roles(request: Request):
         return {"status": "error", "message": str(e)}
 
 
-@router.post("/roles")
+@_core_router.post("/roles")
 async def create_role(req: CreateRoleRequest, request: Request):
     """Cria um novo Nível de Acesso Customizado com permissões personalizadas."""
     caller = get_current_user(request)
@@ -655,7 +747,7 @@ async def create_role(req: CreateRoleRequest, request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.put("/roles/{role_id}")
+@_core_router.put("/roles/{role_id}")
 async def update_role(role_id: int, req: UpdateRoleRequest, request: Request):
     """Atualiza as propriedades e permissões de um Nível de Acesso."""
     caller = get_current_user(request)
@@ -707,7 +799,7 @@ async def update_role(role_id: int, req: UpdateRoleRequest, request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/roles/{role_id}")
+@_core_router.delete("/roles/{role_id}")
 async def delete_role(role_id: int, request: Request):
     """Remove um Nível de Acesso customizado (impede remoção de níveis do sistema ou em uso)."""
     caller = get_current_user(request)
@@ -751,7 +843,7 @@ async def delete_role(role_id: int, request: Request):
 # ENDPOINTS: USER CRUD COMPLETO
 # ============================================================================
 
-@router.get("/users")
+@_core_router.get("/users")
 async def list_users(request: Request):
     """Lista todos os usuários cadastrados juntamente com o nome de exibição do seu Nível de Acesso."""
     user = get_current_user(request)
@@ -782,8 +874,8 @@ async def list_users(request: Request):
                     "username": row[1],
                     "display_name": row[2] or row[1],
                     "role": row[3],
-                    "role_display_name": row[4] if False else row[7] if False else (row[7] and row[7] != '[]' and row[3] or row[3]),
-                    "role_title": row[7] if False else row[3].title(),
+                    "role_display_name": row[7] if (row[7] and row[7] != '[]') else (row[3].title() if row[3] else "Admin"),
+                    "role_title": row[3].title() if row[3] else "Admin",
                     "role_name": row[3],
                     "is_active": bool(row[4]),
                     "last_login": row[5].isoformat() if row[5] else None,
@@ -801,7 +893,7 @@ async def list_users(request: Request):
         return {"status": "error", "message": str(e)}
 
 
-@router.post("/users")
+@_core_router.post("/users")
 async def create_user(req: CreateUserRequest, request: Request):
     """Cria um novo usuário com nível de acesso configurado."""
     caller = get_current_user(request)
@@ -822,7 +914,7 @@ async def create_user(req: CreateUserRequest, request: Request):
         core = get_shared_core()
         with core.get_db_connection() as conn:
             cur = conn.cursor()
-            cur.execute("SELECT id FROM auth_users WHERE username = %s", (req.username.strip(),))
+            cur.execute("SELECT id FROM auth_users WHERE LOWER(username) = LOWER(%s)", (req.username.strip(),))
             if cur.fetchone():
                 raise HTTPException(status_code=400, detail="Nome de usuário já cadastrado")
 
@@ -852,7 +944,7 @@ async def create_user(req: CreateUserRequest, request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.put("/users/{user_id}")
+@_core_router.put("/users/{user_id}")
 async def update_user(user_id: int, req: UpdateUserRequest, request: Request):
     """Atualiza um usuário existente (nome, nível de acesso, status ativo/inativo, nova senha)."""
     caller = get_current_user(request)
@@ -909,7 +1001,7 @@ async def update_user(user_id: int, req: UpdateUserRequest, request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/users/{user_id}")
+@_core_router.delete("/users/{user_id}")
 async def delete_user(user_id: int, request: Request):
     """Remove um usuário do sistema."""
     caller = get_current_user(request)
@@ -944,3 +1036,11 @@ async def delete_user(user_id: int, request: Request):
     except Exception as e:
         logger.error(f"Delete user error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Registro dos Roteadores com Prefixos /api/auth e /api/v1/auth
+# ============================================================================
+router.include_router(_core_router)
+router_v1.include_router(_core_router)
+

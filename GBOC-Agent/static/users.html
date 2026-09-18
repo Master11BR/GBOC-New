@@ -16,6 +16,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     <link rel="stylesheet" href="/static/gboc-layout.css?v=14.4.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="/static/gboc-layout-manager.js"></script>
+    <script src="/static/gboc-modal.js"></script>
     <style>
         .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
         .stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 18px; text-align: center; }
@@ -506,7 +507,11 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         const is_active = document.getElementById('usr-active').checked;
 
         if (!userId && (!username || !password)) {
-            alert('Preencha nome de usuário e senha');
+            if (window.gbocAlert) {
+                await gbocAlert('Por favor, preencha o nome de usuário e a senha.', { title: 'Campos Obrigatórios', type: 'warning' });
+            } else {
+                alert('Preencha nome de usuário e senha');
+            }
             return;
         }
 
@@ -532,31 +537,53 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 
             const d = await r.json();
             if (!r.ok) {
-                alert('Erro: ' + (d.detail || 'Falha ao salvar usuário'));
+                const errDetail = d.detail || 'Falha ao salvar usuário';
+                if (window.gbocAlert) await gbocAlert(errDetail, { title: 'Erro ao Salvar', type: 'error' });
+                else alert('Erro: ' + errDetail);
                 return;
             }
             loadAll();
         } catch(e) {
-            alert('Erro: ' + e.message);
+            if (window.gbocAlert) await gbocAlert(e.message, { title: 'Erro de Conexão', type: 'error' });
+            else alert('Erro: ' + e.message);
         }
     }
 
     function editUser(id) { openUserModal(id); }
 
     async function deleteUser(id) {
-        if (!confirm('Excluir este usuário permanentemente?')) return;
+        const ok = window.gbocConfirm ? await window.gbocConfirm('Tem certeza de que deseja excluir permanentemente este usuário? O acesso será revogado imediatamente.', {
+            title: 'Excluir Usuário',
+            icon: 'fas fa-user-xmark',
+            type: 'danger',
+            confirmText: 'Excluir Usuário',
+            danger: true
+        }) : confirm('Excluir este usuário permanentemente?');
+
+        if (!ok) return;
         try {
             const r = await fetch(AUTH_API + '/users/' + id, { method: 'DELETE' });
             const d = await r.json();
-            if (!r.ok) { alert('Erro: ' + (d.detail || 'Falha ao remover usuário')); return; }
+            if (!r.ok) {
+                const errDetail = d.detail || 'Falha ao remover usuário';
+                if (window.gbocAlert) await gbocAlert(errDetail, { title: 'Erro', type: 'error' });
+                else alert('Erro: ' + errDetail);
+                return;
+            }
             loadAll();
         } catch(e) {
-            alert(e.message);
+            if (window.gbocAlert) await gbocAlert(e.message, { title: 'Erro', type: 'error' });
+            else alert(e.message);
         }
     }
 
     async function resetPassword(id) {
-        const pw = prompt('Digite a nova senha para este usuário:');
+        const pw = window.gbocPrompt ? await window.gbocPrompt('Informe a nova senha segura para o usuário:', '', {
+            title: 'Redefinir Senha',
+            inputType: 'password',
+            placeholder: 'Nova senha...'
+        }) : prompt('Digite a nova senha para este usuário:');
+
         if (!pw) return;
         try {
             const r = await fetch(AUTH_API + '/users/' + id, {
@@ -565,10 +592,20 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 body: JSON.stringify({ new_password: pw })
             });
             const d = await r.json();
-            if (!r.ok) { alert('Erro: ' + (d.detail || 'Falha ao alterar senha')); return; }
-            alert('Senha alterada com sucesso!');
+            if (!r.ok) {
+                const errDetail = d.detail || 'Falha ao alterar senha';
+                if (window.gbocAlert) await gbocAlert(errDetail, { title: 'Erro', type: 'error' });
+                else alert('Erro: ' + errDetail);
+                return;
+            }
+            if (window.gbocAlert) {
+                await gbocAlert('A senha do usuário foi alterada com sucesso!', { title: 'Senha Atualizada', type: 'success' });
+            } else {
+                alert('Senha alterada com sucesso!');
+            }
         } catch(e) {
-            alert('Erro: ' + e.message);
+            if (window.gbocAlert) await gbocAlert(e.message, { title: 'Erro', type: 'error' });
+            else alert('Erro: ' + e.message);
         }
     }
 
@@ -683,14 +720,28 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     }
 
     async function deleteRole(roleId) {
-        if (!confirm('Excluir este nível de acesso customizado?')) return;
+        const ok = window.gbocConfirm ? await window.gbocConfirm('Excluir este nível de acesso customizado? Usuários vinculados poderão perder permissões especiais.', {
+            title: 'Excluir Nível de Acesso',
+            icon: 'fas fa-shield-halved',
+            type: 'danger',
+            confirmText: 'Excluir Nível',
+            danger: true
+        }) : confirm('Excluir este nível de acesso customizado?');
+
+        if (!ok) return;
         try {
             const r = await fetch(AUTH_API + '/roles/' + roleId, { method: 'DELETE' });
             const d = await r.json();
-            if (!r.ok) { alert('Erro: ' + (d.detail || 'Falha ao excluir nível')); return; }
+            if (!r.ok) {
+                const errDetail = d.detail || 'Falha ao excluir nível';
+                if (window.gbocAlert) await gbocAlert(errDetail, { title: 'Erro', type: 'error' });
+                else alert('Erro: ' + errDetail);
+                return;
+            }
             loadAll();
         } catch(e) {
-            alert(e.message);
+            if (window.gbocAlert) await gbocAlert(e.message, { title: 'Erro', type: 'error' });
+            else alert(e.message);
         }
     }
 
@@ -752,11 +803,20 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     }
 
     async function gbocLogout() {
-        if (!confirm('Deseja realmente sair do sistema?')) return;
+        const ok = window.gbocConfirm ? await window.gbocConfirm('Deseja realmente sair do sistema?', {
+            title: 'Encerrar Sessão',
+            icon: 'fas fa-right-from-bracket',
+            type: 'warning',
+            confirmText: 'Sair do Sistema'
+        }) : confirm('Deseja realmente sair do sistema?');
+
+        if (!ok) return;
         try { await fetch(AUTH_API + '/logout', { method: 'POST' }); } catch(e) {}
         localStorage.removeItem('gboc_token');
+        localStorage.removeItem('gboc_server_token');
         localStorage.removeItem('gboc_user');
         document.cookie = 'gboc_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+        document.cookie = 'gboc_server_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
         window.location.href = '/login.html';
     }
     </script>

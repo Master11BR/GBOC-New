@@ -326,13 +326,29 @@ async function saveUser() {
 function editUser(id) { openUserModal(id); }
 
 async function deleteUser(id) {
-    if (!confirm('Excluir este usuário permanentemente?')) return;
+    const ok = window.gbocConfirm ? await window.gbocConfirm('Excluir este usuário permanentemente? O acesso será revogado.', {
+        title: 'Excluir Usuário',
+        icon: 'fas fa-user-xmark',
+        type: 'danger',
+        confirmText: 'Excluir Usuário',
+        danger: true
+    }) : confirm('Excluir este usuário permanentemente?');
+
+    if (!ok) return;
     try {
         const r = await fetch(USERS_API + '/' + id, { method: 'DELETE' });
         const d = await r.json();
-        if (!r.ok) { alert('Erro: ' + (d.detail || 'Falha ao excluir')); return; }
+        if (!r.ok) {
+            const err = d.detail || 'Falha ao excluir';
+            if (window.gbocAlert) await gbocAlert(err, { title: 'Erro', type: 'error' });
+            else alert('Erro: ' + err);
+            return;
+        }
         loadAllUsersModule();
-    } catch (e) { alert('Erro: ' + e.message); }
+    } catch (e) {
+        if (window.gbocAlert) await gbocAlert(e.message, { title: 'Erro de Conexão', type: 'error' });
+        else alert('Erro: ' + e.message);
+    }
 }
 
 function openRoleModal(roleId = null) {
@@ -420,13 +436,29 @@ async function saveRole() {
 }
 
 async function deleteRole(roleId) {
-    if (!confirm('Excluir este nível de acesso customizado?')) return;
+    const ok = window.gbocConfirm ? await window.gbocConfirm('Excluir este nível de acesso customizado? Usuários vinculados poderão ser afetados.', {
+        title: 'Excluir Nível de Acesso',
+        icon: 'fas fa-shield-halved',
+        type: 'danger',
+        confirmText: 'Excluir Nível',
+        danger: true
+    }) : confirm('Excluir este nível de acesso customizado?');
+
+    if (!ok) return;
     try {
         const r = await fetch(USERS_API + '/roles/' + roleId, { method: 'DELETE' });
         const d = await r.json();
-        if (!r.ok) { alert('Erro: ' + (d.detail || 'Falha ao excluir')); return; }
+        if (!r.ok) {
+            const err = d.detail || 'Falha ao excluir';
+            if (window.gbocAlert) await gbocAlert(err, { title: 'Erro', type: 'error' });
+            else alert('Erro: ' + err);
+            return;
+        }
         loadAllUsersModule();
-    } catch (e) { alert('Erro: ' + e.message); }
+    } catch (e) {
+        if (window.gbocAlert) await gbocAlert(e.message, { title: 'Erro de Conexão', type: 'error' });
+        else alert('Erro: ' + e.message);
+    }
 }
 
 async function changeMyPassword() {

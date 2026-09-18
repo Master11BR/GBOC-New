@@ -482,7 +482,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 
     <!-- Lógica de Interface, Animações e Conexão Zero-Mock com o Backend -->
     <script>
-        const API_BASE = '/api/v1/auth';
+        const API_BASE = '/api/auth';
         let isSetupMode = false;
         let oauthConfig = {
             google: { enabled: false },
@@ -634,7 +634,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             }
 
             // Se habilitado pela flag no servidor, redireciona para a URL do provedor
-            const authUrl = provConfig.auth_url || `/api/v1/auth/oauth/${provider}`;
+            const authUrl = provConfig.auth_url || `/api/auth/oauth/${provider}`;
             showAlert(`Redirecionando para autenticação ${provider}...`, false);
             setTimeout(() => {
                 window.location.href = authUrl;
@@ -716,10 +716,16 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                     const data = await res.json();
 
                     if (res.ok && data.status === 'success') {
+                        localStorage.setItem('gboc_token', data.token);
                         localStorage.setItem('gboc_server_token', data.token);
                         if (data.user) {
+                            localStorage.setItem('gboc_user', JSON.stringify(data.user));
                             localStorage.setItem('gboc_server_user', JSON.stringify(data.user));
                         }
+                        // Fallback de cookie no cliente
+                        document.cookie = `gboc_token=${data.token}; path=/; max-age=86400; SameSite=Lax`;
+                        document.cookie = `gboc_server_token=${data.token}; path=/; max-age=86400; SameSite=Lax`;
+
                         const remBox = document.getElementById('remember-me');
                         if (remBox && remBox.checked) {
                             localStorage.setItem('gboc_remember_user', username);
@@ -735,7 +741,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                         showAlert(data.detail || data.message || 'Credenciais inválidas. Verifique seu usuário e senha.');
                     }
                 } catch (err) {
-                    showAlert('Erro de comunicação com o servidor GBOC. Verifique o serviço ou a rede.');
+                    showAlert('Erro de comunicação com o serviço GBOC. Verifique se o processo está em execução.');
                 } finally {
                     btn.disabled = false;
                     btnText.textContent = 'Entrar no Sistema';
@@ -796,10 +802,14 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                         });
                         const loginData = await loginRes.json();
                         if (loginRes.ok && loginData.status === 'success') {
+                            localStorage.setItem('gboc_token', loginData.token);
                             localStorage.setItem('gboc_server_token', loginData.token);
                             if (loginData.user) {
+                                localStorage.setItem('gboc_user', JSON.stringify(loginData.user));
                                 localStorage.setItem('gboc_server_user', JSON.stringify(loginData.user));
                             }
+                            document.cookie = `gboc_token=${loginData.token}; path=/; max-age=86400; SameSite=Lax`;
+                            document.cookie = `gboc_server_token=${loginData.token}; path=/; max-age=86400; SameSite=Lax`;
                             setTimeout(() => {
                                 window.location.href = '/';
                             }, 500);

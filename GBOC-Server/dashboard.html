@@ -19,6 +19,8 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     <link rel="stylesheet" href="/gboc-layout.css?v=14.4.0">
     <link rel="stylesheet" href="/gboc-hardware-hud.css?v=14.2.0">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="/gboc-modal.js?v=14.4.0"></script>
+    <script src="/static/gboc-modal.js?v=14.4.0"></script>
     <script src="/modules/storage/storage.js?v=14.2.0"></script>
     <script src="/modules/job_alert/job_alert.js?v=14.2.0"></script>
     <script src="/static/ai_assistant.js?v=14.2.0"></script>
@@ -2242,7 +2244,14 @@ function gbocToggleSidebarCollapse(){
 
         async function pullOllamaModelServer(modelName) {
             const host = document.getElementById('cfg-ai-endpoint').value || 'http://localhost:11434';
-            if(!confirm(`Deseja iniciar o download do modelo "${modelName}" no Ollama do Servidor?\nIsso será feito em segundo plano pelo servidor central.`)) return;
+            const ok = window.gbocConfirm ? await window.gbocConfirm(`Deseja iniciar o download do modelo "${modelName}" no Ollama do Servidor?\nIsso será feito em segundo plano pelo servidor central.`, {
+                title: 'Download Modelo Ollama (Server)',
+                icon: 'fas fa-brain',
+                type: 'primary',
+                confirmText: 'Baixar Modelo'
+            }) : confirm(`Deseja iniciar o download do modelo "${modelName}" no Ollama do Servidor?\nIsso será feito em segundo plano pelo servidor central.`);
+
+            if(!ok) return;
             const btn = document.querySelector(`button[onclick="pullOllamaModelServer('${modelName}')"]`);
             if(btn) {
                 btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Iniciando Instalação...';
@@ -2398,23 +2407,49 @@ function gbocToggleSidebarCollapse(){
         }
 
         async function runCleanup(){
-            if(!confirm('Executar limpeza de dados antigos (métricas, logs, eventos) conforme política de retenção?'))return;
+            const ok = window.gbocConfirm ? await window.gbocConfirm('Executar limpeza de dados antigos (métricas, logs, eventos) conforme política de retenção?', {
+                title: 'Limpeza de Manutenção',
+                icon: 'fas fa-broom',
+                type: 'warning',
+                confirmText: 'Executar Limpeza'
+            }) : confirm('Executar limpeza de dados antigos (métricas, logs, eventos) conforme política de retenção?');
+
+            if(!ok) return;
             try{
                 const r=await fetch(`${API}/server/maintenance/cleanup`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
                 const d=await r.json();
                 const del=d.deleted||{};
                 const lines=Object.entries(del).map(([k,v])=>`${k}: ${v}`).join('\n');
-                alert(`Limpeza concluída!\nTotal removidos: ${d.total_deleted||0}\n\n${lines}`);
-            }catch(e){alert('Erro: '+e.message)}
+                if (window.gbocAlert) {
+                    await gbocAlert(`Total removidos: ${d.total_deleted||0}`, { title: 'Limpeza Concluída', type: 'success', details: lines });
+                } else {
+                    alert(`Limpeza concluída!\nTotal removidos: ${d.total_deleted||0}\n\n${lines}`);
+                }
+            }catch(e){
+                if (window.gbocAlert) await gbocAlert(e.message, { title: 'Erro', type: 'error' });
+                else alert('Erro: '+e.message);
+            }
         }
 
         async function resetAllSettings(){
-            if(!confirm('⚠️ ATENÇÃO: Isso vai resetar TODAS as configurações para os valores padrão. Continuar?'))return;
+            const ok = window.gbocConfirm ? await window.gbocConfirm('⚠️ ATENÇÃO: Isso vai resetar TODAS as configurações para os valores padrão do servidor.', {
+                title: 'Resetar Configurações',
+                icon: 'fas fa-triangle-exclamation',
+                type: 'danger',
+                confirmText: 'Resetar Tudo',
+                danger: true
+            }) : confirm('⚠️ ATENÇÃO: Isso vai resetar TODAS as configurações para os valores padrão. Continuar?');
+
+            if(!ok) return;
             try{
                 await fetch(`${API}/server/settings/reset`,{method:'POST'});
-                alert('Configurações resetadas para padrão');
+                if (window.gbocAlert) await gbocAlert('Configurações resetadas para o padrão com sucesso.', { title: 'Reset Concluído', type: 'success' });
+                else alert('Configurações resetadas para padrão');
                 loadConfig();
-            }catch(e){alert('Erro: '+e.message)}
+            }catch(e){
+                if (window.gbocAlert) await gbocAlert(e.message, { title: 'Erro', type: 'error' });
+                else alert('Erro: '+e.message);
+            }
         }
 
         async function testNotification(channel){
@@ -3166,26 +3201,43 @@ function gbocToggleSidebarCollapse(){
         }
 
         async function deleteSrvUser(userId, username){
-            if(!confirm(`Excluir usuário ${username}?`)) return;
+            const ok = window.gbocConfirm ? await window.gbocConfirm(`Excluir usuário ${username}? O acesso será revogado permanentemente.`, {
+                title: 'Excluir Usuário',
+                icon: 'fas fa-user-xmark',
+                type: 'danger',
+                confirmText: 'Excluir Usuário',
+                danger: true
+            }) : confirm(`Excluir usuário ${username}?`);
+
+            if(!ok) return;
             try{
                 const r=await fetch(`${API}/auth/users/${userId}`,{method:'DELETE'});
                 const d=await r.json().catch(()=>({}));
                 if(!r.ok) throw new Error(d.detail||d.message||'Falha ao excluir');
                 await loadServerUsers();
-            }catch(e){ alert('Erro: '+e.message); }
+            }catch(e){ 
+                if (window.gbocAlert) await gbocAlert(e.message, { title: 'Erro', type: 'error' });
+                else alert('Erro: '+e.message); 
+            }
         }
 
         async function resetSrvPassword(userId){
-            const pw=prompt('Nova senha (mínimo 4 caracteres):');
+            const pw = window.gbocPrompt ? await window.gbocPrompt('Nova senha (mínimo 4 caracteres):', '', {
+                title: 'Redefinir Senha do Usuário',
+                inputType: 'password'
+            }) : prompt('Nova senha (mínimo 4 caracteres):');
+
             if(!pw) return;
-            if(pw.length<4){ alert('Senha mínima de 4 caracteres.'); return; }
             try{
-                const r=await fetch(`${API}/auth/users/${userId}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
+                const r=await fetch(`${API}/auth/users/${userId}/reset-password`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({new_password:pw})});
                 const d=await r.json().catch(()=>({}));
-                if(!r.ok) throw new Error(d.detail||d.message||'Falha');
-                alert('Senha alterada com sucesso!');
-                await loadServerUsers();
-            }catch(e){ alert('Erro: '+e.message); }
+                if(!r.ok) throw new Error(d.detail||d.message||'Falha ao resetar senha');
+                if (window.gbocAlert) await gbocAlert('Senha alterada com sucesso!', { title: 'Sucesso', type: 'success' });
+                else alert('Senha alterada com sucesso');
+            }catch(e){ 
+                if (window.gbocAlert) await gbocAlert(e.message, { title: 'Erro', type: 'error' });
+                else alert('Erro: '+e.message); 
+            }
         }
 
         async function srvChangePassword(){
@@ -3292,7 +3344,14 @@ function gbocToggleSidebarCollapse(){
 
         // ── Gestão de Agentes ───────────────────────────────────────────────
         async function disconnectAgent(agentId){
-            if(!confirm(`Desconectar agente ${agentId}?`)) return;
+            const ok = window.gbocConfirm ? await window.gbocConfirm(`Desconectar agente ${agentId}? O túnel de comunicação será encerrado.`, {
+                title: 'Desconectar Agente',
+                icon: 'fas fa-link-slash',
+                type: 'warning',
+                confirmText: 'Desconectar'
+            }) : confirm(`Desconectar agente ${agentId}?`);
+
+            if(!ok) return;
             try{
                 const r=await fetch(`${API}/agents/${encodeURIComponent(agentId)}/disconnect`,{method:'POST'});
                 const d=await r.json().catch(()=>({}));
@@ -3700,7 +3759,15 @@ function gbocToggleSidebarCollapse(){
 
         async function killRMMProcess(pid) {
             const agentId = document.getElementById('rmm-agent-select')?.value || 'agente-local';
-            if(!confirm(`Confirma encerrar processo PID ${pid} no agente [${agentId}]?`)) return;
+            const ok = window.gbocConfirm ? await window.gbocConfirm(`Confirma encerrar o processo PID ${pid} no agente [${agentId}]?`, {
+                title: 'Finalizar Processo Remoto',
+                icon: 'fas fa-rectangle-xmark',
+                type: 'danger',
+                confirmText: 'Encerrar Processo',
+                danger: true
+            }) : confirm(`Confirma encerrar processo PID ${pid} no agente [${agentId}]?`);
+
+            if(!ok) return;
             try {
                 const r = await fetch(window.GBOC_API_BASE + `/api/v1/rmm/proxy/${encodeURIComponent(agentId)}/api/v1/rmm/process/kill`, {
                     method: 'POST',
@@ -3719,7 +3786,15 @@ function gbocToggleSidebarCollapse(){
 
         async function toggleRMMIsolation() {
             const agentId = document.getElementById('rmm-agent-select')?.value || 'agente-local';
-            if(!confirm(`⚠️ APOSTA DE SEGURANÇA: Deseja ativar o ISOLAMENTO DE REDE de emergência do agente [${agentId}]?`)) return;
+            const ok = window.gbocConfirm ? await window.gbocConfirm(`⚠️ APOSTA DE SEGURANÇA: Deseja ativar o ISOLAMENTO DE REDE de emergência do agente [${agentId}]? O tráfego não essencial será bloqueado.`, {
+                title: 'Isolamento de Rede de Emergência',
+                icon: 'fas fa-shield-virus',
+                type: 'danger',
+                confirmText: 'Ativar Isolamento',
+                danger: true
+            }) : confirm(`⚠️ APOSTA DE SEGURANÇA: Deseja ativar o ISOLAMENTO DE REDE de emergência do agente [${agentId}]?`);
+
+            if(!ok) return;
             try {
                 const r = await fetch(window.GBOC_API_BASE + `/api/v1/rmm/proxy/${encodeURIComponent(agentId)}/api/v1/rmm/isolation`, {
                     method: 'POST',
