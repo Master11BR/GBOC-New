@@ -1,6 +1,6 @@
-# 📐 GBOC System v13.3.0 — Diretrizes e Políticas de Arquitetura Modular
+# 📐 GBOC System v14.5.0 Enterprise — Diretrizes e Políticas de Arquitetura Modular
 
-<!-- Copyright (c) 2026 Master11BR - GBOC System v13.3.0 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.5.0 Enterprise. Todos os direitos reservados. -->
 
 Este documento estabelece as **Políticas de Arquitetura Obrigatórias** para o desenvolvimento e manutenção do **GBOC Server** e do **GBOC Agent**.
 
@@ -121,6 +121,27 @@ GBOC-Agent/
 
 ---
 
+---
+
+## 🎨 10. Arquitetura Universal de CSS & Política Zero CSS Isolado
+
+> 💎 **UNIVERSALIZAÇÃO TOTAL DE CSS EM TODO O ECOSSISTEMA:**
+> A partir da versão 14.5.0+, todos os estilos visuais, tokens de design, layouts e temas do GBOC System são rigorosamente universalizados e compartilhados entre `GBOC-Server` e `GBOC-Agent`.
+> 
+> **Stack Padrão Universal de CSS:**
+> 1. **`style.css`**: Framework base de componentes universais (Reset, Cards, Botões, Tabelas, Badges, Formulários, Toasts, Loaders e Modais).
+> 2. **`gboc-themes.css`**: Design Tokens universais, 8 Estilos de UI (`minimal`, `neumorphism`, `claymorphism`, `fluent`, `nexus-widgets`, `nexus-glass`, `command-sentinel`, `cyber-3d`), 6 Temas de Iluminação (`dark`, `light`, `amber`, `purple`, `ocean`, `red`), Presets Bacula/Fiorilli e Alto Contraste.
+> 3. **`gboc-layout.css`**: Motor de Layout Universal (Sidebar Vertical, Topbar Horizontal, Collapse Responsivo e Zero-Overflow em 4K/FHD/HD/Mobile).
+> 4. **`gboc-hardware-hud.css`**: HUD Universal de Telemetria de Hardware em Tempo Real.
+> 5. **`gboc-file-picker.css`**: Componente Universal de Navegação de Árvore de Diretórios e Arquivos.
+>
+> **Regras Obrigatórias de CSS:**
+> - **Proibição de CSS Isolado/Órfão**: É estritamente proibido criar arquivos CSS fragmentados ou divergentes. Todo e qualquer CSS do sistema deve residir na stack universal e ser idêntico no Servidor e no Agente.
+> - **Inclusão Padrão nos Documentos HTML**: Todas as páginas HTML do sistema devem carregar os arquivos CSS universais na ordem canônica padrão.
+> - **Uso Estrito de Design Tokens**: Todos os componentes, fragmentos e módulos devem utilizar exclusivamente as variáveis CSS do sistema (`var(--bg-card)`, `var(--text)`, `var(--border)`, `var(--primary)`, `var(--card-radius)`, `var(--card-shadow)`, etc.).
+
+---
+
 ## ⚠️ Regra para Assistentes de IA e Desenvolvedores
 Sempre que for criar uma nova funcionalidade ou ajustar uma existente, identifique o módulo correspondente em `modules/<nome_modulo>/` e faça as alterações nele. Nunca adicione blocos gigantes de código diretamente em `server_gboc.py` ou `dashboard.html`.
-A cada novo arquivo ou alteração finalizada, execute a compilação do pacote de distribuição com `build_installer_package.ps1` e assegure os Motion Principles, Observabilidade e Testes.
+A cada novo arquivo ou alteração finalizada, execute a compilação do pacote de distribuição com `build_installer_package.ps1` e assegure os Motion Principles, Universalização de CSS, Observabilidade e Testes.

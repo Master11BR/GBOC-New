@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v14.4.0 Full Stable Enterprise Edition
+# GBOC System v14.5.0 Full Stable Enterprise Edition
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # Propriedade Intelectual & Direitos Autorais Registrados.
 # A cópia, distribuição ou modificação não autorizada é estritamente proibida.

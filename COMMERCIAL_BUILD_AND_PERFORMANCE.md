@@ -1,8 +1,8 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.1.0 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.5.0 Enterprise. Todos os direitos reservados. -->
 
-# 🚀 GBOC System v14.1.0 — Roteiro de Desempenho, Qualidade Comercial e Compilação Standalone
+# 🚀 GBOC System v14.5.0 — Roteiro de Desempenho, Qualidade Comercial e Compilação Standalone
 
-[![GBOC Version](https://img.shields.io/badge/GBOC%20Version-14.1.0-blue.svg)](file:///d:/GBOC-New/GBOC-New/README.md)
+[![GBOC Version](https://img.shields.io/badge/GBOC%20Version-14.5.0-blue.svg)](file:///d:/GBOC-New/GBOC-New/README.md)
 [![Commercial Ready](https://img.shields.io/badge/commercial-ready-brightgreen.svg)]()
 
 > **Roteiro Técnico para Transformar o GBOC em um Produto Comercial de Alta Performance, Protegido contra Engenharia Reversa e Compilável em Executáveis Standalone Autônomos (`.exe` / Binários Linux)**.
