@@ -25,4 +25,16 @@ if __name__ == "__main__":
     port = int(os.getenv("AGENT_PORT", 9200))
     host = os.getenv("AGENT_HOST", "0.0.0.0")
     print(f"🚀 Iniciando GBOC Agent (via wrapper agent_server.py -> agent_gboc.py)...")
-    uvicorn.run("agent_gboc:app", host=host, port=port, reload=False)
+    _uv_kwargs = {"reload": False}
+    try:
+        import httptools  # noqa: F401
+        _uv_kwargs["http"] = "httptools"
+    except Exception:
+        pass
+    if sys.platform != "win32":
+        try:
+            import uvloop  # noqa: F401
+            _uv_kwargs["loop"] = "uvloop"
+        except Exception:
+            pass
+    uvicorn.run("agent_gboc:app", host=host, port=port, **_uv_kwargs)

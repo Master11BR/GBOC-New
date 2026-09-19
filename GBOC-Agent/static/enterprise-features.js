@@ -344,9 +344,13 @@ function openEntMonitorModal(jobId, title) {
     if (pctEl) pctEl.textContent = '0%';
     if (modal) modal.style.display = 'block';
 
-    if (_activeDbPolling) clearInterval(_activeDbPolling);
+    if (_activeDbPolling) {
+        if (_activeDbPolling.stop) _activeDbPolling.stop();
+        else clearInterval(_activeDbPolling);
+        _activeDbPolling = null;
+    }
 
-    _activeDbPolling = setInterval(async () => {
+    const pollFn = async () => {
         try {
             const res = await fetch(`/api/v1/enterprise/job/status/${jobId}`);
             if (!res.ok) return;
@@ -363,19 +367,28 @@ function openEntMonitorModal(jobId, title) {
             }
 
             if (job.status === 'completed' || job.status === 'failed') {
-                clearInterval(_activeDbPolling);
+                if (_activeDbPolling?.stop) _activeDbPolling.stop();
+                else clearInterval(_activeDbPolling);
+                _activeDbPolling = null;
             }
         } catch (e) {
             console.error('Erro no polling:', e);
         }
-    }, 1000);
+    };
+
+    if (window.gbocPerf?.smartInterval) {
+        _activeDbPolling = window.gbocPerf.smartInterval(pollFn, 1000);
+    } else {
+        _activeDbPolling = setInterval(pollFn, 1000);
+    }
 }
 
 function closeEntMonitorModal() {
     const modal = document.getElementById('ent-monitor-modal');
     if (modal) modal.style.display = 'none';
     if (_activeDbPolling) {
-        clearInterval(_activeDbPolling);
+        if (_activeDbPolling.stop) _activeDbPolling.stop();
+        else clearInterval(_activeDbPolling);
         _activeDbPolling = null;
     }
 }

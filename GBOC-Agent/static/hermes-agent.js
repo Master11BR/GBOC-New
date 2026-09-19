@@ -347,8 +347,16 @@ const HermesUI = (() => {
 
   function startRefresh(intervalMs = 15000) {
     loadStatus();
-    if (_refreshTimer) clearInterval(_refreshTimer);
-    _refreshTimer = setInterval(loadStatus, intervalMs);
+    if (_refreshTimer) {
+      if (_refreshTimer.stop) _refreshTimer.stop();
+      else clearInterval(_refreshTimer);
+      _refreshTimer = null;
+    }
+    if (window.gbocPerf?.smartInterval) {
+      _refreshTimer = window.gbocPerf.smartInterval(loadStatus, intervalMs);
+    } else {
+      _refreshTimer = setInterval(loadStatus, intervalMs);
+    }
   }
 
   // ─── Init ─────────────────────────────────────────────────────────────────

@@ -318,15 +318,24 @@ function openSaasMonitorModal(jobId, title) {
     if (logsEl) logsEl.textContent = 'Iniciando sincronização e coleta de telemetria...';
     if (modal) modal.style.display = 'block';
 
-    if (_activeSaasPolling) clearInterval(_activeSaasPolling);
-    _activeSaasPolling = setInterval(() => pollJobStatus(jobId), 1500);
+    if (_activeSaasPolling) {
+        if (_activeSaasPolling.stop) _activeSaasPolling.stop();
+        else clearInterval(_activeSaasPolling);
+        _activeSaasPolling = null;
+    }
+    if (window.gbocPerf?.smartInterval) {
+        _activeSaasPolling = window.gbocPerf.smartInterval(() => pollJobStatus(jobId), 1500);
+    } else {
+        _activeSaasPolling = setInterval(() => pollJobStatus(jobId), 1500);
+    }
 }
 
 function closeSaasMonitorModal() {
     const modal = document.getElementById('saas-monitor-modal');
     if (modal) modal.style.display = 'none';
     if (_activeSaasPolling) {
-        clearInterval(_activeSaasPolling);
+        if (_activeSaasPolling.stop) _activeSaasPolling.stop();
+        else clearInterval(_activeSaasPolling);
         _activeSaasPolling = null;
     }
 }
@@ -355,8 +364,11 @@ async function pollJobStatus(jobId) {
         }
 
         if (job && (job.status === 'completed' || job.status === 'failed')) {
-            clearInterval(_activeSaasPolling);
-            _activeSaasPolling = null;
+            if (_activeSaasPolling) {
+                if (_activeSaasPolling.stop) _activeSaasPolling.stop();
+                else clearInterval(_activeSaasPolling);
+                _activeSaasPolling = null;
+            }
             const titleEl = document.getElementById('saas-modal-title');
             if (titleEl) {
                 titleEl.innerHTML = job.status === 'completed' ?

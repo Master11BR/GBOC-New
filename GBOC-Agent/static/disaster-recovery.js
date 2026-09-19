@@ -70,12 +70,17 @@ async function loadDisasterRecoveryOverview() {
         // Renderizar lista de VSS Writers
         const writersList = document.getElementById('vss-writers-list');
         if (writersList && Array.isArray(info.vss_writers)) {
-            writersList.innerHTML = info.vss_writers.slice(0, 8).map(w => `
+            const html = info.vss_writers.slice(0, 8).map(w => `
                 <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--border); font-size:0.82em;">
                     <span style="color:var(--text); font-weight:600;"><i class="fas fa-cube" style="color:var(--primary); margin-right:6px;"></i> ${w.name}</span>
                     <span style="color:var(--success); font-family:monospace;">${w.state || 'Stable'}</span>
                 </div>
             `).join('');
+            if (window.gbocPerf?.safeRender) {
+                window.gbocPerf.safeRender(writersList, html);
+            } else {
+                writersList.innerHTML = html;
+            }
         }
     } catch (e) {
         console.error('Erro ao consultar visão geral de DR:', e);
@@ -129,7 +134,7 @@ async function loadDrReadiness() {
         if (scoreFill) scoreFill.style.width = `${r.score || 0}%`;
 
         if (checklistEl && Array.isArray(r.checks)) {
-            checklistEl.innerHTML = r.checks.map(c => `
+            const html = r.checks.map(c => `
                 <div style="display:flex; align-items:flex-start; gap:10px; padding:10px; background:var(--bg-input); border-radius:8px; border:1px solid var(--border);">
                     <div style="font-size:1.1em; color:${c.status === 'PASSED' ? 'var(--success)' : (c.status === 'WARNING' ? 'var(--warning)' : 'var(--primary)')}">
                         <i class="${c.status === 'PASSED' ? 'fas fa-check-circle' : 'fas fa-info-circle'}"></i>
@@ -143,6 +148,11 @@ async function loadDrReadiness() {
                     </span>
                 </div>
             `).join('');
+            if (window.gbocPerf?.safeRender) {
+                window.gbocPerf.safeRender(checklistEl, html);
+            } else {
+                checklistEl.innerHTML = html;
+            }
         }
     } catch (e) {
         console.error('Erro ao consultar DR readiness:', e);
@@ -245,17 +255,27 @@ async function searchAdObjects() {
     tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);"><i class="fas fa-spinner fa-spin"></i> Consultando objetos do Active Directory...</td></tr>';
 
     try {
-        const res = await fetch(`/api/v1/dr/ad-explorer/objects?filter=${filter}&search=${encodeURIComponent(search)}`);
-        if (!res.ok) throw new Error('Falha ao pesquisar objetos');
-        const data = await res.json();
+        const fetchFn = async (signal) => {
+            const res = await fetch(`/api/v1/dr/ad-explorer/objects?filter=${filter}&search=${encodeURIComponent(search)}`, { signal });
+            if (!res.ok) throw new Error('Falha ao pesquisar objetos');
+            return await res.json();
+        };
+
+        const data = window.gbocPerf?.makeCancellable
+            ? await window.gbocPerf.makeCancellable('drAdExplorerSearch', fetchFn)
+            : await fetchFn();
+
+        if (!data) return;
         const list = data.objects || [];
 
         if (!list.length) {
-            tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">Nenhum objeto encontrado no catálogo.</td></tr>';
+            const emptyHtml = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">Nenhum objeto encontrado no catálogo.</td></tr>';
+            if (window.gbocPerf?.safeRender) window.gbocPerf.safeRender(tableBody, emptyHtml);
+            else tableBody.innerHTML = emptyHtml;
             return;
         }
 
-        tableBody.innerHTML = list.map(obj => `
+        const html = list.map(obj => `
             <tr>
                 <td><span class="badge badge-${obj.type === 'User' ? 'primary' : (obj.type === 'Group' ? 'success' : 'warning')}">${obj.type}</span></td>
                 <td><strong>${obj.display_name}</strong><br><span style="font-size:0.75em; color:var(--text-muted);">${obj.sam_name || ''}</span></td>
@@ -268,8 +288,16 @@ async function searchAdObjects() {
                 </td>
             </tr>
         `).join('');
+
+        if (window.gbocPerf?.safeRender) {
+            window.gbocPerf.safeRender(tableBody, html);
+        } else {
+            tableBody.innerHTML = html;
+        }
     } catch (e) {
-        tableBody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--danger);">Erro: ${e.message}</td></tr>`;
+        if (e.name !== 'AbortError') {
+            tableBody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--danger);">Erro: ${e.message}</td></tr>`;
+        }
     }
 }
 
@@ -484,9 +512,13 @@ function openDrMonitorModal(jobId, title) {
     if (statusText) statusText.textContent = 'Executando em background...';
     if (modal) modal.style.display = 'block';
 
-    if (_activeDrPolling) clearInterval(_activeDrPolling);
+    if (_activeDrPolling) {
+        if (_activeDrPolling.stop) _activeDrPolling.stop();
+        else clearInterval(_activeDrPolling);
+        _activeDrPolling = null;
+    }
 
-    _activeDrPolling = setInterval(async () => {
+    const pollFn = async () => {
         try {
             const res = await fetch(`/api/v1/dr/job/status/${jobId}`);
             if (!res.ok) return;
@@ -503,18 +535,28 @@ function openDrMonitorModal(jobId, title) {
             }
 
             if (job.status === 'completed') {
-                clearInterval(_activeDrPolling);
+                if (_activeDrPolling?.stop) _activeDrPolling.stop();
+                else clearInterval(_activeDrPolling);
+                _activeDrPolling = null;
                 if (fillEl) fillEl.style.width = '100%';
                 if (pctEl) pctEl.textContent = '100%';
                 if (statusText) statusText.innerHTML = '<span style="color:var(--success); font-weight:700;">✅ Operação concluída com sucesso!</span>';
             } else if (job.status === 'failed' || job.status === 'cancelled') {
-                clearInterval(_activeDrPolling);
+                if (_activeDrPolling?.stop) _activeDrPolling.stop();
+                else clearInterval(_activeDrPolling);
+                _activeDrPolling = null;
                 if (statusText) statusText.innerHTML = `<span style="color:var(--danger); font-weight:700;">❌ Status: ${job.status.toUpperCase()} (${job.error || 'Cancelado pelo operador'})</span>`;
             }
         } catch (e) {
             console.error('Erro no polling do job DR:', e);
         }
-    }, 1000);
+    };
+
+    if (window.gbocPerf?.smartInterval) {
+        _activeDrPolling = window.gbocPerf.smartInterval(pollFn, 1000);
+    } else {
+        _activeDrPolling = setInterval(pollFn, 1000);
+    }
 }
 
 async function cancelCurrentDrJob() {
@@ -524,7 +566,11 @@ async function cancelCurrentDrJob() {
     try {
         const res = await fetch(`/api/v1/dr/job/cancel/${_currentJobId}`, { method: 'POST' });
         if (res.ok) {
-            if (_activeDrPolling) clearInterval(_activeDrPolling);
+            if (_activeDrPolling) {
+                if (_activeDrPolling.stop) _activeDrPolling.stop();
+                else clearInterval(_activeDrPolling);
+                _activeDrPolling = null;
+            }
             const statusText = document.getElementById('dr-modal-status-text');
             if (statusText) statusText.innerHTML = '<span style="color:var(--danger); font-weight:700;">⚠️ Operação cancelada.</span>';
         }
@@ -537,7 +583,8 @@ function closeDrMonitorModal() {
     const modal = document.getElementById('dr-monitor-modal');
     if (modal) modal.style.display = 'none';
     if (_activeDrPolling) {
-        clearInterval(_activeDrPolling);
+        if (_activeDrPolling.stop) _activeDrPolling.stop();
+        else clearInterval(_activeDrPolling);
         _activeDrPolling = null;
     }
 }

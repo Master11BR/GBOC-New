@@ -555,8 +555,16 @@ async function openRestoreModal(restoreId) {
     modal.classList.add('active');
     
     // Iniciar polling
-    if (restorePollingInterval) clearInterval(restorePollingInterval);
-    restorePollingInterval = setInterval(() => updateRestoreStatus(restoreId), 2000);
+    if (restorePollingInterval) {
+        if (restorePollingInterval.stop) restorePollingInterval.stop();
+        else clearInterval(restorePollingInterval);
+        restorePollingInterval = null;
+    }
+    if (window.gbocPerf?.smartInterval) {
+        restorePollingInterval = window.gbocPerf.smartInterval(() => updateRestoreStatus(restoreId), 2000);
+    } else {
+        restorePollingInterval = setInterval(() => updateRestoreStatus(restoreId), 2000);
+    }
     
     // Primeira atualização
     await updateRestoreStatus(restoreId);
@@ -619,7 +627,8 @@ async function updateRestoreStatus(restoreId) {
         // Se finalizou, parar polling
         if (status.status && !['running', 'preparing'].includes(status.status)) {
             if (restorePollingInterval) {
-                clearInterval(restorePollingInterval);
+                if (restorePollingInterval.stop) restorePollingInterval.stop();
+                else clearInterval(restorePollingInterval);
                 restorePollingInterval = null;
             }
             localStorage.removeItem('gboc_active_restore_id');
@@ -666,7 +675,8 @@ function closeRestoreModal() {
     }
     
     if (restorePollingInterval) {
-        clearInterval(restorePollingInterval);
+        if (restorePollingInterval.stop) restorePollingInterval.stop();
+        else clearInterval(restorePollingInterval);
         restorePollingInterval = null;
     }
 }

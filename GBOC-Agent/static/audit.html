@@ -11,13 +11,20 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GBOC Agent 14.4.0 - Audit Trail</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.5.0">
+    <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=14.5.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=14.5.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/components.css?v=14.5.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/layout.css?v=14.5.0">
     <link rel="stylesheet" href="/static/style.css?v=14.5.0">
     <link rel="stylesheet" href="/static/gboc-themes.css?v=14.5.0">
     <link rel="stylesheet" href="/static/gboc-layout.css?v=14.5.0">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="/static/auth_interceptor.js"></script>
-    <script src="/static/gboc-layout-manager.js"></script>
-    <script src="/static/gboc-modal.js"></script>
+    <script src="/static/gboc-perf.js?v=14.5.0"></script>
+    <script src="/static/gboc-layout-manager.js?v=14.5.0"></script>
+    <script src="/static/gboc-modal.js?v=14.5.0"></script>
+<script src="/static/auth_interceptor.js"></script>
     <style>
         .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:18px}
         .stat-card{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center}
@@ -76,30 +83,42 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 </div>
 <script src="/static/sidebar.js"></script>
 <script>
-document.addEventListener('DOMContentLoaded',()=>{new UnifiedSidebar().initialize();loadAll()});
-const API='/api/audit';
-let _items=[];
+document.addEventListener('DOMContentLoaded', () => {
+  new UnifiedSidebar().initialize();
+  loadAll();
+
+  const userIn = document.getElementById('f-user');
+  const ipIn = document.getElementById('f-ip');
+  const debouncedFilter = window.gbocPerf?.debounce ? window.gbocPerf.debounce(applyFilters, 250) : applyFilters;
+  if (userIn) userIn.addEventListener('input', debouncedFilter);
+  if (ipIn) ipIn.addEventListener('input', debouncedFilter);
+});
+const API = '/api/audit';
+let _items = [];
 
 async function loadAll(){ await Promise.allSettled([loadActions(), loadSummary(), loadEvents()]); }
 
 async function loadActions(){
-  const r=await fetch(API+'/actions'); const d=await r.json();
-  const actions=d.actions||[];
-  document.getElementById('f-action').innerHTML='<option value="">Todas as ações</option>'+actions.map(a=>`<option value="${a}">${a}</option>`).join('');
+  const r = await fetch(API + '/actions');
+  const d = await r.json();
+  const actions = d.actions || [];
+  const html = '<option value="">Todas as ações</option>' + actions.map(a => `<option value="${a}">${a}</option>`).join('');
+  const el = document.getElementById('f-action');
+  if (el) el.innerHTML = html;
 }
 
 async function loadSummary(){
   const [r30, r1] = await Promise.all([
-    fetch(API+'/summary?days=30'),
-    fetch(API+'/summary?days=1')
+    fetch(API + '/summary?days=30'),
+    fetch(API + '/summary?days=1')
   ]);
   const d30 = await r30.json();
   const d1 = await r1.json();
 
-  const total = (d30.daily_activity||[]).reduce((acc,x)=>acc + Number(x.cnt||0), 0);
-  const users = (d30.users||[]).length;
-  const actions = (d30.actions||[]).length;
-  const last24h = (d1.daily_activity||[]).reduce((acc,x)=>acc + Number(x.cnt||0), 0);
+  const total = (d30.daily_activity || []).reduce((acc, x) => acc + Number(x.cnt || 0), 0);
+  const users = (d30.users || []).length;
+  const actions = (d30.actions || []).length;
+  const last24h = (d1.daily_activity || []).reduce((acc, x) => acc + Number(x.cnt || 0), 0);
 
   document.getElementById('kpi-total').textContent = total;
   document.getElementById('kpi-users').textContent = users;
@@ -108,44 +127,62 @@ async function loadSummary(){
 }
 
 async function loadEvents(){
-  const r=await fetch(API+'/?limit=200'); const d=await r.json();
-  _items=d.entries||[];
+  const fetchFn = async (signal) => {
+    const r = await fetch(API + '/?limit=200', { signal });
+    return await r.json();
+  };
+  const d = window.gbocPerf?.makeCancellable
+    ? await window.gbocPerf.makeCancellable('loadAuditEvents', fetchFn)
+    : await fetchFn();
+  _items = d?.entries || [];
   render(_items);
 }
 
 function applyFilters(){
-  const action=document.getElementById('f-action').value;
-  const user=(document.getElementById('f-user').value||'').toLowerCase();
-  const ip=(document.getElementById('f-ip').value||'').toLowerCase();
-  const list=_items.filter(x=>{
-    const xa=(x.action||x.event_type||'');
-    const xu=(x.username||x.user||'').toLowerCase();
-    const xi=(x.ip_address||x.ip||'').toLowerCase();
-    return (!action||xa===action) && (!user||xu.includes(user)) && (!ip||xi.includes(ip));
+  const action = document.getElementById('f-action').value;
+  const user = (document.getElementById('f-user').value || '').toLowerCase();
+  const ip = (document.getElementById('f-ip').value || '').toLowerCase();
+  const list = _items.filter(x => {
+    const xa = (x.action || x.event_type || '');
+    const xu = (x.username || x.user || '').toLowerCase();
+    const xi = (x.ip_address || x.ip || '').toLowerCase();
+    return (!action || xa === action) && (!user || xu.includes(user)) && (!ip || xi.includes(ip));
   });
   render(list);
 }
 
 function clearFilters(){
-  document.getElementById('f-action').value='';
-  document.getElementById('f-user').value='';
-  document.getElementById('f-ip').value='';
+  document.getElementById('f-action').value = '';
+  document.getElementById('f-user').value = '';
+  document.getElementById('f-ip').value = '';
   render(_items);
 }
 
 function render(list){
-  const tb=document.getElementById('audit-table');
-  if(!list.length){tb.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:20px">Sem eventos</td></tr>';return}
-  tb.innerHTML=list.map(x=>`<tr>
-    <td>${x.timestamp?gbocFormatDateTime(x.timestamp):'—'}</td>
-    <td><strong>${x.action||'—'}</strong></td>
-    <td>${x.username||'—'}</td>
-    <td>${x.ip_address||'—'}</td>
-    <td style="max-width:420px;white-space:normal;word-break:break-word">${x.detail ? (typeof x.detail==='string'?x.detail:JSON.stringify(x.detail)) : (x.error_message||'—')}</td>
+  const tb = document.getElementById('audit-table');
+  if (!tb) return;
+  if (!list.length) {
+    const emptyHtml = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:20px">Sem eventos</td></tr>';
+    if (window.gbocPerf?.safeRender) window.gbocPerf.safeRender(tb, emptyHtml);
+    else tb.innerHTML = emptyHtml;
+    return;
+  }
+  const html = list.map(x => `<tr>
+    <td>${x.timestamp ? gbocFormatDateTime(x.timestamp) : '—'}</td>
+    <td><strong>${x.action || '—'}</strong></td>
+    <td>${x.username || '—'}</td>
+    <td>${x.ip_address || '—'}</td>
+    <td style="max-width:420px;white-space:normal;word-break:break-word">${x.detail ? (typeof x.detail === 'string' ? x.detail : JSON.stringify(x.detail)) : (x.error_message || '—')}</td>
   </tr>`).join('');
+
+  if (window.gbocPerf?.safeRender) {
+    window.gbocPerf.safeRender(tb, html);
+  } else {
+    tb.innerHTML = html;
+  }
 }
 
-function exportCsv(){ window.open(API+'/export?format=csv','_blank'); }
+function exportCsv(){ window.open(API + '/export?format=csv', '_blank'); }
 </script>
 </body>
 </html>

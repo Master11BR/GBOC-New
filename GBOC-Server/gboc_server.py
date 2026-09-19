@@ -25,4 +25,16 @@ if __name__ == "__main__":
     port = int(os.getenv("SERVER_PORT", 8000))
     host = os.getenv("SERVER_HOST", "0.0.0.0")
     print(f"🚀 Iniciando GBOC Server (via wrapper gboc_server.py -> server_gboc.py)...")
-    uvicorn.run("server_gboc:app", host=host, port=port, reload=False)
+    _uv_kwargs = {"reload": False}
+    try:
+        import httptools  # noqa: F401
+        _uv_kwargs["http"] = "httptools"
+    except Exception:
+        pass
+    if sys.platform != "win32":
+        try:
+            import uvloop  # noqa: F401
+            _uv_kwargs["loop"] = "uvloop"
+        except Exception:
+            pass
+    uvicorn.run("server_gboc:app", host=host, port=port, **_uv_kwargs)

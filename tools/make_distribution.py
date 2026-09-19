@@ -111,6 +111,21 @@ def build_package(source_root: Path, output_dir: Path, clean: bool = False):
 
     output_dir.mkdir(parents=True, exist_ok=True)
     
+    # 0. Sincronizar e verificar CSS/JS canonicos antes de empacotar
+    sync_script = source_root / "tools" / "sync_css.py"
+    if sync_script.exists():
+        print("  -> Sincronizando e verificando CSS e JS canonicos compartilhados...")
+        import subprocess
+        res_sync = subprocess.run([sys.executable, str(sync_script)], capture_output=True, text=True)
+        if res_sync.returncode != 0:
+            print(f"[ERRO] Falha ao sincronizar CSS/JS canonicos:\n{res_sync.stderr or res_sync.stdout}")
+            sys.exit(1)
+        res_verify = subprocess.run([sys.executable, str(sync_script), "--verify"], capture_output=True, text=True)
+        if res_verify.returncode != 0:
+            print(f"[ERRO] Divergencia nos arquivos canonicos durante verificacao:\n{res_verify.stderr or res_verify.stdout}")
+            sys.exit(1)
+        print("  [OK] CSS e JS compartilhados 100% sincronizados e verificados.")
+
     # 1. Copiar GBOC-Server
     server_src = source_root / "GBOC-Server"
     server_dst = output_dir / "Server"
