@@ -148,15 +148,23 @@ class TaskMonitor {
     
     startMonitoring() {
         // Poll único e leve: evita N chamadas por tarefa
-        this.checkInterval = setInterval(() => {
-            this.checkRunningTasks();
-        }, 2500);
+        if (this.checkInterval) {
+            if (this.checkInterval.stop) this.checkInterval.stop();
+            else clearInterval(this.checkInterval);
+            this.checkInterval = null;
+        }
+        if (window.gbocPerf?.smartInterval) {
+            this.checkInterval = window.gbocPerf.smartInterval(() => this.checkRunningTasks(), 2500);
+        } else {
+            this.checkInterval = setInterval(() => this.checkRunningTasks(), 2500);
+        }
     }
     
     async checkRunningTasks() {
         if (this.runningTasks.size === 0) {
             if (this.checkInterval) {
-                clearInterval(this.checkInterval);
+                if (this.checkInterval.stop) this.checkInterval.stop();
+                else clearInterval(this.checkInterval);
                 this.checkInterval = null;
             }
             return false;
@@ -229,42 +237,4 @@ async function executeTask(taskId, taskName) {
 // INTEGRAÇÃO COM BOTÃO "EXECUTAR"
 // ===================================
 
-// Na página tasks.html, modificar botão de executar:
-/*
-<button onclick="executeTask(123, 'Backup Diário'); return false;">
-    Executar Backup
-</button>
-*/
-
-class GBOCApp {
-    constructor() {
-        this.isInitialized = false;
-        this.retryCount = 0;
-        this.maxRetries = 3;
-        this.pagina = PAGINA_ATUAL;
-
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => this.init());
-        } else {
-            this.init();
-        }
-    }
-
-    init() {
-        console.log(`📄 Inicializando GBOC App (${this.pagina})...`);
-
-        try {
-            // Carregar dados específicos da página
-            if (this.pagina === 'dashboard') {
-                this.loadDashboardData();
-                this.startAutoRefresh();
-            }
-
-            this.startClock();
-            this.isInitialized = true;
-            console.log('✅ GBOC App inicializado com sucesso');
-
-        } catch (error) {
-            console.error('❌ Erro na inicialização:', error);
-        }
-    }
+window.executeTask = executeTask;

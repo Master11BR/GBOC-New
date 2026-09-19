@@ -12,14 +12,20 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GBOC Agent - Tarefas</title>
 
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.5.0">
+    <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=14.5.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=14.5.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/components.css?v=14.5.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/layout.css?v=14.5.0">
     <link rel="stylesheet" href="/static/style.css?v=14.5.0">
     <link rel="stylesheet" href="/static/gboc-themes.css?v=14.5.0">
     <link rel="stylesheet" href="/static/gboc-layout.css?v=14.5.0">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
-    <script src="/static/gboc-layout-manager.js"></script>
-    <script src="/static/gboc-modal.js"></script>
-    <script src="/static/sidebar.js"></script>
+    <script src="/static/gboc-perf.js?v=14.5.0"></script>
+    <script src="/static/gboc-layout-manager.js?v=14.5.0"></script>
+    <script src="/static/gboc-modal.js?v=14.5.0"></script>
+<script src="/static/sidebar.js"></script>
     <script src="/static/app_v6.js"></script>
     <script src="/static/toast_notifications.js"></script>
     <script src="/static/auth_interceptor.js?v=14.1.0"></script>
@@ -583,14 +589,17 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         const list = document.getElementById('task-list');
         if (!list) return;
 
-        list.innerHTML = '';
-
         if (!tasks || tasks.length === 0) {
-            list.innerHTML = '<p style="color:var(--text-muted); grid-column:1/-1; text-align:center;">Nenhuma tarefa configurada.</p>';
+            const emptyHtml = '<p style="color:var(--text-muted); grid-column:1/-1; text-align:center;">Nenhuma tarefa configurada.</p>';
+            if (window.gbocPerf?.safeRender) {
+                window.gbocPerf.safeRender(list, emptyHtml);
+            } else {
+                list.innerHTML = emptyHtml;
+            }
             return;
         }
 
-        tasks.forEach(task => {
+        const cardsHtml = tasks.map(task => {
             const repoName = task.repository_name || `Repo #${task.repository_id}`;
             const repoType = task.repository_type || 'unknown';
             const taskEngine = (task.engine || 'restic').toLowerCase();
@@ -630,10 +639,8 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             const scheduleText = cronToHuman(task.schedule_cron, task.schedule_enabled);
             const scheduleIcon = task.schedule_enabled ? 'fa-calendar-check' : 'fa-calendar-times';
 
-            const card = document.createElement('div');
-            card.className = `gboc-box engine-${taskEngine} ${storageClass}`;
-
-            card.innerHTML = `
+            return `
+            <div class="gboc-box engine-${taskEngine} ${storageClass}">
                 <div class="gboc-box-title">${task.name}</div>
                 <div class="gboc-box-info">
                     <div class="gboc-box-row"><i class="fas fa-server"></i><span class="row-value">${repoName}</span></div>
@@ -673,9 +680,14 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                         <i class="fas fa-trash"></i>
                     </button>
                 </div>
-            `;
-            list.appendChild(card);
-        });
+            </div>`;
+        }).join('');
+
+        if (window.gbocPerf?.safeRender) {
+            window.gbocPerf.safeRender(list, cardsHtml);
+        } else {
+            list.innerHTML = cardsHtml;
+        }
     }
 
     function attachTaskButtonListenersOnce() {

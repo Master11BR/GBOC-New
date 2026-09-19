@@ -419,6 +419,40 @@ app.add_middleware(
     allow_headers=["*"],
 );
 
+_SLOW_THRESHOLD_MS = float(os.getenv("GBOC_SLOW_MS", "250"))
+
+@app.middleware("http")
+async def _gboc_timing_middleware(request: Request, call_next):
+    """Medidor de performance das rotas HTTP.
+
+    Qualquer rota com tempo > GBOC_SLOW_MS (padrão 250 ms) é logada com WARNING
+    para fácil identificação de operações síncronas que bloqueiam o event loop
+    (ex: .sleep síncrono, SELECT * sem índice, subprocess que trava, etc).
+
+    A latência reportada é o tempo de ida-e-volta do handler.
+    """
+    t0 = time.perf_counter()
+    try:
+        r = await call_next(request)
+        return r
+    finally:
+        dt_ms = (time.perf_counter() - t0) * 1000.0
+        if dt_ms >= _SLOW_THRESHOLD_MS:
+            try:
+                method = request.method
+                path = request.url.path
+                query = request.url.query
+                full = f"{method} {path}"
+                if query:
+                    full += f"?{query}"
+                logger.warning(
+                    "[PERF-SLOW] %s — %.0f ms (threshold=%.0f ms). "
+                    "Se repetir, considerar asyncio.to_thread() / LIMIT / índices.",
+                    full, dt_ms, _SLOW_THRESHOLD_MS,
+                )
+            except Exception:
+                pass
+
 
 def _build_error_diagnostic(message: str) -> str:
     msg = (message or '').lower()
@@ -1304,6 +1338,23 @@ if __name__ == "__main__":
 
         logger.info(f"[ACCESS] http://{HOST}:{PORT}")
 
+        def _build_uvicorn_kwargs(extra: dict = None) -> dict:
+            kwargs = {"log_level": "info"}
+            try:
+                import httptools  # noqa: F401
+                kwargs["http"] = "httptools"
+            except Exception:
+                pass
+            if sys.platform != "win32":
+                try:
+                    import uvloop  # noqa: F401
+                    kwargs["loop"] = "uvloop"
+                except Exception:
+                    pass
+            if extra:
+                kwargs.update(extra)
+            return kwargs
+
         if _http2:
             try:
                 from hypercorn.config import Config
@@ -1329,9 +1380,9 @@ if __name__ == "__main__":
                 asyncio.run(_run_https())  # asyncio importado no topo do módulo
             except ImportError:
                 logger.warning("[HTTP2] hypercorn não encontrado — usando uvicorn (HTTP/1.1). Execute: pip install hypercorn[h2]")
-                uvicorn.run(app, host=HOST, port=PORT, log_level="info")
+                uvicorn.run(app, host=HOST, port=PORT, **_build_uvicorn_kwargs())
         else:
-            uvicorn.run(app, host=HOST, port=PORT, log_level="info")
+            uvicorn.run(app, host=HOST, port=PORT, **_build_uvicorn_kwargs())
     except KeyboardInterrupt:
         pass
     except Exception as e:

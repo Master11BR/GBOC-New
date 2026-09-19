@@ -1,13 +1,18 @@
 /* ============================================================================
-   GBOC System v14.2.0 — Dynamic UI Style & Illumination Engine (Modern UI Official)
+   GBOC System v14.5.0 Enterprise — Dynamic UI Style & Illumination Engine (Modern UI Official)
    Model: modern (DEFAULT / ACTIVE)
    ============================================================================ */
 
-@import url('/static/ui/design-system/tokens.css');
-@import url('/static/ui/design-system/unocss-ds.css');
-@import url('/static/ui/models/modern/model.css');
-@import url('/static/ui/models/modern/components.css');
-@import url('/static/ui/models/modern/layout.css');
+/* ATENCAO: Os arquivos abaixo sao carregados como <link> paralelo no <head>
+   (injetados por tools/standardize_all_html_css.py). Nao sao mais @import
+   para evitar bloqueio serial do CSSOM. Ordem correta no HTML:
+     1. tokens.css
+     2. unocss-ds.css
+     3. model.css
+     4. components.css
+     5. layout.css
+     6. gboc-themes.css (este arquivo)
+*/
 
 /* ── 1. ILLUMINATION MODES (Light / Dark) ────────────────────────────────── */
 

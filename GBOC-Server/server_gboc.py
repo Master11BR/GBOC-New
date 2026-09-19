@@ -858,6 +858,34 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="GBOC Server", version=SERVER_VERSION, lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
+_SLOW_THRESHOLD_MS = float(os.getenv("GBOC_SLOW_MS", "250"))
+
+@app.middleware("http")
+async def _gboc_timing_middleware(request: Request, call_next):
+    """Medidor de performance das rotas HTTP no GBOC Server.
+    Qualquer rota com tempo > GBOC_SLOW_MS (padrão 250 ms) é logada com WARNING.
+    """
+    t0 = time.perf_counter()
+    try:
+        r = await call_next(request)
+        return r
+    finally:
+        dt_ms = (time.perf_counter() - t0) * 1000.0
+        if dt_ms >= _SLOW_THRESHOLD_MS:
+            try:
+                method = request.method
+                path = request.url.path
+                query = request.url.query
+                full = f"{method} {path}"
+                if query:
+                    full += f"?{query}"
+                logger.warning(
+                    "[PERF-SLOW] %s — %.0f ms (threshold=%.0f ms).",
+                    full, dt_ms, _SLOW_THRESHOLD_MS,
+                )
+            except Exception:
+                pass
+
 from fastapi.staticfiles import StaticFiles
 modules_dir = os.path.join(os.path.dirname(__file__), "modules")
 if os.path.exists(modules_dir):
@@ -909,15 +937,14 @@ async def get_ai_assistant_js():
 async def get_topbar_html():
     return FileResponse(os.path.join(os.path.dirname(__file__), "_topbar.html"), media_type="text/html")
 
-@app.get("/static/gboc-layout.css", include_in_schema=False)
-@app.get("/gboc-layout.css", include_in_schema=False)
-async def get_layout_css():
-    return FileResponse(os.path.join(os.path.dirname(__file__), "gboc-layout.css"), media_type="text/css")
-
-@app.get("/static/gboc-themes.css", include_in_schema=False)
-@app.get("/gboc-themes.css", include_in_schema=False)
-async def get_themes_css():
-    return FileResponse(os.path.join(os.path.dirname(__file__), "gboc-themes.css"), media_type="text/css")
+# ==============================================================================
+# NOTA (CSS Delivery Unificado, v14.5+):
+#   Os CSS gboc-layout.css / gboc-themes.css NAO tem mais rotas especificas.
+#   Tudo passa por serve_static_asset() (abaixo), que sempre resolve PRIMEIRO
+#   da pasta GBOC-Server/static/ — a fonte sincronizada via tools/sync_css.py
+#   a partir da canonica shared-css/. Sem "mistura de origens" entre raiz e
+#   static/ como existia anteriormente.
+# ==============================================================================
 
 # ==============================================================================
 # Dynamic SemVer 2.0 Versioning & System Endpoints
@@ -952,7 +979,11 @@ async def get_ui_config_endpoint():
         "AVAILABLE_UI_STYLES": ["minimal", "neumorphism", "claymorphism", "fluent", "nexus-widgets", "nexus-glass", "command-sentinel", "cyber-3d"]
     }
 
-# Rota estática universal para recursos da pasta /static/
+# Rota estatica universal para recursos da pasta /static/
+# Ordem de busca (evita "mistura de origens" acidental):
+#   1. GBOC-Server/static/    <- FONTE CANONICA (sincronizada por tools/sync_css.py)
+#   2. GBOC-Server/           <- Fallback de seguranca (somente se arquivo nao existir em static/)
+#   3. GBOC-Agent/static/     <- Fallback de desenvolvimento (DevTools); NAO DEVE ativar em prod
 @app.get("/static/{filename:path}", include_in_schema=False)
 async def serve_static_asset(filename: str):
     clean_fn = (filename or '').lstrip("/\\")
@@ -969,7 +1000,8 @@ async def serve_static_asset(filename: str):
         return FileResponse(agt_file)
     raise HTTPException(404, f"Arquivo estático '{filename}' não encontrado.")
 
-# Rota dinâmica universal para arquivos JavaScript
+# Rota dinamica universal para arquivos JavaScript (URLs sem prefixo /static/)
+# Segue a MESMA ordem de serve_static_asset() para consistencia.
 @app.get("/{file:path}.js", include_in_schema=False)
 async def serve_any_js_page(file: str):
     clean_p = (file or '').lstrip("/\\")
@@ -987,7 +1019,8 @@ async def serve_any_js_page(file: str):
         return FileResponse(agt_file, media_type="application/javascript")
     raise HTTPException(404, f"Script '{fname}' não encontrado.")
 
-# Rota dinâmica universal para arquivos CSS
+# Rota dinamica universal para arquivos CSS (URLs sem prefixo /static/: ex: /style.css)
+# Segue a MESMA ordem de serve_static_asset() para consistencia.
 @app.get("/{file:path}.css", include_in_schema=False)
 async def serve_any_css_page(file: str):
     clean_p = (file or '').lstrip("/\\")
@@ -4623,18 +4656,52 @@ if __name__ == "__main__":
         except ImportError:
             print("[GBOC Server] hypercorn não encontrado — usando uvicorn (HTTP/1.1). Execute: pip install hypercorn[h2]")
             import uvicorn
-            uvicorn.run(app, host=_host, port=_port)
+            _uv_kwargs = {"log_level": "info"}
+            try:
+                import httptools  # noqa: F401
+                _uv_kwargs["http"] = "httptools"
+            except Exception:
+                pass
+            if sys.platform != "win32":
+                try:
+                    import uvloop  # noqa: F401
+                    _uv_kwargs["loop"] = "uvloop"
+                except Exception:
+                    pass
+            uvicorn.run(app, host=_host, port=_port, **_uv_kwargs)
         except Exception as e:
             print(f"[GBOC Server] Hypercorn falhou ({e}) — fallback para Uvicorn com TLS (HTTP/1.1+SSL)")
             import uvicorn
             _cert, _key = _ensure_cert()
-            uvicorn.run(app, host=_host, port=_port,
-                        ssl_certfile=_cert, ssl_keyfile=_key,
-                        log_level="info")
+            _uv_kwargs = {"log_level": "info", "ssl_certfile": _cert, "ssl_keyfile": _key}
+            try:
+                import httptools  # noqa: F401
+                _uv_kwargs["http"] = "httptools"
+            except Exception:
+                pass
+            if sys.platform != "win32":
+                try:
+                    import uvloop  # noqa: F401
+                    _uv_kwargs["loop"] = "uvloop"
+                except Exception:
+                    pass
+            uvicorn.run(app, host=_host, port=_port, **_uv_kwargs)
     else:
         import uvicorn
         print(f"[GBOC Server] HTTP/1.1 via Uvicorn em http://{_host}:{_port}")
-        uvicorn.run(app, host=_host, port=_port)
+        _uv_kwargs = {"log_level": "info"}
+        try:
+            import httptools  # noqa: F401
+            _uv_kwargs["http"] = "httptools"
+        except Exception:
+            pass
+        if sys.platform != "win32":
+            try:
+                import uvloop  # noqa: F401
+                _uv_kwargs["loop"] = "uvloop"
+            except Exception:
+                pass
+        uvicorn.run(app, host=_host, port=_port, **_uv_kwargs)
 
 
 

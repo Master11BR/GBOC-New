@@ -14,6 +14,14 @@ document.addEventListener('DOMContentLoaded', () => {
     loadAdTopology();
     loadAdHealth();
     loadAdBackupHistory();
+
+    const searchInput = document.getElementById('ad-obj-search');
+    if (searchInput) {
+        const debouncedSearch = window.gbocPerf?.debounce
+            ? window.gbocPerf.debounce(searchAdGranularObjects, 300)
+            : searchAdGranularObjects;
+        searchInput.addEventListener('input', debouncedSearch);
+    }
 });
 
 function switchAdTab(tabId) {
@@ -180,11 +188,16 @@ async function loadAdBackupHistory() {
         const list = data.history || [];
 
         if (!list.length) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:18px; color:var(--text-muted);">Nenhum snapshot de backup do Active Directory localizado em disco.</td></tr>';
+            const emptyHtml = '<tr><td colspan="6" style="text-align:center; padding:18px; color:var(--text-muted);">Nenhum snapshot de backup do Active Directory localizado em disco.</td></tr>';
+            if (window.gbocPerf?.safeRender) {
+                window.gbocPerf.safeRender(tbody, emptyHtml);
+            } else {
+                tbody.innerHTML = emptyHtml;
+            }
             return;
         }
 
-        tbody.innerHTML = list.map(item => `
+        const html = list.map(item => `
             <tr>
                 <td><strong>${item.backup_name}</strong></td>
                 <td>${item.domain || '-'}</td>
@@ -198,6 +211,12 @@ async function loadAdBackupHistory() {
                 </td>
             </tr>
         `).join('');
+
+        if (window.gbocPerf?.safeRender) {
+            window.gbocPerf.safeRender(tbody, html);
+        } else {
+            tbody.innerHTML = html;
+        }
     } catch (e) {
         console.error('Erro ao carregar histórico:', e);
     }
@@ -213,17 +232,27 @@ async function searchAdGranularObjects() {
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);"><i class="fas fa-spinner fa-spin"></i> Consultando catálogo do Active Directory...</td></tr>';
 
     try {
-        const res = await fetch(`/api/v1/active-directory/objects?filter=${filter}&search=${encodeURIComponent(search)}`);
-        if (!res.ok) throw new Error('Falha ao listar objetos');
-        const data = await res.json();
+        const fetchFn = async (signal) => {
+            const res = await fetch(`/api/v1/active-directory/objects?filter=${filter}&search=${encodeURIComponent(search)}`, { signal });
+            if (!res.ok) throw new Error('Falha ao listar objetos');
+            return await res.json();
+        };
+
+        const data = window.gbocPerf?.makeCancellable
+            ? await window.gbocPerf.makeCancellable('adGranularSearch', fetchFn)
+            : await fetchFn();
+
+        if (!data) return;
         const list = data.objects || [];
 
         if (!list.length) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">Nenhum objeto retornado para os critérios de busca.</td></tr>';
+            const emptyHtml = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">Nenhum objeto retornado para os critérios de busca.</td></tr>';
+            if (window.gbocPerf?.safeRender) window.gbocPerf.safeRender(tbody, emptyHtml);
+            else tbody.innerHTML = emptyHtml;
             return;
         }
 
-        tbody.innerHTML = list.map(obj => `
+        const html = list.map(obj => `
             <tr>
                 <td><span class="badge badge-${obj.type === 'User' ? 'primary' : (obj.type === 'Group' ? 'success' : 'warning')}">${obj.type}</span></td>
                 <td><strong>${obj.display_name}</strong><br><span style="font-size:0.75em; color:var(--text-muted);">${obj.sam_name || ''}</span></td>
@@ -236,8 +265,16 @@ async function searchAdGranularObjects() {
                 </td>
             </tr>
         `).join('');
+
+        if (window.gbocPerf?.safeRender) {
+            window.gbocPerf.safeRender(tbody, html);
+        } else {
+            tbody.innerHTML = html;
+        }
     } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--danger);">Erro: ${e.message}</td></tr>`;
+        if (e.name !== 'AbortError') {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--danger);">Erro: ${e.message}</td></tr>`;
+        }
     }
 }
 
@@ -310,9 +347,13 @@ function openAdMonitorModal(jobId, title) {
     if (statusText) statusText.textContent = 'Processando backup do Active Directory em background...';
     if (modal) modal.style.display = 'block';
 
-    if (_adPollingTimer) clearInterval(_adPollingTimer);
+    if (_adPollingTimer) {
+        if (_adPollingTimer.stop) _adPollingTimer.stop();
+        else clearInterval(_adPollingTimer);
+        _adPollingTimer = null;
+    }
 
-    _adPollingTimer = setInterval(async () => {
+    const pollFn = async () => {
         try {
             const res = await fetch(`/api/v1/active-directory/backup/status/${jobId}`);
             if (!res.ok) return;
@@ -329,26 +370,37 @@ function openAdMonitorModal(jobId, title) {
             }
 
             if (job.status === 'completed') {
-                clearInterval(_adPollingTimer);
+                if (_adPollingTimer?.stop) _adPollingTimer.stop();
+                else clearInterval(_adPollingTimer);
+                _adPollingTimer = null;
                 if (fillEl) fillEl.style.width = '100%';
                 if (pctEl) pctEl.textContent = '100%';
                 if (statusText) statusText.innerHTML = '<span style="color:var(--success); font-weight:700;">✅ Backup do Active Directory concluído com sucesso!</span>';
                 loadAdBackupHistory();
             } else if (job.status === 'failed') {
-                clearInterval(_adPollingTimer);
+                if (_adPollingTimer?.stop) _adPollingTimer.stop();
+                else clearInterval(_adPollingTimer);
+                _adPollingTimer = null;
                 if (statusText) statusText.innerHTML = `<span style="color:var(--danger); font-weight:700;">❌ Falha no backup: ${job.error || 'Erro desconhecido'}</span>`;
             }
         } catch (e) {
             console.error('Erro no polling do backup AD:', e);
         }
-    }, 1000);
+    };
+
+    if (window.gbocPerf?.smartInterval) {
+        _adPollingTimer = window.gbocPerf.smartInterval(pollFn, 1000);
+    } else {
+        _adPollingTimer = setInterval(pollFn, 1000);
+    }
 }
 
 function closeAdMonitorModal() {
     const modal = document.getElementById('ad-monitor-modal');
     if (modal) modal.style.display = 'none';
     if (_adPollingTimer) {
-        clearInterval(_adPollingTimer);
+        if (_adPollingTimer.stop) _adPollingTimer.stop();
+        else clearInterval(_adPollingTimer);
         _adPollingTimer = null;
     }
 }

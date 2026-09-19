@@ -710,7 +710,11 @@ document.addEventListener('DOMContentLoaded', async function() {
     window.updateThemeButton(savedTheme);
     await window.unifiedSidebar.initialize();
     window.gbocSyncConnectionStatus();
-    setInterval(window.gbocSyncConnectionStatus, 10000);
+    if (window.gbocPerf?.smartInterval) {
+        window._sidebarSyncTimer = window.gbocPerf.smartInterval(window.gbocSyncConnectionStatus, 10000);
+    } else {
+        setInterval(window.gbocSyncConnectionStatus, 10000);
+    }
 });
 
 console.log('✅ UnifiedSidebar module loaded');

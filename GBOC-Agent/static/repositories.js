@@ -243,13 +243,22 @@ function setFieldValue(fieldId, value) {
 
 function startRepositoryPolling() {
     if (repositoryPollingInterval) return;
-    repositoryPollingInterval = setInterval(window.loadRepositories, POLLING_INTERVAL_MS);
+    if (window.gbocPerf && window.gbocPerf.smartInterval) {
+        repositoryPollingInterval = window.gbocPerf.smartInterval(window.loadRepositories, POLLING_INTERVAL_MS);
+        repositoryPollingInterval._isSmart = true;
+    } else {
+        repositoryPollingInterval = setInterval(window.loadRepositories, POLLING_INTERVAL_MS);
+    }
     window.loadRepositories();
 }
 
 function stopRepositoryPolling() {
     if (repositoryPollingInterval) {
-        clearInterval(repositoryPollingInterval);
+        if (repositoryPollingInterval._isSmart && typeof repositoryPollingInterval.stop === 'function') {
+            repositoryPollingInterval.stop();
+        } else {
+            clearInterval(repositoryPollingInterval);
+        }
         repositoryPollingInterval = null;
     }
 }
@@ -261,18 +270,24 @@ function stopRepositoryPolling() {
 window.loadRepositories = async function() {
     let hasPendingRepos = false;
     try {
-        const response = await fetch('/api/repositories/');
-        if (!response.ok) {
-            const errorResult = await response.json().catch(() => ({ detail: response.statusText }));
-            throw new Error(errorResult.detail || `Network response was not ok (${response.status})`);
-        }
-        
-        const repos = await response.json();
+        const fetchFn = async (signal) => {
+            const response = await fetch('/api/repositories/', { signal });
+            if (!response.ok) {
+                const errorResult = await response.json().catch(() => ({ detail: response.statusText }));
+                throw new Error(errorResult.detail || `Network response was not ok (${response.status})`);
+            }
+            return await response.json();
+        };
+
+        const repos = window.gbocPerf?.makeCancellable
+            ? await window.gbocPerf.makeCancellable('loadRepositories', fetchFn)
+            : await fetchFn();
+
         const listContainer = document.getElementById('repo-list');
         const listBody = document.getElementById('repo-list-body');
 
         if (repos && repos.length > 0) {
-            listBody.innerHTML = repos.map(repo => {
+            const html = repos.map(repo => {
                 const typeInfo = getTypeInfo(repo.type);
                 let statusBadge;
 
@@ -308,7 +323,16 @@ window.loadRepositories = async function() {
                 </div>`;
             }).join('');
 
-            // Anexar listeners diretos aos botões de teste após renderizar
+            var changed = true;
+            if (window.gbocPerf && window.gbocPerf.safeRender) {
+                changed = window.gbocPerf.safeRender(listBody, html);
+            } else if (listBody.innerHTML !== html) {
+                listBody.innerHTML = html;
+            } else {
+                changed = false;
+            }
+
+            if (changed) {
             const testButtons = listBody.querySelectorAll('.repo-test-btn');
             testButtons.forEach(btn => {
                 btn.addEventListener('click', async (ev) => {
@@ -336,13 +360,19 @@ window.loadRepositories = async function() {
                     }
                 });
             });
+            }
         } else {
-            listBody.innerHTML = `
+            const emptyHtml = `
                 <div class="empty-state" style="text-align:center; padding:40px; color:#a0aec0;">
                     <i class="fas fa-folder-open" style="font-size:48px; margin-bottom:15px; opacity:0.5;"></i>
                     <p>Nenhum repositório configurado.</p>
                     <p style="font-size:0.9em;">Clique em "Novo Repositório" para começar.</p>
                 </div>`;
+            if (window.gbocPerf && window.gbocPerf.safeRender) {
+                window.gbocPerf.safeRender(listBody, emptyHtml);
+            } else {
+                listBody.innerHTML = emptyHtml;
+            }
         }
 
     } catch (error) {
