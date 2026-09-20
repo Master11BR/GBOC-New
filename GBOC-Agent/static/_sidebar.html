@@ -1,6 +1,6 @@
 <!--
 ==============================================================================
-GBOC System v14.1.0 Enterprise Edition
+GBOC System v14.5.0 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
@@ -60,88 +60,90 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 </style>
 <aside class="sidebar">
     <nav class="nav" id="gboc-nav" style="padding-top:16px">
-        <!-- 1. Dashboard Agente -->
-        <a href="/index.html" class="nav-link" title="Dashboard Principal"><i class="fas fa-home nav-icon"></i> <span>Dashboard Agente</span></a>
+        <!-- 1. Visão Geral -->
+        <a href="/index.html" class="nav-link" title="Visão Geral"><i class="fas fa-home nav-icon"></i> <span>Visão Geral</span></a>
 
-        <!-- 2. Tarefas & Motores -->
-        <div class="nav-group" id="grp-tasks">
-            <button class="nav-group-header" onclick="toggleNavGroup('grp-tasks')" title="Tarefas & Motores">
-                <span><i class="fas fa-tasks nav-icon"></i> Tarefas & Motores</span>
-                <i class="fas fa-chevron-down nav-group-arrow" id="arrow-grp-tasks"></i>
+        <!-- 2. Backup -->
+        <div class="nav-group" id="grp-backup">
+            <button class="nav-group-header" onclick="toggleNavGroup('grp-backup')" title="Backup & Orquestração">
+                <span><i class="fas fa-box-archive nav-icon"></i> Backup</span>
+                <i class="fas fa-chevron-down nav-group-arrow" id="arrow-grp-backup"></i>
             </button>
-            <div class="nav-group-items open" id="items-grp-tasks">
-                <a href="/tasks.html" class="nav-link nav-sub" title="Tarefas de Backup"><i class="fas fa-list-check nav-icon"></i> <span>Tarefas de Backup</span></a>
-                <a href="/repositories.html" class="nav-link nav-sub" title="Repositórios de Backup"><i class="fas fa-database nav-icon"></i> <span>Repositórios Locais</span></a>
-                <a href="/restore.html" class="nav-link nav-sub" title="Assistente de Restauração"><i class="fas fa-undo nav-icon"></i> <span>Assistente Restauração</span></a>
-                <a href="/engines.html" class="nav-link nav-sub" title="Motores Nativos de Backup"><i class="fas fa-cogs nav-icon"></i> <span>Motores Nativos (Restic/Kopia)</span></a>
-                <a href="/duplicati-native.html" class="nav-link nav-sub" title="Duplicati Nativo"><i class="fas fa-plug nav-icon"></i> <span>Duplicati Nativo</span></a>
-                <a href="/database-backup.html" class="nav-link nav-sub" title="Backup de Banco de Dados"><i class="fas fa-server nav-icon"></i> <span>Backup Banco de Dados</span></a>
-                <a href="/active-directory.html" class="nav-link nav-sub" title="Backup do Active Directory (AD DS)"><i class="fas fa-sitemap nav-icon"></i> <span>Backup Active Directory (AD)</span></a>
-                <a href="/enterprise-features.html" class="nav-link nav-sub" title="Recursos Avançados Enterprise (Oracle/SAP/CDP)"><i class="fas fa-gem nav-icon"></i> <span>Módulos Enterprise (Oracle/SAP/CDP)</span></a>
-                <a href="/saas-cloud-enterprise.html" class="nav-link nav-sub" title="SaaS (M365/Google), Kubernetes &amp; Failover Cloud"><i class="fas fa-cloud-arrow-up nav-icon"></i> <span>SaaS, K8s &amp; Cloud Failover</span></a>
-                <a href="/power-tools.html" class="nav-link nav-sub" title="Power Tools (Visual Diff / Bitrot / VFS Z:)"><i class="fas fa-toolbox nav-icon"></i> <span>Power Tools &amp; Produtividade</span></a>
-                <a href="/hermes-agent.html" class="nav-link nav-sub" title="Hermes Agent — Borda Autônoma, Auto-Cura, LAN Mesh, Bandwidth IA"><i class="fas fa-broadcast-tower nav-icon"></i> <span>Hermes Agent (Edge AI)</span></a>
-                <a href="/tape-backup.html" class="nav-link nav-sub" title="Backup em Fita LTO"><i class="fas fa-tape nav-icon"></i> <span>Backup em Fita (LTO)</span></a>
+            <div class="nav-group-items open" id="items-grp-backup">
+                <a href="/tasks.html" class="nav-link nav-sub" title="Jobs e Políticas"><i class="fas fa-list-check nav-icon"></i> <span>Jobs e Políticas</span></a>
+                <a href="/protected-workloads.html" class="nav-link nav-sub" title="Cargas Protegidas (Bancos, AD, Fita, Enterprise)"><i class="fas fa-cubes-stacked nav-icon"></i> <span>Cargas Protegidas</span></a>
+                <a href="/repositories.html" class="nav-link nav-sub" title="Repositórios de Armazenamento"><i class="fas fa-database nav-icon"></i> <span>Repositórios</span></a>
+                <a href="/restore.html" class="nav-link nav-sub" title="Restaurar e Validar (SureRestore Sandbox & Integridade)"><i class="fas fa-undo nav-icon"></i> <span>Restaurar e Validar</span></a>
             </div>
         </div>
 
-        <!-- 3. Proteção & Defesa -->
+        <!-- 3. Disaster Recovery -->
+        <div class="nav-group" id="grp-dr">
+            <button class="nav-group-header" onclick="toggleNavGroup('grp-dr')" title="Disaster Recovery & Continuidade">
+                <span><i class="fas fa-life-ring nav-icon"></i> Disaster Recovery</span>
+                <i class="fas fa-chevron-down nav-group-arrow" id="arrow-grp-dr"></i>
+            </button>
+            <div class="nav-group-items open" id="items-grp-dr">
+                <a href="/disaster-recovery.html?tab=readiness" class="nav-link nav-sub" title="Prontidão e Plano de DR"><i class="fas fa-heartbeat nav-icon"></i> <span>Prontidão e Plano</span></a>
+                <a href="/disaster-recovery.html?tab=instant-vm" class="nav-link nav-sub" title="Recuperação Instantânea (Instant VM Boot)"><i class="fas fa-bolt nav-icon"></i> <span>Recuperação Instantânea</span></a>
+                <a href="/disaster-recovery.html?tab=p2v" class="nav-link nav-sub" title="Bare Metal, P2V e Mídia de Boot WinPE"><i class="fas fa-microchip nav-icon"></i> <span>Bare Metal, P2V e Mídia</span></a>
+                <a href="/disaster-recovery.html?tab=virtual-lab" class="nav-link nav-sub" title="Laboratório Isolado e Teste de Recuperação"><i class="fas fa-flask nav-icon"></i> <span>Laboratório e Validação</span></a>
+            </div>
+        </div>
+
+        <!-- 4. Proteção & Defesa -->
         <div class="nav-group" id="grp-defense">
-            <button class="nav-group-header" onclick="toggleNavGroup('grp-defense')" title="Proteção & Defesa">
-                <span><i class="fas fa-shield-alt nav-icon"></i> Proteção & Defesa</span>
+            <button class="nav-group-header" onclick="toggleNavGroup('grp-defense')" title="Proteção, Ransomware e Conformidade">
+                <span><i class="fas fa-shield-alt nav-icon"></i> Proteção</span>
                 <i class="fas fa-chevron-down nav-group-arrow" id="arrow-grp-defense"></i>
             </button>
             <div class="nav-group-items open" id="items-grp-defense">
                 <a href="/ransomware.html" class="nav-link nav-sub" title="Proteção Ransomware Guardian"><i class="fas fa-shield-virus nav-icon"></i> <span>Ransomware Guardian</span></a>
-                <a href="/compliance.html" class="nav-link nav-sub" title="Compliance & Conformidade"><i class="fas fa-clipboard-check nav-icon"></i> <span>Compliance & Conformidade</span></a>
-                <a href="/audit.html" class="nav-link nav-sub" title="Audit Trail & Trilha de Auditoria"><i class="fas fa-clipboard-list nav-icon"></i> <span>Trilha de Auditoria</span></a>
+                <a href="/compliance.html" class="nav-link nav-sub" title="Conformidade & Políticas"><i class="fas fa-clipboard-check nav-icon"></i> <span>Conformidade</span></a>
+                <a href="/audit.html" class="nav-link nav-sub" title="Audit Trail & Trilha de Auditoria"><i class="fas fa-clipboard-list nav-icon"></i> <span>Auditoria</span></a>
             </div>
         </div>
 
-        <!-- 4. Virtualização & Cloud -->
+        <!-- 5. Virtualização & Cloud -->
         <div class="nav-group" id="grp-virt">
-            <button class="nav-group-header" onclick="toggleNavGroup('grp-virt')" title="Virtualização & Cloud">
-                <span><i class="fas fa-cubes nav-icon"></i> Virtualização & Cloud</span>
+            <button class="nav-group-header" onclick="toggleNavGroup('grp-virt')" title="Virtualização e Ambientes Cloud">
+                <span><i class="fas fa-cloud nav-icon"></i> Virtualização e Cloud</span>
                 <i class="fas fa-chevron-down nav-group-arrow" id="arrow-grp-virt"></i>
             </button>
             <div class="nav-group-items open" id="items-grp-virt">
-                <a href="/virtualization.html" class="nav-link nav-sub" title="VMs VMware / Hyper-V / Proxmox"><i class="fas fa-server nav-icon"></i> <span>VMs (VMware/Hyper-V/Proxmox)</span></a>
-                <a href="/m365-exchange.html" class="nav-link nav-sub" title="Microsoft 365 & Exchange"><i class="fas fa-mail-bulk nav-icon"></i> <span>Microsoft 365 & Exchange</span></a>
-                <a href="/disaster-recovery.html" class="nav-link nav-sub" title="Disaster Recovery & P2V"><i class="fas fa-life-ring nav-icon"></i> <span>Disaster Recovery & P2V</span></a>
-                <a href="/replication.html" class="nav-link nav-sub" title="Replicação Local"><i class="fas fa-exchange-alt nav-icon"></i> <span>Replicação Local</span></a>
+                <a href="/virtualization.html" class="nav-link nav-sub" title="VMware, Hyper-V e Proxmox"><i class="fas fa-server nav-icon"></i> <span>VMware, Hyper-V e Proxmox</span></a>
+                <a href="/m365-exchange.html" class="nav-link nav-sub" title="Microsoft 365 e Exchange"><i class="fas fa-mail-bulk nav-icon"></i> <span>Microsoft 365 e Exchange</span></a>
+                <a href="/saas-cloud-enterprise.html" class="nav-link nav-sub" title="SaaS, Kubernetes e Cloud"><i class="fas fa-cubes nav-icon"></i> <span>SaaS, Kubernetes e Cloud</span></a>
+                <a href="/replication.html" class="nav-link nav-sub" title="Replicação Local e Offsite"><i class="fas fa-exchange-alt nav-icon"></i> <span>Replicação</span></a>
             </div>
         </div>
 
-        <!-- 5. Diagnóstico & Logs -->
-        <div class="nav-group" id="grp-diag">
-            <button class="nav-group-header" onclick="toggleNavGroup('grp-diag')" title="Diagnóstico & Logs">
-                <span><i class="fas fa-stethoscope nav-icon"></i> Diagnóstico & Logs</span>
-                <i class="fas fa-chevron-down nav-group-arrow" id="arrow-grp-diag"></i>
+        <!-- 6. Operações -->
+        <div class="nav-group" id="grp-ops">
+            <button class="nav-group-header" onclick="toggleNavGroup('grp-ops')" title="Operações, Alertas, Logs e Diagnósticos">
+                <span><i class="fas fa-chart-line nav-icon"></i> Operações</span>
+                <i class="fas fa-chevron-down nav-group-arrow" id="arrow-grp-ops"></i>
             </button>
-            <div class="nav-group-items open" id="items-grp-diag">
-                <a href="/diagnostic.html" class="nav-link nav-sub" title="Diagnósticos do Agente"><i class="fas fa-notes-medical nav-icon"></i> <span>Diagnósticos do Agente</span></a>
-                <a href="/logs.html" class="nav-link nav-sub" title="Logs de Sistema"><i class="fas fa-file-alt nav-icon"></i> <span>Logs do Sistema</span></a>
-                <a href="/reports.html" class="nav-link nav-sub" title="Central de Relatórios"><i class="fas fa-chart-pie nav-icon"></i> <span>Central de Relatórios</span></a>
-                <a href="/alerts.html" class="nav-link nav-sub" title="Central de Alertas"><i class="fas fa-bell nav-icon"></i> <span>Central de Alertas</span></a>
-                <a href="/failed-jobs.html" class="nav-link nav-sub" style="color:var(--danger-color, #ef4444)" title="Central de Jobs com Falha"><i class="fas fa-exclamation-triangle nav-icon"></i> <span>Jobs com Falha</span></a>
-                <a href="/auth-diagnostic.html" class="nav-link nav-sub" title="Diagnóstico de Autenticação"><i class="fas fa-key nav-icon"></i> <span>Diagnóstico Autenticação</span></a>
+            <div class="nav-group-items open" id="items-grp-ops">
+                <a href="/alerts.html" class="nav-link nav-sub" title="Alertas e Falhas de Execução"><i class="fas fa-bell nav-icon"></i> <span>Alertas e Falhas</span></a>
+                <a href="/logs.html" class="nav-link nav-sub" title="Logs de Sistema e Auditoria"><i class="fas fa-file-alt nav-icon"></i> <span>Logs</span></a>
+                <a href="/diagnostic.html" class="nav-link nav-sub" title="Diagnóstico de Sistema, Auth e Schema"><i class="fas fa-stethoscope nav-icon"></i> <span>Diagnóstico</span></a>
+                <a href="/reports.html" class="nav-link nav-sub" title="Relatórios Executivos e Técnicos"><i class="fas fa-chart-pie nav-icon"></i> <span>Relatórios</span></a>
             </div>
         </div>
 
-        <!-- 6. Configuração -->
+        <!-- 7. Configuração -->
         <div class="nav-group" id="grp-config">
-            <button class="nav-group-header" onclick="toggleNavGroup('grp-config')" title="Configuração">
+            <button class="nav-group-header" onclick="toggleNavGroup('grp-config')" title="Configurações do Sistema">
                 <span><i class="fas fa-sliders-h nav-icon"></i> Configuração</span>
                 <i class="fas fa-chevron-down nav-group-arrow" id="arrow-grp-config"></i>
             </button>
             <div class="nav-group-items open" id="items-grp-config">
-                <a href="/settings.html" class="nav-link nav-sub" title="Configurações Gerais"><i class="fas fa-cog nav-icon"></i> <span>Configurações do Agente</span></a>
-                <a href="/storage-usage.html" class="nav-link nav-sub" title="Uso & Crescimento de Armazenamento"><i class="fas fa-hdd nav-icon"></i> <span>Uso de Armazenamento</span></a>
-                <a href="/users.html" class="nav-link nav-sub" title="Gestão de Usuários"><i class="fas fa-users-cog nav-icon"></i> <span>Usuários & Permissões</span></a>
-                <a href="/notification-channels.html" class="nav-link nav-sub" title="Canais de Notificação"><i class="fas fa-envelope nav-icon"></i> <span>Canais de Notificação</span></a>
-                <a href="/changelog.html" class="nav-link nav-sub" title="Changelog de Versões"><i class="fas fa-list-alt nav-icon"></i> <span>Changelog</span></a>
-                <a href="/onboarding.html" class="nav-link nav-sub" title="Assistente de Configuração Inicial"><i class="fas fa-magic nav-icon"></i> <span>Assistente Config.</span></a>
-                <a href="#" onclick="if(window.GBOC_AI_Assistant){window.GBOC_AI_Assistant.toggle();}return false;" class="nav-link nav-sub" style="color:var(--primary-color);font-weight:700" title="GBOC AI Copilot"><i class="fas fa-brain nav-icon"></i> <span>GBOC AI Copilot</span></a>
+                <a href="/users.html" class="nav-link nav-sub" title="Usuários e Permissões (RBAC)"><i class="fas fa-users-cog nav-icon"></i> <span>Usuários e Permissões</span></a>
+                <a href="/notification-channels.html" class="nav-link nav-sub" title="Canais de Notificação"><i class="fas fa-envelope nav-icon"></i> <span>Notificações</span></a>
+                <a href="/storage-usage.html" class="nav-link nav-sub" title="Uso & Crescimento de Armazenamento"><i class="fas fa-hdd nav-icon"></i> <span>Armazenamento</span></a>
+                <a href="/engines.html" class="nav-link nav-sub" title="Motores Nativos, Duplicati, Hermes e Power Tools"><i class="fas fa-cogs nav-icon"></i> <span>Motores e Integrações</span></a>
+                <a href="/settings.html" class="nav-link nav-sub" title="Configurações Gerais do Agente"><i class="fas fa-cog nav-icon"></i> <span>Configurações Gerais</span></a>
             </div>
         </div>
     </nav>
@@ -152,7 +154,6 @@ function gbocToggleSidebarCollapse(){
     const isCollapsed = document.body.classList.contains('sidebar-collapsed');
     localStorage.setItem('gboc-sidebar-collapsed', isCollapsed ? 'true' : 'false');
 }
-// Restore collapsed state on load
 (function(){
     if(localStorage.getItem('gboc-sidebar-collapsed') === 'true'){
         document.body.classList.add('sidebar-collapsed');
@@ -177,7 +178,6 @@ function updateThemeButton(theme){
     }
 }
 function gbocSetupSidebarAuth(){
-    // Se há token no localStorage, sempre mostrar botão logout
     const token = localStorage.getItem('gboc_token');
     const user = localStorage.getItem('gboc_user');
     if(user){
@@ -186,21 +186,17 @@ function gbocSetupSidebarAuth(){
             _gbocShowSidebarUser(u);
         } catch(e){}
     } else if(token){
-        // Tem token mas não tem user — mostrar logout mesmo assim
         const btn = document.getElementById('logoutBtn');
         if(btn) btn.style.display = 'block';
     }
-    // Consulta a API para confirmar status
     fetch('/api/auth/status').then(r => r.json()).then(data => {
         if(data.authenticated && data.user){
             _gbocShowSidebarUser(data.user);
         } else if(data.auth_enabled){
-            // Auth habilitado mas não autenticado — mostrar logout para redirecionar ao login
             const btn = document.getElementById('logoutBtn');
             if(btn) btn.style.display = 'block';
         }
     }).catch(()=>{
-        // Se API falhar e há token, manter botão visível
         if(token){
             const btn = document.getElementById('logoutBtn');
             if(btn) btn.style.display = 'block';
@@ -228,10 +224,7 @@ async function gbocLogout(){
 (function(){
     const saved = localStorage.getItem('gboc-theme') || 'dark';
     document.documentElement.setAttribute('data-theme', saved);
-    // Executar setup de auth imediatamente (o DOM do sidebar já está pronto quando o script executa via insertAdjacentHTML)
-    // Aguardar um tick para garantir que os elementos já estão no DOM
     setTimeout(gbocSetupSidebarAuth, 0);
-    // ── Init Collapsible Nav Groups ─────────────────────────────
     initNavGroups();
 })();
 function initNavGroups() {
@@ -278,11 +271,15 @@ function toggleNavGroup(grpId) {
     const items = document.getElementById('items-' + grpId);
     const arrow = document.getElementById('arrow-' + grpId);
     if (!items) return;
-    const isOpen = items.classList.toggle('open');
-    if (arrow) arrow.style.transform = isOpen ? 'rotate(180deg)' : '';
-    localStorage.setItem('gboc-nav-' + grpId, isOpen ? 'open' : 'closed');
+    const isOpen = items.classList.contains('open');
+    if (isOpen) {
+        items.classList.remove('open');
+        if (arrow) arrow.style.transform = '';
+        localStorage.setItem('gboc-nav-' + grpId, 'closed');
+    } else {
+        items.classList.add('open');
+        if (arrow) arrow.style.transform = 'rotate(180deg)';
+        localStorage.setItem('gboc-nav-' + grpId, 'open');
+    }
 }
 </script>
-
-<!-- GBOC Layout Manager: injected here so it runs after sidebar DOM is ready -->
-<script src="/static/gboc-layout-manager.js"></script>

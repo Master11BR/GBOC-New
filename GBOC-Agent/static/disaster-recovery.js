@@ -7,27 +7,52 @@
 let _activeDrPolling = null;
 let _currentJobId = null;
 
+const _DR_TAB_ALIASES = {
+    'readiness': 'hotbackup',
+    'instant-vm': 'instantvm',
+    'instantvm': 'instantvm',
+    'p2v': 'p2v',
+    'virtual-lab': 'virtuallab',
+    'virtuallab': 'virtuallab',
+    'bootmedia': 'bootmedia',
+    'boot-media': 'bootmedia',
+    'adexplorer': 'adexplorer',
+    'activedirectory': 'adexplorer',
+    'sysstate': 'hotbackup'
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     loadDisasterRecoveryOverview();
     loadPhysicalDisks();
     loadDrReadiness();
     loadInstantVmsList();
+
+    const params = new URLSearchParams(window.location.search);
+    const requestedTab = params.get('tab');
+    if (requestedTab) {
+        switchDrTab(requestedTab);
+    }
 });
 
 function switchDrTab(tabId) {
+    const targetId = _DR_TAB_ALIASES[tabId] || tabId;
     document.querySelectorAll('.dr-tab-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.dr-tab-content').forEach(content => content.classList.remove('active'));
 
-    const activeBtn = document.getElementById(`tab-btn-${tabId}`);
-    const activeContent = document.getElementById(`tab-content-${tabId}`);
+    const activeBtn = document.getElementById(`tab-btn-${targetId}`) || document.getElementById(`tab-btn-${tabId}`);
+    const activeContent = document.getElementById(`tab-content-${targetId}`) || document.getElementById(`tab-content-${tabId}`);
     if (activeBtn) activeBtn.classList.add('active');
     if (activeContent) activeContent.classList.add('active');
 
-    if (tabId === 'adexplorer') {
+    if (targetId === 'adexplorer') {
         searchAdObjects();
-    } else if (tabId === 'instantvm') {
+    } else if (targetId === 'instantvm') {
         loadInstantVmsList();
     }
+
+    const url = new URL(window.location);
+    url.searchParams.set('tab', tabId);
+    window.history.replaceState({}, '', url);
 }
 
 // ── Overview & System State ──────────────────────────────────────────────────
