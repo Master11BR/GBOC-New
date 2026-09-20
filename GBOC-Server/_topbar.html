@@ -1,6 +1,6 @@
 <!--
 ==============================================================================
-GBOC System v14.1.0 Full Stable Enterprise Edition — Servidor Central
+GBOC System v14.5.0 Full Stable Enterprise Edition — Servidor Central
 Horizontal Topbar Navigation — injected by gboc-layout-manager.js
 ==============================================================================
 -->
@@ -22,78 +22,91 @@ Horizontal Topbar Navigation — injected by gboc-layout-manager.js
         <input type="text" placeholder="Buscar agentes, jobs, tarefas..." id="tb-global-search">
     </div>
 
-    <!-- Navigation Groups — GBOC SERVER CENTRAL (100% FIEL ÀS 17 ABAS DO SERVIDOR) -->
+    <!-- Navigation Groups — GBOC SERVER CENTRAL (7 DOMÍNIOS CANÔNICOS) -->
     <nav class="tb-nav" id="tb-main-nav">
 
-        <!-- 1. Dashboard Central -->
+        <!-- 1. Visão Geral -->
         <a href="/" onclick="if(typeof switchTab==='function'){switchTab('overview');return false;}" class="tb-nav-link" id="tblink-dashboard">
-            <i class="fas fa-home"></i> Dashboard
+            <i class="fas fa-home"></i> Visão Geral
         </a>
 
-        <!-- 2. Agentes & MSP -->
-        <div class="tb-dropdown">
-            <button class="tb-nav-link" id="tblink-agents">
-                <i class="fas fa-network-wired"></i> Agentes & MSP
-                <i class="fas fa-chevron-down tb-arrow"></i>
-            </button>
-            <div class="tb-dropdown-menu">
-                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('agents');}" class="tb-dropdown-item"><i class="fas fa-server"></i> Agentes Remotos</a>
-                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('rmm');}" class="tb-dropdown-item"><i class="fas fa-terminal"></i> RMM & Terminal Remoto</a>
-                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('multitenant');}" class="tb-dropdown-item"><i class="fas fa-building"></i> Multi-Tenant MSP</a>
-            </div>
-        </div>
-
-        <!-- 3. Backup & Orquestração -->
+        <!-- 2. Backup -->
         <div class="tb-dropdown">
             <button class="tb-nav-link" id="tblink-backup">
-                <i class="fas fa-box-open"></i> Backup & Orquestração
+                <i class="fas fa-box-archive"></i> Backup
                 <i class="fas fa-chevron-down tb-arrow"></i>
             </button>
             <div class="tb-dropdown-menu">
-                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('backups');}" class="tb-dropdown-item"><i class="fas fa-database"></i> Repositórios & Backups</a>
-                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('surerestore');}" class="tb-dropdown-item"><i class="fas fa-microscope"></i> SureRestore Sandbox</a>
-                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('replication');}" class="tb-dropdown-item"><i class="fas fa-exchange-alt"></i> Replicação Off-Site</a>
-                <a href="/modules/engine_migration/engine_migration.html" class="tb-dropdown-item" style="color:var(--primary)"><i class="fas fa-magic"></i> Wizard de Migração de Motores</a>
-                <div class="tb-dropdown-divider"></div>
-                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('job-alert');}" class="tb-dropdown-item" style="color:var(--danger)"><i class="fas fa-exclamation-triangle"></i> Jobs com Falha</a>
+                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('backups');}" class="tb-dropdown-item"><i class="fas fa-list-check"></i> Jobs e Políticas</a>
+                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('workloads');}" class="tb-dropdown-item"><i class="fas fa-cubes-stacked"></i> Cargas Protegidas</a>
+                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('storage');}" class="tb-dropdown-item"><i class="fas fa-database"></i> Repositórios</a>
+                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('surerestore');}" class="tb-dropdown-item"><i class="fas fa-undo"></i> Restaurar e Validar (SureRestore Sandbox)</a>
             </div>
         </div>
 
-        <!-- 4. Segurança & Proteção -->
+        <!-- 3. Disaster Recovery -->
+        <div class="tb-dropdown">
+            <button class="tb-nav-link" id="tblink-dr">
+                <i class="fas fa-life-ring"></i> Disaster Recovery
+                <i class="fas fa-chevron-down tb-arrow"></i>
+            </button>
+            <div class="tb-dropdown-menu">
+                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('dr-readiness');}" class="tb-dropdown-item"><i class="fas fa-heartbeat"></i> Prontidão e Plano</a>
+                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('instant-vm');}" class="tb-dropdown-item"><i class="fas fa-bolt"></i> Recuperação Instantânea</a>
+                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('p2v');}" class="tb-dropdown-item"><i class="fas fa-microchip"></i> Bare Metal, P2V e Mídia</a>
+                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('virtual-lab');}" class="tb-dropdown-item"><i class="fas fa-flask"></i> Laboratório e Validação</a>
+            </div>
+        </div>
+
+        <!-- 4. Proteção -->
         <div class="tb-dropdown">
             <button class="tb-nav-link" id="tblink-security">
-                <i class="fas fa-shield-alt"></i> Segurança
+                <i class="fas fa-shield-alt"></i> Proteção
                 <i class="fas fa-chevron-down tb-arrow"></i>
             </button>
             <div class="tb-dropdown-menu">
                 <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('ransomware');}" class="tb-dropdown-item"><i class="fas fa-shield-virus"></i> Ransomware Guardian</a>
-                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('compliance');}" class="tb-dropdown-item"><i class="fas fa-clipboard-check"></i> Compliance LGPD / GDPR</a>
-                <a href="/modules/hermes/hermes.html" class="tb-dropdown-item" style="color:#a78bfa"><i class="fas fa-paper-plane"></i> Hermes Edge Control Center</a>
+                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('compliance');}" class="tb-dropdown-item"><i class="fas fa-clipboard-check"></i> Conformidade</a>
+                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('audit');}" class="tb-dropdown-item"><i class="fas fa-clipboard-list"></i> Auditoria</a>
             </div>
         </div>
 
-        <!-- 5. Analytics & Monitoramento -->
+        <!-- 5. Virtualização e Cloud -->
         <div class="tb-dropdown">
-            <button class="tb-nav-link" id="tblink-monitor">
-                <i class="fas fa-chart-line"></i> Analytics & Monitoramento
+            <button class="tb-nav-link" id="tblink-virt">
+                <i class="fas fa-cloud"></i> Virtualização e Cloud
                 <i class="fas fa-chevron-down tb-arrow"></i>
             </button>
             <div class="tb-dropdown-menu">
-                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('analytics');}" class="tb-dropdown-item"><i class="fas fa-chart-bar"></i> Analytics & Diagnóstico</a>
-                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('alerts');}" class="tb-dropdown-item"><i class="fas fa-bell"></i> Central de Alertas</a>
-                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('logs');}" class="tb-dropdown-item"><i class="fas fa-file-alt"></i> Logs do Servidor</a>
-                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('reports');}" class="tb-dropdown-item"><i class="fas fa-chart-pie"></i> Relatórios Executivos</a>
-                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('storage');}" class="tb-dropdown-item"><i class="fas fa-hdd"></i> Uso de Armazenamento</a>
+                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('virtualization');}" class="tb-dropdown-item"><i class="fas fa-server"></i> VMware, Hyper-V e Proxmox</a>
+                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('m365');}" class="tb-dropdown-item"><i class="fas fa-mail-bulk"></i> Microsoft 365 e Exchange</a>
+                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('saas-cloud');}" class="tb-dropdown-item"><i class="fas fa-cubes"></i> SaaS, Kubernetes e Cloud</a>
+                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('replication');}" class="tb-dropdown-item"><i class="fas fa-exchange-alt"></i> Replicação</a>
             </div>
         </div>
 
-        <!-- 6. Sistema & Administração -->
+        <!-- 6. Analytics & Monitoramento -->
+        <div class="tb-dropdown">
+            <button class="tb-nav-link" id="tblink-ops">
+                <i class="fas fa-chart-line"></i> Operações
+                <i class="fas fa-chevron-down tb-arrow"></i>
+            </button>
+            <div class="tb-dropdown-menu">
+                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('alerts');}" class="tb-dropdown-item"><i class="fas fa-bell"></i> Alertas e Falhas</a>
+                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('logs');}" class="tb-dropdown-item"><i class="fas fa-file-alt"></i> Logs Globais</a>
+                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('diagnostic');}" class="tb-dropdown-item"><i class="fas fa-stethoscope"></i> Diagnóstico</a>
+                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('reports');}" class="tb-dropdown-item"><i class="fas fa-chart-pie"></i> Relatórios Executivos</a>
+            </div>
+        </div>
+
+        <!-- 7. Configuração & Sistema -->
         <div class="tb-dropdown">
             <button class="tb-nav-link" id="tblink-system">
-                <i class="fas fa-cogs"></i> Sistema
+                <i class="fas fa-sliders-h"></i> Configuração
                 <i class="fas fa-chevron-down tb-arrow"></i>
             </button>
             <div class="tb-dropdown-menu">
+                <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('agents');}" class="tb-dropdown-item"><i class="fas fa-sitemap"></i> Agentes & MSP</a>
                 <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('users');}" class="tb-dropdown-item"><i class="fas fa-users-cog"></i> Usuários & Permissões</a>
                 <a href="javascript:void(0)" onclick="if(typeof switchTab==='function'){switchTab('config');}" class="tb-dropdown-item"><i class="fas fa-cog"></i> Configurações do Servidor</a>
             </div>
@@ -101,7 +114,7 @@ Horizontal Topbar Navigation — injected by gboc-layout-manager.js
 
     </nav>
 
-    <!-- Right Section (Botões de Ação — Isolamento Rígido com Divisória) -->
+    <!-- Right Section (Botões de Ação) -->
     <div class="tb-right">
         <!-- Connection Status (LED + Tooltip) -->
         <div style="display:flex;align-items:center;gap:4px;font-size:0.75em;margin-right:4px;padding:2px 6px;border-radius:12px;background:rgba(72,187,120,0.12);border:1px solid rgba(72,187,120,0.2)" title="Status do Servidor: Server Online (Guardian)">
@@ -115,7 +128,7 @@ Horizontal Topbar Navigation — injected by gboc-layout-manager.js
         </button>
 
         <!-- 2. Alertas & Jobs com Falha (Bell) -->
-        <button class="tbr-icon" title="Central de Alertas & Jobs com Falha" onclick="if(typeof switchTab==='function'){switchTab('job-alert');}">
+        <button class="tbr-icon" title="Central de Alertas & Jobs com Falha" onclick="if(typeof switchTab==='function'){switchTab('alerts');}">
             <i class="fas fa-bell"></i>
             <span class="tbr-badge" id="tb-notif-badge" style="display:none">0</span>
         </button>
@@ -147,7 +160,7 @@ Horizontal Topbar Navigation — injected by gboc-layout-manager.js
 
         <div class="tb-divider"></div>
 
-        <!-- 7. Avatar de Usuário & Dropdown de Opções (ÚLTIMO BOTÃO DA DIREITA) -->
+        <!-- 7. Avatar de Usuário & Dropdown de Opções -->
         <div class="tb-dropdown tb-user-dropdown" id="tb-user-dropdown-container">
             <div class="tb-avatar" id="tb-user-avatar" title="Perfil de Usuário / Conta">
                 <i class="fas fa-user-circle"></i>
@@ -206,7 +219,6 @@ document.addEventListener('fullscreenchange', ()=>{
     }
 });
 
-// Manipulador de Clique do Mouse em Pulldowns
 document.addEventListener('click', function(e) {
     const dropdown = e.target.closest('.tb-dropdown');
     document.querySelectorAll('.tb-dropdown.active').forEach(d => {

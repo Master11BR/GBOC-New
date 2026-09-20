@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cargas Protegidas Enterprise — GBOC Agent</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.5.0">
+    <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=14.5.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=14.5.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/components.css?v=14.5.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/layout.css?v=14.5.0">
+    <link rel="stylesheet" href="/static/style.css?v=14.5.0">
+    <link rel="stylesheet" href="/static/gboc-themes.css?v=14.5.0">
+    <link rel="stylesheet" href="/static/gboc-layout.css?v=14.5.0">
+    <script src="/static/gboc-perf.js?v=14.5.0"></script>
+    <script src="/static/gboc-layout-manager.js?v=14.5.0"></script>
+    <script src="/static/gboc-modal.js?v=14.5.0"></script>
+<!-- Universal CSS Stack -->
+    <link rel="stylesheet" href="/static/gboc-hardware-hud.css">
+    <link rel="stylesheet" href="/static/gboc-file-picker.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body class="gboc-body layout-vertical">
+    <div id="gboc-topbar-root"></div>
+    <div id="gboc-sidebar-root"></div>
+
+    <main class="main-content" id="main-content">
+        <div class="content-header">
+            <div>
+                <h1 class="page-title"><i class="fas fa-cubes-stacked" style="color:var(--primary);margin-right:10px"></i> Cargas Protegidas</h1>
+                <p class="text-muted">Proteção e orquestração de Bancos de Dados, Active Directory, Fita LTO e Workloads Enterprise.</p>
+            </div>
+            <div class="header-actions">
+                <span class="badge badge-success"><i class="fas fa-shield-halved"></i> Modo Consistente Ativo</span>
+            </div>
+        </div>
+
+        <!-- TAB NAVIGATION -->
+        <div class="tabs-container" style="margin-bottom: 20px; display:flex; gap:10px; border-bottom:1px solid var(--border); padding-bottom:10px;">
+            <button class="btn btn-primary tab-btn active" id="tab-btn-database" onclick="switchWorkloadTab('database')">
+                <i class="fas fa-database"></i> Bancos de Dados
+            </button>
+            <button class="btn btn-secondary tab-btn" id="tab-btn-activedirectory" onclick="switchWorkloadTab('activedirectory')">
+                <i class="fas fa-sitemap"></i> Active Directory (AD DS)
+            </button>
+            <button class="btn btn-secondary tab-btn" id="tab-btn-tape" onclick="switchWorkloadTab('tape')">
+                <i class="fas fa-tape"></i> Fita LTO
+            </button>
+            <button class="btn btn-secondary tab-btn" id="tab-btn-enterprise" onclick="switchWorkloadTab('enterprise')">
+                <i class="fas fa-gem"></i> Enterprise (Oracle/SAP/CDP)
+            </button>
+        </div>
+
+        <!-- TAB 1: BANCOS DE DADOS -->
+        <div class="tab-pane" id="pane-database">
+            <div class="card" style="margin-bottom:20px">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-server" style="color:var(--primary)"></i> Bancos de Dados Suportados</h3>
+                </div>
+                <div class="card-body">
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:16px;">
+                        <div class="card" style="padding:16px; border:1px solid var(--border);">
+                            <h4><i class="fas fa-database" style="color:#336791"></i> PostgreSQL</h4>
+                            <p class="text-muted" style="font-size:0.9em">Dump transacional consistente via `pg_dump` e validação com `pg_restore` em banco temporário.</p>
+                            <a href="/database-backup.html" class="btn btn-outline-primary btn-sm"><i class="fas fa-gear"></i> Gerenciar Conexões</a>
+                        </div>
+                        <div class="card" style="padding:16px; border:1px solid var(--border);">
+                            <h4><i class="fas fa-database" style="color:#00758f"></i> MySQL & MariaDB</h4>
+                            <p class="text-muted" style="font-size:0.9em">Snapshot com `--single-transaction` e bloqueio consistente de tabelas.</p>
+                            <a href="/database-backup.html" class="btn btn-outline-primary btn-sm"><i class="fas fa-gear"></i> Gerenciar Conexões</a>
+                        </div>
+                        <div class="card" style="padding:16px; border:1px solid var(--border);">
+                            <h4><i class="fas fa-database" style="color:#005c8a"></i> SQLite</h4>
+                            <p class="text-muted" style="font-size:0.9em">Cópia consistente via VACUUM INTO e verificação com PRAGMA integrity_check.</p>
+                            <a href="/database-backup.html" class="btn btn-outline-primary btn-sm"><i class="fas fa-gear"></i> Gerenciar Conexões</a>
+                        </div>
+                        <div class="card" style="padding:16px; border:1px solid var(--border);">
+                            <h4><i class="fas fa-database" style="color:#cc292b"></i> Microsoft SQL Server</h4>
+                            <p class="text-muted" style="font-size:0.9em">Backup VSS nativo via SQL VSS Writer com suporte a logs transacionais.</p>
+                            <a href="/database-backup.html" class="btn btn-outline-primary btn-sm"><i class="fas fa-gear"></i> Gerenciar Conexões</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: ACTIVE DIRECTORY -->
+        <div class="tab-pane" id="pane-activedirectory" style="display:none">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-sitemap" style="color:var(--primary)"></i> Active Directory Domain Services</h3>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Backup consistente de Domain Controllers, base NTDS.dit, políticas de grupo SYSVOL e recuperação granular de objetos.</p>
+                    <div style="margin-top:16px; display:flex; gap:12px;">
+                        <a href="/active-directory.html" class="btn btn-primary"><i class="fas fa-external-link-alt"></i> Abrir Console Active Directory</a>
+                        <a href="/disaster-recovery.html?tab=sysstate" class="btn btn-secondary"><i class="fas fa-box-archive"></i> Backup de System State & AD</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: FITA LTO -->
+        <div class="tab-pane" id="pane-tape" style="display:none">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-tape" style="color:var(--primary)"></i> Backup em Fita LTO (Linear Tape-Open)</h3>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Automação de bibliotecas de fita LTO-6/7/8/9, gravação LTFS e retenção de longo prazo offline imutável (Air-Gap).</p>
+                    <div style="margin-top:16px;">
+                        <a href="/tape-backup.html" class="btn btn-primary"><i class="fas fa-external-link-alt"></i> Abrir Console de Fita LTO</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: ENTERPRISE -->
+        <div class="tab-pane" id="pane-enterprise" style="display:none">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-gem" style="color:var(--primary)"></i> Workloads Enterprise Avançados</h3>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Integração corporativa para Oracle RMAN, SAP HANA Backint e Continuous Data Protection (CDP).</p>
+                    <div style="margin-top:16px;">
+                        <a href="/enterprise-features.html" class="btn btn-primary"><i class="fas fa-external-link-alt"></i> Abrir Módulos Enterprise</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Universal JS Stack -->
+    <script src="/static/gboc-perf.js"></script>
+    <script src="/static/gboc-layout-manager.js"></script>
+    <script src="/static/gboc-motion.js"></script>
+    <script src="/static/protected-workloads.js"></script>
+</body>
+</html>

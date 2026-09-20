@@ -1,6 +1,6 @@
 <!--
 ==============================================================================
-GBOC System v14.1.0 Enterprise Edition — Agente Local
+GBOC System v14.5.0 Enterprise Edition — Agente Local
 Horizontal Topbar Navigation — injected by gboc-layout-manager.js
 ==============================================================================
 -->
@@ -22,100 +22,101 @@ Horizontal Topbar Navigation — injected by gboc-layout-manager.js
         <input type="text" placeholder="Buscar função, repositório, tarefa..." id="tb-global-search">
     </div>
 
-    <!-- Navigation Groups — GBOC AGENT LOCAL (LINKS DIRETOS HTTP LIMPOS) -->
+    <!-- Navigation Groups — GBOC AGENT LOCAL (7 DOMÍNIOS CANÔNICOS) -->
     <nav class="tb-nav" id="tb-main-nav">
 
-        <!-- 1. Dashboard Agente -->
+        <!-- 1. Visão Geral -->
         <a href="/index.html" class="tb-nav-link" id="tblink-dashboard">
-            <i class="fas fa-home"></i> Dashboard Agente
+            <i class="fas fa-home"></i> Visão Geral
         </a>
 
-        <!-- 2. Tarefas & Motores Nativos -->
+        <!-- 2. Backup -->
         <div class="tb-dropdown">
-            <button class="tb-nav-link" id="tblink-tasks">
-                <i class="fas fa-tasks"></i> Tarefas & Motores
+            <button class="tb-nav-link" id="tblink-backup">
+                <i class="fas fa-box-archive"></i> Backup
                 <i class="fas fa-chevron-down tb-arrow"></i>
             </button>
             <div class="tb-dropdown-menu">
-                <a href="/tasks.html" class="tb-dropdown-item"><i class="fas fa-tasks"></i> Tarefas de Backup</a>
-                <a href="/repositories.html" class="tb-dropdown-item"><i class="fas fa-database"></i> Repositórios Locais</a>
-                <a href="/restore.html" class="tb-dropdown-item"><i class="fas fa-undo"></i> Assistente de Restauração</a>
-                <a href="/engines.html" class="tb-dropdown-item"><i class="fas fa-cogs"></i> Motores Nativos (Restic/Kopia/Duplicati)</a>
-                <a href="/duplicati-native.html" class="tb-dropdown-item"><i class="fas fa-plug"></i> Duplicati Nativo</a>
-                <div class="tb-dropdown-divider"></div>
-                <a href="/database-backup.html" class="tb-dropdown-item"><i class="fas fa-database"></i> Backup Banco de Dados</a>
-                <a href="/active-directory.html" class="tb-dropdown-item"><i class="fas fa-sitemap"></i> Backup Active Directory (AD)</a>
-                <a href="/enterprise-features.html" class="tb-dropdown-item"><i class="fas fa-gem"></i> Módulos Enterprise (Oracle/SAP/CDP)</a>
-                <a href="/saas-cloud-enterprise.html" class="tb-dropdown-item"><i class="fas fa-cloud-arrow-up"></i> SaaS, K8s &amp; Cloud Failover</a>
-                <a href="/power-tools.html" class="tb-dropdown-item"><i class="fas fa-toolbox"></i> Power Tools &amp; Produtividade</a>
-                <a href="/tape-backup.html" class="tb-dropdown-item"><i class="fas fa-tape"></i> Backup em Fita (LTO)</a>
-                <div class="tb-dropdown-divider"></div>
-                <a href="/failed-jobs.html" class="tb-dropdown-item" style="color:var(--danger)"><i class="fas fa-exclamation-triangle"></i> Jobs com Falha</a>
+                <a href="/tasks.html" class="tb-dropdown-item"><i class="fas fa-list-check"></i> Jobs e Políticas</a>
+                <a href="/protected-workloads.html" class="tb-dropdown-item"><i class="fas fa-cubes-stacked"></i> Cargas Protegidas (Bancos, AD, Fita, Enterprise)</a>
+                <a href="/repositories.html" class="tb-dropdown-item"><i class="fas fa-database"></i> Repositórios</a>
+                <a href="/restore.html" class="tb-dropdown-item"><i class="fas fa-undo"></i> Restaurar e Validar (SureRestore Sandbox)</a>
             </div>
         </div>
 
-        <!-- 3. Proteção & Defesa -->
+        <!-- 3. Disaster Recovery -->
         <div class="tb-dropdown">
-            <button class="tb-nav-link" id="tblink-security">
-                <i class="fas fa-shield-virus"></i> Proteção & Defesa
+            <button class="tb-nav-link" id="tblink-dr">
+                <i class="fas fa-life-ring"></i> Disaster Recovery
                 <i class="fas fa-chevron-down tb-arrow"></i>
             </button>
             <div class="tb-dropdown-menu">
-                <a href="/ransomware.html" class="tb-dropdown-item"><i class="fas fa-shield-virus"></i> Ransomware Shield & Guardian</a>
-                <a href="/compliance.html" class="tb-dropdown-item"><i class="fas fa-clipboard-check"></i> Compliance LGPD / GDPR</a>
-                <a href="/audit.html" class="tb-dropdown-item"><i class="fas fa-clipboard-list"></i> Audit Trail Local</a>
-                <a href="/modules/hermes/hermes.html" class="tb-dropdown-item" style="color:#a78bfa"><i class="fas fa-paper-plane"></i> Hermes Edge Agent Local</a>
+                <a href="/disaster-recovery.html?tab=readiness" class="tb-dropdown-item"><i class="fas fa-heartbeat"></i> Prontidão e Plano</a>
+                <a href="/disaster-recovery.html?tab=instant-vm" class="tb-dropdown-item"><i class="fas fa-bolt"></i> Recuperação Instantânea</a>
+                <a href="/disaster-recovery.html?tab=p2v" class="tb-dropdown-item"><i class="fas fa-microchip"></i> Bare Metal, P2V e Mídia</a>
+                <a href="/disaster-recovery.html?tab=virtual-lab" class="tb-dropdown-item"><i class="fas fa-flask"></i> Laboratório e Validação</a>
             </div>
         </div>
 
-        <!-- 4. Virtualização & Cloud -->
+        <!-- 4. Proteção -->
+        <div class="tb-dropdown">
+            <button class="tb-nav-link" id="tblink-defense">
+                <i class="fas fa-shield-alt"></i> Proteção
+                <i class="fas fa-chevron-down tb-arrow"></i>
+            </button>
+            <div class="tb-dropdown-menu">
+                <a href="/ransomware.html" class="tb-dropdown-item"><i class="fas fa-shield-virus"></i> Ransomware Guardian</a>
+                <a href="/compliance.html" class="tb-dropdown-item"><i class="fas fa-clipboard-check"></i> Conformidade & Políticas</a>
+                <a href="/audit.html" class="tb-dropdown-item"><i class="fas fa-clipboard-list"></i> Auditoria (Audit Trail)</a>
+            </div>
+        </div>
+
+        <!-- 5. Virtualização & Cloud -->
         <div class="tb-dropdown">
             <button class="tb-nav-link" id="tblink-virt">
-                <i class="fas fa-cubes"></i> Virtualização & Cloud
+                <i class="fas fa-cloud"></i> Virtualização e Cloud
                 <i class="fas fa-chevron-down tb-arrow"></i>
             </button>
             <div class="tb-dropdown-menu">
-                <a href="/virtualization.html" class="tb-dropdown-item"><i class="fas fa-cubes"></i> VMs (Hyper-V / VMware / Proxmox)</a>
-                <a href="/m365-exchange.html" class="tb-dropdown-item"><i class="fas fa-mail-bulk"></i> M365 & Exchange</a>
-                <a href="/disaster-recovery.html" class="tb-dropdown-item"><i class="fas fa-life-ring"></i> Disaster Recovery & P2V</a>
-                <a href="/replication.html" class="tb-dropdown-item"><i class="fas fa-exchange-alt"></i> Replicação Local</a>
+                <a href="/virtualization.html" class="tb-dropdown-item"><i class="fas fa-server"></i> VMware, Hyper-V e Proxmox</a>
+                <a href="/m365-exchange.html" class="tb-dropdown-item"><i class="fas fa-mail-bulk"></i> Microsoft 365 e Exchange</a>
+                <a href="/saas-cloud-enterprise.html" class="tb-dropdown-item"><i class="fas fa-cubes"></i> SaaS, Kubernetes e Cloud</a>
+                <a href="/replication.html" class="tb-dropdown-item"><i class="fas fa-exchange-alt"></i> Replicação</a>
             </div>
         </div>
 
-        <!-- 5. Diagnóstico & Logs -->
+        <!-- 6. Operações -->
         <div class="tb-dropdown">
-            <button class="tb-nav-link" id="tblink-monitor">
-                <i class="fas fa-stethoscope"></i> Diagnóstico & Logs
+            <button class="tb-nav-link" id="tblink-ops">
+                <i class="fas fa-chart-line"></i> Operações
                 <i class="fas fa-chevron-down tb-arrow"></i>
             </button>
             <div class="tb-dropdown-menu">
-                <a href="/diagnostic.html" class="tb-dropdown-item"><i class="fas fa-stethoscope"></i> Diagnóstico do Agente</a>
-                <a href="/logs.html" class="tb-dropdown-item"><i class="fas fa-file-alt"></i> Logs Locais</a>
-                <a href="/reports.html" class="tb-dropdown-item"><i class="fas fa-chart-pie"></i> Relatórios do Agente</a>
-                <a href="/alerts.html" class="tb-dropdown-item"><i class="fas fa-bell"></i> Alertas Locais</a>
-                <a href="/storage-usage.html" class="tb-dropdown-item"><i class="fas fa-hdd"></i> Uso de Armazenamento</a>
+                <a href="/alerts.html" class="tb-dropdown-item"><i class="fas fa-bell"></i> Alertas e Falhas</a>
+                <a href="/logs.html" class="tb-dropdown-item"><i class="fas fa-file-alt"></i> Logs</a>
+                <a href="/diagnostic.html" class="tb-dropdown-item"><i class="fas fa-stethoscope"></i> Diagnóstico</a>
+                <a href="/reports.html" class="tb-dropdown-item"><i class="fas fa-chart-pie"></i> Relatórios</a>
             </div>
         </div>
 
-        <!-- 6. Configuração & Sistema -->
+        <!-- 7. Configuração -->
         <div class="tb-dropdown">
-            <button class="tb-nav-link" id="tblink-system">
+            <button class="tb-nav-link" id="tblink-config">
                 <i class="fas fa-sliders-h"></i> Configuração
                 <i class="fas fa-chevron-down tb-arrow"></i>
             </button>
             <div class="tb-dropdown-menu">
-                <a href="/settings.html" class="tb-dropdown-item"><i class="fas fa-cogs"></i> Configurações do Agente</a>
-                <a href="/users.html" class="tb-dropdown-item"><i class="fas fa-users"></i> Usuários Locais</a>
-                <a href="/auth-diagnostic.html" class="tb-dropdown-item"><i class="fas fa-user-shield"></i> Status da Autenticação</a>
-                <a href="/notification-channels.html" class="tb-dropdown-item"><i class="fas fa-envelope"></i> Canais de Notificação</a>
-                <a href="/changelog.html" class="tb-dropdown-item"><i class="fas fa-list-alt"></i> Changelog</a>
-                <a href="/onboarding.html" class="tb-dropdown-item"><i class="fas fa-magic"></i> Assistente de Configuração</a>
+                <a href="/users.html" class="tb-dropdown-item"><i class="fas fa-users-cog"></i> Usuários e Permissões</a>
+                <a href="/notification-channels.html" class="tb-dropdown-item"><i class="fas fa-envelope"></i> Notificações</a>
+                <a href="/storage-usage.html" class="tb-dropdown-item"><i class="fas fa-hdd"></i> Armazenamento</a>
+                <a href="/engines.html" class="tb-dropdown-item"><i class="fas fa-cogs"></i> Motores e Integrações</a>
+                <a href="/settings.html" class="tb-dropdown-item"><i class="fas fa-cog"></i> Configurações Gerais</a>
             </div>
         </div>
 
     </nav>
 
-    <!-- Right Section (Botões de Ação — Isolamento Rígido com Divisória) -->
+    <!-- Right Section (Botões de Ação) -->
     <div class="tb-right">
         <!-- Connection Status (LED + Tooltip) -->
         <div style="display:flex;align-items:center;gap:4px;font-size:0.75em;margin-right:4px;padding:2px 6px;border-radius:12px;background:rgba(72,187,120,0.12);border:1px solid rgba(72,187,120,0.2)" title="Status do Agente: Agent Online (Conectado)">
@@ -161,7 +162,7 @@ Horizontal Topbar Navigation — injected by gboc-layout-manager.js
 
         <div class="tb-divider"></div>
 
-        <!-- 7. Avatar de Usuário & Dropdown de Opções (ÚLTIMO BOTÃO DA DIREITA) -->
+        <!-- 7. Avatar de Usuário & Dropdown de Opções -->
         <div class="tb-dropdown tb-user-dropdown" id="tb-user-dropdown-container">
             <div class="tb-avatar" id="tb-user-avatar" title="Perfil de Usuário / Conta">
                 <i class="fas fa-user-circle"></i>
@@ -178,7 +179,7 @@ Horizontal Topbar Navigation — injected by gboc-layout-manager.js
                 </div>
                 <div style="padding:4px 0">
                     <a href="/settings.html" class="tb-dropdown-item"><i class="fas fa-cogs"></i> Configurações do Agente</a>
-                    <a href="/auth-diagnostic.html" class="tb-dropdown-item"><i class="fas fa-user-shield"></i> Diagnóstico de Auth</a>
+                    <a href="/diagnostic.html" class="tb-dropdown-item"><i class="fas fa-user-shield"></i> Diagnóstico de Auth</a>
                     <a href="javascript:void(0)" onclick="window.GBOCLayout && window.GBOCLayout.togglePanel()" class="tb-dropdown-item"><i class="fas fa-palette"></i> Personalizar Interface</a>
                     <div class="tb-dropdown-divider"></div>
                     <a href="javascript:void(0)" onclick="typeof gbocLogout==='function' ? gbocLogout() : window.location.href='/login.html'" class="tb-dropdown-item" style="color:var(--danger)">
@@ -220,7 +221,6 @@ document.addEventListener('fullscreenchange', ()=>{
     }
 });
 
-// Manipulador de Clique do Mouse em Pulldowns no Agente
 document.addEventListener('click', function(e) {
     const dropdown = e.target.closest('.tb-dropdown');
     document.querySelectorAll('.tb-dropdown.active').forEach(d => {

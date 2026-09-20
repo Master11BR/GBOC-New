@@ -390,9 +390,14 @@ def test_restore(backup_id: int) -> Dict:
                 shutil.copy2(filepath, tmp)
                 import sqlite3
                 c = sqlite3.connect(tmp)
+                # Validação de integridade real SQLite
+                integrity = c.execute("PRAGMA integrity_check;").fetchone()
+                if not integrity or integrity[0] != "ok":
+                    c.close()
+                    return {"success": False, "error": f"Falha no PRAGMA integrity_check: {integrity[0] if integrity else 'Desconhecido'}", "duration_seconds": int(time.time() - start)}
                 tables = c.execute("SELECT count(*) FROM sqlite_master WHERE type='table'").fetchone()[0]
                 c.close()
-                return {"success": True, "test_db": tmp, "tables": tables,
+                return {"success": True, "test_db": tmp, "tables": tables, "integrity": "ok",
                         "duration_seconds": int(time.time() - start)}
             finally:
                 if os.path.exists(tmp):
@@ -424,6 +429,16 @@ def _test_restore_pg(conn_data: Dict, filepath: str, test_db: str, start: float)
         cmd = ['pg_restore', '-h', host, '-p', port, '-U', user, '-d', test_db,
                '--no-owner', '--no-privileges', filepath]
         result = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=300)
+
+        # Falhar explicitamente se o pg_restore retornar erro
+        if result.returncode != 0:
+            err_msg = result.stderr.strip() or result.stdout.strip() or f"Código de saída: {result.returncode}"
+            logger.error(f"[Database Restore Test] pg_restore falhou para {filepath}: {err_msg}")
+            return {
+                "success": False,
+                "error": f"pg_restore falhou (código {result.returncode}): {err_msg}",
+                "duration_seconds": int(time.time() - start)
+            }
 
         # Verify
         conn2 = psycopg2.connect(host=host, port=int(port), user=user,

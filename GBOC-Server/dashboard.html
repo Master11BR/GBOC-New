@@ -1615,24 +1615,41 @@ function gbocToggleSidebarCollapse(){
             localStorage.setItem('gboc_server_theme', next);
         }
 
+        const _TAB_ALIASES = {
+            'workloads': 'backups',
+            'dr-readiness': 'surerestore',
+            'instant-vm': 'surerestore',
+            'p2v': 'surerestore',
+            'virtual-lab': 'surerestore',
+            'audit': 'compliance',
+            'm365': 'backups',
+            'saas-cloud': 'backups',
+            'virtualization': 'backups',
+            'diagnostic': 'analytics',
+            'notifications': 'config',
+            'engines': 'config'
+        };
+
         function switchTab(id, btn){
+            const targetId = _TAB_ALIASES[id] || id;
             document.querySelectorAll('.tab-section').forEach(s=>s.classList.remove('active'));
             document.querySelectorAll('.sidebar .nav-link').forEach(l=>l.classList.remove('active'));
-            document.getElementById('tab-'+id).classList.add('active');
+            const targetEl = document.getElementById('tab-'+targetId) || document.getElementById('tab-'+id);
+            if(targetEl) targetEl.classList.add('active');
             if(btn) btn.classList.add('active');
-            if(id==='analytics') loadAnalytics();
-            if(id==='agents') loadAgentsTab();
-            if(id==='rmm') populateRMMAgentSelect();
-            if(id==='logs'){ loadLogAgentFilter(); loadLogs(); }
-            if(id==='config') loadConfig();
-            if(id==='ransomware') loadServerRansomware();
-            if(id==='compliance') loadServerCompliance();
-            if(id==='alerts') loadServerAlerts();
-            if(id==='replication') loadServerReplication();
-            if(id==='users') loadServerUsers();
-            if(id==='reports') { loadReportsTab(); loadTabReportsCatalog(); }
-            if(id==='job-alert') loadServerJobAlertData();
-            if(id==='storage') loadServerStorageData();
+            if(targetId==='analytics' || id==='diagnostic') loadAnalytics();
+            if(targetId==='agents') loadAgentsTab();
+            if(targetId==='rmm') populateRMMAgentSelect();
+            if(targetId==='logs'){ loadLogAgentFilter(); loadLogs(); }
+            if(targetId==='config' || id==='notifications' || id==='engines') loadConfig();
+            if(targetId==='ransomware') loadServerRansomware();
+            if(targetId==='compliance' || id==='audit') loadServerCompliance();
+            if(targetId==='alerts') loadServerAlerts();
+            if(targetId==='replication') loadServerReplication();
+            if(targetId==='users') loadServerUsers();
+            if(targetId==='reports') { loadReportsTab(); loadTabReportsCatalog(); }
+            if(targetId==='job-alert') loadServerJobAlertData();
+            if(targetId==='storage') loadServerStorageData();
         }
 
         let ws=null, _wsReconnectTimer=null, _wsBackoff=2000;

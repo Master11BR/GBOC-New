@@ -1,0 +1,30 @@
+{
+  "storage": {
+    "type": "s3",
+    "config": {
+      "bucket": "gboc-26",
+      "prefix": "Kopia-teste/",
+      "endpoint": "s3.eu-central-2.wasabisys.com",
+      "accessKeyID": "6ANHLBH6UZ4DXDFPUNQ3",
+      "secretAccessKey": "LWpguD24BlSTlSQNcfqDFdte28oJzZjGvYeBF3Bj",
+      "sessionToken": "",
+      "roleARN": "",
+      "sessionName": "",
+      "duration": "0s",
+      "roleEndpoint": "",
+      "roleRegion": "",
+      "region": "eu-central-2"
+    }
+  },
+  "caching": {
+    "cacheDirectory": "C:\\Users\\Administrador\\AppData\\Local\\kopia\\8b48cb001117a324",
+    "maxCacheSize": 5242880000,
+    "maxMetadataCacheSize": 5242880000,
+    "maxListCacheDuration": 30
+  },
+  "hostname": "servidor-2025",
+  "username": "Administrador",
+  "description": "Repository in S3: s3.eu-central-2.wasabisys.com gboc-26",
+  "enableActions": false,
+  "formatBlobCacheDuration": 900000000000
+}
