@@ -59,14 +59,25 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 }
 </style>
 <aside class="sidebar">
-    <nav class="nav" id="gboc-nav" style="padding-top:16px">
+    <nav class="nav" id="gboc-nav" style="padding-top:14px">
         <!-- 1. Visão Geral -->
-        <a href="/index.html" class="nav-link" title="Visão Geral"><i class="fas fa-home nav-icon"></i> <span>Visão Geral</span></a>
+        <div class="nav-group" id="grp-overview">
+            <button class="nav-group-header" onclick="toggleNavGroup('grp-overview')" title="Visão Geral & Indicadores">
+                <span><i class="fas fa-chart-pie nav-icon" style="color:#3b82f6"></i> Visão Geral</span>
+                <i class="fas fa-chevron-down nav-group-arrow" id="arrow-grp-overview"></i>
+            </button>
+            <div class="nav-group-items open" id="items-grp-overview">
+                <a href="/index.html" class="nav-link nav-sub" title="Dashboard Principal"><i class="fas fa-home nav-icon"></i> <span>Dashboard Principal</span></a>
+                <a href="/overview.html" class="nav-link nav-sub" title="Visão Geral Executiva"><i class="fas fa-tachometer-alt nav-icon"></i> <span>Visão Geral Executiva</span></a>
+                <a href="/statistics.html" class="nav-link nav-sub" title="Estatísticas de Backup"><i class="fas fa-chart-line nav-icon"></i> <span>Estatísticas de Backup</span></a>
+                <a href="/audit.html" class="nav-link nav-sub" title="Trilha de Auditoria"><i class="fas fa-clipboard-list nav-icon"></i> <span>Trilha de Auditoria</span></a>
+            </div>
+        </div>
 
         <!-- 2. Backup -->
         <div class="nav-group" id="grp-backup">
             <button class="nav-group-header" onclick="toggleNavGroup('grp-backup')" title="Backup & Orquestração">
-                <span><i class="fas fa-box-archive nav-icon"></i> Backup</span>
+                <span><i class="fas fa-box-archive nav-icon" style="color:#6366f1"></i> Backup</span>
                 <i class="fas fa-chevron-down nav-group-arrow" id="arrow-grp-backup"></i>
             </button>
             <div class="nav-group-items open" id="items-grp-backup">
@@ -80,7 +91,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         <!-- 3. Disaster Recovery -->
         <div class="nav-group" id="grp-dr">
             <button class="nav-group-header" onclick="toggleNavGroup('grp-dr')" title="Disaster Recovery & Continuidade">
-                <span><i class="fas fa-life-ring nav-icon"></i> Disaster Recovery</span>
+                <span><i class="fas fa-life-ring nav-icon" style="color:#ef4444"></i> Disaster Recovery</span>
                 <i class="fas fa-chevron-down nav-group-arrow" id="arrow-grp-dr"></i>
             </button>
             <div class="nav-group-items open" id="items-grp-dr">
@@ -91,10 +102,10 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             </div>
         </div>
 
-        <!-- 4. Proteção & Defesa -->
+        <!-- 4. Proteção -->
         <div class="nav-group" id="grp-defense">
             <button class="nav-group-header" onclick="toggleNavGroup('grp-defense')" title="Proteção, Ransomware e Conformidade">
-                <span><i class="fas fa-shield-alt nav-icon"></i> Proteção</span>
+                <span><i class="fas fa-shield-alt nav-icon" style="color:#10b981"></i> Proteção</span>
                 <i class="fas fa-chevron-down nav-group-arrow" id="arrow-grp-defense"></i>
             </button>
             <div class="nav-group-items open" id="items-grp-defense">
@@ -107,7 +118,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         <!-- 5. Virtualização & Cloud -->
         <div class="nav-group" id="grp-virt">
             <button class="nav-group-header" onclick="toggleNavGroup('grp-virt')" title="Virtualização e Ambientes Cloud">
-                <span><i class="fas fa-cloud nav-icon"></i> Virtualização e Cloud</span>
+                <span><i class="fas fa-cloud nav-icon" style="color:#38bdf8"></i> Virtualização e Cloud</span>
                 <i class="fas fa-chevron-down nav-group-arrow" id="arrow-grp-virt"></i>
             </button>
             <div class="nav-group-items open" id="items-grp-virt">
@@ -121,21 +132,23 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         <!-- 6. Operações -->
         <div class="nav-group" id="grp-ops">
             <button class="nav-group-header" onclick="toggleNavGroup('grp-ops')" title="Operações, Alertas, Logs e Diagnósticos">
-                <span><i class="fas fa-chart-line nav-icon"></i> Operações</span>
+                <span><i class="fas fa-chart-line nav-icon" style="color:#f59e0b"></i> Operações</span>
                 <i class="fas fa-chevron-down nav-group-arrow" id="arrow-grp-ops"></i>
             </button>
             <div class="nav-group-items open" id="items-grp-ops">
                 <a href="/alerts.html" class="nav-link nav-sub" title="Alertas e Falhas de Execução"><i class="fas fa-bell nav-icon"></i> <span>Alertas e Falhas</span></a>
+                <a href="/failed-jobs.html" class="nav-link nav-sub" title="Jobs e Tarefas com Falha" style="color:var(--danger)"><i class="fas fa-exclamation-triangle nav-icon"></i> <span>Jobs com Falha</span></a>
                 <a href="/logs.html" class="nav-link nav-sub" title="Logs de Sistema e Auditoria"><i class="fas fa-file-alt nav-icon"></i> <span>Logs</span></a>
                 <a href="/diagnostic.html" class="nav-link nav-sub" title="Diagnóstico de Sistema, Auth e Schema"><i class="fas fa-stethoscope nav-icon"></i> <span>Diagnóstico</span></a>
                 <a href="/reports.html" class="nav-link nav-sub" title="Relatórios Executivos e Técnicos"><i class="fas fa-chart-pie nav-icon"></i> <span>Relatórios</span></a>
+                <a href="javascript:void(0)" onclick="if(typeof toggleHardwareHUD==='function')toggleHardwareHUD()" class="nav-link nav-sub" title="Telemetria Física & S.M.A.R.T. de Hardware"><i class="fas fa-microchip nav-icon"></i> <span>Telemetria Hardware HUD</span></a>
             </div>
         </div>
 
         <!-- 7. Configuração -->
         <div class="nav-group" id="grp-config">
             <button class="nav-group-header" onclick="toggleNavGroup('grp-config')" title="Configurações do Sistema">
-                <span><i class="fas fa-sliders-h nav-icon"></i> Configuração</span>
+                <span><i class="fas fa-sliders-h nav-icon" style="color:#a855f7"></i> Configuração</span>
                 <i class="fas fa-chevron-down nav-group-arrow" id="arrow-grp-config"></i>
             </button>
             <div class="nav-group-items open" id="items-grp-config">
@@ -144,6 +157,9 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 <a href="/storage-usage.html" class="nav-link nav-sub" title="Uso & Crescimento de Armazenamento"><i class="fas fa-hdd nav-icon"></i> <span>Armazenamento</span></a>
                 <a href="/engines.html" class="nav-link nav-sub" title="Motores Nativos, Duplicati, Hermes e Power Tools"><i class="fas fa-cogs nav-icon"></i> <span>Motores e Integrações</span></a>
                 <a href="/settings.html" class="nav-link nav-sub" title="Configurações Gerais do Agente"><i class="fas fa-cog nav-icon"></i> <span>Configurações Gerais</span></a>
+                <a href="/ui-style-selector.html" class="nav-link nav-sub" title="Estilos Visuais e Temas"><i class="fas fa-palette nav-icon"></i> <span>Estilos & Temas UI</span></a>
+                <a href="/onboarding.html" class="nav-link nav-sub" title="Guia Rápido e Onboarding"><i class="fas fa-compass nav-icon"></i> <span>Guia de Onboarding</span></a>
+                <a href="/changelog.html" class="nav-link nav-sub" title="Changelog e Notas de Versão"><i class="fas fa-clipboard-check nav-icon"></i> <span>Changelog</span></a>
             </div>
         </div>
     </nav>

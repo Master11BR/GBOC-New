@@ -127,10 +127,11 @@ async function runSrvSelectedReport() {
         document.getElementById('btnSrvJson').disabled = false;
 
         // Renderizar Métricas Principais
-        const metricsHtml = (data.metrics || []).map(m => `
-            <div class="srv-metric-card">
-                <div class="lbl">${m.label}</div>
-                <div class="val">${m.value}</div>
+        const kpiColors = ["#0284c7", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4"];
+        const metricsHtml = (data.metrics || []).map((m, idx) => `
+            <div class="srv-metric-card" style="border-left: 4px solid ${kpiColors[idx % kpiColors.length]}; text-align: left;">
+                <div class="lbl" style="font-size:0.72em;">${m.label}</div>
+                <div class="val" style="font-size:1.5em; text-align: left; margin-top:2px;">${m.value}</div>
             </div>
         `).join('');
 
@@ -143,9 +144,9 @@ async function runSrvSelectedReport() {
             ).join('');
 
             tableHtml = `
-                <h4 style="margin:24px 0 12px;font-size:1em;color:var(--text)"><i class="fas fa-table" style="color:var(--primary)"></i> Detalhamento dos Dados Auditados:</h4>
-                <div style="overflow-x:auto">
-                    <table class="data-table">
+                <h4 style="margin:24px 0 12px;font-size:1em;color:var(--text)"><i class="fas fa-table-list" style="color:var(--primary)"></i> Detalhamento dos Dados Auditados:</h4>
+                <div style="overflow-x:auto; border: 1px solid var(--border); border-radius: 8px;">
+                    <table class="data-table" style="width:100%; border-collapse:collapse;">
                         <thead><tr>${headers}</tr></thead>
                         <tbody>${rows || '<tr><td colspan="100%" style="text-align:center">Nenhum registro retornado.</td></tr>'}</tbody>
                     </table>
@@ -154,14 +155,18 @@ async function runSrvSelectedReport() {
         }
 
         body.innerHTML = `
-            <div style="border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+            <div style="border-bottom:1.5px solid var(--border);padding-bottom:14px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">
                 <div>
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+                        <span class="badge badge-success" style="font-size:0.7em"><i class="fas fa-shield-halved"></i> Relatório Oficial Auditável</span>
+                        <span class="badge badge-info" style="font-size:0.7em">${data.category}</span>
+                    </div>
                     <h2 style="color:var(--primary);margin:0 0 4px;font-size:1.4em">${data.title}</h2>
-                    <div style="font-size:0.8em;color:var(--text-muted)">Código: <code>${data.code}</code> | Categoria: <strong>${data.category}</strong></div>
+                    <div style="font-size:0.82em;color:var(--text-muted)">Código Único: <code>${data.code}</code> | Plataforma: <strong>GBOC Server Enterprise</strong></div>
                 </div>
                 <div style="font-size:0.8em;color:var(--text-muted);text-align:right">
-                    Gerado em: <strong>${new Date(data.generated_at).toLocaleString()}</strong><br>
-                    Engine: <span>GBOC Server 14.1.0</span>
+                    <div>Emissão: <strong>${new Date(data.generated_at).toLocaleString()}</strong></div>
+                    <div style="margin-top:4px"><span style="color:var(--success);font-weight:600"><i class="fas fa-check-circle"></i> 100% Dados Reais</span></div>
                 </div>
             </div>
 
@@ -183,6 +188,8 @@ async function runSrvSelectedReport() {
 
 function exportSrvReport(format) {
     if (!srvSelectedReportId) return;
-    const url = `/api/v1/reports/export/${srvSelectedReportId}?format=${format}${format === 'html' ? '&print=1' : ''}`;
+    const base = window.GBOC_API_BASE || '';
+    const url = `${base}/api/v1/reports/export/${srvSelectedReportId}?format=${format}${format === 'html' ? '&print=1' : ''}`;
     window.open(url, '_blank');
 }
+

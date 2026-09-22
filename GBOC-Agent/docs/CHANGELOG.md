@@ -1,8 +1,48 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.5.0 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.6.0 Enterprise. Todos os direitos reservados. -->
 
 # GBOC — Changelog de Atualizações
 
 > Histórico completo de versões, correções e melhorias do sistema GBOC (Agente + Servidor).
+
+---
+
+## 14.6.0 — 2026-09-20 (Operational Backup, Disaster Recovery & Canonical 7-Domain Architecture Release)
+
+### 🛡️ Arquitetura Operacional de Backup & Disaster Recovery (Zero-Mock End-to-End)
+- **Validação Operacional Real em Sandbox Hyper-V (`SureRestore` & `Virtual Lab`)**:
+  - Implementação do ciclo completo de teste de recuperabilidade: Restauração -> Criação de VM Hyper-V em switch isolado (`GBOC-VirtualLab-Switch` / `GBOC-SureRestore-Switch`) -> Boot -> Validação de heartbeat -> Coleta de evidência -> Desmontagem segura.
+  - Zero simulações: sem Hyper-V habilitado no host, o sistema reporta explicitamente a indisponibilidade do hypervisor ao invés de forjar status "OK".
+- **Validação Específica por Tipo de Carga de Trabalho**:
+  - **Bancos de Dados PostgreSQL**: Validação através de `pg_restore --list` e restauração real em schema temporário, falhando imediatamente caso o código de saída seja diferente de zero ou contenha erros estruturais.
+  - **Bancos de Dados SQLite**: Execução real de `PRAGMA integrity_check` e `PRAGMA foreign_key_check` sobre o arquivo restaurado, capturando corrupções reais.
+  - **System State & Bare-Metal**: Verificação física de componentes críticos (`wbadmin`, `NTDS`, `SYSVOL`, `Registry hives`) e drivers de boot WinPE sem fabricação de cabeçalhos.
+  - **Conversão P2V em Bloco**: Conversão física de volumes locais para disco virtual VHDX com validação prévia de privilégios de Administrador e streaming contínuo.
+
+### 🧭 Reestruturação Canônica de Navegação em 7 Domínios
+- **Navegação Modular Baseada em Operações de Negócio (`sidebar.js` & `_topbar.html`)**:
+  - Reorganização de todas as rotas do Agent e Server nos 7 domínios canônicos corporativos:
+    1. **Visão Geral**: Dashboard executivo, Overview e Auditoria/Logs.
+    2. **Backup**: Jobs, Políticas, Histórico, Repositórios e Agendamento.
+    3. **Disaster Recovery**: SureRestore, Virtual Lab, Failover, P2V e Live Recovery.
+    4. **Proteção**: Cargas Corporativas Consolidadas (Databases, Active Directory, Tape Library, Enterprise).
+    5. **Virtualização & Cloud**: Hyper-V, VMware, Cloud Storages e Object Storage (S3/Azure).
+    6. **Operações**: Monitor de Tarefas em tempo real, HUD de Telemetria e Alertas.
+    7. **Configuração**: Configurações Globais, Credenciais, Notificações, Atualizações e Estilos visuais.
+- **Consolidação de Workloads Protegidos (`protected-workloads.html`)**:
+  - Fusão e unificação de telas legadas dispersas em uma única interface moderna com deep-linking (`#databases`, `#activedirectory`, `#tape`, `#enterprise`) e redirecionamentos transparentes mantendo retrocompatibilidade total.
+
+### ⚡ Otimização de Performance e Integridade do Frontend
+- **Safe HTML Rendering com Diff Completo (`gboc-perf.js`)**:
+  - Substituição da verificação de tamanho parcial por comparação estrita de string (`safeRender`), evitando inconsistências visuais em atualizações parciais de HTML.
+- **Cancelamento de Requisições Obsoletas (`gbocPerf.makeCancellable()`)**:
+  - Suporte a `AbortController` nas rotinas de polling e navegação, prevenindo concorrência desnecessária no backend.
+- **Saneamento do Monitor de Tarefas (`task_monitor.js`)**:
+  - Remoção de declarações corrompidas e unificação de inicialização segura do monitor em tempo real.
+
+### 📦 Distribuição & Padronização Global
+- **Sincronização Canônica Universal**:
+  - Atualização dos scripts de build e distribuição (`build_installer_package.ps1`, `tools/make_distribution.py`).
+  - Elevação global de versão para **v14.6.0 Full Stable Enterprise**.
 
 ---
 

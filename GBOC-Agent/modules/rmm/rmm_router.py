@@ -280,8 +280,8 @@ async def rmm_system_info():
             },
             "disks": disks,
             "uptime_seconds": int(time.time() - psutil.boot_time()) if PSUTIL_AVAILABLE else 3600,
-            "gboc_version": getattr(sys.modules.get('version_control'), '__version__', '14.1.0'),
-            "agent_version": getattr(sys.modules.get('version_control'), '__version__', '14.1.0'),
+            "gboc_version": getattr(sys.modules.get('version_control'), '__version__', '14.6.0'),
+            "agent_version": getattr(sys.modules.get('version_control'), '__version__', '14.6.0'),
             "timestamp": datetime.now().isoformat()
         }
     except Exception as e:

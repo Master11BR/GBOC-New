@@ -1,6 +1,6 @@
 <!--
 ==============================================================================
-GBOC System v14.5.0 Enterprise Edition — Agente Local
+GBOC System v14.6.0 Enterprise Edition — Agente Local
 Horizontal Topbar Navigation — injected by gboc-layout-manager.js
 ==============================================================================
 -->
@@ -11,7 +11,7 @@ Horizontal Topbar Navigation — injected by gboc-layout-manager.js
     <!-- Logo Agente Local -->
     <a href="/index.html" class="tb-logo">
         <i class="fas fa-shield-alt tb-logo-icon"></i>
-        <span>GBOC Agent <span id="serverVersionBadge" style="opacity:0.85;font-weight:600;font-size:0.85em;background:rgba(255,255,255,0.12);padding:1px 6px;border-radius:4px;border:1px solid rgba(255,255,255,0.15)">v14.5.0</span></span>
+        <span>GBOC Agent <span id="serverVersionBadge" style="opacity:0.85;font-weight:600;font-size:0.85em;background:rgba(255,255,255,0.12);padding:1px 6px;border-radius:4px;border:1px solid rgba(255,255,255,0.15)">v14.6.0</span></span>
     </a>
 
     <div class="tb-divider" style="margin:0 6px 0 2px"></div>
@@ -26,9 +26,18 @@ Horizontal Topbar Navigation — injected by gboc-layout-manager.js
     <nav class="tb-nav" id="tb-main-nav">
 
         <!-- 1. Visão Geral -->
-        <a href="/index.html" class="tb-nav-link" id="tblink-dashboard">
-            <i class="fas fa-home"></i> Visão Geral
-        </a>
+        <div class="tb-dropdown">
+            <button class="tb-nav-link" id="tblink-overview">
+                <i class="fas fa-chart-pie"></i> Visão Geral
+                <i class="fas fa-chevron-down tb-arrow"></i>
+            </button>
+            <div class="tb-dropdown-menu">
+                <a href="/index.html" class="tb-dropdown-item"><i class="fas fa-home"></i> Dashboard Principal</a>
+                <a href="/overview.html" class="tb-dropdown-item"><i class="fas fa-tachometer-alt"></i> Visão Geral Executiva</a>
+                <a href="/statistics.html" class="tb-dropdown-item"><i class="fas fa-chart-line"></i> Estatísticas de Backup</a>
+                <a href="/audit.html" class="tb-dropdown-item"><i class="fas fa-clipboard-list"></i> Trilha de Auditoria</a>
+            </div>
+        </div>
 
         <!-- 2. Backup -->
         <div class="tb-dropdown">
@@ -40,7 +49,7 @@ Horizontal Topbar Navigation — injected by gboc-layout-manager.js
                 <a href="/tasks.html" class="tb-dropdown-item"><i class="fas fa-list-check"></i> Jobs e Políticas</a>
                 <a href="/protected-workloads.html" class="tb-dropdown-item"><i class="fas fa-cubes-stacked"></i> Cargas Protegidas (Bancos, AD, Fita, Enterprise)</a>
                 <a href="/repositories.html" class="tb-dropdown-item"><i class="fas fa-database"></i> Repositórios</a>
-                <a href="/restore.html" class="tb-dropdown-item"><i class="fas fa-undo"></i> Restaurar e Validar (SureRestore Sandbox)</a>
+                <a href="/restore.html" class="tb-dropdown-item"><i class="fas fa-undo"></i> Restaurar e Validar (SureRestore Sandbox & Integridade)</a>
             </div>
         </div>
 
@@ -93,9 +102,11 @@ Horizontal Topbar Navigation — injected by gboc-layout-manager.js
             </button>
             <div class="tb-dropdown-menu">
                 <a href="/alerts.html" class="tb-dropdown-item"><i class="fas fa-bell"></i> Alertas e Falhas</a>
+                <a href="/failed-jobs.html" class="tb-dropdown-item" style="color:var(--danger)"><i class="fas fa-exclamation-triangle"></i> Jobs com Falha</a>
                 <a href="/logs.html" class="tb-dropdown-item"><i class="fas fa-file-alt"></i> Logs</a>
                 <a href="/diagnostic.html" class="tb-dropdown-item"><i class="fas fa-stethoscope"></i> Diagnóstico</a>
                 <a href="/reports.html" class="tb-dropdown-item"><i class="fas fa-chart-pie"></i> Relatórios</a>
+                <a href="javascript:void(0)" onclick="if(typeof toggleHardwareHUD==='function')toggleHardwareHUD()" class="tb-dropdown-item"><i class="fas fa-microchip"></i> Telemetria Hardware HUD</a>
             </div>
         </div>
 
@@ -111,6 +122,9 @@ Horizontal Topbar Navigation — injected by gboc-layout-manager.js
                 <a href="/storage-usage.html" class="tb-dropdown-item"><i class="fas fa-hdd"></i> Armazenamento</a>
                 <a href="/engines.html" class="tb-dropdown-item"><i class="fas fa-cogs"></i> Motores e Integrações</a>
                 <a href="/settings.html" class="tb-dropdown-item"><i class="fas fa-cog"></i> Configurações Gerais</a>
+                <a href="/ui-style-selector.html" class="tb-dropdown-item"><i class="fas fa-palette"></i> Estilos & Temas UI</a>
+                <a href="/onboarding.html" class="tb-dropdown-item"><i class="fas fa-compass"></i> Guia de Onboarding</a>
+                <a href="/changelog.html" class="tb-dropdown-item"><i class="fas fa-clipboard-check"></i> Changelog</a>
             </div>
         </div>
 

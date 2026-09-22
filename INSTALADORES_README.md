@@ -1,8 +1,8 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.5.0 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.6.0 Enterprise. Todos os direitos reservados. -->
 
-# 📦 GBOC System v14.5.0 Enterprise — Guia Oficial de Instaladores & Implantação
+# 📦 GBOC System v14.6.0 Enterprise — Guia Oficial de Instaladores & Implantação
 
-Este guia detalha a instalação do **GBOC Server (Servidor Central)** e do **GBOC Agent (Agente Local e Remoto LAN)**.
+Este guia detalha a instalação e implantação do **GBOC Server (Servidor Central)** e do **GBOC Agent (Agente Local e Remoto LAN)**.
 
 ---
 
@@ -22,7 +22,7 @@ Este guia detalha a instalação do **GBOC Server (Servidor Central)** e do **GB
    ```powershell
    .\GBOC-Server\start_server.ps1
    ```
-4. Acesse o painel pelo navegador: **`https://localhost:8000`**
+4. Acesse o painel pelo navegador: **`http://localhost:8000`**
 
 ---
 
@@ -51,9 +51,7 @@ Para instalar o GBOC Agent em outros servidores ou estações de trabalho sem pr
 
 ---
 
----
-
-## 🎁 5. Instalador Unificado Enterprise & Pacote de Distribuição
+## 🎁 4. Instalador Unificado Enterprise & Pacote de Distribuição
 
 Para gerar uma pasta externa de distribuição limpa contendo o **Server**, o **Agent** e o **Instalador Unificado**:
 

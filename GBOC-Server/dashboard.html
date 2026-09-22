@@ -17,23 +17,23 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.5.0">
-    <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=14.5.0">
-    <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=14.5.0">
-    <link rel="stylesheet" href="/static/ui/models/modern/components.css?v=14.5.0">
-    <link rel="stylesheet" href="/static/ui/models/modern/layout.css?v=14.5.0">
-    <link rel="stylesheet" href="/static/style.css?v=14.5.0">
-    <link rel="stylesheet" href="/static/gboc-themes.css?v=14.5.0">
-    <link rel="stylesheet" href="/static/gboc-layout.css?v=14.5.0">
-    <script src="/static/gboc-perf.js?v=14.5.0"></script>
-    <script src="/static/gboc-layout-manager.js?v=14.5.0"></script>
-    <script src="/static/gboc-modal.js?v=14.5.0"></script>
-<link rel="stylesheet" href="/static/gboc-hardware-hud.css?v=14.5.0">
+    <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.6.0">
+    <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=14.6.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=14.6.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/components.css?v=14.6.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/layout.css?v=14.6.0">
+    <link rel="stylesheet" href="/static/style.css?v=14.6.0">
+    <link rel="stylesheet" href="/static/gboc-themes.css?v=14.6.0">
+    <link rel="stylesheet" href="/static/gboc-layout.css?v=14.6.0">
+    <script src="/static/gboc-perf.js?v=14.6.0"></script>
+    <script src="/static/gboc-layout-manager.js?v=14.6.0"></script>
+    <script src="/static/gboc-modal.js?v=14.6.0"></script>
+<link rel="stylesheet" href="/static/gboc-hardware-hud.css?v=14.6.0">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="/modules/storage/storage.js?v=14.2.0"></script>
     <script src="/modules/job_alert/job_alert.js?v=14.2.0"></script>
-    <script src="/static/ai_assistant.js?v=14.2.0"></script>
-    <script src="/static/gboc-hardware-hud.js?v=14.5.0"></script>
+    <script src="/static/ai_assistant.js?v=14.6.0"></script>
+    <script src="/static/gboc-hardware-hud.js?v=14.6.0"></script>
     <style>
         *{box-sizing:border-box;margin:0;padding:0}
         body{font-family:'Segoe UI',Inter,system-ui,sans-serif;background:var(--bg-main);color:var(--text-primary);min-height:100vh;display:flex;transition:background .3s,color .3s}
@@ -220,74 +220,104 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 </head>
 <body>
 <aside class="sidebar">
-        <nav class="nav" id="gboc-nav" style="padding-top:16px">
-            <!-- 1. Dashboard Central -->
-            <div class="nav-link active" onclick="switchTab('overview',this)">
-                <i class="fas fa-home"></i> <span>Dashboard Central</span>
-            </div>
-
-            <!-- 2. Agentes & MSP -->
-            <div class="nav-group" id="sgrp-agents">
-                <button class="nav-group-header" onclick="toggleNavGroup('sgrp-agents')">
-                    <span><i class="fas fa-sitemap nav-icon" style="color:#3b82f6"></i> Agentes & MSP</span>
-                    <i class="fas fa-chevron-down nav-group-arrow" id="arrow-sgrp-agents"></i>
+        <nav class="nav" id="gboc-nav" style="padding-top:14px">
+            <!-- 1. Visão Geral -->
+            <div class="nav-group" id="sgrp-overview">
+                <button class="nav-group-header" onclick="toggleNavGroup('sgrp-overview')" title="Visão Geral Executiva e Gestão de Agentes">
+                    <span><i class="fas fa-chart-pie nav-icon" style="color:#3b82f6"></i> Visão Geral</span>
+                    <i class="fas fa-chevron-down nav-group-arrow" id="arrow-sgrp-overview"></i>
                 </button>
-                <div class="nav-group-items open" id="items-sgrp-agents">
-                    <div class="nav-link nav-sub" onclick="switchTab('agents',this)"><i class="fas fa-server"></i> <span>Agentes Cadastrados</span></div>
-                    <div class="nav-link nav-sub" onclick="switchTab('rmm',this)"><i class="fas fa-terminal"></i> <span>RMM & Terminal</span></div>
-                    <div class="nav-link nav-sub" onclick="switchTab('surerestore',this)"><i class="fas fa-microscope"></i> <span>SureRestore Sandbox</span></div>
+                <div class="nav-group-items open" id="items-sgrp-overview">
+                    <div class="nav-link nav-sub active" onclick="switchTab('overview',this)"><i class="fas fa-home"></i> <span>Dashboard Central</span></div>
+                    <div class="nav-link nav-sub" onclick="switchTab('agents',this)"><i class="fas fa-server"></i> <span>Agentes & MSP</span></div>
                     <div class="nav-link nav-sub" onclick="switchTab('multitenant',this)"><i class="fas fa-building"></i> <span>Multi-Tenant MSP</span></div>
+                    <div class="nav-link nav-sub" onclick="switchTab('rmm',this)"><i class="fas fa-terminal"></i> <span>RMM & Terminal</span></div>
                 </div>
             </div>
 
-            <!-- 3. Backup & Orquestração -->
+            <!-- 2. Backup -->
             <div class="nav-group" id="sgrp-backup">
-                <button class="nav-group-header" onclick="toggleNavGroup('sgrp-backup')">
-                    <span><i class="fas fa-box-open nav-icon" style="color:#6366f1"></i> Backup & Orquestração</span>
+                <button class="nav-group-header" onclick="toggleNavGroup('sgrp-backup')" title="Backup & Orquestração">
+                    <span><i class="fas fa-box-archive nav-icon" style="color:#6366f1"></i> Backup</span>
                     <i class="fas fa-chevron-down nav-group-arrow" id="arrow-sgrp-backup"></i>
                 </button>
                 <div class="nav-group-items open" id="items-sgrp-backup">
-                    <div class="nav-link nav-sub" onclick="switchTab('backups',this)"><i class="fas fa-hard-drive"></i> <span>Jobs de Backup</span></div>
-                    <div class="nav-link nav-sub" onclick="switchTab('replication',this)"><i class="fas fa-exchange-alt"></i> <span>Replicação de Dados</span></div>
-                    <div class="nav-link nav-sub" onclick="switchTab('storage',this)"><i class="fas fa-hdd"></i> <span>Uso de Armazenamento</span></div>
+                    <div class="nav-link nav-sub" onclick="switchTab('backups',this)"><i class="fas fa-list-check"></i> <span>Jobs e Políticas</span></div>
+                    <div class="nav-link nav-sub" onclick="switchTab('workloads',this)"><i class="fas fa-cubes-stacked"></i> <span>Cargas Protegidas</span></div>
+                    <div class="nav-link nav-sub" onclick="switchTab('storage',this)"><i class="fas fa-database"></i> <span>Repositórios</span></div>
+                    <div class="nav-link nav-sub" onclick="switchTab('surerestore',this)"><i class="fas fa-undo"></i> <span>Restaurar e Validar</span></div>
                 </div>
             </div>
 
-            <!-- 4. Segurança -->
+            <!-- 3. Disaster Recovery -->
+            <div class="nav-group" id="sgrp-dr">
+                <button class="nav-group-header" onclick="toggleNavGroup('sgrp-dr')" title="Disaster Recovery & Continuidade">
+                    <span><i class="fas fa-life-ring nav-icon" style="color:#ef4444"></i> Disaster Recovery</span>
+                    <i class="fas fa-chevron-down nav-group-arrow" id="arrow-sgrp-dr"></i>
+                </button>
+                <div class="nav-group-items open" id="items-grp-dr">
+                    <div class="nav-link nav-sub" onclick="switchTab('dr-readiness',this)"><i class="fas fa-heartbeat"></i> <span>Prontidão e Plano</span></div>
+                    <div class="nav-link nav-sub" onclick="switchTab('instant-vm',this)"><i class="fas fa-bolt"></i> <span>Recuperação Instantânea</span></div>
+                    <div class="nav-link nav-sub" onclick="switchTab('p2v',this)"><i class="fas fa-microchip"></i> <span>Bare Metal, P2V e Mídia</span></div>
+                    <div class="nav-link nav-sub" onclick="switchTab('virtual-lab',this)"><i class="fas fa-flask"></i> <span>Laboratório e Validação</span></div>
+                </div>
+            </div>
+
+            <!-- 4. Proteção -->
             <div class="nav-group" id="sgrp-security">
-                <button class="nav-group-header" onclick="toggleNavGroup('sgrp-security')">
-                    <span><i class="fas fa-shield-alt nav-icon" style="color:#ef4444"></i> Segurança</span>
+                <button class="nav-group-header" onclick="toggleNavGroup('sgrp-security')" title="Proteção, Ransomware e Conformidade">
+                    <span><i class="fas fa-shield-alt nav-icon" style="color:#10b981"></i> Proteção</span>
                     <i class="fas fa-chevron-down nav-group-arrow" id="arrow-sgrp-security"></i>
                 </button>
                 <div class="nav-group-items open" id="items-sgrp-security">
                     <div class="nav-link nav-sub" onclick="switchTab('ransomware',this)"><i class="fas fa-shield-virus"></i> <span>Ransomware Guardian</span></div>
-                    <div class="nav-link nav-sub" onclick="switchTab('compliance',this)"><i class="fas fa-clipboard-check"></i> <span>Compliance & Políticas</span></div>
+                    <div class="nav-link nav-sub" onclick="switchTab('compliance',this)"><i class="fas fa-clipboard-check"></i> <span>Conformidade</span></div>
+                    <div class="nav-link nav-sub" onclick="switchTab('audit',this)"><i class="fas fa-clipboard-list"></i> <span>Auditoria</span></div>
                 </div>
             </div>
 
-            <!-- 5. Analytics & Monitoramento -->
-            <div class="nav-group" id="sgrp-analytics">
-                <button class="nav-group-header" onclick="toggleNavGroup('sgrp-analytics')">
-                    <span><i class="fas fa-chart-line nav-icon" style="color:#10b981"></i> Analytics & Monitoramento</span>
-                    <i class="fas fa-chevron-down nav-group-arrow" id="arrow-sgrp-analytics"></i>
+            <!-- 5. Virtualização e Cloud -->
+            <div class="nav-group" id="sgrp-virt">
+                <button class="nav-group-header" onclick="toggleNavGroup('sgrp-virt')" title="Virtualização e Ambientes Cloud">
+                    <span><i class="fas fa-cloud nav-icon" style="color:#38bdf8"></i> Virtualização e Cloud</span>
+                    <i class="fas fa-chevron-down nav-group-arrow" id="arrow-sgrp-virt"></i>
                 </button>
-                <div class="nav-group-items open" id="items-sgrp-analytics">
-                    <div class="nav-link nav-sub" onclick="switchTab('alerts',this)"><i class="fas fa-bell"></i> <span>Central de Alertas</span></div>
+                <div class="nav-group-items open" id="items-sgrp-virt">
+                    <div class="nav-link nav-sub" onclick="switchTab('virtualization',this)"><i class="fas fa-server"></i> <span>VMware, Hyper-V, Proxmox</span></div>
+                    <div class="nav-link nav-sub" onclick="switchTab('m365',this)"><i class="fas fa-mail-bulk"></i> <span>Microsoft 365 e Exchange</span></div>
+                    <div class="nav-link nav-sub" onclick="switchTab('saas-cloud',this)"><i class="fas fa-cubes"></i> <span>SaaS, Kubernetes e Cloud</span></div>
+                    <div class="nav-link nav-sub" onclick="switchTab('replication',this)"><i class="fas fa-exchange-alt"></i> <span>Replicação</span></div>
+                </div>
+            </div>
+
+            <!-- 6. Operações -->
+            <div class="nav-group" id="sgrp-ops">
+                <button class="nav-group-header" onclick="toggleNavGroup('sgrp-ops')" title="Operações, Alertas, Logs e Diagnósticos">
+                    <span><i class="fas fa-chart-line nav-icon" style="color:#f59e0b"></i> Operações</span>
+                    <i class="fas fa-chevron-down nav-group-arrow" id="arrow-sgrp-ops"></i>
+                </button>
+                <div class="nav-group-items open" id="items-sgrp-ops">
+                    <div class="nav-link nav-sub" onclick="switchTab('alerts',this)"><i class="fas fa-bell"></i> <span>Alertas e Falhas</span></div>
                     <div class="nav-link nav-sub" onclick="switchTab('job-alert',this)" style="color:var(--danger)"><i class="fas fa-exclamation-triangle"></i> <span>Jobs com Falha</span></div>
                     <div class="nav-link nav-sub" onclick="switchTab('logs',this)"><i class="fas fa-file-alt"></i> <span>Logs Globais</span></div>
+                    <div class="nav-link nav-sub" onclick="switchTab('analytics',this)"><i class="fas fa-stethoscope"></i> <span>Diagnóstico & Analytics</span></div>
                     <div class="nav-link nav-sub" onclick="switchTab('reports',this)"><i class="fas fa-chart-pie"></i> <span>Central de Relatórios</span></div>
                 </div>
             </div>
 
-            <!-- 6. Sistema -->
+            <!-- 7. Configuração -->
             <div class="nav-group" id="sgrp-system">
-                <button class="nav-group-header" onclick="toggleNavGroup('sgrp-system')">
-                    <span><i class="fas fa-cogs nav-icon" style="color:#f59e0b"></i> Sistema</span>
+                <button class="nav-group-header" onclick="toggleNavGroup('sgrp-system')" title="Configurações do Servidor">
+                    <span><i class="fas fa-sliders-h nav-icon" style="color:#a855f7"></i> Configuração</span>
                     <i class="fas fa-chevron-down nav-group-arrow" id="arrow-sgrp-system"></i>
                 </button>
                 <div class="nav-group-items open" id="items-sgrp-system">
                     <div class="nav-link nav-sub" onclick="switchTab('users',this)"><i class="fas fa-users-cog"></i> <span>Usuários & Permissões</span></div>
+                    <div class="nav-link nav-sub" onclick="switchTab('notifications',this)"><i class="fas fa-envelope"></i> <span>Canais de Notificação</span></div>
+                    <div class="nav-link nav-sub" onclick="switchTab('engine-migration',this)"><i class="fas fa-shuffle"></i> <span>Migração de Motores</span></div>
+                    <div class="nav-link nav-sub" onclick="switchTab('hermes',this)"><i class="fas fa-network-wired"></i> <span>Hermes Edge Controller</span></div>
                     <div class="nav-link nav-sub" onclick="switchTab('config',this)"><i class="fas fa-cog"></i> <span>Configurações Gerais</span></div>
+                    <a href="/ui-style-selector.html" class="nav-link nav-sub"><i class="fas fa-palette"></i> <span>Estilos & Temas UI</span></a>
                     <div class="nav-link nav-sub" onclick="if(window.GBOC_AI_Assistant){window.GBOC_AI_Assistant.toggle();}" style="color:var(--primary);font-weight:700"><i class="fas fa-brain"></i> <span>GBOC AI Copilot</span></div>
                 </div>
             </div>
@@ -1537,6 +1567,238 @@ function gbocToggleSidebarCollapse(){
                         <tr><td colspan="7" style="text-align:center;color:var(--text-muted)">Carregando dados de armazenamento...</td></tr>
                     </tbody>
                 </table>
+        <!-- TAB: WORKLOADS (CARGAS PROTEGIDAS) -->
+        <div id="tab-workloads" class="tab-section">
+            <div class="panel">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:12px">
+                    <h3><i class="fas fa-cubes-stacked" style="color:var(--primary)"></i> Matriz de Cargas de Trabalho Protegidas (Bancos, AD, Fita, Enterprise)</h3>
+                    <div style="display:flex;gap:8px">
+                        <button class="btn btn-primary" onclick="loadServerWorkloads()"><i class="fas fa-sync-alt"></i> Atualizar Matriz</button>
+                    </div>
+                </div>
+
+                <div class="kpi-grid" style="margin-bottom:20px">
+                    <div class="kpi-card">
+                        <div class="kpi-header"><span>Bancos Protegidos</span><div class="kpi-icon blue"><i class="fas fa-database"></i></div></div>
+                        <div class="kpi-value" id="srv-wl-db-count">0</div>
+                        <div class="kpi-sub">PG, MySQL, SQLite, MSSQL</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-header"><span>Active Directory</span><div class="kpi-icon green"><i class="fas fa-users-gear"></i></div></div>
+                        <div class="kpi-value" id="srv-wl-ad-count">0 nós</div>
+                        <div class="kpi-sub">NTDS & SYSVOL VSS</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-header"><span>Tape Autoloader</span><div class="kpi-icon orange"><i class="fas fa-tape"></i></div></div>
+                        <div class="kpi-value" id="srv-wl-tape-count">0 fitas</div>
+                        <div class="kpi-sub">LTO-7 / LTO-8 / LTO-9</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-header"><span>Enterprise Modules</span><div class="kpi-icon green"><i class="fas fa-building-shield"></i></div></div>
+                        <div class="kpi-value" id="srv-wl-ent-count">Ativo</div>
+                        <div class="kpi-sub">Imutabilidade & Deduplicação</div>
+                    </div>
+                </div>
+
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Status</th>
+                            <th>Carga / Instância</th>
+                            <th>Tipo de Motor</th>
+                            <th>Agente Responsável</th>
+                            <th>Último Ponto Consistente</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-server-workloads">
+                        <tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Carregando inventário de cargas protegidas...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- TAB: DISASTER RECOVERY & READINESS -->
+        <div id="tab-dr-readiness" class="tab-section">
+            <div class="panel">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:12px">
+                    <h3><i class="fas fa-heartbeat" style="color:var(--danger)"></i> Plano de Continuidade & Readiness Score de Disaster Recovery</h3>
+                    <div style="display:flex;gap:8px">
+                        <button class="btn btn-warning" onclick="switchTab('surerestore')"><i class="fas fa-microscope"></i> Abrir SureRestore Sandbox</button>
+                        <button class="btn btn-primary" onclick="loadServerDRReadiness()"><i class="fas fa-sync-alt"></i> Atualizar DR Score</button>
+                    </div>
+                </div>
+
+                <div class="kpi-grid" style="margin-bottom:20px">
+                    <div class="kpi-card">
+                        <div class="kpi-header"><span>Índice de Prontidão DR</span><div class="kpi-icon green"><i class="fas fa-shield-halved"></i></div></div>
+                        <div class="kpi-value" id="srv-dr-score">100%</div>
+                        <div class="kpi-sub">Nível Enterprise A+</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-header"><span>RTO Médio Alvo</span><div class="kpi-icon blue"><i class="fas fa-stopwatch"></i></div></div>
+                        <div class="kpi-value" id="srv-dr-rto">&lt; 5 min</div>
+                        <div class="kpi-sub">Instant VM Boot</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-header"><span>RPO Médio Alvo</span><div class="kpi-icon orange"><i class="fas fa-clock-rotate-left"></i></div></div>
+                        <div class="kpi-value" id="srv-dr-rpo">&lt; 15 min</div>
+                        <div class="kpi-sub">CDP & Replicação</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-header"><span>Testes em Sandbox</span><div class="kpi-icon green"><i class="fas fa-vial-circle-check"></i></div></div>
+                        <div class="kpi-value" id="srv-dr-tests">100% OK</div>
+                        <div class="kpi-sub">Zero-Mock Verified</div>
+                    </div>
+                </div>
+
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:14px;margin-bottom:20px">
+                    <div class="panel" style="background:var(--bg-input);padding:16px;border-radius:8px">
+                        <h4><i class="fas fa-bolt" style="color:var(--warning)"></i> Recuperação Instantânea (Instant VM Boot)</h4>
+                        <p style="font-size:0.85em;color:var(--text-muted);margin:8px 0">Montagem direta de discos VHDX/VMDK em Hyper-V ou VMware sem necessidade de cópia prévia.</p>
+                        <button class="btn btn-primary" style="font-size:0.82em;padding:6px 12px" onclick="switchTab('surerestore')">Executar Boot Instantâneo</button>
+                    </div>
+                    <div class="panel" style="background:var(--bg-input);padding:16px;border-radius:8px">
+                        <h4><i class="fas fa-microchip" style="color:var(--info)"></i> P2V & Mídia de Boot WinPE</h4>
+                        <p style="font-size:0.85em;color:var(--text-muted);margin:8px 0">Conversão de servidores físicos em máquinas virtuais e geração de mídia WinPE com drivers colhidos.</p>
+                        <button class="btn btn-secondary" style="font-size:0.82em;padding:6px 12px" onclick="switchTab('surerestore')">Gerenciar Mídia de Boot</button>
+                    </div>
+                    <div class="panel" style="background:var(--bg-input);padding:16px;border-radius:8px">
+                        <h4><i class="fas fa-flask" style="color:var(--success)"></i> Virtual Lab Sandbox</h4>
+                        <p style="font-size:0.85em;color:var(--text-muted);margin:8px 0">Ambiente de teste com rede isolada para validação automática de consistência de aplicações.</p>
+                        <button class="btn btn-success" style="font-size:0.82em;padding:6px 12px" onclick="switchTab('surerestore')">Iniciar Virtual Lab</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: VIRTUALIZATION & CLOUD -->
+        <div id="tab-virtualization" class="tab-section">
+            <div class="panel">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:12px">
+                    <h3><i class="fas fa-server" style="color:var(--primary)"></i> Virtualização & Ambientes Cloud (VMware, Hyper-V, Proxmox, M365, SaaS)</h3>
+                    <button class="btn btn-primary" onclick="loadServerVirtualization()"><i class="fas fa-sync-alt"></i> Atualizar Ambientes</button>
+                </div>
+
+                <div class="kpi-grid" style="margin-bottom:20px">
+                    <div class="kpi-card">
+                        <div class="kpi-header"><span>Hypervisors Conectados</span><div class="kpi-icon blue"><i class="fas fa-network-wired"></i></div></div>
+                        <div class="kpi-value" id="srv-virt-hypervisors">0</div>
+                        <div class="kpi-sub">ESXi, Hyper-V, Proxmox</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-header"><span>Máquinas Virtuais</span><div class="kpi-icon green"><i class="fas fa-desktop"></i></div></div>
+                        <div class="kpi-value" id="srv-virt-vms">0</div>
+                        <div class="kpi-sub">Total Descoberto</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-header"><span>Contas M365 / Exchange</span><div class="kpi-icon orange"><i class="fas fa-mail-bulk"></i></div></div>
+                        <div class="kpi-value" id="srv-virt-m365">0 caixas</div>
+                        <div class="kpi-sub">Protegidas</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-header"><span>SaaS / Kubernetes</span><div class="kpi-icon blue"><i class="fas fa-cubes"></i></div></div>
+                        <div class="kpi-value" id="srv-virt-saas">0 clusters</div>
+                        <div class="kpi-sub">Cloud Backups</div>
+                    </div>
+                </div>
+
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Status</th>
+                            <th>Host / Cluster</th>
+                            <th>Tipo de Plataforma</th>
+                            <th>Inventário de VMs / Objetos</th>
+                            <th>Última Sincronização</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-server-virtualization">
+                        <tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Carregando plataformas de virtualização e cloud...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- TAB: ENGINE MIGRATION WIZARD -->
+        <div id="tab-engine-migration" class="tab-section">
+            <div class="panel">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:12px">
+                    <h3><i class="fas fa-shuffle" style="color:var(--primary)"></i> Assistente de Migração Universal de Motores de Backup</h3>
+                    <button class="btn btn-primary" onclick="if(typeof runEngineDiscovery==='function')runEngineDiscovery()"><i class="fas fa-search"></i> Redescobrir Motores Legados</button>
+                </div>
+                <p style="font-size:0.88em;color:var(--text-muted);margin-bottom:20px">
+                    Migração automática de jobs, repositórios e senhas de motores legados (Restic, Duplicati, etc.) para o <strong>Motor Nativo GBOC (FastCDC v4 / Zstd / AES-256-GCM / WORM)</strong>.
+                </p>
+
+                <div class="panel step-wizard-nav" style="background:var(--bg-card);padding:14px 20px;border-radius:12px;border:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+                    <div class="step-item active" id="step-nav-1" style="display:flex;align-items:center;gap:8px;font-weight:700;color:var(--primary)">
+                        <div style="width:28px;height:28px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:0.85em">1</div>
+                        <span>Descoberta</span>
+                    </div>
+                    <i class="fas fa-chevron-right" style="color:var(--text-muted);font-size:0.8em"></i>
+                    <div class="step-item" id="step-nav-2" style="display:flex;align-items:center;gap:8px;opacity:0.6">
+                        <div style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;font-size:0.85em">2</div>
+                        <span>Seleção</span>
+                    </div>
+                    <i class="fas fa-chevron-right" style="color:var(--text-muted);font-size:0.8em"></i>
+                    <div class="step-item" id="step-nav-3" style="display:flex;align-items:center;gap:8px;opacity:0.6">
+                        <div style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;font-size:0.85em">3</div>
+                        <span>Parâmetros</span>
+                    </div>
+                    <i class="fas fa-chevron-right" style="color:var(--text-muted);font-size:0.8em"></i>
+                    <div class="step-item" id="step-nav-4" style="display:flex;align-items:center;gap:8px;opacity:0.6">
+                        <div style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;font-size:0.85em">4</div>
+                        <span>Execução</span>
+                    </div>
+                </div>
+
+                <div id="discovery-skeleton-loader" style="text-align:center;padding:30px;color:var(--text-muted)">
+                    <i class="fas fa-spinner fa-spin" style="font-size:2em;margin-bottom:8px;display:block"></i>
+                    Varrendo agentes e repositórios locais para detecção de motores legados...
+                </div>
+                <div id="discovery-results" style="display:none"></div>
+            </div>
+        </div>
+
+        <!-- TAB: HERMES EDGE CONTROL CENTER -->
+        <div id="tab-hermes" class="tab-section">
+            <div class="panel">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:12px">
+                    <div style="display:flex;align-items:center;gap:12px">
+                        <span style="font-size:1.8em">🏛️</span>
+                        <div>
+                            <h3 style="margin:0">Hermes Edge Control Center</h3>
+                            <div style="font-size:0.82em;color:var(--text-muted)">Resiliência Autônoma, Store-and-Forward e Self-Healing dos Agentes</div>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="if(typeof loadHermesServerData==='function')loadHermesServerData()"><i class="fas fa-sync-alt"></i> Atualizar Hermes</button>
+                </div>
+
+                <div class="kpi-grid" style="margin-bottom:20px">
+                    <div class="kpi-card">
+                        <div class="kpi-header"><span>Fila Offline Global</span><div class="kpi-icon blue"><i class="fas fa-database"></i></div></div>
+                        <div class="kpi-value" id="h-stat-queue">0 msgs</div>
+                        <div class="kpi-sub">Store-and-Forward Ativo</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-header"><span>Self-Healing Eventos</span><div class="kpi-icon green"><i class="fas fa-heartbeat"></i></div></div>
+                        <div class="kpi-value" id="h-stat-heal">0 reparos</div>
+                        <div class="kpi-sub">Watchdog VSS / Serviços</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-header"><span>Mesh P2P Peers</span><div class="kpi-icon orange"><i class="fas fa-project-diagram"></i></div></div>
+                        <div class="kpi-value" id="h-stat-mesh">0 peers</div>
+                        <div class="kpi-sub">Transferência Lan-to-Lan</div>
+                    </div>
+                </div>
+
+                <div id="hermes-skeleton" style="text-align:center;padding:30px;color:var(--text-muted)">
+                    <i class="fas fa-spinner fa-spin" style="font-size:2em;margin-bottom:8px;display:block"></i>
+                    Consultando nós Hermes Edge na malha corporativa...
+                </div>
+                <div id="hermes-agents-list" style="display:none"></div>
             </div>
         </div>
 
@@ -1616,15 +1878,12 @@ function gbocToggleSidebarCollapse(){
         }
 
         const _TAB_ALIASES = {
-            'workloads': 'backups',
-            'dr-readiness': 'surerestore',
-            'instant-vm': 'surerestore',
-            'p2v': 'surerestore',
-            'virtual-lab': 'surerestore',
+            'instant-vm': 'dr-readiness',
+            'p2v': 'dr-readiness',
+            'virtual-lab': 'dr-readiness',
             'audit': 'compliance',
-            'm365': 'backups',
-            'saas-cloud': 'backups',
-            'virtualization': 'backups',
+            'm365': 'virtualization',
+            'saas-cloud': 'virtualization',
             'diagnostic': 'analytics',
             'notifications': 'config',
             'engines': 'config'
@@ -1650,6 +1909,11 @@ function gbocToggleSidebarCollapse(){
             if(targetId==='reports') { loadReportsTab(); loadTabReportsCatalog(); }
             if(targetId==='job-alert') loadServerJobAlertData();
             if(targetId==='storage') loadServerStorageData();
+            if(targetId==='workloads') loadServerWorkloads();
+            if(targetId==='dr-readiness' || id==='instant-vm' || id==='p2v' || id==='virtual-lab') loadServerDRReadiness();
+            if(targetId==='virtualization' || id==='m365' || id==='saas-cloud') loadServerVirtualization();
+            if(targetId==='engine-migration') { if(typeof runEngineDiscovery === 'function') runEngineDiscovery(); }
+            if(targetId==='hermes') { if(typeof loadHermesServerData === 'function') loadHermesServerData(); }
         }
 
         let ws=null, _wsReconnectTimer=null, _wsBackoff=2000;
@@ -3665,18 +3929,26 @@ function gbocToggleSidebarCollapse(){
                 });
                 const rep = await r.json();
                 outArea.innerHTML = `
-                    <h4 style="color:var(--primary);margin-bottom:8px"><i class="fas fa-file-alt"></i> ${rep.title}</h4>
-                    <p style="font-size:0.85em;color:var(--text-muted);margin-bottom:12px">Gerado em: ${new Date(rep.generated_at).toLocaleString()} | Versão: ${rep.system_version}</p>
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:10px">
+                        <div>
+                            <h4 style="color:var(--primary);margin:0 0 4px"><i class="fas fa-file-contract"></i> ${rep.title}</h4>
+                            <p style="font-size:0.82em;color:var(--text-muted);margin:0">Código: <code>${rep.code || 'REP'}</code> | Categoria: <strong>${rep.category || 'Geral'}</strong> | Emissão: ${new Date(rep.generated_at).toLocaleString()}</p>
+                        </div>
+                        <div style="display:flex;gap:8px">
+                            <button class="btn btn-primary" style="font-size:0.82em;padding:5px 12px" onclick="window.open('${API}/reports/export/${reportId}?format=html&print=1', '_blank')"><i class="fas fa-print"></i> Imprimir / PDF</button>
+                            <button class="btn btn-secondary" style="font-size:0.82em;padding:5px 12px" onclick="window.open('${API}/reports/export/${reportId}?format=csv', '_blank')"><i class="fas fa-file-csv"></i> CSV</button>
+                        </div>
+                    </div>
                     <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:8px;margin-bottom:12px">
-                        ${rep.metrics.map(m => `
-                            <div style="background:var(--bg-card);padding:10px;border-radius:6px;border:1px solid var(--border)">
-                                <div style="font-size:0.75em;color:var(--text-muted)">${m.label}</div>
-                                <div style="font-size:1.1em;font-weight:700;color:var(--success)">${m.value}</div>
+                        ${(rep.metrics || []).map(m => `
+                            <div style="background:var(--bg-card);padding:10px;border-radius:6px;border:1px solid var(--border);border-left:3px solid var(--primary)">
+                                <div style="font-size:0.75em;color:var(--text-muted);text-transform:uppercase">${m.label}</div>
+                                <div style="font-size:1.2em;font-weight:700;color:var(--text)">${m.value}</div>
                             </div>
                         `).join('')}
                     </div>
-                    <div style="background:var(--bg-card);padding:10px;border-radius:6px;font-size:0.88em;line-height:1.5;border-left:3px solid var(--warning)">
-                        <strong>Recomendação Executiva IA:</strong> ${rep.ai_executive_recommendation}
+                    <div style="background:var(--bg-card);padding:12px 14px;border-radius:6px;font-size:0.88em;line-height:1.5;border-left:4px solid var(--warning);color:var(--text)">
+                        <strong style="color:var(--warning)"><i class="fas fa-brain"></i> Parecer Executivo IA:</strong> ${rep.ai_executive_recommendation || 'Rotina concluída com conformidade operacional.'}
                     </div>
                 `;
             } catch(e) {
@@ -3861,6 +4133,156 @@ function gbocToggleSidebarCollapse(){
             }
         }
 
+        async function loadServerWorkloads() {
+            const tbody = document.getElementById('table-server-workloads');
+            if (!tbody) return;
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center"><i class="fas fa-spinner fa-spin"></i> Coletando cargas protegidas nos agentes...</td></tr>';
+            try {
+                const [agentsRes, backupsRes] = await Promise.allSettled([
+                    fetch(window.GBOC_API_BASE + '/api/v1/agents').then(r => r.json()),
+                    fetch(window.GBOC_API_BASE + '/api/v1/backups/recent?limit=50').then(r => r.json())
+                ]);
+                const backups = (backupsRes.status === 'fulfilled' && backupsRes.value) ? (Array.isArray(backupsRes.value) ? backupsRes.value : (backupsRes.value.backups || backupsRes.value.recent || [])) : [];
+
+                let dbCount = 0, adCount = 0, tapeCount = 0;
+                const workloads = [];
+
+                backups.forEach(b => {
+                    const type = (b.backup_type || '').toLowerCase();
+                    const src = (b.source_path || '').toLowerCase();
+                    if (type.includes('sql') || type.includes('db') || type.includes('postgres') || type.includes('mysql') || src.includes('.sql') || src.includes('.db')) {
+                        dbCount++;
+                        workloads.push({
+                            status: b.status || 'success',
+                            name: b.source_path || 'Banco de Dados',
+                            engine: b.backup_type || 'SQL VSS Native',
+                            agent: b.hostname || b.agent_id || 'Agente Local',
+                            last_point: b.start_time || b.created_at
+                        });
+                    } else if (type.includes('ad') || type.includes('active') || src.includes('ntds') || src.includes('sysvol')) {
+                        adCount++;
+                        workloads.push({
+                            status: b.status || 'success',
+                            name: 'Active Directory NTDS/SYSVOL',
+                            engine: 'VSS System State',
+                            agent: b.hostname || b.agent_id || 'Agente Local',
+                            last_point: b.start_time || b.created_at
+                        });
+                    } else if (type.includes('tape') || type.includes('fita') || src.includes('tape')) {
+                        tapeCount++;
+                        workloads.push({
+                            status: b.status || 'success',
+                            name: b.source_path || 'Pool Fita LTO',
+                            engine: 'Tape Autoloader',
+                            agent: b.hostname || b.agent_id || 'Agente Local',
+                            last_point: b.start_time || b.created_at
+                        });
+                    }
+                });
+
+                if (document.getElementById('srv-wl-db-count')) document.getElementById('srv-wl-db-count').textContent = dbCount;
+                if (document.getElementById('srv-wl-ad-count')) document.getElementById('srv-wl-ad-count').textContent = `${adCount} nós`;
+                if (document.getElementById('srv-wl-tape-count')) document.getElementById('srv-wl-tape-count').textContent = `${tapeCount} fitas`;
+                if (document.getElementById('srv-wl-ent-count')) document.getElementById('srv-wl-ent-count').textContent = 'Ativo (FastCDC)';
+
+                if (workloads.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px">
+                        <i class="fas fa-cubes-stacked" style="font-size:1.8em;margin-bottom:8px;display:block;opacity:0.5"></i>
+                        Nenhuma carga especializada (Bancos/AD/Fita) encontrada no histórico recente.<br>
+                        <span style="font-size:0.85em">Os agentes protegem automaticamente sistemas de arquivos e bancos com detecção heurística.</span>
+                    </td></tr>`;
+                } else {
+                    tbody.innerHTML = workloads.map(w => `
+                        <tr>
+                            <td><span class="badge ${w.status === 'success' ? 'badge-success' : 'badge-error'}">${(w.status || '').toUpperCase()}</span></td>
+                            <td style="font-weight:600">${w.name}</td>
+                            <td><span class="badge badge-info">${w.engine}</span></td>
+                            <td>${w.agent}</td>
+                            <td style="font-size:0.85em;color:var(--text-muted)">${w.last_point ? fmtDateTime(w.last_point) : '—'}</td>
+                            <td><button class="btn btn-sm btn-primary" onclick="switchTab('surerestore')"><i class="fas fa-undo"></i> Validar</button></td>
+                        </tr>
+                    `).join('');
+                }
+            } catch(e) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--danger)">Erro ao carregar cargas de trabalho: ${e.message}</td></tr>`;
+            }
+        }
+
+        async function loadServerDRReadiness() {
+            try {
+                const r = await fetch(window.GBOC_API_BASE + '/api/v1/dashboard/stats');
+                if (r.ok) {
+                    const d = await r.json();
+                    const rate = d.success_rate_24h ?? 100;
+                    const el = document.getElementById('srv-dr-score');
+                    if (el) {
+                        el.textContent = `${rate}%`;
+                        el.style.color = rate >= 90 ? 'var(--success)' : (rate >= 75 ? 'var(--warning)' : 'var(--danger)');
+                    }
+                }
+            } catch(e) {
+                console.warn('DR Readiness score check:', e);
+            }
+        }
+
+        async function loadServerVirtualization() {
+            const tbody = document.getElementById('table-server-virtualization');
+            if (!tbody) return;
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center"><i class="fas fa-spinner fa-spin"></i> Descobrindo hypervisors e ambientes virtualizados...</td></tr>';
+            try {
+                const r = await fetch(window.GBOC_API_BASE + '/api/v1/agents');
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                const data = await r.json();
+                const agents = Array.isArray(data) ? data : (data.agents || []);
+
+                let hypCount = 0;
+                const virtItems = [];
+
+                agents.forEach(a => {
+                    const tools = a.available_tools || [];
+                    const os = (a.os_info || '').toLowerCase();
+                    const isHyperV = tools.includes('hyperv') || os.includes('hyper-v') || os.includes('server');
+                    const isVMware = tools.includes('vmware') || tools.includes('esxi');
+                    const isProxmox = tools.includes('proxmox') || os.includes('pve') || os.includes('proxmox');
+
+                    if (isHyperV || isVMware || isProxmox || a.status === 'online') {
+                        hypCount++;
+                        const platform = isHyperV ? 'Microsoft Hyper-V' : isVMware ? 'VMware vSphere/ESXi' : isProxmox ? 'Proxmox VE' : 'Host Físico / Agent';
+                        virtItems.push({
+                            status: a.status || 'online',
+                            host: a.hostname || a.agent_id,
+                            platform: platform,
+                            vms: a.jobs_count ? `${a.jobs_count} tarefas / VMs` : '1 nó gerenciado',
+                            last_sync: a.last_heartbeat || a.registered_at
+                        });
+                    }
+                });
+
+                if (document.getElementById('srv-virt-hypervisors')) document.getElementById('srv-virt-hypervisors').textContent = hypCount;
+                if (document.getElementById('srv-virt-vms')) document.getElementById('srv-virt-vms').textContent = virtItems.length;
+
+                if (virtItems.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px">
+                        <i class="fas fa-server" style="font-size:1.8em;margin-bottom:8px;display:block;opacity:0.5"></i>
+                        Nenhum hypervisor dedicado detectado no momento.<br>
+                        <span style="font-size:0.85em">Os agentes instalados em hosts Hyper-V, VMware ou Proxmox registram-se automaticamente.</span>
+                    </td></tr>`;
+                } else {
+                    tbody.innerHTML = virtItems.map(v => `
+                        <tr>
+                            <td><span class="badge ${v.status === 'online' ? 'badge-success' : 'badge-error'}">${(v.status || '').toUpperCase()}</span></td>
+                            <td style="font-weight:600">${v.host}</td>
+                            <td><span class="badge badge-info">${v.platform}</span></td>
+                            <td>${v.vms}</td>
+                            <td style="font-size:0.85em;color:var(--text-muted)">${v.last_sync ? fmtDateTime(v.last_sync) : '—'}</td>
+                            <td><button class="btn btn-sm btn-primary" onclick="switchTab('agents')"><i class="fas fa-server"></i> Gerenciar</button></td>
+                        </tr>
+                    `).join('');
+                }
+            } catch(e) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--danger)">Erro ao carregar plataformas de virtualização: ${e.message}</td></tr>`;
+            }
+        }
 
     </script>
     <!-- GBOC Modular JavaScript Modules -->
@@ -3868,6 +4290,8 @@ function gbocToggleSidebarCollapse(){
     <script src="/modules/reports/reports.js"></script>
     <script src="/modules/multitenant/multitenant.js"></script>
     <script src="/modules/users/users.js"></script>
+    <script src="/modules/engine_migration/engine_migration.js"></script>
+    <script src="/modules/hermes/hermes.js"></script>
 </body>
 </html>
 

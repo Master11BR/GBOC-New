@@ -1,8 +1,8 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.5.0 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.6.0 Enterprise. Todos os direitos reservados. -->
 
-# 📘 GBOC System v14.5.0 — Guia Master de Configurações, Parâmetros e Controle de IA
+# 📘 GBOC System v14.6.0 — Guia Master de Configurações, Parâmetros e Controle de IA
 
-[![GBOC Version](https://img.shields.io/badge/GBOC%20Version-14.5.0-blue.svg)](file:///d:/GBOC-New/GBOC-New/README.md)
+[![GBOC Version](https://img.shields.io/badge/GBOC%20Version-14.6.0-blue.svg)](file:///d:/GBOC-New/GBOC-New/README.md)
 [![UI Model](https://img.shields.io/badge/UI__MODEL-modern%20(Official)-indigo.svg)]()
 [![Status](https://img.shields.io/badge/status-active-brightgreen.svg)]()
 
@@ -16,17 +16,18 @@
 3. [Configuração da Engine de Inteligência Artificial (Local & Nuvem)](#3-configuração-da-engine-de-inteligência-artificial-local--nuvem)
 4. [Configuração do GBOC Server](#4-configuração-do-gboc-server)
 5. [Configuração do GBOC Agent & SharedCore](#5-configuração-do-gboc-agent--sharedcore)
-6. [Catálogo e Parâmetros dos 50 Relatórios Avançados](#6-catálogo-e-parâmetros-dos-50-relatórios-avançados)
-7. [Instaladores, Serviços Windows e Desinstalação](#7-instaladores-serviços-windows-e-desinstalação)
+6. [Parâmetros de Disaster Recovery, SureRestore Sandbox & Virtual Lab](#6-parâmetros-de-disaster-recovery-surerestore-sandbox--virtual-lab)
+7. [Catálogo e Parâmetros dos 50 Relatórios Avançados](#7-catálogo-e-parâmetros-dos-50-relatórios-avançados)
+8. [Instaladores, Serviços Windows e Desinstalação](#8-instaladores-serviços-windows-e-desinstalação)
 
 ---
 
 ## 1. 🏗️ Visão Geral de Arquitetura e Parâmetros
 
 O GBOC opera em uma estrutura distribuída e modular composta por:
-- **GBOC Server**: Controladora central em FastAPI + PostgreSQL 16 + Redis + DLQ.
-- **GBOC Agent**: Agente nativo executado como serviço Windows (`LocalSystem`) que orquestra motores de backup (Duplicati, Restic, Kopia e Native).
-- **AI Diagnostic Engine**: Engine de inteligência artificial de modo duplo (IA Local via Ollama/LocalAI ou IA em Nuvem via OpenAI/Claude).
+- **GBOC Server**: Controladora central em FastAPI + PostgreSQL 16 + Redis + DLQ com taxonomia canônica de 7 domínios de negócio.
+- **GBOC Agent**: Agente nativo executado como serviço Windows (`LocalSystem`) que orquestra motores de backup (FastCDC Native, Duplicati, Restic, Kopia), Disaster Recovery e Virtual Lab Sandbox.
+- **AI Diagnostic Engine**: Engine de inteligência artificial de modo duplo (IA Local via Ollama/LocalAI ou IA em Nuvem via OpenAI/Claude/Gemini/DeepSeek).
 
 ---
 
@@ -65,7 +66,7 @@ DEAD_LETTER_QUEUE_ENABLED=true
 DLQ_FILE="data/dead_letter_queue.jsonl"
 
 # Engine de IA (Local & Nuvem)
-AI_PROVIDER="auto"                                   # Opções: 'auto', 'local', 'openai', 'anthropic'
+AI_PROVIDER="auto"                                   # Opções: 'auto', 'local', 'openai', 'anthropic', 'gemini', 'deepseek'
 LOCAL_LLM_URL="http://localhost:11434/api/generate" # Ollama / LocalAI
 OPENAI_API_KEY=""                                    # Opcional (sk-...)
 ANTHROPIC_API_KEY=""                                 # Opcional (sk-ant-...)
@@ -86,6 +87,13 @@ SHARED_CORE_LOG_LEVEL="INFO"
 RESTIC_PATH="C:\GBOC\Tools\Restic\restic.exe"
 KOPIA_PATH="C:\GBOC\Tools\Kopia\kopia.exe"
 DUPLICATI_PATH="C:\GBOC\Tools\Duplicati\Duplicati.CommandLine.exe"
+
+# Disaster Recovery, P2V & Virtual Lab Sandbox
+DR_EXPORTS_DIR="C:\GBOC-DR"
+VIRTUAL_LAB_SWITCH_NAME="GBOC-Isolated-Lab"
+VIRTUAL_LAB_TIMEOUT_SECONDS=120
+P2V_DEFAULT_FORMAT="VHDX"
+P2V_DYNAMIC_EXPANDABLE=true
 
 # Ransomware Shield & IA Local
 SHIELD_ENABLED=true
@@ -128,17 +136,28 @@ As configurações do servidor são gerenciadas pela API REST `/api/v1/server/se
 O `SharedCore` é o orquestrador nativo do Agente.
 
 ### Recursos Configuráveis:
-1. **Ransomware Shield v14.1.0**:
+1. **Ransomware Shield v14.6.0**:
    - Cria arquivos canário estratégicos (`.gboc_canary_repos`).
    - Bloqueia automaticamente processos suspeitos que tentem modificar canários em massa.
 2. **Duplicati Native Engine**:
    - Suporta autenticação dupla: **JWT Bearer** para Duplicati v2.3+ e **XSRF** para versões legadas v2.0+.
-3. **Módulo de Recovery**:
-   - Restauração pontual granulada diretamente para pastas locais ou alvos remotos.
+3. **Módulo de Recovery & Cargas Protegidas**:
+   - Orquestração de Bancos de Dados (PostgreSQL, MySQL, SQLite, SQL Server), Active Directory NTDS/SYSVOL, Fita LTO e Workloads Enterprise.
 
 ---
 
-## 6. 📊 Catálogo e Parâmetros dos 50 Relatórios Avançados
+## 6. 🔬 Parâmetros de Disaster Recovery, SureRestore Sandbox & Virtual Lab
+
+| Parâmetro | Padrão | Descrição |
+| :--- | :--- | :--- |
+| `VIRTUAL_LAB_SWITCH_NAME` | `GBOC-Isolated-Lab` | Nome do switch virtual privado Hyper-V sem acesso à placa física (Zero-Collision). |
+| `VIRTUAL_LAB_TIMEOUT_SECONDS` | `120` | Tempo limite de espera para detecção de heartbeat WMI do Guest SO em sandbox. |
+| `P2V_DEFAULT_FORMAT` | `VHDX` | Formato padrão de saída na conversão físico-para-virtual (`VHDX` para Hyper-V/Proxmox QEMU). |
+| `P2V_DYNAMIC_EXPANDABLE` | `true` | Alocação dinâmica de espaço em disco no contêiner VHDX. |
+
+---
+
+## 7. 📊 Catálogo e Parâmetros dos 50 Relatórios Avançados
 
 O GBOC expõe 50 relatórios executivos via `/api/v1/reports/catalog` e `/api/v1/reports/generate`:
 
@@ -148,7 +167,7 @@ O GBOC expõe 50 relatórios executivos via `/api/v1/reports/catalog` e `/api/v1
 
 ---
 
-## 7. ⚙️ Instaladores, Serviços Windows e Desinstalação
+## 8. ⚙️ Instaladores, Serviços Windows e Desinstalação
 
 ### Instalação via PowerShell (Como Administrador)
 ```powershell
@@ -180,4 +199,4 @@ cd d:\GBOC-New\GBOC-New\GBOC-Server
 
 ---
 
-**GBOC System v14.3.0** — Guia Oficial de Parâmetros e Configuração.
+**GBOC System v14.6.0** — Guia Oficial de Parâmetros e Configuração.

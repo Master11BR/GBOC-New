@@ -1,6 +1,6 @@
-# 📐 GBOC System v14.5.0 Enterprise — Diretrizes e Políticas de Arquitetura Modular
+# 📐 GBOC System v14.6.0 Enterprise — Diretrizes e Políticas de Arquitetura Modular
 
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.5.0 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.6.0 Enterprise. Todos os direitos reservados. -->
 
 Este documento estabelece as **Políticas de Arquitetura Obrigatórias** para o desenvolvimento e manutenção do **GBOC Server** e do **GBOC Agent**.
 
@@ -28,105 +28,45 @@ Este documento estabelece as **Políticas de Arquitetura Obrigatórias** para o 
 
 ---
 
-## 📁 Estrutura de Módulos (GBOC-Server)
+## 🗺️ 5. Estrutura Canônica de Navegação (7 Domínios de Negócio)
 
-```
-GBOC-Server/
-├── modules/
-│   ├── overview/        (overview_router.py, overview.js, overview.html)
-│   ├── rmm/             (rmm_router.py, rmm.js, rmm.html)
-│   ├── agents/          (agents_router.py, agents.js, agents.html)
-│   ├── backups/         (backups_router.py, backups.js, backups.html)
-│   ├── surerestore/     (surerestore_router.py, surerestore.js, surerestore.html)
-│   ├── multitenant/     (multitenant_router.py, multitenant.js, multitenant.html)
-│   ├── analytics/       (analytics_router.py, analytics.js, analytics.html)
-│   ├── ransomware/      (ransomware_router.py, ransomware.js, ransomware.html)
-│   ├── compliance/      (compliance_router.py, compliance.js, compliance.html)
-│   ├── alerts/          (alerts_router.py, alerts.js, alerts.html)
-│   ├── job_alert/       (job_alert_router.py, job_alert.js, job_alert.html)
-│   ├── storage/         (storage_router.py, storage.js, storage.html)
-│   ├── replication/     (replication_router.py, replication.js, replication.html)
-│   ├── logs/            (logs_router.py, logs.js, logs.html)
-│   ├── reports/         (reports_router.py, reports.js, reports.html)
-│   ├── users/           (users_router.py, users.js, users.html)
-│   └── config/          (config_router.py, config.js, config.html)
-```
+A interface e as APIs do sistema devem obrigatoriamente refletir a taxonomia de negócio consolidada:
+
+1. **Visão Geral**: Dashboard executivo e telemetria operacional.
+2. **Backup**: Jobs e Políticas (`tasks.html`), Cargas Protegidas (`protected-workloads.html` - Bancos, AD, LTO, Enterprise), Repositórios (`repositories.html`), Restaurar e Validar (`restore.html`).
+3. **Disaster Recovery**: Prontidão e Plano, Recuperação Instantânea (Instant VM Boot), Bare Metal / P2V e Mídia WinPE (`disaster-recovery.html`), Laboratório Isolado (`virtual-lab`).
+4. **Proteção**: Ransomware Guardian (`ransomware.html`), Conformidade (`compliance.html`), Trilha de Auditoria (`audit.html`).
+5. **Virtualização e Cloud**: VMware, Hyper-V e Proxmox (`virtualization.html`), Microsoft 365 e Exchange (`m365-exchange.html`), SaaS, Kubernetes e Cloud (`saas-cloud-enterprise.html`), Replicação (`replication.html`).
+6. **Operações**: Alertas e Falhas (`alerts.html`, `failed-jobs.html`), Logs Globais (`logs.html`), Diagnóstico Unificado (`diagnostic.html`), Relatórios (`reports.html`).
+7. **Configuração**: Usuários e Permissões (`users.html`), Notificações (`notification-channels.html`), Armazenamento (`storage-usage.html`), Motores e Integrações (`engines.html`), Configurações Gerais (`settings.html`).
 
 ---
 
-## 📁 Estrutura de Módulos (GBOC-Agent)
+## 🛡️ 6. Política Zero-Mock de Recuperação e Validação Operacional
 
-```
-GBOC-Agent/
-├── modules/
-│   ├── rmm/             (rmm_router.py)
-│   ├── cbt/             (cbt_router.py)
-│   ├── dr/              (dr_router.py)
-│   ├── security/        (security_router.py)
-│   ├── job_alert/       (job_alert_router.py)
-│   ├── storage/         (storage_router.py)
-│   ├── logs/            (logs_router.py)
-│   └── config/          (config_router.py)
-```
+> ⚠️ **REGRA ZERO-MOCK IMPERATIVA:**
+> É estritamente proibido simular estados de saúde, recuperação ou boot de máquinas virtuais. Um ponto de backup só pode ser rotulado como "Recuperável" após validação real na sua respectiva carga:
+> 
+> 1. **SureRestore & Virtual Lab**: Execução em VM de teste temporária em switch isolado (`GBOC-Isolated-Lab`) com verificação real de heartbeat WMI / Guest Service e teardown seguro. Estados permitidos: `Aprovado`, `Reprovado`, `Inconclusivo`, `Expirado`.
+> 2. **Bancos de Dados**: Restauração real em banco temporário isolado. `_test_restore_pg` DEVE falhar explicitamente caso `pg_restore` retorne código != 0; SQLite DEVE executar `PRAGMA integrity_check;`.
+> 3. **P2V (Physical-to-Virtual)**: Streaming real de blocos do disco físico ou snapshot VSS para contêiner VHDX com geração de manifesto `.vmconfig.json`.
+> 4. **System State & AD**: Execução de `wbadmin start systemstatebackup` e catálogo de consistência NTDS.dit/SYSVOL com manifesto SHA-256 (`dr_manifest.json`).
+> 5. **Mídia de Boot**: Extração real de drivers com `Export-WindowsDriver` e compilação de ISO bootável autêntica (proibida a geração de arquivos vazios ou cabeçalhos fictícios).
 
 ---
 
-## 🔄 5. Atualização Obrigatória dos Módulos de Distribuição
+## 🔄 7. Atualização Obrigatória dos Módulos de Distribuição
 
-> ⚠️ **REGRA IMPERATIVA DE DESENVOLVIMENTO:**
-> A cada novo arquivo, módulo ou funcionalidade criada, alterada ou refatorada no código-fonte do sistema (`GBOC-Server` ou `GBOC-Agent`), o script de empacotamento e compilação de distribuição (`build_installer_package.ps1` / `tools/make_distribution.py`) **DEVE ser obrigatoriamente executado** para sincronizar e atualizar a pasta externa de distribuição (`GBOC-Distribution`).
-
----
-
-## 🎨 6. Diretrizes de Motion Principles & UX Engine (Kyle Zantos Motion Principles)
-
-> 🎬 **PADRÃO DE ANIMACAO E INTERFACE DE USUARIO:**
-> Toda nova tela, módulo, tabela ou componente visual criado ou atualizado no `GBOC-Server` ou `GBOC-Agent` DEVE obrigatoriamente implementar:
-> 1. **Skeleton Screens (Loaders)**: Exibir esqueletos animados com efeito shimmer (`.skeleton`, `.skeleton-card`, `.skeleton-table-row`) durante o carregamento de dados remotos/APIs, evitando telas em branco.
-> 2. **Lazy Loading**: Utilizar a classe `.lazy-load` e `GBOCMotion.initLazyLoading()` (Intersection Observer) para adiar o carregamento de componentes visuais até que entrem na viewport.
-> 3. **Smooth Animations de Entrada e Saída**: Suavizar a transição de visualização com `.motion-slide-up`, `.motion-fade-in` (entradas), `.motion-fade-out` (saídas) e efeito hover elevation (`.motion-hover-lift`).
-> 4. **Progress Fluid Bar**: Barras de progresso contínuas e fluidas (`.progress-fluid-bar`) para upload, download, backups e tarefas de restauração.
+> ⚠️ **REGRA IMPERATIVA DE BUILD:**
+> A cada novo arquivo, módulo ou funcionalidade criada, alterada ou refatorada no código-fonte do sistema (`GBOC-Server` ou `GBOC-Agent`), o script de empacotamento (`build_installer_package.ps1` / `tools/make_distribution.py`) **DEVE ser obrigatoriamente executado**.
+> O build executa o gatekeeper `python tools/sync_css.py --verify` e falha imediatamente caso haja qualquer divergência de CSS ou JS compartilhado.
 
 ---
 
-## 📡 7. Observabilidade e Telemetria Corporativa
-
-> 🌐 **STACK DE OBSERVABILIDADE:**
-> O GBOC Server e o GBOC Agent possuem suporte nativo e obrigatório à telemetria de produção:
-> - **Sentry**: Rastreamento avançado de exceções de runtime e erros de requisições.
-> - **OpenTelemetry (OTel)**: Rastreamento distribuído padrão W3C (spans, traces e métricas ativas).
-> - **Datadog & NewRelic**: Monitoramento de APM e performance de transações de banco de dados e jobs.
-> - Módulo de integração: `GBOC-Server/modules/telemetry/telemetry_engine.py` e `GBOC-Agent/engines/telemetry_engine.py`.
-
----
-
-## 🛠️ 8. Qualidade, Governança & Linting de Código
-
-> 📏 **FERRAMENTAS DE GOVERNANÇA:**
-> Todo código produzido no repositório DEVE obrigatoriamente respeitar as regras estáticas de linting:
-> - **Arch-contract** (`arch_contract.json`): Validação imperativa da arquitetura 1 Módulo = 1 Diretório e Zero-Mock Policy.
-> - **Biome** (`biome.json`): Linter e formatador de ultra-alta velocidade para JavaScript, CSS e JSON.
-> - **Commitlint** (`.commitlintrc.json`): Padronização internacional de mensagens de commit (Conventional Commits).
-> - **Knip** (`knip.json`): Detecção automática de código morto, exportações não utilizadas e arquivos orfãos.
-> - **Stryker** (`stryker.config.json`): Testes de mutação para garantir a eficácia da suíte de validação.
-
----
-
-## 🧪 9. Suíte de Testes Unitários, Integração & End-to-End (E2E)
-
-> 🚦 **PILAR DE GARANTIA DE QUALIDADE:**
-> - **Playwright E2E** (`playwright.config.js` e `tests/e2e/`): Testes automatizados End-to-End em navegadores reais (Chromium, Firefox) validando o Dashboard e as APIs do Server e Agent.
-> - **Pytest** (`pytest.ini`): Testes unitários e de integração de serviços de backend e banco de dados.
-> - **Codecov** (`.codecov.yml`): Relatórios automatizados de cobertura de código (mínimo exigido de 80%).
-
----
-
----
-
-## 🎨 10. Arquitetura Universal de CSS & Política Zero CSS Isolado
+## 🎨 8. Arquitetura Universal de CSS & Política Zero CSS Isolado
 
 > 💎 **UNIVERSALIZAÇÃO TOTAL DE CSS EM TODO O ECOSSISTEMA:**
-> A partir da versão 14.5.0+, todos os estilos visuais, tokens de design, layouts e temas do GBOC System são rigorosamente universalizados e compartilhados entre `GBOC-Server` e `GBOC-Agent`.
+> Todos os estilos visuais, tokens de design, layouts e temas do GBOC System são rigorosamente universalizados e compartilhados entre `GBOC-Server` e `GBOC-Agent`.
 > 
 > **Stack Padrão Universal de CSS:**
 > 1. **`style.css`**: Framework base de componentes universais (Reset, Cards, Botões, Tabelas, Badges, Formulários, Toasts, Loaders e Modais).
@@ -134,14 +74,21 @@ GBOC-Agent/
 > 3. **`gboc-layout.css`**: Motor de Layout Universal (Sidebar Vertical, Topbar Horizontal, Collapse Responsivo e Zero-Overflow em 4K/FHD/HD/Mobile).
 > 4. **`gboc-hardware-hud.css`**: HUD Universal de Telemetria de Hardware em Tempo Real.
 > 5. **`gboc-file-picker.css`**: Componente Universal de Navegação de Árvore de Diretórios e Arquivos.
->
-> **Regras Obrigatórias de CSS:**
-> - **Proibição de CSS Isolado/Órfão**: É estritamente proibido criar arquivos CSS fragmentados ou divergentes. Todo e qualquer CSS do sistema deve residir na stack universal e ser idêntico no Servidor e no Agente.
-> - **Inclusão Padrão nos Documentos HTML**: Todas as páginas HTML do sistema devem carregar os arquivos CSS universais na ordem canônica padrão.
-> - **Uso Estrito de Design Tokens**: Todos os componentes, fragmentos e módulos devem utilizar exclusivamente as variáveis CSS do sistema (`var(--bg-card)`, `var(--text)`, `var(--border)`, `var(--primary)`, `var(--card-radius)`, `var(--card-shadow)`, etc.).
 
 ---
 
-## ⚠️ Regra para Assistentes de IA e Desenvolvedores
-Sempre que for criar uma nova funcionalidade ou ajustar uma existente, identifique o módulo correspondente em `modules/<nome_modulo>/` e faça as alterações nele. Nunca adicione blocos gigantes de código diretamente em `server_gboc.py` ou `dashboard.html`.
-A cada novo arquivo ou alteração finalizada, execute a compilação do pacote de distribuição com `build_installer_package.ps1` e assegure os Motion Principles, Universalização de CSS, Observabilidade e Testes.
+## 🎬 9. Diretrizes de Motion Principles & UX Engine (Kyle Zantos)
+
+> Toda nova tela ou componente DEVE implementar:
+> 1. **Skeleton Screens**: Efeito shimmer durante carregamento assíncrono.
+> 2. **Lazy Loading**: `GBOCMotion.initLazyLoading()` para carregamento sob demanda via Intersection Observer.
+> 3. **Smooth Animations**: Transições de entrada/saída suaves (`.motion-slide-up`, `.motion-fade-in`).
+> 4. **Cancelamento de Requisições**: Utilização de `gbocPerf.makeCancellable()` para abortar requisições em polling ou trocas de contexto.
+
+---
+
+## 📡 10. Observabilidade, Governança & Testes
+
+> - **Sentry & OpenTelemetry**: Rastreamento distribuído e telemetria contínua.
+> - **Pytest**: Testes unitários e de integração obrigatórios (Zero-Mock test suite).
+> - **Playwright E2E**: Testes End-to-End em navegadores reais.
