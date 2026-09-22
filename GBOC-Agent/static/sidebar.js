@@ -338,15 +338,72 @@ class UnifiedSidebar {
 
         const fallbackHtml = `
         <aside class="sidebar">
-            <nav class="nav" style="padding-top:16px">
-                <a href="/index.html" class="nav-link ${this.currentPage === 'dashboard' ? 'active' : ''}"><i class="fas fa-home nav-icon"></i> <span>Dashboard Agente</span></a>
-                <div class="nav-group" id="fb-grp-tasks">
-                    <button class="nav-group-header" onclick="toggleNavGroup('fb-grp-tasks')"><span><i class="fas fa-tasks nav-icon"></i> Tarefas & Motores</span><i class="fas fa-chevron-down nav-group-arrow"></i></button>
-                    <div class="nav-group-items open" id="items-fb-grp-tasks">
-                        <a href="/tasks.html" class="nav-link nav-sub"><i class="fas fa-list-check nav-icon"></i> <span>Tarefas de Backup</span></a>
-                        <a href="/repositories.html" class="nav-link nav-sub"><i class="fas fa-database nav-icon"></i> <span>Repositórios Locais</span></a>
-                        <a href="/restore.html" class="nav-link nav-sub"><i class="fas fa-undo nav-icon"></i> <span>Assistente Restauração</span></a>
-                        <a href="/engines.html" class="nav-link nav-sub"><i class="fas fa-cogs nav-icon"></i> <span>Motores Nativos</span></a>
+            <nav class="nav" id="gboc-nav" style="padding-top:14px">
+                <div class="nav-group" id="fb-grp-overview">
+                    <button class="nav-group-header" onclick="toggleNavGroup('fb-grp-overview')"><span><i class="fas fa-chart-pie nav-icon" style="color:#3b82f6"></i> Visão Geral</span><i class="fas fa-chevron-down nav-group-arrow"></i></button>
+                    <div class="nav-group-items open" id="items-fb-grp-overview">
+                        <a href="/index.html" class="nav-link nav-sub"><i class="fas fa-home nav-icon"></i> <span>Dashboard Principal</span></a>
+                        <a href="/overview.html" class="nav-link nav-sub"><i class="fas fa-tachometer-alt nav-icon"></i> <span>Visão Geral Executiva</span></a>
+                        <a href="/statistics.html" class="nav-link nav-sub"><i class="fas fa-chart-line nav-icon"></i> <span>Estatísticas de Backup</span></a>
+                    </div>
+                </div>
+                <div class="nav-group" id="fb-grp-backup">
+                    <button class="nav-group-header" onclick="toggleNavGroup('fb-grp-backup')"><span><i class="fas fa-box-archive nav-icon" style="color:#6366f1"></i> Backup</span><i class="fas fa-chevron-down nav-group-arrow"></i></button>
+                    <div class="nav-group-items open" id="items-fb-grp-backup">
+                        <a href="/tasks.html" class="nav-link nav-sub"><i class="fas fa-list-check nav-icon"></i> <span>Jobs e Políticas</span></a>
+                        <a href="/protected-workloads.html" class="nav-link nav-sub"><i class="fas fa-cubes-stacked nav-icon"></i> <span>Cargas Protegidas</span></a>
+                        <a href="/repositories.html" class="nav-link nav-sub"><i class="fas fa-database nav-icon"></i> <span>Repositórios</span></a>
+                        <a href="/restore.html" class="nav-link nav-sub"><i class="fas fa-undo nav-icon"></i> <span>Restaurar e Validar</span></a>
+                    </div>
+                </div>
+                <div class="nav-group" id="fb-grp-dr">
+                    <button class="nav-group-header" onclick="toggleNavGroup('fb-grp-dr')"><span><i class="fas fa-life-ring nav-icon" style="color:#ef4444"></i> Disaster Recovery</span><i class="fas fa-chevron-down nav-group-arrow"></i></button>
+                    <div class="nav-group-items open" id="items-fb-grp-dr">
+                        <a href="/disaster-recovery.html?tab=readiness" class="nav-link nav-sub"><i class="fas fa-heartbeat nav-icon"></i> <span>Prontidão e Plano</span></a>
+                        <a href="/disaster-recovery.html?tab=instant-vm" class="nav-link nav-sub"><i class="fas fa-bolt nav-icon"></i> <span>Recuperação Instantânea</span></a>
+                        <a href="/disaster-recovery.html?tab=p2v" class="nav-link nav-sub"><i class="fas fa-microchip nav-icon"></i> <span>Bare Metal, P2V e Mídia</span></a>
+                        <a href="/disaster-recovery.html?tab=virtual-lab" class="nav-link nav-sub"><i class="fas fa-flask nav-icon"></i> <span>Laboratório e Validação</span></a>
+                    </div>
+                </div>
+                <div class="nav-group" id="fb-grp-prot">
+                    <button class="nav-group-header" onclick="toggleNavGroup('fb-grp-prot')"><span><i class="fas fa-shield-alt nav-icon" style="color:#10b981"></i> Proteção</span><i class="fas fa-chevron-down nav-group-arrow"></i></button>
+                    <div class="nav-group-items open" id="items-fb-grp-prot">
+                        <a href="/ransomware.html" class="nav-link nav-sub"><i class="fas fa-shield-virus nav-icon"></i> <span>Ransomware Guardian</span></a>
+                        <a href="/compliance.html" class="nav-link nav-sub"><i class="fas fa-clipboard-check nav-icon"></i> <span>Conformidade</span></a>
+                        <a href="/audit.html" class="nav-link nav-sub"><i class="fas fa-clipboard-list nav-icon"></i> <span>Auditoria</span></a>
+                    </div>
+                </div>
+                <div class="nav-group" id="fb-grp-virt">
+                    <button class="nav-group-header" onclick="toggleNavGroup('fb-grp-virt')"><span><i class="fas fa-cloud nav-icon" style="color:#38bdf8"></i> Virtualização e Cloud</span><i class="fas fa-chevron-down nav-group-arrow"></i></button>
+                    <div class="nav-group-items open" id="items-fb-grp-virt">
+                        <a href="/virtualization.html" class="nav-link nav-sub"><i class="fas fa-server nav-icon"></i> <span>VMware, Hyper-V, Proxmox</span></a>
+                        <a href="/m365-exchange.html" class="nav-link nav-sub"><i class="fas fa-mail-bulk nav-icon"></i> <span>Microsoft 365 e Exchange</span></a>
+                        <a href="/saas-cloud-enterprise.html" class="nav-link nav-sub"><i class="fas fa-cubes nav-icon"></i> <span>SaaS, Kubernetes e Cloud</span></a>
+                        <a href="/replication.html" class="nav-link nav-sub"><i class="fas fa-exchange-alt nav-icon"></i> <span>Replicação</span></a>
+                    </div>
+                </div>
+                <div class="nav-group" id="fb-grp-ops">
+                    <button class="nav-group-header" onclick="toggleNavGroup('fb-grp-ops')"><span><i class="fas fa-chart-line nav-icon" style="color:#f59e0b"></i> Operações</span><i class="fas fa-chevron-down nav-group-arrow"></i></button>
+                    <div class="nav-group-items open" id="items-fb-grp-ops">
+                        <a href="/alerts.html" class="nav-link nav-sub"><i class="fas fa-bell nav-icon"></i> <span>Alertas e Falhas</span></a>
+                        <a href="/failed-jobs.html" class="nav-link nav-sub" style="color:var(--danger)"><i class="fas fa-exclamation-triangle nav-icon"></i> <span>Jobs com Falha</span></a>
+                        <a href="/logs.html" class="nav-link nav-sub"><i class="fas fa-file-alt nav-icon"></i> <span>Logs</span></a>
+                        <a href="/diagnostic.html" class="nav-link nav-sub"><i class="fas fa-stethoscope nav-icon"></i> <span>Diagnóstico</span></a>
+                        <a href="/reports.html" class="nav-link nav-sub"><i class="fas fa-chart-pie nav-icon"></i> <span>Relatórios</span></a>
+                        <a href="javascript:void(0)" onclick="if(typeof toggleHardwareHUD==='function')toggleHardwareHUD()" class="nav-link nav-sub"><i class="fas fa-microchip nav-icon"></i> <span>Telemetria Hardware HUD</span></a>
+                    </div>
+                </div>
+                <div class="nav-group" id="fb-grp-cfg">
+                    <button class="nav-group-header" onclick="toggleNavGroup('fb-grp-cfg')"><span><i class="fas fa-sliders-h nav-icon" style="color:#a855f7"></i> Configuração</span><i class="fas fa-chevron-down nav-group-arrow"></i></button>
+                    <div class="nav-group-items open" id="items-fb-grp-cfg">
+                        <a href="/users.html" class="nav-link nav-sub"><i class="fas fa-users-cog nav-icon"></i> <span>Usuários & Permissões</span></a>
+                        <a href="/notification-channels.html" class="nav-link nav-sub"><i class="fas fa-envelope nav-icon"></i> <span>Notificações</span></a>
+                        <a href="/storage-usage.html" class="nav-link nav-sub"><i class="fas fa-hdd nav-icon"></i> <span>Armazenamento</span></a>
+                        <a href="/engines.html" class="nav-link nav-sub"><i class="fas fa-cogs nav-icon"></i> <span>Motores e Integrações</span></a>
+                        <a href="/settings.html" class="nav-link nav-sub"><i class="fas fa-cog nav-icon"></i> <span>Configurações Gerais</span></a>
+                        <a href="/ui-style-selector.html" class="nav-link nav-sub"><i class="fas fa-palette nav-icon"></i> <span>Estilos & Temas UI</span></a>
+                        <a href="/onboarding.html" class="nav-link nav-sub"><i class="fas fa-compass nav-icon"></i> <span>Guia de Onboarding</span></a>
+                        <a href="/changelog.html" class="nav-link nav-sub"><i class="fas fa-clipboard-check nav-icon"></i> <span>Changelog</span></a>
                     </div>
                 </div>
             </nav>

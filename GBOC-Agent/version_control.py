@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v14.5.0 Full Stable Enterprise Edition
+# GBOC System v14.6.0 Full Stable Enterprise Edition
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # Propriedade Intelectual & Direitos Autorais Registrados.
 # A cópia, distribuição ou modificação não autorizada é estritamente proibida.
@@ -22,7 +22,7 @@ VERSION_FILE = os.path.join(BASE_DIR, "data", "version_info.json")
 
 # Configuração Base SemVer
 MAJOR = 14
-MINOR = 5
+MINOR = 6
 PATCH = 0
 PRERELEASE = "full-stable"
 

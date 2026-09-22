@@ -1,11 +1,11 @@
 /*
 ==============================================================================
-GBOC System v14.5.0 Enterprise Edition
+GBOC System v14.6.0 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
 */
-/* GBOC System v14.5.0 - Universal Theme & Component Framework */
+/* GBOC System v14.6.0 - Universal Theme & Component Framework */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 /* ======================== THEME VARIABLES ======================== */
@@ -1170,5 +1170,480 @@ body.gboc-modal-open {
     .gboc-dialog-progress-fill {
         animation: none !important;
         transition: none !important;
+    }
+}
+
+/* ==============================================================================
+   GBOC UNIVERSAL REPORT & PRINT SYSTEM (A4 EXECUTIVE LAYOUT & ANTI-OVERFLOW)
+   ============================================================================== */
+
+.gboc-report-document {
+    font-family: 'Segoe UI', Inter, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+    color: var(--text, #1e293b);
+    background: var(--bg-card, #ffffff);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 12px;
+    padding: 28px;
+    margin: 0 auto;
+    max-width: 1100px;
+    box-sizing: border-box;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.report-header-banner {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--primary, #0284c7);
+    margin-bottom: 20px;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.report-brand-wrap {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.report-brand-logo {
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+}
+
+.report-brand-title {
+    font-size: 1.35em;
+    font-weight: 800;
+    color: var(--text, #0f172a);
+    letter-spacing: -0.02em;
+    margin: 0;
+    line-height: 1.2;
+}
+
+.report-brand-sub {
+    font-size: 0.78em;
+    color: var(--text-muted, #64748b);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-top: 3px;
+}
+
+.report-badge-classification {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 0.76em;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: rgba(2, 132, 199, 0.12);
+    color: var(--primary, #0284c7);
+    border: 1px solid rgba(2, 132, 199, 0.3);
+}
+
+.report-meta-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+    background: var(--bg-input, #f8fafc);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 22px;
+}
+
+.report-meta-item {
+    font-size: 0.82em;
+}
+
+.report-meta-item .meta-k {
+    color: var(--text-muted, #64748b);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.72em;
+    display: block;
+    margin-bottom: 2px;
+}
+
+.report-meta-item .meta-v {
+    color: var(--text, #0f172a);
+    font-weight: 600;
+    word-break: break-all;
+}
+
+.report-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.report-kpi-card {
+    background: var(--bg-card, #ffffff);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 10px;
+    padding: 14px 16px;
+    text-align: left;
+    position: relative;
+    overflow: hidden;
+}
+
+.report-kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: var(--kpi-color, var(--primary, #0284c7));
+}
+
+.report-kpi-card .kpi-label {
+    font-size: 0.74em;
+    color: var(--text-muted, #64748b);
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.report-kpi-card .kpi-value {
+    font-size: 1.55em;
+    font-weight: 800;
+    color: var(--text, #0f172a);
+    margin-top: 4px;
+    line-height: 1.2;
+}
+
+.report-ai-card {
+    background: rgba(245, 158, 11, 0.06);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    border-left: 5px solid #f59e0b;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    line-height: 1.6;
+    font-size: 0.9em;
+    color: var(--text, #1e293b);
+}
+
+.report-ai-card .ai-title {
+    color: #d97706;
+    font-weight: 700;
+    font-size: 0.95em;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.report-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    margin-bottom: 24px;
+    border-radius: 8px;
+    border: 1px solid var(--border, #e2e8f0);
+}
+
+.report-audit-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.86em;
+    table-layout: auto;
+    text-align: left;
+}
+
+.report-audit-table thead th {
+    background: var(--bg-input, #f1f5f9);
+    color: var(--text, #334155);
+    padding: 11px 14px;
+    font-size: 0.78em;
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid var(--border, #cbd5e1);
+    white-space: nowrap;
+}
+
+.report-audit-table tbody td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border, #e2e8f0);
+    color: var(--text, #1e293b);
+    vertical-align: middle;
+    word-break: break-word;
+}
+
+.report-audit-table tbody tr:nth-child(even) {
+    background: rgba(0, 0, 0, 0.015);
+}
+
+.report-audit-table tbody tr:hover {
+    background: rgba(2, 132, 199, 0.04);
+}
+
+.report-signature-block {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 30px;
+    margin-top: 36px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border, #e2e8f0);
+}
+
+.report-sig-item {
+    text-align: center;
+}
+
+.report-sig-line {
+    border-bottom: 1px solid #94a3b8;
+    height: 38px;
+    margin-bottom: 8px;
+}
+
+.report-sig-name {
+    font-size: 0.85em;
+    font-weight: 700;
+    color: var(--text, #0f172a);
+}
+
+.report-sig-role {
+    font-size: 0.74em;
+    color: var(--text-muted, #64748b);
+    text-transform: uppercase;
+}
+
+.report-footer-bar {
+    margin-top: 24px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border, #e2e8f0);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.76em;
+    color: var(--text-muted, #64748b);
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+/* ─── NATIVE PRINT / PDF STYLING (A4 STRICT FRAMING) ────────────────────────── */
+
+@page {
+    size: A4 portrait;
+    margin: 12mm 14mm 14mm 14mm;
+}
+
+@media print {
+    *, *::before, *::after {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        box-shadow: none !important;
+        text-shadow: none !important;
+    }
+
+    html, body {
+        background: #ffffff !important;
+        color: #0f172a !important;
+        font-size: 9.5pt !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+
+    /* Ocultar elementos de navegação e shell de aplicação */
+    .sidebar,
+    .topbar,
+    .navbar,
+    .gboc-header,
+    .app-header,
+    .header-actions,
+    .srv-catalog-panel,
+    .catalog-panel,
+    .btn,
+    button,
+    nav,
+    .no-print {
+        display: none !important;
+    }
+
+    .main-content,
+    .content,
+    .app,
+    .panel,
+    .server-reports-layout,
+    .reports-layout,
+    .srv-viewer-panel,
+    .report-viewer-panel {
+        display: block !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        background: transparent !important;
+        height: auto !important;
+        min-height: 0 !important;
+        overflow: visible !important;
+    }
+
+    .gboc-report-document {
+        border: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        max-width: 100% !important;
+        box-shadow: none !important;
+        border-radius: 0 !important;
+        background: #ffffff !important;
+        color: #0f172a !important;
+    }
+
+    .report-header-banner {
+        border-bottom: 2px solid #0284c7 !important;
+        padding-bottom: 12px !important;
+        margin-bottom: 14px !important;
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    .report-brand-title {
+        color: #0f172a !important;
+        font-size: 1.25em !important;
+    }
+
+    .report-badge-classification {
+        background: #f0f9ff !important;
+        color: #0369a1 !important;
+        border: 1px solid #bae6fd !important;
+    }
+
+    .report-meta-grid {
+        background: #f8fafc !important;
+        border: 1px solid #cbd5e1 !important;
+        color: #0f172a !important;
+        padding: 8px 12px !important;
+        margin-bottom: 14px !important;
+        gap: 8px !important;
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    .report-meta-item .meta-k {
+        color: #475569 !important;
+    }
+
+    .report-meta-item .meta-v {
+        color: #0f172a !important;
+    }
+
+    .report-kpi-grid {
+        grid-template-columns: repeat(4, 1fr) !important;
+        gap: 10px !important;
+        margin-bottom: 16px !important;
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    .report-kpi-card {
+        background: #f8fafc !important;
+        border: 1px solid #cbd5e1 !important;
+        border-left: 4px solid #0284c7 !important;
+        padding: 8px 12px !important;
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    .report-kpi-card .kpi-label {
+        color: #475569 !important;
+        font-size: 0.72em !important;
+    }
+
+    .report-kpi-card .kpi-value {
+        color: #0f172a !important;
+        font-size: 1.35em !important;
+    }
+
+    .report-ai-card {
+        background: #fffbeb !important;
+        border: 1px solid #fde68a !important;
+        border-left: 4px solid #d97706 !important;
+        color: #1e293b !important;
+        padding: 10px 14px !important;
+        margin-bottom: 16px !important;
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    .report-ai-card .ai-title {
+        color: #b45309 !important;
+    }
+
+    .report-table-wrap {
+        border: 1px solid #cbd5e1 !important;
+        overflow: visible !important;
+        margin-bottom: 16px !important;
+    }
+
+    .report-audit-table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+    }
+
+    .report-audit-table thead {
+        display: table-header-group !important;
+    }
+
+    .report-audit-table tfoot {
+        display: table-footer-group !important;
+    }
+
+    .report-audit-table tr {
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    .report-audit-table thead th {
+        background: #f1f5f9 !important;
+        color: #0f172a !important;
+        border-bottom: 2px solid #94a3b8 !important;
+        padding: 6px 10px !important;
+        font-size: 7.5pt !important;
+    }
+
+    .report-audit-table tbody td {
+        padding: 6px 10px !important;
+        border-bottom: 1px solid #e2e8f0 !important;
+        color: #0f172a !important;
+        font-size: 8pt !important;
+    }
+
+    .report-audit-table tbody tr:nth-child(even) {
+        background: #f8fafc !important;
+    }
+
+    .report-signature-block {
+        break-inside: avoid;
+        page-break-inside: avoid;
+        margin-top: 24px !important;
+        padding-top: 16px !important;
+        border-top: 1px solid #94a3b8 !important;
+    }
+
+    .report-sig-line {
+        border-bottom: 1px solid #64748b !important;
+        height: 30px !important;
+    }
+
+    .report-footer-bar {
+        border-top: 1px solid #cbd5e1 !important;
+        margin-top: 16px !important;
+        padding-top: 10px !important;
+        color: #64748b !important;
+        font-size: 7pt !important;
+        break-inside: avoid;
+        page-break-inside: avoid;
     }
 }

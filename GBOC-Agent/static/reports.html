@@ -14,17 +14,17 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     <title>GBOC Agent 14.4.0 - Central de Relatórios UniFi</title>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.5.0">
-    <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=14.5.0">
-    <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=14.5.0">
-    <link rel="stylesheet" href="/static/ui/models/modern/components.css?v=14.5.0">
-    <link rel="stylesheet" href="/static/ui/models/modern/layout.css?v=14.5.0">
-    <link rel="stylesheet" href="/static/style.css?v=14.5.0">
-    <link rel="stylesheet" href="/static/gboc-themes.css?v=14.5.0">
-    <link rel="stylesheet" href="/static/gboc-layout.css?v=14.5.0">
-    <script src="/static/gboc-perf.js?v=14.5.0"></script>
-    <script src="/static/gboc-layout-manager.js?v=14.5.0"></script>
-    <script src="/static/gboc-modal.js?v=14.5.0"></script>
+    <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.6.0">
+    <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=14.6.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=14.6.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/components.css?v=14.6.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/layout.css?v=14.6.0">
+    <link rel="stylesheet" href="/static/style.css?v=14.6.0">
+    <link rel="stylesheet" href="/static/gboc-themes.css?v=14.6.0">
+    <link rel="stylesheet" href="/static/gboc-layout.css?v=14.6.0">
+    <script src="/static/gboc-perf.js?v=14.6.0"></script>
+    <script src="/static/gboc-layout-manager.js?v=14.6.0"></script>
+    <script src="/static/gboc-modal.js?v=14.6.0"></script>
 <style>
         .reports-layout {
             display: grid;
@@ -204,42 +204,104 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             color: var(--text-muted);
         }
 
+        @page {
+            size: A4 portrait;
+            margin: 12mm 14mm 14mm 14mm;
+        }
+
         @media print {
-            @page {
-                size: A4 portrait;
-                margin: 1.5cm;
+            *, *::before, *::after {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                box-shadow: none !important;
+                text-shadow: none !important;
             }
 
-            body {
-                background: #fff !important;
-                color: #000 !important;
+            html, body {
+                background: #ffffff !important;
+                color: #0f172a !important;
+                font-size: 9pt !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 100% !important;
             }
 
             .sidebar,
+            .topbar,
+            .header,
+            .header-actions,
             .catalog-panel,
-            .viewer-header button,
+            .viewer-header,
             .btn,
+            button,
             nav {
                 display: none !important;
             }
 
-            .reports-layout {
-                display: block !important;
-            }
-
-            .report-viewer-panel {
-                border: none !important;
-                height: auto !important;
-                width: 100% !important;
-            }
-
+            .app,
+            .main-content,
+            .content,
+            .reports-layout,
+            .report-viewer-panel,
             .viewer-body {
+                display: block !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 0 !important;
                 padding: 0 !important;
+                border: none !important;
+                background: transparent !important;
+                height: auto !important;
+                min-height: 0 !important;
+                overflow: visible !important;
+            }
+
+            .unifi-metric-card {
+                background: #f8fafc !important;
+                border: 1px solid #cbd5e1 !important;
+                border-left: 3px solid #0284c7 !important;
+                break-inside: avoid;
+                page-break-inside: avoid;
+                padding: 8px 12px !important;
+            }
+
+            .unifi-metric-card .val {
+                color: #0f172a !important;
+                font-size: 1.3em !important;
+            }
+
+            .data-table {
+                width: 100% !important;
+                border-collapse: collapse !important;
+            }
+
+            .data-table thead {
+                display: table-header-group !important;
+            }
+
+            .data-table tr {
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }
+
+            .data-table th {
+                background: #f1f5f9 !important;
+                color: #0f172a !important;
+                border-bottom: 1.5px solid #94a3b8 !important;
+                padding: 6px 8px !important;
+                font-size: 7.5pt !important;
+            }
+
+            .data-table td {
+                padding: 6px 8px !important;
+                border-bottom: 1px solid #e2e8f0 !important;
+                color: #0f172a !important;
+                font-size: 7.8pt !important;
             }
         }
     </style>
-    <script src="/static/auth_interceptor.js?v=14.1.0"></script>
-    <script src="/static/gboc-global.js?v=14.1.0"></script>
+    <script src="/static/auth_interceptor.js?v=14.6.0"></script>
+    <script src="/static/gboc-global.js?v=14.6.0"></script>
 </head>
 
 <body data-theme="unifi">
@@ -292,11 +354,15 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                                 style="margin:0;font-size:1.05em;display:flex;align-items:center;gap:8px"><i
                                     class="fas fa-chart-line" style="color:var(--primary)"></i> Selecione um Relatório
                             </h3>
-                            <div style="display:flex;gap:8px">
+                            <div style="display:flex;gap:8px;flex-wrap:wrap">
                                 <button class="btn btn-primary" id="btnRunCurrent" onclick="runCurrentSelectedReport()"
                                     disabled><i class="fas fa-play"></i> Gerar Agora</button>
-                                <button class="btn btn-secondary" onclick="window.print()" id="btnPrint" disabled><i
-                                        class="fas fa-print"></i> Imprimir</button>
+                                <button class="btn btn-secondary" onclick="exportAgentReport('html')" id="btnPrint" disabled><i
+                                        class="fas fa-print"></i> Imprimir / PDF</button>
+                                <button class="btn btn-secondary" onclick="exportAgentReport('csv')" id="btnCsv" disabled><i
+                                        class="fas fa-file-csv"></i> CSV</button>
+                                <button class="btn btn-secondary" onclick="exportAgentReport('json')" id="btnJson" disabled><i
+                                        class="fas fa-code"></i> JSON</button>
                             </div>
                         </div>
 
@@ -315,7 +381,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         </main>
     </div>
 
-    <script src="/static/sidebar.js?v=14.1.0"></script>
+    <script src="/static/sidebar.js?v=14.6.0"></script>
     <script>
         let allReports = [];
         let selectedReportId = null;
@@ -436,6 +502,8 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 }
 
                 document.getElementById('btnPrint').disabled = false;
+                document.getElementById('btnCsv').disabled = false;
+                document.getElementById('btnJson').disabled = false;
 
                 const metricsHtml = (data.metrics || []).map(m => `
                     <div class="unifi-metric-card">
@@ -463,9 +531,15 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 }
 
                 body.innerHTML = `
-                <div style="border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:16px">
-                    <h2 style="color:var(--primary);margin-bottom:4px;font-size:1.3em">${data.title}</h2>
-                    <div style="font-size:0.8em;color:var(--text-muted)">Código: <code>${data.code || 'REP'}</code> | Categoria: <strong>${data.category || 'Geral'}</strong> | Gerado em: ${new Date(data.generated_at || Date.now()).toLocaleString()}</div>
+                <div style="border-bottom:1.5px solid var(--border);padding-bottom:14px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">
+                    <div>
+                        <h2 style="color:var(--primary);margin:0 0 4px;font-size:1.35em">${data.title}</h2>
+                        <div style="font-size:0.82em;color:var(--text-muted)">Código: <code>${data.code || 'REP'}</code> | Categoria: <strong>${data.category || 'Geral'}</strong></div>
+                    </div>
+                    <div style="text-align:right;font-size:0.8em;color:var(--text-muted)">
+                        <div>Data: <strong>${new Date(data.generated_at || Date.now()).toLocaleString()}</strong></div>
+                        <div>Plataforma: <strong>GBOC Agent v14.1.0</strong></div>
+                    </div>
                 </div>
 
                 <h4 style="margin-bottom:10px;font-size:0.95em"><i class="fas fa-chart-bar" style="color:var(--primary)"></i> Métricas do Diagnóstico:</h4>
@@ -475,7 +549,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 
                 <h4 style="margin-bottom:10px;font-size:0.95em"><i class="fas fa-robot" style="color:var(--warning)"></i> Parecer Executivo & Recomendação IA:</h4>
                 <div style="background:var(--bg-input);padding:14px;border-radius:8px;border-left:4px solid var(--warning);font-size:0.9em;line-height:1.6">
-                    ${data.ai_executive_recommendation || data.content || ''}
+                    ${data.ai_executive_recommendation || data.content || 'Rotina operacional analisada sem inconformidades de integridade.'}
                 </div>
 
                 ${tableHtml}
@@ -483,6 +557,12 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             } catch (e) {
                 body.innerHTML = `<p style="color:var(--danger);padding:20px;text-align:center">Erro ao gerar relatório: ${e.message}</p>`;
             }
+        }
+
+        function exportAgentReport(format) {
+            if (!selectedReportId) return;
+            const url = `/api/reports/export/${selectedReportId}?format=${format}${format === 'html' ? '&print=1' : ''}`;
+            window.open(url, '_blank');
         }
     </script>
 </body>

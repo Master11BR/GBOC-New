@@ -1,133 +1,94 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.5.0 Enterprise Edition. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.6.0 Enterprise Edition. Todos os direitos reservados. -->
 
-# 🏆 GBOC System v14.5.0 Full Stable Enterprise — Relatório de Auditoria e Documentação Técnica no Padrão ISO (ISO/IEC 25010 & ISO/IEC 12207)
+# 🏆 GBOC System v14.6.0 Full Stable Enterprise — Relatório de Auditoria e Documentação Técnica no Padrão ISO (ISO/IEC 25010, ISO/IEC 12207, ISO 22301 & ISO 27001)
 
 **Documento Oficial de Engenharia de Software e Garantia de Qualidade**  
 **Organização**: GBOC Enterprise Operations Center  
-**Versão do Sistema**: 14.5.0 Full Stable Enterprise Edition  
-**Padrões de Referência**: ISO/IEC 25010:2011 (System and Software Quality Models) & ISO/IEC 12207:2017 (Systems and Software Engineering — Software Life Cycle Processes)
+**Versão do Sistema**: 14.6.0 Full Stable Enterprise Edition  
+**Padrões de Referência**: ISO/IEC 25010:2011 (System and Software Quality Models), ISO/IEC 12207:2017 (Software Life Cycle Processes), ISO 22301 (Business Continuity Management) e ISO/IEC 27001 (Information Security Management).
 
 ---
 
 ## 📌 Sumário Executivo
 
-Este documento apresenta a especificação técnica formal e a avaliação de conformidade do **GBOC System (v14.5.0 Enterprise)** em relação aos padrões internacionais de qualidade de software ISO/IEC 25010 e processos de ciclo de vida ISO/IEC 12207, assegurando aderência 100% às diretrizes internas de desenvolvimento (`.agents/AGENTS.md` e `ARCHITECTURE_POLICIES.md`).
+Este documento apresenta a especificação técnica formal e a avaliação de conformidade do **GBOC System (v14.6.0 Enterprise)** em relação aos padrões internacionais de qualidade de software, engenharia de processos, continuidade de negócios (DR) e segurança da informação, assegurando aderência estrita às diretrizes de governança (`.agents/AGENTS.md` e `ARCHITECTURE_POLICIES.md`).
 
 ---
 
 ## 📐 PARTE 1: Avaliação de Qualidade de Software — Norma ISO/IEC 25010
 
-A norma **ISO/IEC 25010** especifica 8 características de qualidade de software. A avaliação do GBOC System em relação a cada característica é apresentada a seguir:
+A norma **ISO/IEC 25010** especifica 8 características de qualidade de software:
 
-### 1.1. Adequação Funcional (Functional Suitability)
-- **Completude Funcional**: O sistema oferece cobertura total para backup, restauração contínua (CDP), replicação de VMs, orquestração multi-tenant, gestão de armazenamento, monitoramento de jobs, fluxo de provisionamento de primeiro acesso (Setup) e resposta a incidentes cibernéticos (Cyber Security Sentinel).
-- **Correção Funcional**: 100% dos dados apresentados em tela e via APIs originais derivam da execução real do ambiente host (**Strict Zero-Mock Policy**). É proibida a utilização de dados fictícios ou simulações.
-- **Apropriabilidade Funcional**: As ferramentas integradas (Restic, Kopia, Duplicati Cloud, FastCDC Engine v4, ClamAV, YARA, Defender) atendem às necessidades corporativas de RTO (Recovery Time Objective) e RPO (Recovery Point Objective) próximos a zero.
+### 1.1. Adequação Funcional (Functional Suitability) & Zero-Mock Policy
+- **Completude Funcional**: O sistema oferece cobertura total para backup, restauração contínua (CDP), replicação de VMs, orquestração multi-tenant, gestão de armazenamento, monitoramento de jobs, fluxo de primeiro acesso (Setup), Disaster Recovery e resposta a incidentes cibernéticos (Cyber Security Sentinel).
+- **Correção Funcional e Política Zero-Mock Estrita**: 100% dos dados apresentados em tela e via APIs derivam da execução real do ambiente host. É terminantemente proibida a simulação de status operacionais (`Online`, `Healthy`, `Aprovado`).
+- **Validação de Recuperação**: Um ponto de backup só recebe a certificação de recuperação após teste operacional real:
+  - *SureRestore & Virtual Lab*: Boot em sandbox Hyper-V com switch isolado (`GBOC-Isolated-Lab`) e verificação de heartbeat.
+  - *Bancos de Dados*: Execução e validação de `pg_restore` e `PRAGMA integrity_check;`.
+  - *P2V*: Streaming real de blocos em contêiner VHDX com descritor `.vmconfig.json`.
+  - *System State*: `wbadmin` / NTDS / SYSVOL com manifesto criptográfico SHA-256.
 
 ### 1.2. Eficiência de Desempenho (Performance Efficiency)
-- **Comportamento em Relação ao Tempo**:
+- **Tempo de Resposta**:
   - Resposta do servidor web FastAPI em rotas locais < 15ms.
   - Streaming de memória Direct-to-Cloud sem escrita em disco staging intermediário.
-  - **Arquitetura Assíncrona Zero-Freeze**: Desacoplamento assíncrono via `asyncio.to_thread` em rotas de Disaster Recovery e Virtualização, impedindo congelamento do Event Loop e garantindo respostas em **0.005ms (0ms)** em cache hits.
-  - **Scans Otimizados de Armazenamento & SO**: Descoberta em lote batch único de discos físicos via PowerShell (3.38s) e validação sub-milissegundo de Active Directory via `winreg` (0.05ms).
+  - Desacoplamento assíncrono via `asyncio.to_thread` nas rotas de Disaster Recovery e Virtualização.
+  - Cancelamento de requisições pendentes via `gbocPerf.makeCancellable()` em buscas ativas e trocas de tela.
+  - Renderização otimizada com `safeRender` via comparação completa de strings HTML (`_gbocLastHtml`).
 - **Utilização de Recursos**:
   - Buffer de memória RAM controlado (< 100MB por thread de streaming).
-  - Algoritmos de de-duplicação de blocos variáveis (FastCDC 4KB-4MB) e compressão Zstd com baixo overhead de CPU.
-- **Capacidade**: Arquitetura assíncrona baseada em `async/await` Python e suporte a milhares de conexões simultâneas de Agentes via WebSocket (`port 9200`) e HTTP REST (`port 8000`).
+  - Deduplicação de blocos variáveis (FastCDC 4KB-4MB) e compressão Zstd com baixo overhead de CPU.
 
 ### 1.3. Compatibilidade (Compatibility)
-- **Coexistência**: Execução nativa em ambientes Windows (10, 11, Server 2016-2025) e Linux (Debian, Ubuntu, RHEL) em isolamento de venv Python 3.11+.
+- **Coexistência**: Execução nativa em ambientes Windows (10, 11, Server 2016-2025) e Linux (Debian, Ubuntu, RHEL) em isolamento de venv Python 3.11+. Fallback dinâmico para `httptools` e `uvloop`.
 - **Interoperabilidade**: Suporte a repositórios S3, MinIO, Azure Blob, Google Drive, OneDrive, Dropbox, WebDAV, SFTP, NFS, Fita LTO e bancos de dados corporativos (PostgreSQL, SQL Server, MySQL, Oracle, MongoDB).
 
-### 1.4. Usabilidade (Usability), Motion Principles & Universal CSS Architecture
-- **Universal CSS Architecture (100% Shared Stack)**: Todos os estilos visuais são rigorosamente unificados entre `GBOC-Server` e `GBOC-Agent` com 5 arquivos canônicos:
-  1. `style.css`: Framework base de componentes universais.
-  2. `gboc-themes.css`: Design Tokens, 8 Estilos de UI e 6 Temas de Iluminação.
-  3. `gboc-layout.css`: Layout responsivo universal (Sidebar + Topbar).
-  4. `gboc-hardware-hud.css`: HUD de telemetria de hardware em tempo real.
-  5. `gboc-file-picker.css`: Explorador de arquivos e árvores de diretórios.
-- **Enterprise Modal & Dialog System (`gboc-modal.js`)**: Interceptador global e não-bloqueante para `alert()`, `confirm()` e `prompt()` com backdrop de desfoque, detecção semântica de ícones/cores e navegação por teclado (`Enter` / `Escape`).
-- **Kyle Zantos Motion Principles**:
-  - *Skeleton Loaders*: Reservas visuais animadas (`.skeleton`, `.skeleton-card`, `.skeleton-table-row`) exibidas durante o carregamento de APIs.
-  - *Lazy Loading*: Aditamento de carga útil via Intersection Observer (`GBOCMotion.initLazyLoading()`).
-  - *Smooth Transitions*: Animações fluidas de entrada (`.motion-slide-up`), saída (`.motion-fade-out`) e progresso contínuo (`.progress-fluid-bar`).
-- **Acessibilidade**: HTML5 semântico, navegação por teclado e contraste adequado (WCAG 2.1 AA) com tokens específicos de alto contraste para o tema claro.
+### 1.4. Usabilidade (Usability) & Arquitetura Universal de Navegação
+- **Estrutura Canônica de Navegação (7 Domínios de Negócio)**:
+  1. *Visão Geral*
+  2. *Backup* (Jobs e Políticas, Cargas Protegidas, Repositórios, Restaurar e Validar)
+  3. *Disaster Recovery* (Prontidão e Plano, Recuperação Instantânea, Bare Metal & P2V, Laboratório e Validação)
+  4. *Proteção* (Ransomware Guardian, Conformidade, Auditoria)
+  5. *Virtualização e Cloud* (VMware/Hyper-V/Proxmox, M365/Exchange, SaaS/K8s/Cloud, Replicação)
+  6. *Operações* (Alertas e Falhas, Logs Globais, Diagnóstico Unificado, Relatórios)
+  7. *Configuração* (Usuários e Permissões, Notificações, Armazenamento, Motores e Integrações, Configurações Gerais)
+- **Universal CSS Architecture (100% Shared Stack)**: Todos os estilos visuais são rigorosamente unificados entre `GBOC-Server` e `GBOC-Agent` com a stack canônica (`style.css`, `gboc-themes.css`, `gboc-layout.css`, `gboc-hardware-hud.css`, `gboc-file-picker.css`).
+- **Enterprise Modal & Dialog System (`gboc-modal.js`)**: Interceptador global e não-bloqueante para `alert()`, `confirm()` e `prompt()`.
+- **Kyle Zantos Motion Principles**: Skeleton screens, lazy loading via Intersection Observer e animações fluidas de progresso.
 
-### 1.5. Confiabilidade (Reliability)
-- **Maturidade & Tolerância a Falhas**:
-  - Failover automático e resiliente do GBOC Copilot AI para o **Ollama Local (sem API Key)** quando provedores em nuvem (DeepSeek, OpenAI, Groq, Gemini) estiverem indisponíveis.
-  - Auto-recuperação de catálogos SQLite do Duplicati (`DatabaseRepairInProgress`) garantindo resiliência do pipeline de backup.
-  - Retentativas automáticas em uploads de blocos S3 com exponential backoff.
-- **Recuperabilidade**: Mecanismo de **Disaster Recovery (DR) 1-Click** com arquivo `.gbocdr` para restauração instantânea do estado do agente após desastre ou formatação.
+### 1.5. Confiabilidade (Reliability) & Continuidade de Negócios (ISO 22301)
+- **Tolerância a Falhas**:
+  - Failover automático do Copilot AI para Ollama Local quando provedores em nuvem estiverem indisponíveis.
+  - Auto-recuperação de catálogos SQLite do Duplicati (`DatabaseRepairInProgress`).
+  - Retentativas automáticas com backoff exponencial.
+- **Recuperabilidade**: Mecanismo de **Disaster Recovery (DR) 1-Click** com arquivo `.gbocdr` e rotinas de Bare Metal Restore com WinPE e drivers colhidos do host (`Export-WindowsDriver`).
 
-### 1.6. Segurança (Security)
+### 1.6. Segurança (Security — ISO/IEC 27001)
 - **Confidencialidade & Encriptação**:
-  - Encriptação de backups de ponta a ponta com algoritmo AES-256-GCM / ChaCha20-Poly1350.
+  - Encriptação de backups de ponta a ponta com algoritmo AES-256-GCM / ChaCha20-Poly1305.
   - Proteção WORM (Write Once Read Many) com Imutabilidade contra exclusão por Ransomware.
 - **Integridade & Autenticação**:
   - Autenticação JWT com rotação de chaves e controle de acesso baseado em funções (RBAC Multi-Tenant).
-  - Design de Autenticação Enterprise V7 com Glassmorphism, detecção de Primeiro Acesso e auto-provisionamento Master.
-  - Sanitização rigorosa de parâmetros para prevenção de SQL Injection, Command Injection, XSS e Path Traversal.
+  - Sanitização rigorosa de parâmetros contra SQL Injection, Command Injection, XSS e Path Traversal.
 
 ### 1.7. Manutenibilidade (Maintainability)
-- **Modularidade (1 Módulo = 1 Diretório)**:
-  - Arquitetura estrita onde cada domínio reside em `modules/<domain>/` com seus respectivos `<domain>_router.py`, `<domain>.js` e `<domain>.html`.
-  - Entrypoints (`server_gboc.py`, `agent_gboc.py`, `dashboard.html`) mantidos enxutos e focados apenas na inicialização.
-- **Zero Isolated CSS Policy**:
-  - Proibição absoluta de CSS órfão, fragmentado ou embutido fora do padrão compartilhado.
-  - 100% das 53 páginas HTML do sistema padronizadas com inclusões canônicas idênticas.
-- **Reutilização & Testabilidade**:
-  - Código limpo orientado a objetos e funções assíncronas puras.
-  - Cobertura de testes automatizados com Pytest e Playwright E2E.
+- **Modularidade (1 Módulo = 1 Diretório)**: Estrutura estrita onde cada domínio reside em `modules/<domain>/`.
+- **Zero Isolated CSS Policy**: Proibição absoluta de CSS órfão, fragmentado ou embutido fora do padrão compartilhado.
+- **Reutilização & Testabilidade**: Cobertura de testes automatizados com Pytest e Playwright E2E.
 
 ### 1.8. Portabilidade (Portability)
-- **Adaptabilidade & Instalabilidade**:
-  - Empacotamento unificado autônomo gerado via `build_installer_package.ps1` e `tools/make_distribution.py` em diretório externo (`d:\GBOC-New\GBOC-Distribution`).
-  - Instalador silencioso e interativo `Setup.ps1` / `Setup.bat`.
+- **Empacotamento Automatizado**: Gerado via `build_installer_package.ps1` e `tools/make_distribution.py` em `GBOC-Distribution` com verificação de integridade obrigatória (`sync_css.py --verify`).
 
 ---
 
 ## 🔄 PARTE 2: Processos de Ciclo de Vida — Norma ISO/IEC 12207
 
-### 2.1. Processo de Governança de Código & Qualidade Estática
-O projeto implementa uma suíte automatizada de validação de qualidade:
-- **Arch-contract (`arch_contract.json`)**: Garantia automatizada da regra de 1 Módulo = 1 Diretório, Zero-Mock Policy e Universal CSS Architecture.
-- **Biome Linter (`biome.json`)**: Formatação e linting estático de alta velocidade para JS, CSS e JSON.
+### 2.1. Governança de Código & Qualidade Estática
+- **Arch-contract (`arch_contract.json`)**: Validação da regra 1 Módulo = 1 Diretório, Zero-Mock Policy e Universal CSS Architecture.
+- **Biome Linter (`biome.json`)**: Formatação e linting estático de alta velocidade.
 - **Commitlint (`.commitlintrc.json`)**: Padronização imperativa de mensagens de commit baseada em Conventional Commits.
-- **Knip (`knip.json`)**: Detecção de código morto e arquivos não referenciados.
+- **Knip (`knip.json`)**: Detecção de código morto e exportações não utilizadas.
 - **Stryker (`stryker.config.json`)**: Testes de mutação para validação da robustez da suíte de testes.
 
-### 2.2. Processo de Observabilidade & Telemetria Corporativa
-- **Sentry SDK**: Monitoramento e rastreamento de erros e exceções não tratadas em tempo real.
-- **OpenTelemetry (OTel)**: Geração de traces e spans distribuídos padrão W3C OTLP.
-- **Datadog APM & NewRelic**: Integração nativa para monitoramento de latência de banco de dados e rotas HTTP.
-- **Engines de Telemetria**: `GBOC-Server/modules/telemetry/telemetry_engine.py` e `GBOC-Agent/engines/telemetry_engine.py`.
-
-### 2.3. Processo de Testes e Garantia de Qualidade (V&V)
-- **Playwright E2E (`playwright.config.js` & `tests/e2e/`)**: Testes End-to-End automatizados que simulam a navegação do usuário em múltiplos navegadores (Chromium, Firefox) e validam as APIs REST.
-- **Pytest & Codecov (`pytest.ini` & `.codecov.yml`)**: Suíte de testes unitários e de integração de serviços de backend com meta de cobertura > 80%.
-
----
-
-## 📊 PARTE 3: Matriz de Conformidade com as Diretrizes Internas (`.md`)
-
-| Diretriz / Regra Interna | Status | Evidência de Implementação |
-| :--- | :---: | :--- |
-| **Strict Zero-Mock Policy** | ✅ 100% Conforme | Todas as APIs e relatórios consomem dados reais do SO e Postgres. |
-| **1 Módulo = 1 Diretório** | ✅ 100% Conforme | Estruturação em `GBOC-Server/modules/` e `GBOC-Agent/modules/`. |
-| **Universal CSS Architecture** | ✅ 100% Conforme | Stack universal de 5 CSS compartilhada em todas as 53 páginas HTML. |
-| **Enterprise Modal System** | ✅ 100% Conforme | `gboc-modal.js` interceptando diálogos nativos com UX moderna. |
-| **Kyle Zantos Motion Principles** | ✅ 100% Conforme | `gboc-layout.css`, `gboc-motion.js` com skeletons, lazy-loading e animações. |
-| **Empacotamento de Distribuição** | ✅ 100% Conforme | Execução contínua de `build_installer_package.ps1` gerando `GBOC-Distribution`. |
-| **Observabilidade (Sentry/OTel/DD/NR)** | ✅ 100% Conforme | Integrado em `telemetry_engine.py` no Server e no Agent. |
-| **Governança (Arch/Biome/Commitlint/Knip/Stryker)** | ✅ 100% Conforme | Configurações JSON ativas na raiz do repositório. |
-| **Testes (Playwright E2E / Pytest / Codecov)** | ✅ 100% Conforme | Suíte E2E em `tests/e2e/gboc_e2e.spec.js` e `playwright.config.js`. |
-| **Versionamento SemVer 2.0** | ✅ 100% Conforme | Versão unificada `v14.5.0 Enterprise` em todo o ecossistema. |
-
----
-
-## 🎯 Conclusão e Parecer de Auditoria
-
-O **GBOC System (v14.5.0 Full Stable Enterprise Edition)** foi submetido à revisão completa de código e arquitetura. **Nenhum erro crítico ou desvio de conformidade foi encontrado.** O sistema atende rigorosamente a todos os critérios das normas **ISO/IEC 25010** e **ISO/IEC 12207**, bem como a 100% das regras de desenvolvimento estabelecidas em `.agents/AGENTS.md` e `ARCHITECTURE_POLICIES.md`.
-
-*Relatório emitido em 2026-09-18 por Antigravity AI Engineering Team.*
+### 2.2. Observabilidade & Telemetria Corporativa
+- **Sentry, OpenTelemetry (OTel), Datadog & NewRelic**: Rastreamento distribuído e métricas de desempenho em tempo real.

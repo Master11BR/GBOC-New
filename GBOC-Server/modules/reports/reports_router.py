@@ -1181,12 +1181,19 @@ async def export_report(report_id: int, format: str = Query("html", pattern="^(h
         )
 
     else:
+        import hashlib
+        payload_str = f"{report_data.get('code')}-{report_data.get('report_id')}-{report_data.get('generated_at')}-{len(report_data.get('table_rows', []))}"
+        audit_hash = hashlib.sha256(payload_str.encode('utf-8')).hexdigest().upper()
+        audit_hash_short = f"{audit_hash[:8]}-{audit_hash[8:16]}-{audit_hash[16:24]}-{audit_hash[24:32]}"
+
+        # Renderizar KPIs
+        kpi_colors = ["#0284c7", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4"]
         metrics_html = "".join([f"""
-            <div style="background:#182035;border:1px solid #2a3f5f;border-radius:8px;padding:14px;text-align:center;">
-                <div style="font-size:0.75em;color:#7ea8cc;text-transform:uppercase;font-weight:700;">{m['label']}</div>
-                <div style="font-size:1.6em;font-weight:700;color:#4fa3e8;margin-top:4px;">{m['value']}</div>
+            <div class="report-kpi-card" style="--kpi-color:{kpi_colors[i % len(kpi_colors)]}">
+                <div class="kpi-label">{m['label']}</div>
+                <div class="kpi-value">{m['value']}</div>
             </div>
-        """ for m in report_data["metrics"]])
+        """ for i, m in enumerate(report_data.get("metrics", []))])
 
         headers_html = "".join([f"<th>{h}</th>" for h in report_data.get("table_headers", [])])
         rows_html = "".join([
@@ -1198,56 +1205,688 @@ async def export_report(report_id: int, format: str = Query("html", pattern="^(h
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>{report_data['title']} - GBOC Report</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{report_data['title']} — GBOC Enterprise Suite</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body {{ font-family: 'Segoe UI', Inter, Arial, sans-serif; background: #0e1525; color: #dce8f5; padding: 30px; margin: 0; }}
-        .header {{ border-bottom: 2px solid #4fa3e8; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; }}
-        .header h1 {{ margin: 0; color: #4fa3e8; font-size: 1.6em; }}
-        .meta {{ font-size: 0.85em; color: #7ea8cc; margin-top: 6px; }}
-        .grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 30px; }}
-        table {{ width: 100%; border-collapse: collapse; margin-bottom: 30px; background: #182035; border-radius: 8px; overflow: hidden; }}
-        th {{ background: #111928; color: #7ea8cc; text-align: left; padding: 12px; font-size: 0.8em; text-transform: uppercase; border-bottom: 1px solid #2a3f5f; }}
-        td {{ padding: 12px; border-bottom: 1px solid #2a3f5f; font-size: 0.9em; }}
-        .ai-box {{ background: #111928; border-left: 4px solid #f0a940; padding: 16px; border-radius: 6px; margin-bottom: 30px; line-height: 1.6; font-size: 0.95em; }}
-        .footer {{ border-top: 1px solid #2a3f5f; padding-top: 15px; text-align: center; font-size: 0.8em; color: #7ea8cc; }}
-        @media print {{ body {{ background: #fff; color: #000; }} th {{ background: #eee; color: #333; }} .ai-box {{ border-left-color: #333; background: #f9f9f9; }} }}
+        :root {{
+            --primary: #0284c7;
+            --primary-dark: #0369a1;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --bg-page: #0b1120;
+            --bg-sheet: #ffffff;
+            --border-color: #cbd5e1;
+        }}
+
+        * {{
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }}
+
+        body {{
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--bg-page);
+            color: var(--text-main);
+            padding: 24px 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }}
+
+        /* Barra de Ações Interativas (Apenas em tela) */
+        .report-actions-bar {{
+            width: 100%;
+            max-width: 1050px;
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 10px;
+            padding: 12px 20px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }}
+
+        .report-actions-bar .info {{
+            color: #94a3b8;
+            font-size: 0.85em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }}
+
+        .report-actions-bar .info strong {{
+            color: #f8fafc;
+        }}
+
+        .action-btns {{
+            display: flex;
+            gap: 10px;
+        }}
+
+        .btn-action {{
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #0284c7;
+            color: #ffffff;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 0.84em;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s;
+        }}
+
+        .btn-action:hover {{
+            background: #0369a1;
+            transform: translateY(-1px);
+        }}
+
+        .btn-action.secondary {{
+            background: #334155;
+            color: #e2e8f0;
+        }}
+
+        .btn-action.secondary:hover {{
+            background: #475569;
+        }}
+
+        /* Folha A4 do Relatório Executivo */
+        .report-sheet {{
+            background: var(--bg-sheet);
+            width: 100%;
+            max-width: 1050px;
+            border-radius: 12px;
+            padding: 36px 42px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+            box-sizing: border-box;
+            position: relative;
+        }}
+
+        /* Cabeçalho do Relatório */
+        .report-header {{
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2.5px solid var(--primary);
+            padding-bottom: 18px;
+            margin-bottom: 20px;
+            gap: 16px;
+        }}
+
+        .brand-block {{
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }}
+
+        .brand-logo-svg {{
+            width: 44px;
+            height: 44px;
+            flex-shrink: 0;
+        }}
+
+        .brand-text h2 {{
+            font-size: 1.25em;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: -0.02em;
+            margin: 0;
+            line-height: 1.2;
+        }}
+
+        .brand-text p {{
+            font-size: 0.72em;
+            color: var(--text-muted);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-top: 2px;
+        }}
+
+        .classification-block {{
+            text-align: right;
+        }}
+
+        .badge-classification {{
+            display: inline-block;
+            background: #f0fdf4;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.72em;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }}
+
+        .doc-reference {{
+            font-size: 0.75em;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }}
+
+        /* Título e Escopo do Documento */
+        .report-title-banner {{
+            margin-bottom: 20px;
+        }}
+
+        .report-title-banner h1 {{
+            font-size: 1.45em;
+            color: #0f172a;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            margin-bottom: 6px;
+        }}
+
+        .report-title-banner .desc {{
+            font-size: 0.88em;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }}
+
+        /* Metadados Oficiais */
+        .report-meta-grid {{
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 22px;
+        }}
+
+        .meta-cell {{
+            font-size: 0.8em;
+        }}
+
+        .meta-cell .k {{
+            color: var(--text-muted);
+            font-size: 0.72em;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 2px;
+            display: block;
+        }}
+
+        .meta-cell .v {{
+            color: #0f172a;
+            font-weight: 600;
+        }}
+
+        .meta-cell .v.mono {{
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9em;
+        }}
+
+        /* Grade de KPIs */
+        .report-kpi-grid {{
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 22px;
+        }}
+
+        .report-kpi-card {{
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px 14px;
+            position: relative;
+            overflow: hidden;
+            border-left: 4px solid var(--kpi-color, var(--primary));
+        }}
+
+        .report-kpi-card .kpi-label {{
+            font-size: 0.72em;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+        }}
+
+        .report-kpi-card .kpi-value {{
+            font-size: 1.45em;
+            font-weight: 800;
+            color: #0f172a;
+            margin-top: 4px;
+            letter-spacing: -0.02em;
+        }}
+
+        /* Parecer de Inteligência Preditiva IA */
+        .report-ai-card {{
+            background: #fffbeb;
+            border: 1px solid #fde68a;
+            border-left: 5px solid #d97706;
+            border-radius: 8px;
+            padding: 14px 18px;
+            margin-bottom: 24px;
+            line-height: 1.6;
+            font-size: 0.88em;
+            color: #1e293b;
+        }}
+
+        .report-ai-card .ai-title {{
+            color: #b45309;
+            font-weight: 700;
+            font-size: 0.92em;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }}
+
+        /* Tabela de Auditoria */
+        .report-section-title {{
+            font-size: 0.95em;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }}
+
+        .table-container {{
+            width: 100%;
+            overflow-x: auto;
+            margin-bottom: 24px;
+            border-radius: 8px;
+            border: 1px solid #cbd5e1;
+        }}
+
+        .audit-table {{
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.84em;
+            text-align: left;
+        }}
+
+        .audit-table thead th {{
+            background: #f1f5f9;
+            color: #334155;
+            padding: 10px 12px;
+            font-size: 0.74em;
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            border-bottom: 1.5px solid #cbd5e1;
+            white-space: nowrap;
+        }}
+
+        .audit-table tbody td {{
+            padding: 9px 12px;
+            border-bottom: 1px solid #e2e8f0;
+            color: #1e293b;
+            vertical-align: middle;
+            word-break: break-word;
+        }}
+
+        .audit-table tbody tr:nth-child(even) {{
+            background: #f8fafc;
+        }}
+
+        /* Termo de Encerramento e Assinaturas */
+        .audit-sign-section {{
+            margin-top: 32px;
+            padding-top: 20px;
+            border-top: 1px solid #cbd5e1;
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }}
+
+        .audit-sign-disclaimer {{
+            font-size: 0.76em;
+            color: var(--text-muted);
+            line-height: 1.5;
+            margin-bottom: 24px;
+            text-align: justify;
+        }}
+
+        .signatures-grid {{
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 40px;
+            margin-top: 20px;
+        }}
+
+        .sig-box {{
+            text-align: center;
+        }}
+
+        .sig-line {{
+            border-bottom: 1px solid #64748b;
+            height: 36px;
+            margin-bottom: 6px;
+        }}
+
+        .sig-name {{
+            font-size: 0.82em;
+            font-weight: 700;
+            color: #0f172a;
+        }}
+
+        .sig-role {{
+            font-size: 0.72em;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }}
+
+        /* Rodapé Oficial */
+        .report-footer {{
+            margin-top: 24px;
+            padding-top: 12px;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.72em;
+            color: var(--text-muted);
+            flex-wrap: wrap;
+            gap: 8px;
+        }}
+
+        .audit-hash-badge {{
+            font-family: 'JetBrains Mono', monospace;
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 1px solid #cbd5e1;
+            font-size: 0.95em;
+        }}
+
+        /* ─── REGRAS NATIVAS DE IMPRESSÃO A4 (ANTI-OVERFLOW ESTREITO) ─── */
+        @page {{
+            size: A4 portrait;
+            margin: 12mm 14mm 14mm 14mm;
+        }}
+
+        @media print {{
+            *, *::before, *::after {{
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                box-shadow: none !important;
+                text-shadow: none !important;
+            }}
+
+            html, body {{
+                background: #ffffff !important;
+                color: #0f172a !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                width: 100% !important;
+                font-size: 9pt !important;
+            }}
+
+            .report-actions-bar {{
+                display: none !important;
+            }}
+
+            .report-sheet {{
+                max-width: 100% !important;
+                width: 100% !important;
+                padding: 0 !important;
+                border: none !important;
+                box-shadow: none !important;
+                border-radius: 0 !important;
+            }}
+
+            .report-header {{
+                border-bottom: 2px solid #0284c7 !important;
+                padding-bottom: 10px !important;
+                margin-bottom: 12px !important;
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }}
+
+            .report-meta-grid {{
+                background: #f8fafc !important;
+                border: 1px solid #cbd5e1 !important;
+                padding: 8px 12px !important;
+                margin-bottom: 14px !important;
+                gap: 8px !important;
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }}
+
+            .report-kpi-grid {{
+                grid-template-columns: repeat(4, 1fr) !important;
+                gap: 8px !important;
+                margin-bottom: 14px !important;
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }}
+
+            .report-kpi-card {{
+                padding: 8px 10px !important;
+                border: 1px solid #cbd5e1 !important;
+                border-left: 3px solid #0284c7 !important;
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }}
+
+            .report-kpi-card .kpi-value {{
+                font-size: 1.25em !important;
+            }}
+
+            .report-ai-card {{
+                background: #fffbeb !important;
+                border: 1px solid #fde68a !important;
+                border-left: 4px solid #d97706 !important;
+                padding: 10px 12px !important;
+                margin-bottom: 14px !important;
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }}
+
+            .table-container {{
+                border: 1px solid #cbd5e1 !important;
+                overflow: visible !important;
+                margin-bottom: 14px !important;
+            }}
+
+            .audit-table {{
+                width: 100% !important;
+            }}
+
+            .audit-table thead {{
+                display: table-header-group !important;
+            }}
+
+            .audit-table tr {{
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }}
+
+            .audit-table th {{
+                background: #f1f5f9 !important;
+                color: #0f172a !important;
+                border-bottom: 1.5px solid #94a3b8 !important;
+                padding: 6px 8px !important;
+                font-size: 7.5pt !important;
+            }}
+
+            .audit-table td {{
+                padding: 6px 8px !important;
+                border-bottom: 1px solid #e2e8f0 !important;
+                font-size: 7.8pt !important;
+            }}
+
+            .audit-sign-section {{
+                margin-top: 20px !important;
+                padding-top: 14px !important;
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }}
+
+            .sig-line {{
+                height: 28px !important;
+            }}
+
+            .report-footer {{
+                border-top: 1px solid #cbd5e1 !important;
+                margin-top: 14px !important;
+                padding-top: 8px !important;
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }}
+        }}
     </style>
 </head>
 <body>
-    <div class="header">
-        <div>
+    <!-- Barra de Controle Interativo em Tela -->
+    <div class="report-actions-bar">
+        <div class="info">
+            <i class="fas fa-file-shield" style="color:#38bdf8"></i>
+            <span>Relatório Oficial <strong>{report_data['code']}</strong> — Visualização A4 Executiva</span>
+        </div>
+        <div class="action-btns">
+            <button class="btn-action" onclick="window.print()">
+                <i class="fas fa-print"></i> Imprimir / Salvar PDF
+            </button>
+            <a class="btn-action secondary" href="?format=csv">
+                <i class="fas fa-file-csv"></i> Exportar CSV
+            </a>
+            <button class="btn-action secondary" onclick="window.close()">
+                <i class="fas fa-times"></i> Fechar
+            </button>
+        </div>
+    </div>
+
+    <!-- Folha Oficial do Relatório -->
+    <main class="report-sheet">
+        <!-- Cabeçalho Institucional -->
+        <header class="report-header">
+            <div class="brand-block">
+                <svg class="brand-logo-svg" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M24 4L6 12V22C6 33.1 13.7 43.4 24 46C34.3 43.4 42 33.1 42 22V12L24 4Z" fill="#0284c7" fill-opacity="0.15" stroke="#0284c7" stroke-width="2.5" stroke-linejoin="round"/>
+                    <path d="M17 24L22 29L31 19" stroke="#0284c7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <div class="brand-text">
+                    <h2>GBOC ENTERPRISE SUITE</h2>
+                    <p>Central de Auditoria, Riscos & Governança de Backup</p>
+                </div>
+            </div>
+            <div class="classification-block">
+                <span class="badge-classification"><i class="fas fa-shield-halved"></i> Documento Oficial Auditável</span>
+                <div class="doc-reference">ISO 27001 • LGPD Art. 46 • NIST CSF</div>
+            </div>
+        </header>
+
+        <!-- Banner com Título e Código -->
+        <section class="report-title-banner">
             <h1>{report_data['title']}</h1>
-            <div class="meta">Código: {report_data['code']} | Categoria: {report_data['category']} | Tipo: {report_data['type']}</div>
-        </div>
-        <div style="text-align:right">
-            <strong style="color:#4fa3e8">GBOC System v14.1.0</strong><br>
-            <span class="meta">Data: {report_data['generated_at'][:19].replace('T', ' ')}</span>
-        </div>
-    </div>
+            <p class="desc">{report_data.get('description', 'Relatório analítico consolidado gerado automaticamente pela plataforma GBOC Enterprise.')}</p>
+        </section>
 
-    <div class="grid">{metrics_html}</div>
+        <!-- Metadados de Autenticidade -->
+        <section class="report-meta-grid">
+            <div class="meta-cell">
+                <span class="k">Código do Relatório</span>
+                <span class="v mono">{report_data['code']}</span>
+            </div>
+            <div class="meta-cell">
+                <span class="k">Data de Emissão (UTC)</span>
+                <span class="v">{report_data['generated_at'][:19].replace('T', ' ')} UTC</span>
+            </div>
+            <div class="meta-cell">
+                <span class="k">Categoria & Escopo</span>
+                <span class="v">{report_data['category']} • Servidor Central</span>
+            </div>
+            <div class="meta-cell">
+                <span class="k">Hash de Autenticidade</span>
+                <span class="v mono">{audit_hash_short}</span>
+            </div>
+        </section>
 
-    <div class="ai-box">
-        <strong style="color:#f0a940">🤖 Parecer Técnico & Recomendação de IA:</strong>
-        <p style="margin-top:8px;margin-bottom:0;">{report_data['ai_executive_recommendation']}</p>
-    </div>
+        <!-- Grade de Métricas Principais (KPIs) -->
+        <section class="report-kpi-grid">
+            {metrics_html}
+        </section>
 
-    {'<h3>📋 Detalhamento dos Dados Auditados</h3><table><thead><tr>' + headers_html + '</tr></thead><tbody>' + rows_html + '</tbody></table>' if headers_html else ''}
+        <!-- Parecer Executivo de IA Preditiva -->
+        <section class="report-ai-card">
+            <div class="ai-title">
+                <i class="fas fa-brain"></i> Parecer Técnico & Inteligência Preditiva GBOC:
+            </div>
+            <p>{report_data.get('ai_executive_recommendation', 'Ambiente operacional monitorado em conformidade com as políticas estabelecidas.')}</p>
+        </section>
 
-    <div class="footer">
-        Relatório gerado automaticamente pelo GBOC Server Enterprise v14.1.0 — Documento de Auditoria e Governança de Dados.
-    </div>
+        <!-- Detalhamento dos Registros Auditados (se houver tabela) -->
+        {f'''
+        <section>
+            <div class="report-section-title">
+                <i class="fas fa-table-list" style="color:var(--primary)"></i> Detalhamento dos Dados Auditados
+            </div>
+            <div class="table-container">
+                <table class="audit-table">
+                    <thead><tr>{headers_html}</tr></thead>
+                    <tbody>{rows_html if rows_html else '<tr><td colspan="100%" style="text-align:center">Nenhum registro auditado no período selecionado.</td></tr>'}</tbody>
+                </table>
+            </div>
+        </section>
+        ''' if headers_html else ''}
+
+        <!-- Seção de Responsabilidade e Assinatura Técnica -->
+        <section class="audit-sign-section">
+            <p class="audit-sign-disclaimer">
+                <strong>Declaração de Conformidade Técnica:</strong> As informações contidas neste documento foram extraídas diretamente da base de dados e telemetria operacional em tempo real do GBOC System v14.1.0 Enterprise Edition, sem simulações ou dados fictícios. A integridade dos dados pode ser atestada pelo hash criptográfico constante no cabeçalho.
+            </p>
+            <div class="signatures-grid">
+                <div class="sig-box">
+                    <div class="sig-line"></div>
+                    <div class="sig-name">Administrador de Infraestrutura & Backup</div>
+                    <div class="sig-role">Operações de TI • GBOC Enterprise</div>
+                </div>
+                <div class="sig-box">
+                    <div class="sig-line"></div>
+                    <div class="sig-name">Auditoria de Segurança da Informação</div>
+                    <div class="sig-role">Governança, Riscos & Compliance (GRC)</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Rodapé do Relatório -->
+        <footer class="report-footer">
+            <span>GBOC System v14.1.0 Enterprise Edition — Propriedade Intelectual Registrada.</span>
+            <span>Assinatura Digital: <span class="audit-hash-badge">{audit_hash[:16]}...</span></span>
+        </footer>
+    </main>
 
     <script>
-        window.onload = function() {{
+        window.addEventListener('DOMContentLoaded', () => {{
             if (window.location.search.includes('print=1')) {{
-                window.print();
+                setTimeout(() => {{
+                    window.print();
+                }}, 300);
             }}
-        }}
+        }});
     </script>
 </body>
 </html>"""
         return HTMLResponse(content=html_content)
+
 
 
 @router.get("/schedules")

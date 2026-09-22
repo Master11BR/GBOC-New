@@ -1,35 +1,42 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.5.0 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.6.0 Enterprise. Todos os direitos reservados. -->
 
-# 🚀 GBOC - Gestão & Backup Operations Center (v14.5.0 Enterprise Edition)
+# 🚀 GBOC - Gestão & Backup Operations Center (v14.6.0 Enterprise Edition)
 
-[![GBOC System Version](https://img.shields.io/badge/version-14.5.0--Enterprise-blue.svg)](https://github.com/Master11BR/GBOC-New)
+[![GBOC System Version](https://img.shields.io/badge/version-14.6.0--Enterprise-blue.svg)](https://github.com/Master11BR/GBOC-New)
 [![Python Version](https://img.shields.io/badge/python-3.11%2B%20%7C%203.14-green.svg)](https://www.python.org/)
 [![PostgreSQL](https://img.shields.io/badge/postgresql-16-blue.svg)](https://www.postgresql.org/)
 [![UI Model](https://img.shields.io/badge/UI__MODEL-modern%20(Official)-indigo.svg)]()
 [![Status](https://img.shields.io/badge/status-production--ready-brightgreen.svg)]()
 
-> **GBOC (Gestão & Backup Operations Center v14.5.0 Enterprise Edition)** é a mais avançada plataforma corporativa de orquestração de backup, RMM, monitoramento preditivo, telemetria 100% real (Zero-Mock Strict), modelo visual oficial **Modern UI (UnoCSS)** e resposta cibernética a incidentes.
+> **GBOC (Gestão & Backup Operations Center v14.6.0 Enterprise Edition)** é a mais avançada plataforma corporativa de orquestração de backup, Disaster Recovery (DR) 100% verificável ponta a ponta, RMM, telemetria real (Zero-Mock Strict), modelo visual universal **Modern UI (UnoCSS)** e resposta cibernética a incidentes.
 
 ---
 
 ## 📌 Sumário
-1. [Visão Geral e Arquitetura](#-visão-geral-e-arquitetura)
-2. [Recursos de Destaque (v14.5.0 Enterprise)](#-recursos-de-destaque-v1450-enterprise)
-3. [Cyber Security Sentinel (ClamAV, YARA, Maltrail, Wazuh, Defender)](#-cyber-security-sentinel)
-4. [Assistente de Inteligência Artificial & LLMs (Ollama & Nuvem)](#-assistente-de-inteligência-artificial--llms)
-5. [Disaster Recovery (DR) & Sync em Nuvem 1-Click](#-disaster-recovery-dr--sync-em-nuvem-1-click)
-6. [Resiliência a Longos Intervalos (Auto-Heal & Lock Prune)](#-resiliência-a-longos-intervalos-auto-heal--lock-prune)
-7. [Instalação & Configuração Rápida](#-instalação--configuração-rápida)
-8. [Histórico de Mudanças (Changelog v14.5.0 Enterprise)](#-histórico-de-mudanças)
+1. [Visão Geral e Arquitetura Operacional](#-visão-geral-e-arquitetura-operacional)
+2. [Estrutura Canônica de Navegação (7 Domínios de Negócio)](#-estrutura-canônica-de-navegação)
+3. [Recursos de Destaque (v14.6.0 Enterprise)](#-recursos-de-destaque-v1460-enterprise)
+4. [Disaster Recovery & SureRestore Sandbox Zero-Mock](#-disaster-recovery--surerestore-sandbox-zero-mock)
+5. [Cyber Security Sentinel (ClamAV, YARA, Maltrail, Wazuh, Defender)](#-cyber-security-sentinel)
+6. [Assistente de Inteligência Artificial & LLMs (Ollama & Nuvem)](#-assistente-de-inteligência-artificial--llms)
+7. [Histórico de Mudanças (Changelog v14.6.0 Enterprise)](#-histórico-de-mudanças)
+8. [Instalação & Configuração Rápida](#-instalação--configuração-rápida)
 
 ---
 
-## 🏗️ Visão Geral e Arquitetura
+## 🏗️ Visão Geral e Arquitetura Operacional
 
+O GBOC v14.6.0 opera sob o ciclo de vida completo e verificável de proteção contínua:
+
+```text
+Política → Backup consistente → Armazenamento → Integridade →
+Teste de recuperação → Recuperação → Validação operacional → Evidência
 ```
+
+```text
                   ┌────────────────────────────────────────┐
                   │             GBOC SERVER                │
-                  │   - Dashboard Enterprise Unificado     │
+                  │   - Dashboard Enterprise Canônico      │
                   │   - PostgreSQL 16 (Imunidade WAL)      │
                   │   - RMM Proxy & Espelho Web Agente     │
                   │   - SureRestore Sandbox & Multi-Tenant │
@@ -44,6 +51,7 @@
                │   - Cyber Security Sentinel (ClamAV/YARA)    │
                │   - AI Diagnostic Engine (Ollama/Cloud)      │
                │   - DR Backup S3 (.gbocdr 1-Click Restore)   │
+               │   - Virtual Lab Sandbox (Switch Isolado)     │
                └──────┬────────────────┬───────────────┬──────┘
                       │                │               │
                       ▼                ▼               ▼
@@ -55,45 +63,99 @@
 
 ---
 
-## ⚡ Recursos de Destaque (v14.5.0 Full Stable Enterprise)
+## 🗺️ Estrutura Canônica de Navegação
 
-- **Universal CSS Architecture & Zero Isolated CSS**: Padrão visual 100% compartilhado e sincronizado entre `GBOC-Server` e `GBOC-Agent` em todas as 53 páginas HTML com a stack canônica (`style.css`, `gboc-themes.css`, `gboc-layout.css`, `gboc-hardware-hud.css`, `gboc-file-picker.css`), 8 estilos de componentes e 6 temas de iluminação.
-- **Enterprise Modal & Dialog System (`gboc-modal.js`)**: Interceptador global e transparente para `window.alert`, `window.confirm` e `window.prompt` com animações suaves Kyle Zantos, detecção semântica de status/emojis, suporte a atalhos de teclado (Esc/Enter) e eliminação completa de caixas de diálogo síncronas legadas do navegador.
-- **Nova Interface Visual de Autenticação V7 (Dark Glassmorphism)**: Tela de login e registro corporativo com degradês dourados/âmbar, efeitos de desfoque de fundo (backdrop blur), animações suaves e alternância dinâmica entre Login e Criação de Conta.
-- **Primeiro Acesso / Setup Automatizado**: Detecção inteligente de primeiro uso sem administrador cadastrado, acionando o formulário de provisionamento inicial do Admin mestre com auto-login instantâneo tanto no Servidor quanto no Agente.
-- **Resolução de Importação Duplicati Cloud & Reparos de Banco**: Suporte nativo completo para repositórios Cloud (`s3`, `azure`, `googledrive`, `onedrive`, `dropbox`, `webdav`, `sftp`) e autocorreção do erro `DatabaseRepairInProgress` via deleção e reparo seguro do banco local Duplicati.
-- **Motion Principles UX Engine (Kyle Zantos)**: Interface 100% dinâmica com Skeleton Loaders, Lazy Loading inteligente via Intersection Observer, animações de entrada/saída suaves e barras de progresso contínuas e fluidas.
-- **Storage Usage & Growth Monitor GUI**: Módulo centralizado (`modules/storage`) para monitoramento em tempo real de volumes de armazenamento, capacidade utilizada/livre e tendência de crescimento com gráficos dinâmicos Chart.js.
-- **Job Failure & Alert Monitor GUI**: Módulo centralizado (`modules/job_alert`) para consolidação de falhas de jobs ativas, fluxo de resolução com 1-clique e testes de disparo de alertas em múltiplos canais.
-- **GBOC Native Engine v4**: FastCDC (Content-Defined Chunking 4KB-4MB), compressão Zstd, encriptação autenticada AES-256-GCM e WORM Immutability.
-- **Direct-to-Cloud Memory Streaming**: Envio contínuo via RAM buffer (< 100MB) diretamente para repositórios Cloud (S3, MinIO, Azure, SFTP) sem criar arquivos staging no disco local.
-- **RMM Proxy & Espelho Web do Agente**: Execute PowerShell/Bash remotos com o terminal interativo do servidor e controle a interface web do agente via proxy em tempo real.
+A interface e as APIs do Servidor e Agente são organizadas estritamente em **7 Domínios Canônicos de Negócio**:
+
+```text
+Visão Geral
+└── Dashboard Principal (/index.html / tab:overview)
+
+Backup
+├── Jobs e Políticas (/tasks.html / tab:backups)
+├── Cargas Protegidas (/protected-workloads.html / tab:workloads — Bancos, AD, LTO, Oracle, SAP)
+├── Repositórios (/repositories.html / tab:storage)
+└── Restaurar e Validar (/restore.html / tab:surerestore — Assistente, Integridade, Sandbox)
+
+Disaster Recovery
+├── Prontidão e Plano (/disaster-recovery.html?tab=readiness / tab:dr-readiness)
+├── Recuperação Instantânea (/disaster-recovery.html?tab=instant-vm / tab:instant-vm)
+├── Bare Metal, P2V e Mídia (/disaster-recovery.html?tab=p2v / tab:p2v)
+└── Laboratório e Validação (/disaster-recovery.html?tab=virtual-lab / tab:virtual-lab)
+
+Proteção
+├── Ransomware Guardian (/ransomware.html / tab:ransomware)
+├── Conformidade (/compliance.html / tab:compliance)
+└── Auditoria (/audit.html / tab:audit)
+
+Virtualização e Cloud
+├── VMware, Hyper-V e Proxmox (/virtualization.html / tab:virtualization)
+├── Microsoft 365 e Exchange (/m365-exchange.html / tab:m365)
+├── SaaS, Kubernetes e Cloud (/saas-cloud-enterprise.html / tab:saas-cloud)
+└── Replicação (/replication.html / tab:replication)
+
+Operações
+├── Alertas e Falhas (/alerts.html / tab:alerts)
+├── Logs Globais (/logs.html / tab:logs)
+├── Diagnóstico (/diagnostic.html / tab:diagnostic)
+└── Relatórios (/reports.html / tab:reports)
+
+Configuração
+├── Usuários e Permissões (/users.html / tab:users)
+├── Notificações (/notification-channels.html / tab:notifications)
+├── Armazenamento (/storage-usage.html / tab:storage)
+├── Motores e Integrações (/engines.html / tab:engines)
+└── Configurações Gerais (/settings.html / tab:config)
+```
 
 ---
 
-## 📜 Histórico de Mudanças (Changelog v14.5.0 Enterprise)
+## ⚡ Recursos de Destaque (v14.6.0 Full Stable Enterprise)
 
-- **Universalização Completa de CSS & Política Zero CSS Isolado**:
-  - Unificação estrita e bidirecional de todos os arquivos de estilo entre `GBOC-Server` e `GBOC-Agent/static/` (`style.css`, `gboc-themes.css`, `gboc-layout.css`, `gboc-hardware-hud.css`, `gboc-file-picker.css`).
-  - Padronização automatizada de todas as 53 páginas HTML do ecossistema para consumir a stack CSS canônica e o componente global de modais.
-  - Eliminação definitiva de regras CSS fragmentadas, isoladas ou embutidas fora da arquitetura compartilhada.
-  - Adição de tokens de design de alto contraste para o modo claro e suporte contínuo a 8 estilos de UI e 6 temas de iluminação.
-- **Sistema Corporativo Universal de Modais & Caixas de Diálogo (`gboc-modal.js`)**:
-  - Interceptação global e não invasiva das chamadas nativas `alert()`, `confirm()` e `prompt()`.
-  - Renderização assíncrona em DOM com backdrop de desfoque, animação suave de escala e elevação, detecção de emojis e palavras-chave de severidade (*sucesso, erro, falha, atenção, info*).
-  - Acessibilidade completa com suporte a navegação por teclado (`Enter` para confirmar, `Escape` para cancelar), foco automático em inputs de prompt e prevenção de rolagem do body.
-- **Design de Autenticação Enterprise V7 (Login / Create Account)**:
-  - Implementação da nova interface visual moderna baseada em Tailwind CSS, Glassmorphism escuro (`zinc-900/70`) e realces dourados/âmbar (`amber-500` / `yellow-500`).
-  - Unificação da experiência visual entre o GBOC Server (`GBOC-Server/login.html`) e o GBOC Agent (`GBOC-Agent/static/login.html`).
-  - Alternância de visualização de senhas (*Eye Toggle*), opção *Lembrar credencial* persistida no `localStorage`, e banners de status dinâmicos animados.
-  - Modo Primeiro Acesso (Setup): Quando não existem administradores cadastrados no banco de dados, a interface ativa automaticamente o fluxo de criação de conta master (`/setup`) com login automático subsequente.
-  - Cumprimento rigoroso da política *Zero-Mock*: remoção de botões sociais falsos e inclusão de badges de segurança real (*Criptografia SHA-256/PBKDF2* e *Auditoria Ativa*).
-- **Resolução de Erros Críticos no Motor de Importação Duplicati**:
-  - Correção do erro `Tipo de repositório Duplicati não suportado: cloud`: normalização de esquemas de storage cloud em `task_manager.py`, `repository_manager.py`, `real_restore_manager.py` e `integrity_api.py`.
-  - Tratamento determinístico para `DatabaseRepairInProgress`: eliminação de bancos locais SQLite corrompidos antes de reexecutar o `repair` do Duplicati nativo.
-- **Atualização SemVer e Pacote de Distribuição**:
-  - Incremento global de versão para **v14.5.0 Full Stable Enterprise**.
-  - Reconstrução completa do pacote de distribuição em `GBOC-Distribution`.
+- **Arquitetura Operacional de DR & SureRestore Zero-Mock**:
+  - Eliminação definitiva de declarações ou retornos simulados. Um ponto de restauração só recebe o status de *Aprovado* após boot real em VM isolada com validação de heartbeat e consistência de carga.
+  - Estados padronizados: `Protegido`, `Em risco`, `Atenção`, `Falhou`, `Não protegido`.
+  - Estados de validação: `Aprovado`, `Reprovado`, `Inconclusivo`, `Expirado`.
+- **Restauração de Banco de Dados com Validação Estrita**:
+  - PostgreSQL: Invocação de `pg_restore` em banco temporário com captura de `stderr` e falha explícita imediata se o código de saída for diferente de 0.
+  - SQLite: Execução do `PRAGMA integrity_check;` e verificação da estrutura de tabelas.
+- **Clonagem P2V & Streaming de Blocos**:
+  - Criação de imagem VHDX com streaming direto de dados a partir de snapshot VSS consistente, validação de privilégios de Administrador e geração de manifesto de hardware VM (`.vmconfig.json`).
+- **Backup de System State & Active Directory**:
+  - Integração nativa com `wbadmin start systemstatebackup` e catálogo completo de consistência NTDS/SYSVOL, registro e manifesto criptográfico SHA-256 (`dr_manifest.json`).
+- **Mídia de Boot WinPE / ISO Real**:
+  - Extração automática de drivers de armazenamento, rede e RAID do host operacional via `Export-WindowsDriver`, scripts de recuperação autônoma e compilação de ISO bootável real via `oscdimg` (Windows ADK).
+- **Virtual Lab Sandbox**:
+  - Provisionamento e isolamento de rede em switch virtual privado (`GBOC-Isolated-Lab`), prevenindo qualquer colisão com o ambiente de produção.
+- **Universal CSS & Cancelamento Real de Requisições**:
+  - 100% de sincronização bidirecional de CSS e JS compartilhados (`gboc-perf.js`, `gboc-modal.js`, `gboc-layout-manager.js`, `gboc-hardware-hud.js`, `gboc-motion.js`).
+  - Utilização de `gbocPerf.makeCancellable()` para abortar requisições pendentes em trocas de tela e buscas ativas.
+  - Fallback resiliente no startup do servidor e agente para `httptools` e `uvloop`.
+
+---
+
+## 📜 Histórico de Mudanças (Changelog v14.6.0 Enterprise)
+
+- **Reestruturação Canônica de Navegação (7 Domínios de Negócio)**:
+  - Alinhamento completo da Sidebar e Topbar no Server e no Agent com os domínios: *Visão Geral, Backup, Disaster Recovery, Proteção, Virtualização & Cloud, Operações e Configuração*.
+  - Criação do módulo consolidado de **Cargas Protegidas** ([`protected-workloads.html`](file:///d:/GBOC-New/GBOC-New/GBOC-Agent/static/protected-workloads.html) e [`protected-workloads.js`](file:///d:/GBOC-New/GBOC-New/GBOC-Agent/static/protected-workloads.js)).
+  - Adição de sub-abas consolidadas em `restore.html`, `alerts.html`, `diagnostic.html`, `engines.html` e `disaster-recovery.html`.
+  - Mapeamento de aliases e suporte a deep linking via URL params com preservação de retrocompatibilidade de URLs legadas.
+- **Eliminação de Simulações & Zero-Mock Strict Policy**:
+  - SureRestore Sandbox reescrito para validação real no hypervisor (`surerestore_router.py`).
+  - Falha explícita garantida em `_test_restore_pg()` para retornos com código != 0 e SQLite integrity check.
+  - P2V atualizado com leitura real de blocos, checagem de privilégios de Administrador e geração de descritor de VM.
+  - Backup de System State e AD com suporte a `wbadmin` e manifesto SHA-256.
+  - Staging de Mídia de Boot WinPE com exportação real de drivers via PowerShell e compilação de ISO.
+  - Virtual Lab Sandbox com ciclo de vida completo de VM isolada e verificação de heartbeat WMI.
+- **Estabilidade do Frontend & Pipeline de Build**:
+  - Correção da classe inacabada no [`task_monitor.js`](file:///d:/GBOC-New/GBOC-New/GBOC-Agent/static/task_monitor.js).
+  - Correção da função `safeRender` em [`gboc-perf.js`](file:///d:/GBOC-New/GBOC-New/shared-css/gboc-perf.js) com comparação completa `_gbocLastHtml`.
+  - Inclusão de `gboc-perf.js` e scripts compartilhados na fonte canônica `shared-css/` e no sincronizador `sync_css.py`.
+  - Execução obrigatória do gatekeeper `python tools/sync_css.py --verify` antes da geração do pacote de distribuição no `make_distribution.py`.
+  - Implementação de fallback dinâmico para `httptools` e `uvloop` em `agent_gboc.py`, `agent_server.py`, `server_gboc.py` e `gboc_server.py`.
+  - Aplicação de `gbocPerf.makeCancellable()` nas telas de alta frequência.
+  - Incremento global de versão para **v14.6.0 Full Stable Enterprise**.
 
 ---
 
@@ -116,63 +178,23 @@ Integrado com os 5 principais ecossistemas globais de segurança:
 
 ---
 
-## 🔄 Disaster Recovery (DR) & Sync em Nuvem 1-Click
+## ⚙️ Instalação & Configuração Rápida
 
-- Ao final de cada backup, o módulo [agent_dr_sync.py](file:///d:/GBOC-New/GBOC-New/GBOC-Agent/core/agent_dr_sync.py) grava e criptografa as configurações e banco local em um pacote `.gbocdr` enviado automaticamente para a Nuvem (`/_gboc_dr_metadata/{agent_id}/`).
-- Após uma instalação limpa do SO, o administrador pode utilizar o assistente [dr_restore_manager.py](file:///d:/GBOC-New/GBOC-New/GBOC-Agent/core/dr_restore_manager.py) para reconstruir 100% dos repositórios, agendamentos e tarefas em 1 clique.
+### Pré-requisitos
+- **Windows Server 2016+ / Windows 10/11** ou **Linux Ubuntu 22.04+ / Debian 12+**
+- **Python 3.11+ / 3.14**
+- **PostgreSQL 14+ / 16** (para o Servidor Central)
 
----
+### Iniciar Servidor Central
+```powershell
+cd GBOC-Server
+python server_gboc.py
+```
+Acesse: `http://localhost:8000`
 
-## 🛡️ Resiliência a Longos Intervalos (Auto-Heal & Lock Prune)
-
-- **Rotina Preventiva para Falhas por Inatividade**: Quando uma tarefa fica mais de 3 dias sem executar, o GBOC executa automaticamente o Auto-Heal: higieniza travas obsoletas (`.lock`), valida o banco do repositório (`repair`) e garante a execução transparente do backup sem desincronizações.
-
-## 📜 Histórico de Mudanças (Changelog v14.4.0 Enterprise)
-
-- **Arquitetura Assíncrona Zero-Freeze para Virtualização & Disaster Recovery (DR)**:
-  - Resolução definitiva de travamentos e lentidões nas telas `/virtualization.html` e `/disaster-recovery.html`.
-  - Desacoplamento de todas as chamadas de motores e subprocessos do SO do Event Loop principal do FastAPI via `await asyncio.to_thread(...)`, mantendo o servidor 100% responsivo a requisições, WebSockets e pings.
-  - Implementação de cache TTL em memória thread-safe (30s) para topologia de discos (`_disks_cache`), informações de Active Directory/VSS (`_sys_info_cache`) e auditoria de readiness (`_readiness_cache`), reduzindo o tempo de resposta em reloads/navegações de 48s para **0.005ms (instantâneo)**.
-  - Consulta em lote único (Batch PowerShell) para discos físicos e partições (tempo de detecção reduzido de 16.33s para 3.38s).
-  - Detecção sub-milissegundo de Active Directory Domain Controller via Windows Registry (`winreg`) direto em `Services\NTDS` (0.05ms) e validação de serviço Hyper-V via `sc.exe query vmms` (0.19s).
-- **Ativação e Conexão Global do Hardware & S.M.A.R.T. HUD**:
-  - Integração do widget de telemetria de hardware (`gboc-hardware-hud.js` e `gboc-hardware-hud.css`) aos Dashboards principais do Agente e do Servidor, além da tela de Overview.
-  - Gauges interativos de CPU, Memória RAM e Storage com disparo ao clique (`toggleHardwareHUD()`) e atalho na barra de Ações Rápidas.
-- **Limpeza e Otimização do Frontend**:
-  - Eliminação de duplicações de scripts e de inicializações redundantes do `UnifiedSidebar` no Agente.
-  - Inserção de skeleton loader / spinner com feedback visual em tempo real durante a enumeração de VMs Hyper-V locais.
-
-## 📜 Histórico de Mudanças (Changelog v14.3.0 Enterprise)
-
-- **Auto-Diagnóstico de IA com Telemetria Real e Respostas Precisas ("O Que Fazer Exatamente")**:
-  - Eliminação de respostas genéricas estáticas (*"Erro detectado: 'Diagnóstico geral...'"*).
-  - Coleta em tempo real de telemetria física do host operacional (`CPU`, `RAM`, `Disco`, `Status BD`, `Locks em Repositório`) via `psutil`.
-  - Diagnósticos estruturados em 3 seções obrigatórias: 🔍 **Causa Raiz Técnica**, 🛠️ **O Que Fazer Exatamente (Passo a Passo numerado)** e ⚡ **Executar Correção Automática (Auto-Heal)** (botão 1-click integrado a `/api/v2/system/auto-heal`).
-- **Ativação Dinâmica em Tempo Real dos 4 Estilos de Componentes UI/UX**:
-  - Correção dos seletores globais em `gboc-themes.css` vinculando cards, painéis, estatísticas, inputs, botões e modais às variáveis de design tokens (`--card-radius`, `--card-border`, `--card-shadow`, `--card-backdrop`, `--card-bg`).
-  - Alternância imediata no navegador entre os 4 estilos visuais: **SaaS Minimal**, **Neumorphism (Soft UI)**, **3D Claymorphism** e **Fluent Design (Microsoft Acrylic Glass)**.
-- **Padronização Estrita da API v2 (`/api/v2/`)**:
-  - Endpoints oficiais `/api/v2/system/ui-config`, `/api/v2/system/version`, `/api/v2/ai/diagnose` e `/api/v2/system/auto-heal` envelopados com `build_v2_response`.
-
-## 📜 Histórico de Mudanças (Changelog v14.2.0 Enterprise)
-
-- **Backup Agentless de Máquinas Virtuais (VMware ESXi & Hyper-V)**: Motor `vmware_hypervisor_engine.py` com integração ao vSphere REST & SOAP SDK (CBT) e Hyper-V WMI nativo (RCT), com criação de checkpoints de produção consistentes via VSS sem instalar agentes no SO convidado.
-- **Instant VM Recovery Local (Boot Instantâneo < 60s)**: Motor `instant_recovery_engine.py` com exportador de Datastore SMB/NFS local e camada diferencial Copy-on-Write (CoW) para inicialização direta do storage de backup sem cópia prévia.
-- **Backup Nativo Microsoft 365 e Google Workspace (SaaS)**: Motor `saas_protection_engine.py` com cliente OAuth2 Microsoft Graph API para backup de Exchange Online, OneDrive, SharePoint e Teams.
-- **Restauração Granular de Itens (Item-Level Recovery)**: Motor `sql_granular_explorer.py` com inspeção de Table of Contents (TOC) em dumps PostgreSQL (`pg_restore -l`), extração cirúrgica de tabela única, e exploração de tabelas no Microsoft SQL Server e SQLite.
-- **Seletor Dinâmico de Estilos UX/UI & Iluminação**: Suporte dinâmico a 2 Modos de Iluminação (Light e Dark Carbon `#121212`) e 4 Formatos de Componentes (SaaS Minimal, Neumorphism Soft UI 3D, 3D Claymorphism e Fluent Design Acrylic Glass).
-- **Migrador Cross-Database Zero-Data-Loss**: Motor `database_cross_migrator.py` com sincronização bidirecional completa entre SQLite (WAL) e PostgreSQL.
-
-## 📜 Histórico de Mudanças (Changelog v14.1.0 Enterprise)
-
-- **Strict Zero-Mock Architecture**: Remoção de 100% de dados simulados, respostas estáticas e fallbacks fake em todos os motores e rotas API (`healer_engine.py`, `tape_robotics_engine.py`, `auto_verify_engine.py`, `cyber_cleanroom_engine.py`, `enterprise_database_connectors.py`).
-- **Telemetria 100% Real do SO Host**: Detecção de hardware de fita LTO/autoloader via WMI real, medição de entropia de Shannon sobre bytes físicos de arquivos no disk, e verificação de hashes SHA-256 em blocos de dados.
-- **Relatórios Preditivos com Dados Reais**: Refatoração dos relatórios de Deduplicação, Outage Cloud, Volumes Desprotegidos e Restauração Bare-Metal (BMR) para consultar o banco de dados e partições reais do SO host.
-- **Sincronização de Pacote de Distribuição**: Pacote `GBOC-Distribution` atualizado com scripts de instalação rápida (`Setup.bat`, `Setup.ps1`).
-
----
-
-## ⚖️ Direitos Autorais & Licença
-
-- **Copyright (c) 2026 Master11BR - Todos os direitos reservados.**
-- Todos os arquivos fonte contêm cabeçalhos legalmente registrados de Propriedade Intelectual.
+### Iniciar Agente Local
+```powershell
+cd GBOC-Agent
+python agent_gboc.py
+```
+Acesse: `http://localhost:9200`

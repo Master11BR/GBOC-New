@@ -1,8 +1,8 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.5.0 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.6.0 Enterprise. Todos os direitos reservados. -->
 
-# 🚀 GBOC System v14.5.0 — Roteiro de Desempenho, Qualidade Comercial e Compilação Standalone
+# 🚀 GBOC System v14.6.0 — Roteiro de Desempenho, Qualidade Comercial e Compilação Standalone
 
-[![GBOC Version](https://img.shields.io/badge/GBOC%20Version-14.5.0-blue.svg)](file:///d:/GBOC-New/GBOC-New/README.md)
+[![GBOC Version](https://img.shields.io/badge/GBOC%20Version-14.6.0-blue.svg)](file:///d:/GBOC-New/GBOC-New/README.md)
 [![Commercial Ready](https://img.shields.io/badge/commercial-ready-brightgreen.svg)]()
 
 > **Roteiro Técnico para Transformar o GBOC em um Produto Comercial de Alta Performance, Protegido contra Engenharia Reversa e Compilável em Executáveis Standalone Autônomos (`.exe` / Binários Linux)**.
@@ -12,7 +12,7 @@
 ## 📌 Sumário
 1. [Compilação Standalone sem Dependência de Python (PyInstaller & Nuitka)](#1-compilação-standalone-sem-dependência-de-python)
 2. [Proteção de Código e Ofuscação (PyArmor / C-Extensions)](#2-proteção-de-código-e-ofuscação)
-3. [Otimizações de Desempenho e Alta Escala](#3-otimizações-de-desempenho-e-alta-escala)
+3. [Otimizações de Desempenho e Alta Escala (v14.6.0)](#3-otimizações-de-desempenho-e-alta-escala)
 4. [Empacotamento Comercial Industrial (Inno Setup / MSI)](#4-empacotamento-comercial-industrial)
 
 ---
@@ -93,88 +93,33 @@ pyinstaller --clean GBOCAgent.spec
 
 ---
 
-### 1.2 Compilação via Nuitka (Máxima Performance C/C++)
+## 2. 🛡️ Proteção de Código e Ofuscação (PyArmor / C-Extensions)
 
-O **Nuitka** converte o código Python diretamente para código C/C++ nativo e o compila via GCC/MSVC, obtendo ganhos de velocidade de até 300%:
+Para proteger a propriedade intelectual dos algoritmos do GBOC (FastCDC Native Engine, SureRestore Sandbox e Cyber Security Sentinel):
 
-```bash
-pip install nuitka
-nuitka --standalone --onefile --enable-plugin=pydantic --include-data-dir=static=static agent_server.py -o GBOCAgent.exe
-```
-
----
-
-## 2. 🔐 Proteção de Código e Ofuscação (PyArmor)
-
-Para proteger os algoritmos de backup, heurística de ransomware e conectores de IA contra engenharia reversa e descompilação:
-
-### Passo a Passo com PyArmor:
 ```bash
 pip install pyarmor
-```
-
-#### Ofuscar Módulos Críticos:
-```bash
-pyarmor gen --recursive --output dist_protected shared_core.py ai_diagnostic.py engines/
-```
-*Isso gera módulos `.pyd` (Windows) ou `.so` (Linux) criptografados com checagem de licença em tempo de execução.*
-
----
-
-## 3. ⚡ Otimizações de Desempenho e Alta Escala
-
-Para suportar **milhares de agentes concorrentes** e garantir prontidão comercial enterprise:
-
-### 3.1 Otimização do Banco PostgreSQL & Connection Pool
-- **Asyncpg / psycopg3**: Migrar conexões síncronas do psycopg2 para drivers assíncronos nativos (`asyncpg`), reduzindo a latência por requisição de 15ms para 2ms.
-- **Tuning do Pool**:
-  ```ini
-  DB_POOL_MIN=5
-  DB_POOL_MAX=50
-  ```
-- **Índices de Tabela e Particionamento**:
-  - Particionamento por mês da tabela `system_events` e `task_executions`.
-  - Índices compostos em `(agent_id, status, created_at)`.
-
-### 3.2 Loteamento de Telemetria WebSocket (Telemetry Batching)
-- Em vez de enviar cada evento individualmente pelo WebSocket, o Agente acumula métricas em memória e dispara pacotes comprimidos via gzip a cada 5 segundos.
-
-### 3.3 Cache Preditivo com Redis
-- Habilitar `REDIS_ENABLED=true` para armazenar o status dos agentes e reduzir a carga de leitura no PostgreSQL em até 85%.
-
----
-
-## 4. 🛠️ Empacotamento Comercial Industrial (Inno Setup)
-
-Para distribuir o GBOC como um instalador comercial `.exe` com assistente gráfico, licença EULA e criação automática de serviços Windows:
-
-### Script Inno Setup (`GBOCSetup.iss`):
-```pascal
-[Setup]
-AppName=GBOC Operations Center
-AppVersion=14.1.0
-DefaultDirName={autopf}\GBOC
-DefaultGroupName=GBOC
-OutputDir=Output
-OutputBaseFilename=GBOC_Installer_v14.1.0
-Compression=lzma2
-SolidCompression=yes
-ArchitecturesInstallIn64BitMode=x64
-
-[Files]
-Source: "dist\GBOCAgent.exe"; DestDir: "{app}\Agent"
-Source: "dist\GBOCServer.exe"; DestDir: "{app}\Server"
-Source: "Tools\*"; DestDir: "{app}\Tools"; Flags: recursesubdirs
-
-[Run]
-Filename: "{app}\Tools\nssm\nssm.exe"; Parameters: "install GBOCAgent ""{app}\Agent\GBOCAgent.exe"""; Flags: runhidden
-Filename: "net"; Parameters: "start GBOCAgent"; Flags: runhidden
-
-[UninstallRun]
-Filename: "net"; Parameters: "stop GBOCAgent"; Flags: runhidden
-Filename: "{app}\Tools\nssm\nssm.exe"; Parameters: "remove GBOCAgent confirm"; Flags: runhidden
+pyarmor gen --recursive -O dist_protected GBOC-Agent/
 ```
 
 ---
 
-**GBOC System v14.1.0** — Roteiro de Desempenho e Comercialização.
+## 3. ⚡ Otimizações de Desempenho e Alta Escala (v14.6.0)
+
+1. **Cancelamento Real de Requisições via `gbocPerf.makeCancellable()`**:
+   - Cada busca ativa, paginação ou troca de tela descarta requisições pendentes anteriores via `AbortController`, eliminando gargalos e *race conditions* no cliente.
+2. **Algoritmo de Renderização Segura (`safeRender`)**:
+   - Comparação estrita de string HTML completa (`_gbocLastHtml`) evitando renderizações desnecessárias do DOM e impedindo perda de foco ou piscamento em tabelas dinâmicas.
+3. **Sincronização Automatizada com Gatekeeper de Build**:
+   - O pipeline de distribuição executa `sync_css.py --verify` de modo determinístico antes de compilar os pacotes de instalação.
+4. **Resiliência de Startup HTTP**:
+   - Detecção dinâmica e fallback seguro para `httptools` e `uvloop` sem risco de falha em ambientes limpos.
+
+---
+
+## 4. 📦 Empacotamento Comercial Industrial
+
+O pacote consolidado de instalação em `GBOC-Distribution/` fornece:
+- `Setup.bat` / `Setup.ps1` com menu interativo e modo silencioso.
+- Instalação e provisionamento automático do serviço Windows via NSSM.
+- Suporte a silent install: `Setup.bat -Silent -Mode Agent -ServerUrl http://srv:8000`.

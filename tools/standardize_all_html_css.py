@@ -15,17 +15,17 @@ standalone_pages = []
 fragment_templates = []
 
 STANDARD_HEAD_INJECTIONS = """    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.5.0">
-    <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=14.5.0">
-    <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=14.5.0">
-    <link rel="stylesheet" href="/static/ui/models/modern/components.css?v=14.5.0">
-    <link rel="stylesheet" href="/static/ui/models/modern/layout.css?v=14.5.0">
-    <link rel="stylesheet" href="/static/style.css?v=14.5.0">
-    <link rel="stylesheet" href="/static/gboc-themes.css?v=14.5.0">
-    <link rel="stylesheet" href="/static/gboc-layout.css?v=14.5.0">
-    <script src="/static/gboc-perf.js?v=14.5.0"></script>
-    <script src="/static/gboc-layout-manager.js?v=14.5.0"></script>
-    <script src="/static/gboc-modal.js?v=14.5.0"></script>"""
+    <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.6.0">
+    <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=14.6.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=14.6.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/components.css?v=14.6.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/layout.css?v=14.6.0">
+    <link rel="stylesheet" href="/static/style.css?v=14.6.0">
+    <link rel="stylesheet" href="/static/gboc-themes.css?v=14.6.0">
+    <link rel="stylesheet" href="/static/gboc-layout.css?v=14.6.0">
+    <script src="/static/gboc-perf.js?v=14.6.0"></script>
+    <script src="/static/gboc-layout-manager.js?v=14.6.0"></script>
+    <script src="/static/gboc-modal.js?v=14.6.0"></script>"""
 
 for folder in folders:
     for root, _, files in os.walk(folder):
@@ -40,6 +40,10 @@ for folder in folders:
                 # Check if this is a standalone HTML page with <head>
                 if "<head>" in content and "</head>" in content and not f.startswith("_"):
                     standalone_pages.append(p)
+                    head_part = content[content.find("<head>"):content.find("</head>")]
+
+                    # Bump any old cache-busting versions to 14.6.0
+                    content = re.sub(r'(\/static\/[^"\'>\s]+\.(?:css|js))\?v=[0-9.]+', r'\1?v=14.6.0', content)
                     head_part = content[content.find("<head>"):content.find("</head>")]
 
                     has_style = "style.css" in head_part
