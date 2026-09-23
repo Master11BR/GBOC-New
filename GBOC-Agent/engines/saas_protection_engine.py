@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v14.1.0 Enterprise Edition
+# GBOC System v14.6.0 Enterprise Edition
 # Module: SaaS Cloud-Native Protection Engine (Microsoft 365 Graph API & Google)
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================
@@ -85,7 +85,7 @@ class MicrosoftGraphClient:
         headers = {
             "Authorization": f"Bearer {token}",
             "Accept": "application/json",
-            "User-Agent": "GBOC-Backup-Engine/14.1.0"
+            "User-Agent": "GBOC-Backup-Engine/14.6.0"
         }
         data = json.dumps(body).encode("utf-8") if body else None
         if data:

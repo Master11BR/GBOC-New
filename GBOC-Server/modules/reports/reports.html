@@ -1,19 +1,110 @@
-<!-- GBOC System v14.1.0 Enterprise Edition -->
+<!-- GBOC System v14.6.0 Enterprise Edition -->
 <!-- Module: Reports HTML Template (Server) -->
 
 <div class="panel">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
         <div>
-            <h3 style="margin:0;font-size:1.2em"><i class="fas fa-chart-pie" style="color:var(--primary)"></i> Central de Relatórios Executivos & Preditivos</h3>
-            <p style="font-size:0.85em;color:var(--text-muted);margin-top:4px">50 relatórios completos com extração de dados 100% reais do banco de dados PostgreSQL e Inteligência Preditiva.</p>
+            <h3 style="margin:0;font-size:1.25em"><i class="fas fa-chart-pie" style="color:var(--primary)"></i> Central de Relatórios Executivos & Inteligência v2.0</h3>
+            <p style="font-size:0.85em;color:var(--text-muted);margin-top:4px">Arquitetura consolidada: 7 Relatórios Flagship de mercado alimentados por 50 módulos internos de dados 100% reais.</p>
         </div>
-        <div style="display:flex;gap:8px">
-            <span class="badge badge-info" style="font-size:0.8em;padding:6px 12px"><i class="fas fa-database"></i> Dados Reais Ativos</span>
-            <span class="badge badge-success" style="font-size:0.8em;padding:6px 12px"><i class="fas fa-brain"></i> IA GBOC 14.1.0</span>
+        <div style="display:flex;gap:8px;align-items:center">
+            <span class="badge badge-info" style="font-size:0.8em;padding:6px 12px"><i class="fas fa-database"></i> Dados 100% Reais</span>
+            <span class="badge badge-success" style="font-size:0.8em;padding:6px 12px"><i class="fas fa-shield-halved"></i> Hash SHA-256</span>
+            <span class="badge badge-warning" style="font-size:0.8em;padding:6px 12px"><i class="fas fa-brain"></i> IA GBOC v2.0</span>
         </div>
     </div>
 
+    <!-- Navigation Switcher: Flagships vs Internal Data Modules -->
+    <div style="display:flex;gap:10px;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:12px;flex-wrap:wrap">
+        <button id="btnTabFlagships" class="btn btn-primary" onclick="switchReportsMode('flagships')" style="display:flex;align-items:center;gap:8px">
+            <i class="fas fa-star"></i> 7 Relatórios Flagship v2.0 (Executivos)
+        </button>
+        <button id="btnTabDataModules" class="btn" onclick="switchReportsMode('modules')" style="display:flex;align-items:center;gap:8px">
+            <i class="fas fa-layer-group"></i> Módulos de Dados Internos (50 Relatórios Base)
+        </button>
+    </div>
+
     <style>
+        /* Flagship Grid Styles */
+        .flagships-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 16px;
+            margin-top: 10px;
+        }
+        .flagship-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 18px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: all 0.25s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            position: relative;
+            overflow: hidden;
+        }
+        .flagship-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+        }
+        .flagship-card-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+        .flagship-code {
+            font-size: 0.8em;
+            font-weight: 700;
+            color: var(--primary);
+            background: rgba(79,163,232,0.12);
+            padding: 3px 8px;
+            border-radius: 6px;
+            letter-spacing: 0.5px;
+        }
+        .flagship-target {
+            font-size: 0.72em;
+            color: var(--text-muted);
+            background: var(--bg-input);
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+        }
+        .flagship-title {
+            font-size: 1.05em;
+            font-weight: 600;
+            color: var(--text);
+            margin: 0 0 6px 0;
+            line-height: 1.35;
+        }
+        .flagship-desc {
+            font-size: 0.82em;
+            color: var(--text-muted);
+            line-height: 1.45;
+            margin-bottom: 12px;
+            flex: 1;
+        }
+        .flagship-replaces {
+            font-size: 0.73em;
+            color: var(--text-muted);
+            background: var(--bg-input);
+            border-left: 3px solid var(--primary);
+            padding: 6px 10px;
+            border-radius: 0 6px 6px 0;
+            margin-bottom: 14px;
+        }
+        .flagship-actions {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            border-top: 1px solid var(--border);
+            padding-top: 12px;
+        }
+
+        /* 50 Data Modules Layout */
         .server-reports-layout {
             display: grid;
             grid-template-columns: 360px 1fr;
@@ -152,50 +243,76 @@
         }
     </style>
 
-    <div class="server-reports-layout">
-        <!-- Painel Lateral de Catálogo -->
-        <div class="srv-catalog-panel">
-            <div class="srv-search-box">
-                <i class="fas fa-search"></i>
-                <input type="text" id="srvReportSearch" placeholder="Buscar por ID, nome ou tipo..." onkeyup="filterSrvReports()">
-            </div>
-
-            <div class="srv-cat-chips" id="srvCategoryChips">
-                <span class="srv-cat-chip active" onclick="setSrvCategoryFilter('ALL', this)">Todos (50)</span>
-                <span class="srv-cat-chip" onclick="setSrvCategoryFilter('Executive', this)">Executivos</span>
-                <span class="srv-cat-chip" onclick="setSrvCategoryFilter('Storage', this)">Storage</span>
-                <span class="srv-cat-chip" onclick="setSrvCategoryFilter('Performance', this)">Performance</span>
-                <span class="srv-cat-chip" onclick="setSrvCategoryFilter('Security', this)">Segurança</span>
-                <span class="srv-cat-chip" onclick="setSrvCategoryFilter('AI Predictive', this)">IA Preditiva</span>
-                <span class="srv-cat-chip" onclick="setSrvCategoryFilter('AI Executive', this)">IA Executiva</span>
-            </div>
-
-            <div class="srv-reports-list" id="srvReportsList">
-                <p style="color:var(--text-muted);text-align:center;padding:30px"><i class="fas fa-spinner fa-spin"></i> Carregando catálogo dos 50 relatórios...</p>
+    <!-- SECTION 1: 7 FLAGSHIPS (DEFAULT) -->
+    <div id="sectionFlagships">
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin-bottom:20px">
+            <div style="display:flex;align-items:center;gap:12px">
+                <i class="fas fa-crown fa-2x" style="color:#f59e0b"></i>
+                <div>
+                    <h4 style="margin:0;font-size:1.05em;color:var(--text)">Arquitetura de Relatórios v2.0 — Narrativa Executiva & Inteligência Real</h4>
+                    <p style="margin:2px 0 0;font-size:0.83em;color:var(--text-muted)">
+                        Relatórios estruturados com <strong>Score Único</strong>, <strong>Delta comparativo de 3 bullets</strong>, <strong>Parecer IA inline</strong>, métricas individuais por task e <strong>ações priorizadas</strong> recomendadas.
+                    </p>
+                </div>
             </div>
         </div>
 
-        <!-- Painel Visualizador Principal -->
-        <div class="srv-viewer-panel">
-            <div class="srv-viewer-header">
-                <h3 id="srvViewerTitle" style="margin:0;font-size:1.1em;display:flex;align-items:center;gap:10px;color:var(--text)">
-                    <i class="fas fa-file-contract" style="color:var(--primary)"></i> Selecione um Relatório no Catálogo
-                </h3>
-                <div style="display:flex;gap:8px;flex-wrap:wrap">
-                    <button class="btn btn-primary" id="btnSrvRunCurrent" onclick="runSrvSelectedReport()" disabled><i class="fas fa-play"></i> Gerar Agora</button>
-                    <button class="btn" onclick="exportSrvReport('html')" id="btnSrvPrint" disabled><i class="fas fa-print"></i> Imprimir / PDF</button>
-                    <button class="btn" onclick="exportSrvReport('csv')" id="btnSrvCsv" disabled><i class="fas fa-file-csv"></i> Exportar CSV</button>
-                    <button class="btn" onclick="exportSrvReport('json')" id="btnSrvJson" disabled><i class="fas fa-code"></i> JSON</button>
+        <div class="flagships-grid" id="flagshipsGrid">
+            <!-- Renderizado dinamicamente pelo reports.js -->
+            <p style="color:var(--text-muted);text-align:center;padding:30px;grid-column:1/-1">
+                <i class="fas fa-spinner fa-spin"></i> Carregando os 7 Relatórios Flagship...
+            </p>
+        </div>
+    </div>
+
+    <!-- SECTION 2: 50 DATA MODULES (INTERNAL DRILL-DOWN) -->
+    <div id="sectionDataModules" style="display:none">
+        <div class="server-reports-layout">
+            <!-- Painel Lateral de Catálogo -->
+            <div class="srv-catalog-panel">
+                <div class="srv-search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="srvReportSearch" placeholder="Buscar por ID, nome ou tipo..." onkeyup="filterSrvReports()">
+                </div>
+
+                <div class="srv-cat-chips" id="srvCategoryChips">
+                    <span class="srv-cat-chip active" onclick="setSrvCategoryFilter('ALL', this)">Todos (50)</span>
+                    <span class="srv-cat-chip" onclick="setSrvCategoryFilter('Executive', this)">Executivos</span>
+                    <span class="srv-cat-chip" onclick="setSrvCategoryFilter('Storage', this)">Storage</span>
+                    <span class="srv-cat-chip" onclick="setSrvCategoryFilter('Performance', this)">Performance</span>
+                    <span class="srv-cat-chip" onclick="setSrvCategoryFilter('Security', this)">Segurança</span>
+                    <span class="srv-cat-chip" onclick="setSrvCategoryFilter('AI Predictive', this)">IA Preditiva</span>
+                    <span class="srv-cat-chip" onclick="setSrvCategoryFilter('AI Executive', this)">IA Executiva</span>
+                </div>
+
+                <div class="srv-reports-list" id="srvReportsList">
+                    <p style="color:var(--text-muted);text-align:center;padding:30px"><i class="fas fa-spinner fa-spin"></i> Carregando catálogo dos 50 relatórios...</p>
                 </div>
             </div>
 
-            <div id="srvViewerBody" style="flex:1">
-                <div style="text-align:center;padding:80px 20px;color:var(--text-muted)">
-                    <i class="fas fa-chart-line fa-3x" style="color:var(--border);margin-bottom:16px"></i>
-                    <h3>Escolha qualquer um dos 50 relatórios da lista à esquerda</h3>
-                    <p style="max-width:480px;margin:10px auto;font-size:0.9em;line-height:1.5">Cada relatório realiza consultas SQL dinâmicas no banco PostgreSQL em tempo real e compila diagnósticos gerenciais com inteligência artificial.</p>
+            <!-- Painel Visualizador Principal -->
+            <div class="srv-viewer-panel">
+                <div class="srv-viewer-header">
+                    <h3 id="srvViewerTitle" style="margin:0;font-size:1.1em;display:flex;align-items:center;gap:10px;color:var(--text)">
+                        <i class="fas fa-file-contract" style="color:var(--primary)"></i> Selecione um Relatório no Catálogo
+                    </h3>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap">
+                        <button class="btn btn-primary" id="btnSrvRunCurrent" onclick="runSrvSelectedReport()" disabled><i class="fas fa-play"></i> Gerar Agora</button>
+                        <button class="btn" onclick="exportSrvReport('html')" id="btnSrvPrint" disabled><i class="fas fa-print"></i> Imprimir / PDF</button>
+                        <button class="btn" onclick="exportSrvReport('csv')" id="btnSrvCsv" disabled><i class="fas fa-file-csv"></i> Exportar CSV</button>
+                        <button class="btn" onclick="exportSrvReport('json')" id="btnSrvJson" disabled><i class="fas fa-code"></i> JSON</button>
+                    </div>
+                </div>
+
+                <div id="srvViewerBody" style="flex:1">
+                    <div style="text-align:center;padding:80px 20px;color:var(--text-muted)">
+                        <i class="fas fa-chart-line fa-3x" style="color:var(--border);margin-bottom:16px"></i>
+                        <h3>Escolha qualquer um dos 50 relatórios da lista à esquerda</h3>
+                        <p style="max-width:480px;margin:10px auto;font-size:0.9em;line-height:1.5">Cada relatório realiza consultas SQL dinâmicas no banco PostgreSQL em tempo real e compila diagnósticos gerenciais com inteligência artificial.</p>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+

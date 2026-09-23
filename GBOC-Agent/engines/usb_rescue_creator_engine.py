@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v14.1.0 Enterprise Edition
+# GBOC System v14.6.0 Enterprise Edition
 # Module: 1-Click Bootable USB Rescue Media Creator Engine
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================

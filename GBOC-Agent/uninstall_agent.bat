@@ -1,6 +1,6 @@
 @echo off
 :: ==============================================================================
-:: GBOC System v14.1.0 Enterprise Edition
+:: GBOC System v14.6.0 Enterprise Edition
 :: Desinstalador do GBOC Agent para Windows (CMD Batch Wrapper)
 :: ==============================================================================
 

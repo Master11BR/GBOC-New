@@ -1,22 +1,148 @@
-/* GBOC System v14.1.0 Enterprise Edition */
+/* GBOC System v14.6.0 Enterprise Edition */
 /* Module: Reports JavaScript Controller (Server) */
 
+let srvFlagships = [];
 let srvAllReports = [];
 let srvSelectedReportId = null;
 let srvCurrentCategory = 'ALL';
+let srvCurrentMode = 'flagships';
 
 async function loadReportsTab() {
-    console.log('[ReportsModule] Carregando módulo de relatórios...');
+    console.log('[ReportsModule] Carregando módulo de relatórios v2.0...');
+    loadFlagships();
+    loadInternalDataModules();
+}
+
+function switchReportsMode(mode) {
+    srvCurrentMode = mode;
+    const secFlagships = document.getElementById('sectionFlagships');
+    const secModules = document.getElementById('sectionDataModules');
+    const btnFlagships = document.getElementById('btnTabFlagships');
+    const btnModules = document.getElementById('btnTabDataModules');
+
+    if (mode === 'flagships') {
+        if (secFlagships) secFlagships.style.display = 'block';
+        if (secModules) secModules.style.display = 'none';
+        if (btnFlagships) {
+            btnFlagships.classList.add('btn-primary');
+            btnFlagships.classList.remove('btn-default');
+        }
+        if (btnModules) {
+            btnModules.classList.remove('btn-primary');
+        }
+    } else {
+        if (secFlagships) secFlagships.style.display = 'none';
+        if (secModules) secModules.style.display = 'block';
+        if (btnModules) {
+            btnModules.classList.add('btn-primary');
+            btnModules.classList.remove('btn-default');
+        }
+        if (btnFlagships) {
+            btnFlagships.classList.remove('btn-primary');
+        }
+    }
+}
+
+// ---------------------------------------------------------------------
+// 7 Flagships v2.0 Controller
+// ---------------------------------------------------------------------
+
+async function loadFlagships() {
+    const grid = document.getElementById('flagshipsGrid');
+    if (!grid) return;
+
+    try {
+        const base = window.GBOC_API_BASE || '';
+        const r = await fetch(`${base}/api/v1/reports/flagships`);
+        const d = await r.json();
+        srvFlagships = d.flagships || [];
+        renderFlagshipsGrid();
+    } catch (e) {
+        console.error('[ReportsModule] Erro ao carregar flagships:', e);
+        if (grid) {
+            grid.innerHTML = `<p style="color:var(--danger);padding:20px;grid-column:1/-1;text-align:center">Erro ao conectar com API de Flagships: ${e.message}</p>`;
+        }
+    }
+}
+
+function renderFlagshipsGrid() {
+    const grid = document.getElementById('flagshipsGrid');
+    if (!grid) return;
+
+    if (!srvFlagships || srvFlagships.length === 0) {
+        grid.innerHTML = '<p style="color:var(--text-muted);text-align:center;grid-column:1/-1;padding:30px">Nenhum relatório flagship localizado.</p>';
+        return;
+    }
+
+    const iconMap = {
+        'REP-F1': 'fa-shield-halved',
+        'REP-F2': 'fa-biohazard',
+        'REP-F3': 'fa-hard-drive',
+        'REP-F4': 'fa-scale-balanced',
+        'REP-F5': 'fa-gauge-high',
+        'REP-F6': 'fa-coins',
+        'REP-F7': 'fa-truck-medical'
+    };
+
+    grid.innerHTML = srvFlagships.map(f => {
+        const icon = iconMap[f.id] || 'fa-chart-line';
+        return `
+            <div class="flagship-card">
+                <div>
+                    <div class="flagship-card-top">
+                        <span class="flagship-code"><i class="fas ${icon}"></i> ${f.id}</span>
+                        <span class="flagship-target"><i class="fas fa-users"></i> ${f.audience || 'TI / Gestão'}</span>
+                    </div>
+                    <div class="flagship-title">${f.name}</div>
+                    <div class="flagship-desc">${f.objective || f.description || ''}</div>
+                    <div class="flagship-replaces">
+                        <strong>Substitui / Consolida:</strong> ${f.replaces || 'Módulos de dados'}
+                    </div>
+                </div>
+                <div class="flagship-actions">
+                    <button class="btn btn-primary btn-sm" onclick="openFlagship('${f.id}', 'html')" style="flex:1">
+                        <i class="fas fa-eye"></i> Visualizar
+                    </button>
+                    <button class="btn btn-sm" onclick="openFlagship('${f.id}', 'pdf')" title="Imprimir em A4 / Salvar PDF">
+                        <i class="fas fa-print"></i> PDF/A4
+                    </button>
+                    <button class="btn btn-sm" onclick="openFlagship('${f.id}', 'csv')" title="Exportar dados tabulares">
+                        <i class="fas fa-file-csv"></i> CSV
+                    </button>
+                    <button class="btn btn-sm" onclick="openFlagship('${f.id}', 'json')" title="API Payload JSON">
+                        <i class="fas fa-code"></i> JSON
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function openFlagship(flagshipId, format) {
+    const base = window.GBOC_API_BASE || '';
+    let url = `${base}/api/v1/reports/flagships/${flagshipId}?format=${format}`;
+    if (format === 'pdf') {
+        url = `${base}/api/v1/reports/flagships/${flagshipId}?format=html&print=1`;
+    }
+    window.open(url, '_blank');
+}
+
+// ---------------------------------------------------------------------
+// 50 Internal Data Modules Controller
+// ---------------------------------------------------------------------
+
+async function loadInternalDataModules() {
     const container = document.getElementById('srvReportsList');
     if (!container) return;
 
     try {
-        const r = await fetch(window.GBOC_API_BASE + '/api/v1/reports/catalog');
+        const base = window.GBOC_API_BASE || '';
+        const r = await fetch(base + '/api/v1/reports/catalog');
         const d = await r.json();
         srvAllReports = d.reports || [];
         renderSrvReportsList();
     } catch (e) {
-        console.error('[ReportsModule] Erro ao carregar catálogo:', e);
+        console.error('[ReportsModule] Erro ao carregar catálogo interno:', e);
         container.innerHTML = `<p style="color:var(--danger);padding:20px;text-align:center;">Erro ao conectar com API: ${e.message}</p>`;
     }
 }
@@ -114,7 +240,8 @@ async function runSrvSelectedReport() {
     `;
 
     try {
-        const r = await fetch(window.GBOC_API_BASE + '/api/v1/reports/generate', {
+        const base = window.GBOC_API_BASE || '';
+        const r = await fetch(base + '/api/v1/reports/generate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ report_id: srvSelectedReportId })
@@ -192,4 +319,5 @@ function exportSrvReport(format) {
     const url = `${base}/api/v1/reports/export/${srvSelectedReportId}?format=${format}${format === 'html' ? '&print=1' : ''}`;
     window.open(url, '_blank');
 }
+
 

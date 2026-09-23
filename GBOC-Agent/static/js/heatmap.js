@@ -1,12 +1,12 @@
 /*
 ==============================================================================
-GBOC System v14.1.0 Enterprise Edition
+GBOC System v14.6.0 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
 */
 /**
- * GBOC v14.1.0 - Activity Heatmap (GitHub-style)
+ * GBOC v14.6.0 - Activity Heatmap (GitHub-style)
  * Renders a year-view heatmap of backup activity using Canvas.
  */
 class ActivityHeatmap {

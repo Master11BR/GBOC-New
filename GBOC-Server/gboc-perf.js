@@ -1,5 +1,5 @@
 /* ============================================================================
-   GBOC System v14.5.0 — Performance Helpers
+   GBOC System v14.6.0 — Performance Helpers
    Objetivo: Eliminar reflows desnecessarios, debounce de inputs, abort de
    fetch concorrente, polling adaptativo por visibilidade da aba.
 

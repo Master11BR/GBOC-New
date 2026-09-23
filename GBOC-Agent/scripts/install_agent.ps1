@@ -1,17 +1,17 @@
 <#
 ==============================================================================
-GBOC System v14.1.0 Enterprise Edition
+GBOC System v14.6.0 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
 #>
 
 # ========================================
-# GBOC Agent 14.1.0 - Instalador PowerShell
+# GBOC Agent 14.6.0 - Instalador PowerShell
 # ========================================
 
 Write-Host "`n========================================" -ForegroundColor Cyan
-Write-Host "  GBOC Agent 14.1.0 - Instalador" -ForegroundColor Cyan
+Write-Host "  GBOC Agent 14.6.0 - Instalador" -ForegroundColor Cyan
 Write-Host "========================================`n" -ForegroundColor Cyan
 
 $PythonExe = $null

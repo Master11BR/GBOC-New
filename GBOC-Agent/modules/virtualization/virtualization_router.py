@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v14.1.0 Enterprise Edition
+# GBOC System v14.6.0 Enterprise Edition
 # Module: Virtualization Management Router (VMware ESXi, Hyper-V RCT & Proxmox)
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================

@@ -22,7 +22,7 @@ VERSION_FILE = os.path.join(BASE_DIR, "data", "version_info.json")
 
 # Configuração Base SemVer
 MAJOR = 14
-MINOR = 6
+MINOR = 7
 PATCH = 0
 PRERELEASE = "full-stable"
 
@@ -142,7 +142,7 @@ def get_version_info() -> Dict[str, Any]:
         "last_updated": meta.get("last_updated"),
         "release_channel": "Enterprise Stable",
         "compatibility": {
-            "min_agent_version": "14.1.0",
+            "min_agent_version": "14.6.0",
             "recommended_agent_version": raw_version,
             "protocol_version": "2.1"
         }

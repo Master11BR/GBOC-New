@@ -1,6 +1,6 @@
 /*
 ==============================================================================
-GBOC System v14.1.0 Enterprise Edition
+GBOC System v14.6.0 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
@@ -723,7 +723,9 @@ window.gbocSyncConnectionStatus = async function() {
         const res = await fetch('/api/system/info');
         if (res.ok) {
             const info = await res.json();
-            const ver = info.gboc_version || '14.1.0';
+            const rawVer = info.raw_version || info.gboc_version || '14.6.0';
+            const cleanVer = String(rawVer).replace(/^v/i, '').split('-')[0];
+            const ver = cleanVer || '14.6.0';
 
             if (dot && label) {
                 dot.className = 'ws-dot on';

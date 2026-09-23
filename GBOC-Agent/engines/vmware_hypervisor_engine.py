@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v14.1.0 Enterprise Edition
+# GBOC System v14.6.0 Enterprise Edition
 # Module: Agentless Hypervisor Engine (VMware ESXi, Hyper-V RCT & Proxmox VE)
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================

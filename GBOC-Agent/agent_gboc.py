@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-🚀 GBOC Agent 14.1.0 - Servidor Principal
+🚀 GBOC Agent 14.6.0 - Servidor Principal
 Servidor FastAPI com arquitetura modular limpa
 """
 
@@ -67,7 +67,7 @@ try:
     from version_control import __version__ as AGENT_VERSION, get_version_info, auto_increment_build
     auto_increment_build()
 except Exception:
-    AGENT_VERSION = "14.2.0"
+    AGENT_VERSION = "14.6.0"
     def get_version_info():
         return {"raw_version": AGENT_VERSION, "semver": AGENT_VERSION}
 
@@ -244,7 +244,7 @@ except ImportError as e:
 async def lifespan(app: FastAPI):
     """Gerenciamento do ciclo de vida da aplicação"""
     logger.info("=" * 50)
-    logger.info("[STARTUP] GBOC Agent 14.1.0 - Servidor Iniciado")
+    logger.info("[STARTUP] GBOC Agent 14.6.0 - Servidor Iniciado")
     logger.info(f"[DATA] {DATA_DIR}")
     logger.info(f"[LOGS] {LOGS_DIR}")
     
@@ -385,8 +385,9 @@ async def get_agent_version_endpoint():
     """Retorna informações detalhadas do versionamento semântico 2.0 e contrato de UI Model."""
     info = get_version_info()
     if isinstance(info, dict):
-        info["gboc_version"] = info.get("semver") or AGENT_VERSION
-        info["version"] = info.get("semver") or AGENT_VERSION
+        info["gboc_version"] = AGENT_VERSION
+        info["raw_version"] = AGENT_VERSION
+        info["version"] = AGENT_VERSION
         info["status"] = "success"
         info["UI_MODEL"] = "modern"
         info["ACTIVE_UI_MODEL"] = "modern"
@@ -667,9 +668,9 @@ API_MODULES = [
     ("api.fs", "router"),
     ("api.tasks_ops", "router"),
     ("api.smtp", "router"),  # ✅ Configuração SMTP
-    ("api.advanced_stats_api", "router"),  # ✅ Estatísticas avançadas 14.1.0
-    ("api.preemptive_api", "router"),  # ✅ Diagnóstico preemptivo 14.1.0
-    ("api.system_api", "router"),  # ✅ Sistema completo 14.1.0
+    ("api.advanced_stats_api", "router"),  # ✅ Estatísticas avançadas 14.6.0
+    ("api.preemptive_api", "router"),  # ✅ Diagnóstico preemptivo 14.6.0
+    ("api.system_api", "router"),  # ✅ Sistema completo 14.6.0
     ("api.auth", "router"),  # ✅ Autenticação (/api/auth)
     ("api.auth", "router_v1"),  # ✅ Autenticação v1 (/api/v1/auth)
     ("api.export_api", "router"),  # ✅ Exportação de relatórios

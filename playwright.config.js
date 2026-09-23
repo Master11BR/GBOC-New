@@ -1,4 +1,4 @@
-// GBOC System v14.1.0 Full Stable Enterprise — Playwright E2E Test Suite Configuration
+// GBOC System v14.6.0 Full Stable Enterprise — Playwright E2E Test Suite Configuration
 const { defineConfig, devices } = require('@playwright/test');
 
 module.exports = defineConfig({

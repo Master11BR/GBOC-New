@@ -1,5 +1,5 @@
 /**
- * GBOC System v14.1.0 Enterprise Edition
+ * GBOC System v14.6.0 Enterprise Edition
  * Module: Freemium & Open-Source Power Tools Controller
  * Copyright (c) 2026 Master11BR - Todos os direitos reservados.
  * Zero-Mock: 100% de integração com APIs reais e dados do sistema host.

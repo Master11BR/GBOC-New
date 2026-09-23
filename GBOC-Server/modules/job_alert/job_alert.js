@@ -1,5 +1,5 @@
 /**
- * GBOC Server v14.1.0 — Job Alert Module UI Script
+ * GBOC Server v14.6.0 — Job Alert Module UI Script
  */
 
 async function loadServerJobAlertData() {

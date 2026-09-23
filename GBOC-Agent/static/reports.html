@@ -1,6 +1,6 @@
 <!--
 ==============================================================================
-GBOC System v14.1.0 Enterprise Edition
+GBOC System v14.6.0 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
@@ -11,7 +11,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GBOC Agent 14.4.0 - Central de Relatórios UniFi</title>
+    <title>GBOC Agent 14.6.0 - Central de Relatórios UniFi</title>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.6.0">
@@ -143,7 +143,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             border-radius: 4px;
         }
 
-        as atu .report-viewer-panel {
+        .report-viewer-panel {
             background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: 12px;
@@ -191,18 +191,66 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             border-radius: 8px;
             padding: 14px;
             text-align: center;
+            position: relative;
         }
 
         .unifi-metric-card .val {
-            font-size: 1.6em;
+            font-size: 1.5em;
             font-weight: 700;
             color: var(--success);
         }
 
         .unifi-metric-card .lbl {
-            font-size: 0.78em;
+            font-size: 0.75em;
             color: var(--text-muted);
+            text-transform: uppercase;
+            font-weight: 600;
+            margin-top: 2px;
         }
+
+        .unifi-metric-card .target {
+            font-size: 0.7em;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin: 6px auto 0;
+        }
+        .status-dot.ok { background: #10b981; }
+        .status-dot.warning, .status-dot.at_risk { background: #f59e0b; }
+        .status-dot.critical { background: #ef4444; }
+
+        .badge-ok { background: #10b981; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 0.76em; font-weight: 700; }
+        .badge-warn { background: #f59e0b; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 0.76em; font-weight: 700; }
+        .badge-fail { background: #ef4444; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 0.76em; font-weight: 700; }
+
+        .action-item {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            padding: 10px 14px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            border: 1px solid;
+            font-size: 0.86em;
+        }
+        .action-item.action-high { background: rgba(239, 68, 68, 0.08); border-color: rgba(239, 68, 68, 0.25); color: #ef4444; }
+        .action-item.action-medium { background: rgba(245, 158, 11, 0.08); border-color: rgba(245, 158, 11, 0.25); color: #f59e0b; }
+        .action-item.action-low { background: rgba(148, 163, 184, 0.08); border-color: rgba(148, 163, 184, 0.25); color: var(--text-muted); }
+        .action-badge {
+            font-size: 0.7em;
+            font-weight: 800;
+            padding: 2px 8px;
+            border-radius: 4px;
+            white-space: nowrap;
+        }
+        .action-high .action-badge { background: #ef4444; color: #fff; }
+        .action-medium .action-badge { background: #f59e0b; color: #fff; }
+        .action-low .action-badge { background: #64748b; color: #fff; }
 
         @page {
             size: A4 portrait;
@@ -309,70 +357,178 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         <main class="main-content">
             <header class="header">
                 <div>
-                    <h1 class="page-title"><i class="fas fa-file-contract" style="color:var(--primary)"></i> Central de Relatórios Gerenciais</h1>
-                    <div class="page-subtitle">Catálogo unificado de inteligência preditiva, SLAs, capacidade e
-                        auditoria GBOC v14.1.0</div>
+                    <h1 class="page-title"><i class="fas fa-file-contract" style="color:var(--primary)"></i> Central de Relatórios Executivos & Inteligência v2.0</h1>
+                    <div class="page-subtitle">Arquitetura consolidada: 7 Relatórios Flagship de mercado alimentados por 50 módulos internos com 100% de dados reais.</div>
                 </div>
                 <div class="header-actions">
-                    <button class="btn btn-secondary" onclick="loadCatalog()"><i class="fas fa-sync-alt"></i>
-                        Atualizar</button>
+                    <button class="btn btn-secondary" onclick="loadAllReports()"><i class="fas fa-sync-alt"></i> Atualizar</button>
                     <a href="/docs" target="_blank" class="btn btn-primary"><i class="fas fa-book"></i> API Docs</a>
                 </div>
             </header>
 
             <div class="content">
-                <div class="reports-layout">
-                    <!-- Catalog List Panel -->
-                    <div class="catalog-panel">
-                        <div class="catalog-search">
-                            <i class="fas fa-search"></i>
-                            <input type="text" id="reportSearch" placeholder="Buscar por ID, nome ou tipo..."
-                                onkeyup="filterReports()">
-                        </div>
+                <!-- Navigation Switcher: Flagships vs 50 Data Modules -->
+                <div style="display:flex;gap:10px;margin-bottom:18px;border-bottom:1px solid var(--border);padding-bottom:12px;flex-wrap:wrap">
+                    <button id="btnTabFlagships" class="btn btn-primary" onclick="switchReportsMode('flagships')" style="display:flex;align-items:center;gap:8px">
+                        <i class="fas fa-star"></i> 7 Relatórios Flagship v2.0 (Executivos)
+                    </button>
+                    <button id="btnTabDataModules" class="btn btn-secondary" onclick="switchReportsMode('modules')" style="display:flex;align-items:center;gap:8px">
+                        <i class="fas fa-layer-group"></i> Módulos de Dados Internos (50 Relatórios Base)
+                    </button>
+                </div>
 
-                        <div class="cat-filters" id="categoryChips">
-                            <span class="cat-chip active" onclick="setCategoryFilter('ALL', this)">Todos (50)</span>
-                            <span class="cat-chip" onclick="setCategoryFilter('Executive', this)">Executivos</span>
-                            <span class="cat-chip" onclick="setCategoryFilter('Performance', this)">Performance</span>
-                            <span class="cat-chip" onclick="setCategoryFilter('Storage', this)">Storage</span>
-                            <span class="cat-chip" onclick="setCategoryFilter('Security', this)">Segurança</span>
-                            <span class="cat-chip" onclick="setCategoryFilter('AI Predictive', this)">IA
-                                Preditiva</span>
-                            <span class="cat-chip" onclick="setCategoryFilter('AI Executive', this)">IA Executiva</span>
-                        </div>
-
-                        <div class="reports-list" id="reportsList">
-                            <p style="color:var(--text-muted);text-align:center;padding:20px"><i
-                                    class="fas fa-spinner fa-spin"></i> Carregando 50 relatórios...</p>
+                <!-- SECTION 1: 7 FLAGSHIPS (DEFAULT) -->
+                <div id="sectionFlagships">
+                    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin-bottom:20px">
+                        <div style="display:flex;align-items:center;gap:12px">
+                            <i class="fas fa-crown fa-2x" style="color:#f59e0b"></i>
+                            <div>
+                                <h4 style="margin:0;font-size:1.05em;color:var(--text)">Arquitetura de Relatórios v2.0 — Narrativa Executiva & Inteligência Real</h4>
+                                <p style="margin:2px 0 0;font-size:0.83em;color:var(--text-muted)">
+                                    Cada relatório possui <strong>Score Único</strong> destacado, <strong>Delta comparativo de 3 bullets</strong>, <strong>Parecer IA inline</strong>, métricas individuais por rotina e <strong>ações priorizadas</strong> recomendadas.
+                                </p>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Report Viewer Panel -->
-                    <div class="report-viewer-panel">
-                        <div class="viewer-header">
-                            <h3 id="viewerTitle"
-                                style="margin:0;font-size:1.05em;display:flex;align-items:center;gap:8px"><i
-                                    class="fas fa-chart-line" style="color:var(--primary)"></i> Selecione um Relatório
-                            </h3>
-                            <div style="display:flex;gap:8px;flex-wrap:wrap">
-                                <button class="btn btn-primary" id="btnRunCurrent" onclick="runCurrentSelectedReport()"
-                                    disabled><i class="fas fa-play"></i> Gerar Agora</button>
-                                <button class="btn btn-secondary" onclick="exportAgentReport('html')" id="btnPrint" disabled><i
-                                        class="fas fa-print"></i> Imprimir / PDF</button>
-                                <button class="btn btn-secondary" onclick="exportAgentReport('csv')" id="btnCsv" disabled><i
-                                        class="fas fa-file-csv"></i> CSV</button>
-                                <button class="btn btn-secondary" onclick="exportAgentReport('json')" id="btnJson" disabled><i
-                                        class="fas fa-code"></i> JSON</button>
+                    <style>
+                        .agent-flagships-grid {
+                            display: grid;
+                            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+                            gap: 16px;
+                            margin-top: 10px;
+                        }
+                        .agent-flagship-card {
+                            background: var(--bg-card);
+                            border: 1px solid var(--border);
+                            border-radius: 12px;
+                            padding: 18px;
+                            display: flex;
+                            flex-direction: column;
+                            justify-content: space-between;
+                            transition: all 0.25s ease;
+                            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+                        }
+                        .agent-flagship-card:hover {
+                            border-color: var(--primary);
+                            transform: translateY(-2px);
+                            box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+                        }
+                        .af-card-top {
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: flex-start;
+                            margin-bottom: 10px;
+                        }
+                        .af-code {
+                            font-size: 0.8em;
+                            font-weight: 700;
+                            color: var(--primary);
+                            background: rgba(79,163,232,0.12);
+                            padding: 3px 8px;
+                            border-radius: 6px;
+                        }
+                        .af-target {
+                            font-size: 0.72em;
+                            color: var(--text-muted);
+                            background: var(--bg-input);
+                            padding: 2px 8px;
+                            border-radius: 4px;
+                            border: 1px solid var(--border);
+                        }
+                        .af-title {
+                            font-size: 1.05em;
+                            font-weight: 600;
+                            color: var(--text);
+                            margin: 0 0 6px 0;
+                            line-height: 1.35;
+                        }
+                        .af-desc {
+                            font-size: 0.82em;
+                            color: var(--text-muted);
+                            line-height: 1.45;
+                            margin-bottom: 12px;
+                            flex: 1;
+                        }
+                        .af-replaces {
+                            font-size: 0.73em;
+                            color: var(--text-muted);
+                            background: var(--bg-input);
+                            border-left: 3px solid var(--primary);
+                            padding: 6px 10px;
+                            border-radius: 0 6px 6px 0;
+                            margin-bottom: 14px;
+                        }
+                        .af-actions {
+                            display: flex;
+                            gap: 6px;
+                            flex-wrap: wrap;
+                            border-top: 1px solid var(--border);
+                            padding-top: 12px;
+                        }
+                    </style>
+
+                    <div class="agent-flagships-grid" id="agentFlagshipsGrid">
+                        <p style="color:var(--text-muted);text-align:center;padding:30px;grid-column:1/-1">
+                            <i class="fas fa-spinner fa-spin"></i> Carregando os 7 Relatórios Flagship...
+                        </p>
+                    </div>
+                </div>
+
+                <!-- SECTION 2: 50 DATA MODULES (INTERNAL DRILL-DOWN) -->
+                <div id="sectionDataModules" style="display:none">
+                    <div class="reports-layout">
+                        <!-- Catalog List Panel -->
+                        <div class="catalog-panel">
+                            <div class="catalog-search">
+                                <i class="fas fa-search"></i>
+                                <input type="text" id="reportSearch" placeholder="Buscar por ID, nome ou tipo..."
+                                    onkeyup="filterReports()">
+                            </div>
+
+                            <div class="cat-filters" id="categoryChips">
+                                <span class="cat-chip active" onclick="setCategoryFilter('ALL', this)">Todos (50)</span>
+                                <span class="cat-chip" onclick="setCategoryFilter('Executive', this)">Executivos</span>
+                                <span class="cat-chip" onclick="setCategoryFilter('Performance', this)">Performance</span>
+                                <span class="cat-chip" onclick="setCategoryFilter('Storage', this)">Storage</span>
+                                <span class="cat-chip" onclick="setCategoryFilter('Security', this)">Segurança</span>
+                                <span class="cat-chip" onclick="setCategoryFilter('AI Predictive', this)">IA Preditiva</span>
+                                <span class="cat-chip" onclick="setCategoryFilter('AI Executive', this)">IA Executiva</span>
+                            </div>
+
+                            <div class="reports-list" id="reportsList">
+                                <p style="color:var(--text-muted);text-align:center;padding:20px"><i
+                                        class="fas fa-spinner fa-spin"></i> Carregando 50 relatórios...</p>
                             </div>
                         </div>
 
-                        <div class="viewer-body" id="viewerBody">
-                            <div class="viewer-empty" id="viewerEmpty">
-                                <i class="fas fa-file-contract"></i>
-                                <h3>Selecione um dos 50 relatórios ao lado</h3>
-                                <p style="max-width:400px;font-size:0.88em;line-height:1.5">Escolha qualquer um dos 30
-                                    relatórios de mercado ou 20 relatórios exclusivos orientados por Inteligência
-                                    Artificial.</p>
+                        <!-- Report Viewer Panel -->
+                        <div class="report-viewer-panel">
+                            <div class="viewer-header">
+                                <h3 id="viewerTitle"
+                                    style="margin:0;font-size:1.05em;display:flex;align-items:center;gap:8px"><i
+                                        class="fas fa-chart-line" style="color:var(--primary)"></i> Selecione um Relatório
+                                </h3>
+                                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                                    <button class="btn btn-primary" id="btnRunCurrent" onclick="runCurrentSelectedReport()"
+                                        disabled><i class="fas fa-play"></i> Gerar Agora</button>
+                                    <button class="btn btn-secondary" onclick="exportAgentReport('html')" id="btnPrint" disabled><i
+                                            class="fas fa-print"></i> Imprimir / PDF</button>
+                                    <button class="btn btn-secondary" onclick="exportAgentReport('csv')" id="btnCsv" disabled><i
+                                            class="fas fa-file-csv"></i> CSV</button>
+                                    <button class="btn btn-secondary" onclick="exportAgentReport('json')" id="btnJson" disabled><i
+                                            class="fas fa-code"></i> JSON</button>
+                                </div>
+                            </div>
+
+                            <div class="viewer-body" id="viewerBody">
+                                <div class="viewer-empty" id="viewerEmpty">
+                                    <i class="fas fa-file-contract"></i>
+                                    <h3>Selecione um dos 50 relatórios ao lado</h3>
+                                    <p style="max-width:400px;font-size:0.88em;line-height:1.5">Escolha qualquer um dos 30
+                                        relatórios de mercado ou 20 relatórios exclusivos orientados por Inteligência
+                                        Artificial.</p>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -383,21 +539,137 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 
     <script src="/static/sidebar.js?v=14.6.0"></script>
     <script>
+        let agentFlagships = [];
         let allReports = [];
         let selectedReportId = null;
         let currentCategory = 'ALL';
 
         document.addEventListener('DOMContentLoaded', () => {
             document.documentElement.setAttribute('data-theme', 'unifi');
-            loadCatalog();
+            loadAllReports();
         });
+
+        function switchReportsMode(mode) {
+            const secFlagships = document.getElementById('sectionFlagships');
+            const secModules = document.getElementById('sectionDataModules');
+            const btnFlagships = document.getElementById('btnTabFlagships');
+            const btnModules = document.getElementById('btnTabDataModules');
+
+            if (mode === 'flagships') {
+                if (secFlagships) secFlagships.style.display = 'block';
+                if (secModules) secModules.style.display = 'none';
+                if (btnFlagships) {
+                    btnFlagships.classList.add('btn-primary');
+                    btnFlagships.classList.remove('btn-secondary');
+                }
+                if (btnModules) {
+                    btnModules.classList.remove('btn-primary');
+                    btnModules.classList.add('btn-secondary');
+                }
+            } else {
+                if (secFlagships) secFlagships.style.display = 'none';
+                if (secModules) secModules.style.display = 'block';
+                if (btnModules) {
+                    btnModules.classList.add('btn-primary');
+                    btnModules.classList.remove('btn-secondary');
+                }
+                if (btnFlagships) {
+                    btnFlagships.classList.remove('btn-primary');
+                    btnFlagships.classList.add('btn-secondary');
+                }
+            }
+        }
+
+        async function loadAllReports() {
+            loadAgentFlagships();
+            loadCatalog();
+        }
+
+        async function loadAgentFlagships() {
+            const grid = document.getElementById('agentFlagshipsGrid');
+            if (!grid) return;
+
+            try {
+                let r = await fetch('/api/reports/flagships');
+                if (!r.ok) {
+                    r = await fetch((window.GBOC_API_BASE || '') + '/api/v1/reports/flagships');
+                }
+                const d = await r.json();
+                agentFlagships = d.flagships || [];
+                renderAgentFlagships();
+            } catch (e) {
+                console.error('[AgentReports] Erro ao carregar flagships:', e);
+                grid.innerHTML = `<p style="color:var(--danger);padding:20px;grid-column:1/-1;text-align:center">Erro ao carregar flagships: ${e.message}</p>`;
+            }
+        }
+
+        function renderAgentFlagships() {
+            const grid = document.getElementById('agentFlagshipsGrid');
+            if (!grid) return;
+
+            if (!agentFlagships || agentFlagships.length === 0) {
+                grid.innerHTML = '<p style="color:var(--text-muted);text-align:center;grid-column:1/-1;padding:30px">Nenhum relatório flagship localizado.</p>';
+                return;
+            }
+
+            const iconMap = {
+                'REP-F1': 'fa-shield-halved',
+                'REP-F2': 'fa-biohazard',
+                'REP-F3': 'fa-hard-drive',
+                'REP-F4': 'fa-scale-balanced',
+                'REP-F5': 'fa-gauge-high',
+                'REP-F6': 'fa-coins',
+                'REP-F7': 'fa-truck-medical'
+            };
+
+            grid.innerHTML = agentFlagships.map(f => {
+                const icon = iconMap[f.id] || 'fa-chart-line';
+                return `
+                    <div class="agent-flagship-card">
+                        <div>
+                            <div class="af-card-top">
+                                <span class="af-code"><i class="fas ${icon}"></i> ${f.id}</span>
+                                <span class="af-target"><i class="fas fa-users"></i> ${f.audience || 'Operações'}</span>
+                            </div>
+                            <div class="af-title">${f.name}</div>
+                            <div class="af-desc">${f.objective || f.description || ''}</div>
+                            <div class="af-replaces">
+                                <strong>Substitui / Consolida:</strong> ${f.replaces || 'Módulos internos'}
+                            </div>
+                        </div>
+                        <div class="af-actions">
+                            <button class="btn btn-primary btn-sm" onclick="openAgentFlagship('${f.id}', 'html')" style="flex:1">
+                                <i class="fas fa-eye"></i> Visualizar
+                            </button>
+                            <button class="btn btn-secondary btn-sm" onclick="openAgentFlagship('${f.id}', 'pdf')" title="Imprimir em A4 / Salvar PDF">
+                                <i class="fas fa-print"></i> PDF/A4
+                            </button>
+                            <button class="btn btn-secondary btn-sm" onclick="openAgentFlagship('${f.id}', 'csv')" title="Exportar dados tabulares">
+                                <i class="fas fa-file-csv"></i> CSV
+                            </button>
+                            <button class="btn btn-secondary btn-sm" onclick="openAgentFlagship('${f.id}', 'json')" title="API Payload JSON">
+                                <i class="fas fa-code"></i> JSON
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function openAgentFlagship(flagshipId, format) {
+            let url = `/api/reports/flagships/${flagshipId}?format=${format}`;
+            if (format === 'pdf') {
+                url = `/api/reports/flagships/${flagshipId}?format=html&print=1`;
+            }
+            window.open(url, '_blank');
+        }
 
         async function loadCatalog() {
             const container = document.getElementById('reportsList');
             try {
-                let r = await fetch(window.GBOC_API_BASE + '/api/v1/reports/catalog');
+                let r = await fetch('/api/reports/catalog');
                 if (!r.ok) {
-                    r = await fetch('/api/reports/catalog');
+                    r = await fetch((window.GBOC_API_BASE || '') + '/api/v1/reports/catalog');
                 }
                 const data = await r.json();
                 allReports = data.reports || [];
@@ -409,7 +681,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 
         function renderReports() {
             const container = document.getElementById('reportsList');
-            const searchTxt = (document.getElementById('reportSearch').value || '').trim().toLowerCase();
+            const searchTxt = (document.getElementById('reportSearch')?.value || '').trim().toLowerCase();
 
             const filtered = allReports.filter(rep => {
                 const repCat = (rep.category || '').toLowerCase();
@@ -471,7 +743,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 <p style="color:var(--text-muted);font-size:0.88em">Código Único de Exportação: <code>${rep.code || 'REP-' + rep.id}</code></p>
             </div>
             <div style="text-align:center;padding:40px">
-                <p style="color:var(--text-muted);margin-bottom:16px">Clique no botão abaixo para processar os dados deste relatório com a Engine GBOC v14.1.0.</p>
+                <p style="color:var(--text-muted);margin-bottom:16px">Clique no botão abaixo para processar os dados deste relatório com a Engine GBOC v14.6.0.</p>
                 <button class="btn btn-primary" onclick="runCurrentSelectedReport()" style="padding:10px 24px;font-size:1em"><i class="fas fa-play"></i> Processar & Gerar Relatório #${rep.id}</button>
             </div>
         `;
@@ -489,7 +761,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                     body: JSON.stringify({ report_id: selectedReportId })
                 });
                 if (!r.ok) {
-                    r = await fetch(window.GBOC_API_BASE + '/api/v1/reports/generate', {
+                    r = await fetch((window.GBOC_API_BASE || '') + '/api/v1/reports/generate', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ report_id: selectedReportId })
@@ -497,27 +769,91 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 }
                 const data = await r.json();
 
-                if (!data || data.status === 'error' || !data.title) {
-                    throw new Error((data && (data.message || data.detail)) || 'Erro ao comunicar com a engine do agente.');
+                if (!data || data.status === 'error' || (!data.title && !data.code)) {
+                    throw new Error((data && (data.message || data.detail || data.reason)) || 'Erro ao comunicar com a engine do agente.');
                 }
 
                 document.getElementById('btnPrint').disabled = false;
                 document.getElementById('btnCsv').disabled = false;
                 document.getElementById('btnJson').disabled = false;
 
-                const metricsHtml = (data.metrics || []).map(m => `
+                if (data.status === 'unavailable') {
+                    body.innerHTML = `
+                        <div style="background:rgba(245,158,11,0.08);border:1.5px solid rgba(245,158,11,0.3);border-radius:8px;padding:20px;margin-bottom:20px">
+                            <h3 style="color:var(--warning);margin:0 0 8px"><i class="fas fa-triangle-exclamation"></i> Recurso Requer Integração Externa</h3>
+                            <p style="margin:0 0 12px;font-size:0.92em;color:var(--text)">${data.reason || 'Este relatório requer integração com componente externo.'}</p>
+                            <div style="font-size:0.86em;color:var(--text-muted)">Consulte as configurações do agente ou conecte ao GBOC Server Central para habilitar este monitoramento.</div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Score banner
+                let scoreHtml = '';
+                if (data.score) {
+                    const sc = data.score;
+                    const scColor = sc.status === 'OK' ? '#10b981' : (sc.status === 'AT_RISK' ? '#f59e0b' : '#ef4444');
+                    scoreHtml = `
+                        <div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg-input);border:1.5px solid var(--border);border-left:5px solid ${scColor};border-radius:8px;padding:12px 18px;margin-bottom:16px;">
+                            <div style="display:flex;align-items:center;gap:16px;">
+                                <div style="font-size:2em;font-weight:800;color:${scColor};">${sc.value}<span style="font-size:0.5em;color:var(--text-muted)">/100</span></div>
+                                <div>
+                                    <div style="font-weight:700;font-size:0.95em;color:var(--text);">Protection & Operations Score</div>
+                                    <div style="font-size:0.78em;color:var(--text-muted);">Tendência: <strong>${sc.trend}pp</strong> vs período anterior • Status: <span class="badge" style="background:${scColor};color:#fff;font-size:0.8em;padding:2px 6px;border-radius:4px;">${sc.status}</span></div>
+                                </div>
+                            </div>
+                            <div style="font-size:0.75em;color:var(--text-muted);text-align:right;">
+                                <div>GBOC Engine v3.0</div>
+                                <code>${data.schema_version || '3.0.0'}</code>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // Delta list
+                let deltaHtml = '';
+                if (data.delta && data.delta.length > 0) {
+                    const bullets = data.delta.map(d => {
+                        const ic = d.icon === 'up' ? '<i class="fas fa-arrow-up" style="color:#10b981"></i>' : (d.icon === 'down' ? '<i class="fas fa-arrow-down" style="color:#ef4444"></i>' : '<i class="fas fa-minus" style="color:#0284c7"></i>');
+                        return `<li style="display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:0.85em;color:var(--text);">${ic} <span>${d.text}</span></li>`;
+                    }).join('');
+                    deltaHtml = `
+                        <div style="background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:18px;">
+                            <div style="font-size:0.75em;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px;"><i class="fas fa-chart-line"></i> O que mudou vs período anterior:</div>
+                            <ul style="list-style:none;margin:0;padding:0;">${bullets}</ul>
+                        </div>
+                    `;
+                }
+
+                const metricsHtml = (data.metrics || []).map(m => {
+                    const st = String(m.status || 'ok').toLowerCase();
+                    return `
                     <div class="unifi-metric-card">
                         <div class="lbl">${m.label}</div>
                         <div class="val">${m.value}</div>
+                        ${m.target ? `<div class="target">Meta: ${m.target}</div>` : ''}
+                        <div class="status-dot ${st}"></div>
                     </div>
-                `).join('');
+                    `;
+                }).join('');
 
                 let tableHtml = '';
                 if (data.table_headers && data.table_headers.length > 0) {
                     const headers = data.table_headers.map(h => `<th>${h}</th>`).join('');
-                    const rows = (data.table_rows || []).map(row => 
-                        `<tr>${row.map(cell => `<td>${cell}</td>`).join('')}</tr>`
-                    ).join('');
+                    const rows = (data.table_rows || []).map(row => {
+                        const cells = row.map(cell => {
+                            const cStr = String(cell).toUpperCase();
+                            if (cStr === 'CONFORME' || cStr === 'OK') {
+                                return `<td><span class="badge-ok">CONFORME</span></td>`;
+                            } else if (cStr === 'EM RISCO' || cStr === 'AT_RISK' || cStr === 'ATENÇÃO') {
+                                return `<td><span class="badge-warn">EM RISCO</span></td>`;
+                            } else if (cStr === 'NÃO CONFORME' || cStr === 'CRITICAL' || cStr === 'FALHA') {
+                                return `<td><span class="badge-fail">NÃO CONFORME</span></td>`;
+                            }
+                            return `<td>${cell}</td>`;
+                        }).join('');
+                        return `<tr>${cells}</tr>`;
+                    }).join('');
 
                     tableHtml = `
                         <h4 style="margin:20px 0 10px;font-size:0.95em"><i class="fas fa-table" style="color:var(--primary)"></i> Detalhamento dos Dados Auditados:</h4>
@@ -530,6 +866,23 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                     `;
                 }
 
+                let actionsHtml = '';
+                if (data.recommended_actions && data.recommended_actions.length > 0) {
+                    const acts = data.recommended_actions.map(act => {
+                        const p = String(act.priority || 'MEDIUM').toUpperCase();
+                        return `
+                            <div class="action-item action-${p.toLowerCase()}">
+                                <span class="action-badge">${p}</span>
+                                <span class="action-text">${act.action}</span>
+                            </div>
+                        `;
+                    }).join('');
+                    actionsHtml = `
+                        <h4 style="margin:20px 0 10px;font-size:0.95em"><i class="fas fa-bolt" style="color:var(--warning)"></i> Ações Recomendadas:</h4>
+                        <div class="actions-list">${acts}</div>
+                    `;
+                }
+
                 body.innerHTML = `
                 <div style="border-bottom:1.5px solid var(--border);padding-bottom:14px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">
                     <div>
@@ -538,9 +891,12 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                     </div>
                     <div style="text-align:right;font-size:0.8em;color:var(--text-muted)">
                         <div>Data: <strong>${new Date(data.generated_at || Date.now()).toLocaleString()}</strong></div>
-                        <div>Plataforma: <strong>GBOC Agent v14.1.0</strong></div>
+                        <div>Plataforma: <strong>GBOC Agent v14.7.0</strong></div>
                     </div>
                 </div>
+
+                ${scoreHtml}
+                ${deltaHtml}
 
                 <h4 style="margin-bottom:10px;font-size:0.95em"><i class="fas fa-chart-bar" style="color:var(--primary)"></i> Métricas do Diagnóstico:</h4>
                 <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(170px, 1fr));gap:10px;margin-bottom:20px">
@@ -553,6 +909,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 </div>
 
                 ${tableHtml}
+                ${actionsHtml}
             `;
             } catch (e) {
                 body.innerHTML = `<p style="color:var(--danger);padding:20px;text-align:center">Erro ao gerar relatório: ${e.message}</p>`;
@@ -567,4 +924,4 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     </script>
 </body>
 
-</html>
+</html>

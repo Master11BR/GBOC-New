@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC Agent 14.1.0 - Motor de Recuperação
+GBOC Agent 14.6.0 - Motor de Recuperação
 Engine para recuperação e correção automática de problemas
 """
 
@@ -20,7 +20,11 @@ class HealerEngine:
     def __init__(self, core):
         """Inicializa o motor de recuperação"""
         self.core = core
-        self.version = "14.1.0"
+        try:
+            from version_control import __version__ as AGENT_VERSION
+            self.version = AGENT_VERSION
+        except Exception:
+            self.version = "14.6.0"
         self.initialized = False
         self.auto_heal_enabled = True
         self.healing_rules = []

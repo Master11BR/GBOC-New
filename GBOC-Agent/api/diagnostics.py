@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-🔍 GBOC Agent 14.1.0 - API DIAGNOSTICS
+🔍 GBOC Agent 14.6.0 - API DIAGNOSTICS
 Responsável por: Rotas para sistema de diagnóstico
 """
 

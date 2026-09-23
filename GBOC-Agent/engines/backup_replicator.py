@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 14.1.0 - Backup Replicator Engine
+GBOC 14.6.0 - Backup Replicator Engine
 Copies backups from one repository to another (3-2-1 rule enforcement).
 Supports cross-engine replication, integrity verification after copy, scheduling.
 """

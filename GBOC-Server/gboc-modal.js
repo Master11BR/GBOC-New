@@ -1,6 +1,6 @@
 /*
 ==============================================================================
-GBOC System v14.5.0 Enterprise Edition — Modern Modal & Dialog Framework
+GBOC System v14.6.0 Enterprise Edition — Modern Modal & Dialog Framework
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Kyle Zantos Motion Principles: Glassmorphism, Fluid Transitions & Accessible Dialogs
 ==============================================================================

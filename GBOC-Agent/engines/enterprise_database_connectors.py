@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v14.1.0 Enterprise Edition
+# GBOC System v14.6.0 Enterprise Edition
 # Module: Enterprise Database Connectors (Oracle RMAN, SAP HANA, IBM DB2)
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================

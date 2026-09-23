@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v14.1.0 Enterprise Edition
+# GBOC System v14.6.0 Enterprise Edition
 # Module: Hermes Self-Healing Engine — VSS Repair, Disk Guard, Service Watchdog
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================

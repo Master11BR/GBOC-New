@@ -1,5 +1,5 @@
 """
-GBOC Server 14.1.0
+GBOC Server 14.6.0
 Servidor Central — Real-time Agent Communication + Complete Data Sync + Advanced Analytics
 Banco de dados: PostgreSQL (oficial)
 """
@@ -79,7 +79,7 @@ try:
     from version_control import __version__ as SERVER_VERSION, get_version_info, auto_increment_build
     auto_increment_build()
 except Exception:
-    SERVER_VERSION = "14.2.0"
+    SERVER_VERSION = "14.6.0"
     def get_version_info():
         return {"raw_version": SERVER_VERSION, "semver": SERVER_VERSION}
 
@@ -957,8 +957,9 @@ async def get_server_version_endpoint():
     """Retorna informações detalhadas do versionamento semântico 2.0 e contrato de UI Model."""
     info = get_version_info()
     if isinstance(info, dict):
-        info["gboc_version"] = info.get("semver") or SERVER_VERSION
-        info["version"] = info.get("semver") or SERVER_VERSION
+        info["gboc_version"] = SERVER_VERSION
+        info["raw_version"] = SERVER_VERSION
+        info["version"] = SERVER_VERSION
         info["status"] = "success"
         info["UI_MODEL"] = "modern"
         info["ACTIVE_UI_MODEL"] = "modern"

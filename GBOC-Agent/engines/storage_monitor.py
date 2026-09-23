@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 14.1.0 - Storage Usage & Repository Growth Monitor
+GBOC 14.6.0 - Storage Usage & Repository Growth Monitor
 Tracks physical size of all Restic / Kopia / Duplicati repositories and local paths.
 Generates growth trend data and fires alerts when thresholds are exceeded.
 """

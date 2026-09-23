@@ -1,4 +1,4 @@
-# GBOC System v14.1.0 Enterprise Edition
+# GBOC System v14.6.0 Enterprise Edition
 # Module: Executive & Operational Reports Router (Server)
 
 import logging
@@ -10,6 +10,11 @@ from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, HTTPException, Request, Response, Query
 from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse
 from psycopg2.extras import RealDictCursor
+
+try:
+    from version_control import __version__ as SERVER_VERSION
+except Exception:
+    SERVER_VERSION = "14.6.0"
 
 logger = logging.getLogger("gboc_reports_module")
 router = APIRouter(prefix="/api/v1/reports", tags=["Relatórios Executivos"])
@@ -346,7 +351,7 @@ def build_report_data_from_db(rep_id: int) -> Dict[str, Any]:
             {"label": "Score de Risco", "value": "🟢 Baixo (98/100)" if failed_backups == 0 else "🟡 Moderado"}
         ]
         table_headers = ["Agente ID", "Hostname", "IP Address", "Status", "Jobs", "Versão Agente"]
-        table_rows = [[a.get('agent_id'), a.get('hostname'), a.get('ip_address'), str(a.get('status')).upper(), a.get('jobs_count', 0), a.get('agent_version', 'v14.1.0')] for a in agents_list]
+        table_rows = [[a.get('agent_id'), a.get('hostname'), a.get('ip_address'), str(a.get('status')).upper(), a.get('jobs_count', 0), a.get('agent_version') or f"v{SERVER_VERSION}"] for a in agents_list]
         ai_recommendation = f"Resumo executivo compilado: O ambiente conta com <strong>{total_agents} agentes cadastrados</strong> ({online_agents} online). A taxa de sucesso real das <strong>{total_backups} execuções registradas</strong> é de <strong>{success_rate}%</strong> com volume total protegido de <strong>{total_gb} GB</strong>."
 
     elif rep_id == 2: # Conformidade de SLA de RPO / RTO
@@ -409,12 +414,12 @@ def build_report_data_from_db(rep_id: int) -> Dict[str, Any]:
         metrics = [
             {"label": "Licenças Ativas", "value": f"{total_agents} / 250"},
             {"label": "Nós Conectados", "value": str(total_agents)},
-            {"label": "Versão Dominante", "value": "v14.1.0 Enterprise"},
+            {"label": "Versão Dominante", "value": f"v{SERVER_VERSION} Enterprise"},
             {"label": "Status Licença", "value": "🟢 Válida (Anual)"}
         ]
         table_headers = ["Hostname", "Sistema Operacional", "Versão GBOC Agent", "Data Registro", "Status Licença"]
-        table_rows = [[a.get('hostname'), a.get('os_info', 'Windows / Linux'), a.get('agent_version', 'v14.1.0'), str(a.get('registered_at', ''))[:10], "ATIVADA (LIC-13)"] for a in agents_list]
-        ai_recommendation = f"Auditoria de Licenciamento: A frota possui <strong>{total_agents} nós registrados de um limite de 250 licenças</strong> Enterprise. Todos os agentes encontram-se atualizados na versão 14.1.0."
+        table_rows = [[a.get('hostname'), a.get('os_info', 'Windows / Linux'), a.get('agent_version') or f"v{SERVER_VERSION}", str(a.get('registered_at', ''))[:10], "ATIVADA (LIC-13)"] for a in agents_list]
+        ai_recommendation = f"Auditoria de Licenciamento: A frota possui <strong>{total_agents} nós registrados de um limite de 250 licenças</strong> Enterprise. Todos os agentes encontram-se atualizados na versão {SERVER_VERSION}."
 
     elif rep_id == 7: # Perfil da Janela de Backup & Concorrência
         metrics = [
@@ -725,11 +730,11 @@ def build_report_data_from_db(rep_id: int) -> Dict[str, Any]:
             {"label": "Sistemas Mapeados", "value": str(total_agents)},
             {"label": "Patches Críticos", "value": "0 Pendentes"},
             {"label": "Conformidade SO", "value": "100% Atualizado"},
-            {"label": "GBOC Agent Version", "value": "v14.1.0 Enterprise"}
+            {"label": "GBOC Agent Version", "value": f"v{SERVER_VERSION} Enterprise"}
         ]
         table_headers = ["Hostname", "Sistema Operacional", "Versão Agent", "Patches Pendentes", "Status Segurança"]
-        table_rows = [[a.get('hostname'), a.get('os_info', 'Windows Server 2022 / Linux'), a.get('agent_version', 'v14.1.0'), "Nenhum Patch Crítico", "🟢 CONFORME"] for a in agents_list]
-        ai_recommendation = "Inventário de Software: A auditoria de patches confirma que todos os nós estão com atualizações de segurança em dia e rodando a versão estável do GBOC Agent v14.1.0."
+        table_rows = [[a.get('hostname'), a.get('os_info', 'Windows Server 2022 / Linux'), a.get('agent_version') or f"v{SERVER_VERSION}", "Nenhum Patch Crítico", "🟢 CONFORME"] for a in agents_list]
+        ai_recommendation = f"Inventário de Software: A auditoria de patches confirma que todos os nós estão com atualizações de segurança em dia e rodando a versão estável do GBOC Agent v{SERVER_VERSION}."
 
     elif rep_id == 31: # Diagnóstico do Event Log & Falhas do SO
         metrics = [
@@ -1157,7 +1162,7 @@ async def export_report(report_id: int, format: str = Query("html", pattern="^(h
     elif format == "csv":
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(["GBOC System v14.1.0 Enterprise - Relatório Exportado"])
+        writer.writerow(["GBOC System v14.6.0 Enterprise - Relatório Exportado"])
         writer.writerow(["Título", report_data["title"]])
         writer.writerow(["Código", report_data["code"]])
         writer.writerow(["Categoria", report_data["category"]])
@@ -1851,7 +1856,7 @@ async def export_report(report_id: int, format: str = Query("html", pattern="^(h
         <!-- Seção de Responsabilidade e Assinatura Técnica -->
         <section class="audit-sign-section">
             <p class="audit-sign-disclaimer">
-                <strong>Declaração de Conformidade Técnica:</strong> As informações contidas neste documento foram extraídas diretamente da base de dados e telemetria operacional em tempo real do GBOC System v14.1.0 Enterprise Edition, sem simulações ou dados fictícios. A integridade dos dados pode ser atestada pelo hash criptográfico constante no cabeçalho.
+                <strong>Declaração de Conformidade Técnica:</strong> As informações contidas neste documento foram extraídas diretamente da base de dados e telemetria operacional em tempo real do GBOC System v14.6.0 Enterprise Edition, sem simulações ou dados fictícios. A integridade dos dados pode ser atestada pelo hash criptográfico constante no cabeçalho.
             </p>
             <div class="signatures-grid">
                 <div class="sig-box">
@@ -1869,7 +1874,7 @@ async def export_report(report_id: int, format: str = Query("html", pattern="^(h
 
         <!-- Rodapé do Relatório -->
         <footer class="report-footer">
-            <span>GBOC System v14.1.0 Enterprise Edition — Propriedade Intelectual Registrada.</span>
+            <span>GBOC System v14.6.0 Enterprise Edition — Propriedade Intelectual Registrada.</span>
             <span>Assinatura Digital: <span class="audit-hash-badge">{audit_hash[:16]}...</span></span>
         </footer>
     </main>
@@ -1900,3 +1905,77 @@ async def get_report_schedules():
             {"id": "sch-03", "report_id": 23, "name": "Auditoria Semanal Anti-Ransomware", "cron": "0 18 * * 5", "target_email": "sec-team@empresa.com", "enabled": True}
         ]
     })
+
+
+# =====================================================================
+# GBOC v2.0 FLAGSHIP REPORTS (7 Relatórios Executivos de Mercado)
+# =====================================================================
+
+try:
+    from modules.reports.flagship_reports import (
+        FLAGSHIPS_CATALOG_7,
+        build_flagship_report_server,
+        render_flagship_html,
+        render_flagship_csv,
+    )
+except ImportError:
+    from flagship_reports import (
+        FLAGSHIPS_CATALOG_7,
+        build_flagship_report_server,
+        render_flagship_html,
+        render_flagship_csv,
+    )
+
+
+@router.get("/flagships")
+async def list_flagship_reports():
+    """Retorna o catálogo dos 7 relatórios flagship executivos da Arquitetura v2.0."""
+    return JSONResponse({
+        "status": "success",
+        "version": "2.0.0",
+        "platform": f"GBOC Server v{SERVER_VERSION}",
+        "count": len(FLAGSHIPS_CATALOG_7),
+        "flagships": FLAGSHIPS_CATALOG_7
+    })
+
+
+@router.get("/flagships/{flagship_id}")
+async def get_flagship_report_endpoint(
+    flagship_id: str,
+    format: str = Query("html", pattern="^(html|pdf|csv|json)$"),
+    print: Optional[str] = Query(None)
+):
+    """Gera e retorna um dos 7 relatórios flagship no formato requisitado (html, pdf, csv, json)."""
+    fid = flagship_id.upper().strip()
+    valid_ids = [f["id"] for f in FLAGSHIPS_CATALOG_7]
+    if fid not in valid_ids:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Relatório Flagship '{flagship_id}' não encontrado. IDs válidos: {', '.join(valid_ids)}"
+        )
+
+    try:
+        payload = build_flagship_report_server(fid)
+    except Exception as e:
+        logger.error(f"Erro ao gerar payload do Flagship {fid}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erro interno ao gerar relatório: {str(e)}")
+
+    # Formatos de saída
+    if format == "json":
+        return JSONResponse(content=payload)
+
+    elif format == "csv":
+        csv_data = render_flagship_csv(payload)
+        filename = f"{fid}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        return Response(
+            content=csv_data,
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+
+    else:
+        # html ou pdf (A4 print layout)
+        is_print = (format == "pdf") or (print in ("1", "true", "yes"))
+        html_content = render_flagship_html(payload, is_print=is_print)
+        return HTMLResponse(content=html_content)
+
