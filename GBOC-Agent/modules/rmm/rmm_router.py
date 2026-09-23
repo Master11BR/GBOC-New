@@ -1,4 +1,4 @@
-# GBOC System v14.1.0 Enterprise Edition
+# GBOC System v14.6.0 Enterprise Edition
 # Module: Agent RMM Router & System Manager
 # Remote Terminal, Process & Services Management, Network Telemetry, and Agent Mirroring
 
@@ -350,7 +350,7 @@ async def rmm_get_agent_mirror():
                 "agent_id": socket.gethostname(),
                 "hostname": socket.gethostname(),
                 "ip_address": sys_info.get("ip_address"),
-                "agent_version": "v14.1.0 Enterprise",
+                "agent_version": f"v{getattr(sys.modules.get('version_control'), '__version__', '14.6.0')} Enterprise",
                 "system_telemetry": sys_info,
                 "repositories_count": repos_count,
                 "tasks_count": tasks_count,

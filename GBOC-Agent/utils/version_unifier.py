@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # ==============================================================================
-# GBOC System v14.1.0 Enterprise Edition
+# GBOC System v14.6.0 Enterprise Edition
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # Propriedade Intelectual & Direitos Autorais Registrados.
 # A cópia, distribuição ou modificação não autorizada é estritamente proibida.
 # ==============================================================================
 
 """
-GBOC System v14.1.0 Enterprise - Unificador Global de Versões e Auditoria Integrada
-Varre todo o repositório GBOC e garante que 100% das referências residuais sejam unificadas para 14.1.0.
+GBOC System v14.6.0 Enterprise - Unificador Global de Versões e Auditoria Integrada
+Varre todo o repositório GBOC e garante que 100% das referências residuais sejam unificadas para 14.6.0.
 """
 
 import os
@@ -19,25 +19,29 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("VersionUnifier")
 
-TARGET_VERSION = "14.1.0"
+try:
+    from version_control import __version__ as TARGET_VERSION
+except Exception:
+    TARGET_VERSION = "14.6.0"
 
 LEGACY_EXACT_PATTERNS = [
-    (r'v14\.0\.0', 'v14.1.0'),
-    (r'14\.0\.0', '14.1.0'),
-    (r'v13\.2\.0', 'v14.1.0'),
-    (r'13\.2\.0', '14.1.0'),
-    (r'v13\.1\.2', 'v14.1.0'),
-    (r'13\.1\.2', '14.1.0'),
-    (r'v13\.1\.1', 'v14.1.0'),
-    (r'13\.1\.1', '14.1.0'),
-    (r'v13\.1\.0', 'v14.1.0'),
-    (r'13\.1\.0', '14.1.0'),
-    (r'v13\.0\.0', 'v14.1.0'),
-    (r'13\.0\.0', '14.1.0')
+    (r'v14\.5\.0', f'v{TARGET_VERSION}'),
+    (r'14\.5\.0', TARGET_VERSION),
+    (r'v14\.4\.0', f'v{TARGET_VERSION}'),
+    (r'14\.4\.0', TARGET_VERSION),
+    (r'v14\.3\.0', f'v{TARGET_VERSION}'),
+    (r'14\.3\.0', TARGET_VERSION),
+    (r'v14\.2\.0', f'v{TARGET_VERSION}'),
+    (r'14\.2\.0', TARGET_VERSION),
+    (r'v14\.1\.0', f'v{TARGET_VERSION}'),
+    (r'14\.1\.0', TARGET_VERSION),
+    (r'v14\.0\.0', f'v{TARGET_VERSION}'),
+    (r'14\.0\.0', TARGET_VERSION)
 ]
 
 TARGET_EXTENSIONS = {'.py', '.html', '.js', '.css', '.md', '.ps1', '.bat', '.txt'}
 EXCLUDE_DIRS = {'.git', '__pycache__', '.venv', 'venv', 'logs', 'data', 'node_modules', '.gemini'}
+EXCLUDE_FILES = {'CHANGELOG.md'}
 
 class GlobalVersionUnifier:
     def __init__(self, root_dir: Path):
@@ -56,6 +60,8 @@ class GlobalVersionUnifier:
             dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
 
             for file in files:
+                if file in EXCLUDE_FILES:
+                    continue
                 file_path = Path(current_root) / file
                 if file_path.suffix.lower() in TARGET_EXTENSIONS:
                     self._process_file(file_path)

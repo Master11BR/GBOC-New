@@ -1,6 +1,6 @@
 @echo off
 REM ==============================================================================
-REM GBOC System v14.1.0 Enterprise Edition
+REM GBOC System v14.6.0 Enterprise Edition
 REM Launcher para gerar o pacote de instalacao completo
 REM ==============================================================================
 

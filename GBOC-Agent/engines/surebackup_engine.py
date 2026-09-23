@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 14.1.0 - SureBackup & Assured Recovery Engine (Zero-Mock)
+GBOC 14.6.0 - SureBackup & Assured Recovery Engine (Zero-Mock)
 Automated verification for disk images (VHD, VHDX, VMDK), database backups and archives.
 Real header integrity check, container format validation, and bootability inspection.
 """

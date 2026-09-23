@@ -1,5 +1,5 @@
 /* ============================================================================
-   GBOC System v14.1.0 Full Stable Enterprise Edition
+   GBOC System v14.6.0 Full Stable Enterprise Edition
    Module: Hermes Server Control Center (hermes.js)
    ============================================================================ */
 

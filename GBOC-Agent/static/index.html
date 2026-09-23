@@ -1,6 +1,6 @@
 <!--
 ==============================================================================
-GBOC System v14.1.0 Enterprise Edition
+GBOC System v14.6.0 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
@@ -14,7 +14,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GBOC Agent 14.4.0 - Dashboard</title>
+    <title>GBOC Agent 14.6.0 - Dashboard</title>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.6.0">
@@ -105,7 +105,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     <div id="gboc-splash" style="position:fixed;inset:0;z-index:9999;background:var(--bg-main,#0f172a);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .5s">
         <div style="text-align:center">
             <i class="fas fa-shield-alt" style="font-size:3.5em;color:#4299e1;margin-bottom:16px;animation:pulse 1.5s ease-in-out infinite"></i>
-            <h1 style="font-size:1.6em;font-weight:700;color:#e2e8f0;margin:0 0 8px">GBOC Agent 14.4.0</h1>
+            <h1 style="font-size:1.6em;font-weight:700;color:#e2e8f0;margin:0 0 8px">GBOC Agent 14.6.0</h1>
             <p style="color:#718096;font-size:.9em;margin:0 0 24px">Inicializando sistema de backup...</p>
             <div style="width:200px;height:4px;background:rgba(255,255,255,.1);border-radius:4px;overflow:hidden;margin:0 auto">
                 <div id="splash-bar" style="width:0%;height:100%;background:linear-gradient(90deg,#4299e1,#48bb78);border-radius:4px;transition:width .3s"></div>
@@ -152,7 +152,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 <div>
                     <div class="breadcrumb"><a href="/">GBOC</a> / Dashboard</div>
                     <h1 class="page-title">Dashboard</h1>
-                    <div class="page-subtitle">Sistema de Backup Centralizado • <span id="app-version">14.2.0</span>
+                    <div class="page-subtitle">Sistema de Backup Centralizado • <span id="app-version">14.6.0</span>
                         <span style="margin-left:12px;"><span class="ws-dot off" id="wsDot"></span><span id="wsLabel" style="font-size:.8em;">Offline</span></span>
                     </div>
                 </div>
@@ -248,7 +248,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 <!-- System Footer -->
                 <div class="sys-footer">
                     <div class="sys-item"><i class="fab fa-windows"></i><div><strong>Plataforma</strong><span id="sysPlatform">...</span></div></div>
-                    <div class="sys-item"><i class="fas fa-code-branch"></i><div><strong>Versão</strong><span id="sysVersion">14.2.0</span></div></div>
+                    <div class="sys-item"><i class="fas fa-code-branch"></i><div><strong>Versão</strong><span id="sysVersion">14.6.0</span></div></div>
                     <div class="sys-item"><i class="fas fa-globe"></i><div><strong>Servidor</strong><span id="sysHost">-</span></div></div>
                     <div class="sys-item"><i class="fas fa-clock"></i><div><strong>Uptime</strong><span id="sysUptime">...</span></div></div>
                     <div class="sys-item"><i class="fas fa-wifi"></i><div><strong>WebSocket</strong><span id="sysWS">-</span></div></div>
@@ -265,10 +265,10 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 
     <script>
     // ═══════════════════════════════════════════════════
-    // GBOC Dashboard 14.1.0 — Full Implementation  
+    // GBOC Dashboard 14.6.0 — Full Implementation  
     // ═══════════════════════════════════════════════════
 
-    const GBOC_VERSION = { app:'14.1.0', build:'20250615.1100' };
+    const GBOC_VERSION = { app:'14.6.0', build:'20250615.1100' };
     let gauges = {};
     let chartTrend = null, chartStatus = null;
     let heatmap = null, timeline = null;
@@ -780,7 +780,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             const rep = await r.json();
             outArea.innerHTML = `
                 <h4 style="color:var(--primary);margin-bottom:8px"><i class="fas fa-file-alt"></i> ${rep.title}</h4>
-                <p style="font-size:0.85em;color:var(--text-muted);margin-bottom:12px">Gerado em: ${new Date(rep.generated_at).toLocaleString()} | Agente Node 14.1.0</p>
+                <p style="font-size:0.85em;color:var(--text-muted);margin-bottom:12px">Gerado em: ${new Date(rep.generated_at).toLocaleString()} | Agente Node 14.6.0</p>
                 <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:8px;margin-bottom:12px">
                     ${rep.metrics.map(m => `
                         <div style="background:var(--bg-card);padding:10px;border-radius:6px;border:1px solid var(--border)">

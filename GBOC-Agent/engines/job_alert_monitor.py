@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 14.1.0 - Job Alert Monitor & Proactive Failure Detection Engine
+GBOC 14.6.0 - Job Alert Monitor & Proactive Failure Detection Engine
 Monitors backup task executions in real-time.
 On failure: retries automatically (configurable) and dispatches multi-channel alerts
 (Email SMTP, Telegram Bot, WhatsApp, Webhook HTTP/S).

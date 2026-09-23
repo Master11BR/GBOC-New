@@ -1,8 +1,63 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.6.0 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.7.0 Enterprise. Todos os direitos reservados. -->
 
 # GBOC — Changelog de Atualizações
 
 > Histórico completo de versões, correções e melhorias do sistema GBOC (Agente + Servidor).
+
+---
+
+## 14.7.0 — 2026-09-22 (Padrão Oficial de Relatórios v3.0 & Zero-Mock Intelligence)
+
+### 📊 Padrão Oficial de Relatórios v3.0 (Contrato JSON Universal & Zero-Mock Estrito)
+- **Eliminação de Mocks e Correção dos 10 Bugs Históricos (BUG-01 a BUG-10)**:
+  - **`v3_reports_engine.py`**: Motor oficial normativo para o GBOC Agent implementando paridade comercial com Veeam ONE, Rubrik Radar e Datto RMM.
+  - **BUG-01 Resolvido**: SLA e RPO calculados individualmente por tarefa (`QUERY_RPO_PER_TASK`), com duração e RTO reais, substituindo "15 min" e status binários por semáforo tri-estado (`CONFORME`, `EM RISCO`, `NÃO CONFORME`).
+  - **BUG-02 Resolvido**: Throughput de rede e disco calculados a partir de telemetria real em `task_executions` / `backups`, eliminando taxas fixas (85/72/48 MB/s).
+  - **BUG-03 Resolvido**: Poda e retenção alimentadas diretamente de `settings` (`category='retention'`) e eventos reais de `system_logs` (pruning / snapshot removido).
+  - **BUG-04 Resolvido**: Dead Letter Queue (DLQ) com contagem real de retentativas e agrupamento de falhas por fingerprint de erro.
+  - **BUG-05 Resolvido**: Uptime, PID e consumo de memória coletados em tempo real via `psutil.Process(os.getpid())`, eliminando "PID 4120" e "99.98%" fixos.
+  - **BUG-06 Resolvido**: Testes de restauração auditados a partir de eventos reais de restore em `system_logs` e `surebackup_verifications`, eliminando caminhos fictícios `C:\Temp\RestoreTest`.
+  - **BUG-07 Resolvido**: Ransomware Shield avaliado com base em canários físicos reais (`ransomware_canaries`), integridade de hash e histórico de alertas.
+  - **BUG-08 Resolvido**: Predição de esgotamento de storage por regressão linear (série temporal de 30 a 90 dias) projetando crescimento diário real e data de esgotamento estimada.
+  - **BUG-09 Resolvido**: Parecer executivo de IA gerado por template analítico cruzando $\ge 2$ métricas (taxa de sucesso, RTO vs RPO alvo, tendências temporais vs período anterior e ação corretiva imediata).
+  - **BUG-10 Resolvido**: Resolução dinâmica e resiliente entre `backups` (SQLite) e `task_executions` (PostgreSQL), garantindo zero queries falhando silenciosamente.
+  - **Tratamento de REPs Sem Sensor Local**: REPs 33, 36, 38, 41, 46, 47 retornam expressamente `status: "unavailable"` com diagnóstico e orientações de configuração em vez de números forjados.
+- **Higienização de Nomes e Integridade Criptográfica**:
+  - Implementação de `_clean_task_name()` para remover sufixos de identificadores automáticos (ex: `_PEZ2B4L6H7L8R9YIIWNV`).
+  - Assinatura criptográfica SHA-256 (`integrity_hash`) em todos os payloads JSON gerados.
+- **Interface e Visualizador Oficial (`reports.html` & `reports_api.py`)**:
+  - Exibição de Scorecard com gauge e semáforo dinâmico.
+  - Caixa de Delta analítico ("O que mudou vs período anterior").
+  - KPI Cards enriquecidos com Meta/Target e Status Dot coloridos.
+  - Seção formal de "Ações Recomendadas" categorizadas por prioridade (`ALTA`, `MÉDIA`, `BAIXA`).
+  - Sincronização e extensão com os 7 Relatórios Flagship (`REP-F1` a `REP-F7`).
+
+---
+
+## 14.6.1 — 2026-09-22 (Arquitetura de Relatórios Flagship v2.0 & Inteligência Executiva)
+
+### 📊 Arquitetura de Relatórios Flagship v2.0 (Zero-Mock End-to-End)
+- **7 Relatórios Flagship de Mercado (`REP-F1` a `REP-F7`)**:
+  - Consolidação dos 50 relatórios originais como **módulos internos de dados** que alimentam 7 relatórios flagship executivos:
+    - **`REP-F1` — Data Protection & Resilience Scorecard**: Visão executiva em menos de 10 segundos da proteção da infraestrutura, RPO/RTO individuais, SLA e cobertura de tarefas.
+    - **`REP-F2` — Cyber Resilience & Ransomware Threat Report**: Linha do tempo unificada de eventos de segurança, honeypots/canários ativos, proteção WORM e sandbox SureRestore.
+    - **`REP-F3` — Storage Intelligence Report**: Saúde dos repositórios, esgotamento preditivo de capacidade, deduplicação FastCDC/ZSTD real e custo cloud projetado.
+    - **`REP-F4` — Compliance & Governance Report**: Auditoria de SLA em minutos, políticas de retenção/descarte, requisitos LGPD/GDPR e trilha de auditoria administrativa.
+    - **`REP-F5` — Operational Performance Report**: Telemetria individual de execuções (sem médias agregadas por linha), comparativo entre motores e causa raiz de falhas.
+    - **`REP-F6` — FinOps & Total Cost of Ownership Report**: TCO detalhado com cotação em tempo real USD→BRL (Banco Central), oportunidades de economia e eficiência energética.
+    - **`REP-F7` — Disaster Recovery Readiness Report**: Matriz de prontidão para DR, gaps reais vs metas de RTO/RPO por ativo crítico, estimativa Bare-Metal e simulação de contingência.
+- **Filosofia de Design & Estrutura Universal**:
+  - **Score único por tela** (0–100) com componentes ponderados.
+  - **Delta ("O que mudou")**: 3 bullets automáticos comparando com período anterior (↑ melhoria, ↓ atenção, → tendência dominante).
+  - **KPI Cards com Benchmark Embutido**: Valor Real, Alvo e Semáforo de Status (CONFORME, EM RISCO, NÃO CONFORME).
+  - **Narrativa antes da tabela**: Frase-síntese de IA antes de cada tabela analítica.
+  - **Dados reais e individuais**: Métricas individuais por tarefa/repositório, proibindo repetição de médias globais por linha e ocultando IDs brutos internos.
+  - **Ações recomendadas obrigatórias priorizadas**: Bloco priorizado (`[ALTA]`, `[MÉDIA]`, `[BAIXA]`) com responsável sugerido e prazo estimado.
+  - **Hash SHA-256 e Assinatura Digital**: Cabeçalho e rodapé oficiais com integridade criptográfica SHA-256 e grid formal de assinatura técnica para documentos A4.
+- **Implementação Multi-Plataforma Simétrica (Server & Agent)**:
+  - Backend e rotas `/api/v1/reports/flagships` e `/api/reports/flagships` em ambos os sistemas.
+  - Interface visual com alternador ágil entre os 7 Flagships e os 50 módulos internos de dados em ambos os painéis.
+  - 4 formatos de saída padronizados: HTML Interativo, PDF/A4 Oficial, CSV Tabular e JSON REST API.
 
 ---
 
@@ -40,9 +95,11 @@
   - Remoção de declarações corrompidas e unificação de inicialização segura do monitor em tempo real.
 
 ### 📦 Distribuição & Padronização Global
-- **Sincronização Canônica Universal**:
-  - Atualização dos scripts de build e distribuição (`build_installer_package.ps1`, `tools/make_distribution.py`).
-  - Elevação global de versão para **v14.6.0 Full Stable Enterprise**.
+- **Sincronização Canônica Universal & Unificação Estrita de Versão (Single Source of Truth)**:
+  - Erradicação de literais de versão legada (`14.1.0`, `14.2.0`, `14.4.0`, `14.5.0`) em todos os endpoints (`/api/system/info`, `/api/system/version`, `/api/v2/system/version`), scripts e modelos HTML.
+  - Varredura e consolidação de mais de 335 arquivos para a versão canônica **v14.6.0 Full Stable Enterprise**.
+  - Redesenho completo do motor de relatórios executivos com diagramação A4 de alta fidelidade para impressão/PDF, hash de auditoria SHA-256 e scorecards de KPI reais.
+  - Atualização dos scripts de build e distribuição (`build_installer_package.ps1`, `tools/make_distribution.py`, `Setup.ps1`).
 
 ---
 

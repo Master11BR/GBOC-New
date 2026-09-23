@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v14.1.0 Enterprise Edition
+# GBOC System v14.6.0 Enterprise Edition
 # Module: Disaster Recovery, P2V & Boot Media Engine
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================
@@ -15,6 +15,11 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, List, Optional
+
+try:
+    from version_control import __version__ as AGENT_VERSION
+except Exception:
+    AGENT_VERSION = "14.6.0"
 
 logger = logging.getLogger("gboc_dr_engine")
 
@@ -547,7 +552,7 @@ attach vdisk
 
             # 4. Criação do Manifesto Criptográfico SHA-256
             manifest = {
-                "gboc_version": "14.5.0 Enterprise",
+                "gboc_version": f"{AGENT_VERSION} Enterprise",
                 "backup_type": "HOT_SYSTEM_STATE_AND_AD",
                 "hostname": sys_info.get("hostname"),
                 "domain": sys_info.get("domain_name"),

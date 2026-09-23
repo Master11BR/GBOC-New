@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC Agent 14.1.0 - Task Manager
+GBOC Agent 14.6.0 - Task Manager
 [OK] Usa motor_password para repositórios locais e cloud_password para nuvem
 """
 

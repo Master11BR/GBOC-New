@@ -1,4 +1,4 @@
-# GBOC System v14.1.0 Enterprise Edition
+# GBOC System v14.6.0 Enterprise Edition
 # Module: Server AI Copilot Assistant (Multi-Provider: Ollama Local, DeepSeek, Groq Free, Gemini, OpenAI, Claude)
 
 import os

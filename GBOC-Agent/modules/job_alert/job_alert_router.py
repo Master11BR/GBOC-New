@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""GBOC 14.1.0 - Job Alert Monitor API Router (Módulo Estrito)"""
+"""GBOC 14.6.0 - Job Alert Monitor API Router (Módulo Estrito)"""
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse

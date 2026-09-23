@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-🌐 GBOC Agent 14.1.0 - CENTRAL SERVER CLIENT
+🌐 GBOC Agent 14.6.0 - CENTRAL SERVER CLIENT
 Cliente para comunicação com servidor GBOC central
 """
 
@@ -34,6 +34,11 @@ import websockets.exceptions
 
 from server_config import config_manager
 from shared_core import SharedCore
+
+try:
+    from version_control import __version__ as AGENT_VERSION
+except Exception:
+    AGENT_VERSION = "14.6.0"
 
 logger = logging.getLogger(__name__)
 
@@ -404,7 +409,7 @@ class CentralServerClient:
                 "agent_id": self.agent_id,
                 "hostname": socket.gethostname(),
                 "platform": os.name,
-                "version": "14.1.0",
+                "version": AGENT_VERSION,
                 "registered_at": datetime.now().isoformat(),
                 "tenant_id": self.tenant_id
             }
@@ -906,7 +911,7 @@ class CentralServerClient:
                 "agent_id": self.agent_id,
                 "hostname": socket.gethostname(),
                 "status": "online",
-                "version": "14.1.0",
+                "version": AGENT_VERSION,
                 "ip_address": self._get_local_ip() + ":9200",  # Endereço real do agente
                 "cpu_usage": cpu_percent,
                 "ram_usage": memory.percent,

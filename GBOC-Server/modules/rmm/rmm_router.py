@@ -1,4 +1,4 @@
-# GBOC System v14.1.0 Enterprise Edition
+# GBOC System v14.6.0 Enterprise Edition
 # Module: Server RMM & Remote Terminal Router
 # Remote Agent Execution Dispatcher, WebSocket/HTTP Proxy & Local Execution Fallback
 
@@ -15,6 +15,11 @@ from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, Request, Response, HTTPException
 from fastapi.responses import JSONResponse
 import httpx
+
+try:
+    from version_control import __version__ as SERVER_VERSION
+except Exception:
+    SERVER_VERSION = "14.6.0"
 
 try:
     import psutil
@@ -365,7 +370,7 @@ async def rmm_get_mirror(agent_id: Optional[str] = None):
             "agent_id": agent_id or "servidor-central",
             "hostname": hostname,
             "ip_address": socket.gethostbyname(hostname),
-            "version": "GBOC Server 14.1.0 Enterprise",
+            "version": f"GBOC Server {SERVER_VERSION} Enterprise",
             "system_telemetry": {
                 "hostname": hostname,
                 "os_info": os_info,

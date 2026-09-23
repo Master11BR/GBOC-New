@@ -1,8 +1,13 @@
-# GBOC System v14.1.0 Enterprise Edition
+# GBOC System v14.6.0 Enterprise Edition
 # Module: Agent Config Router
 
 import logging
 from fastapi import APIRouter
+
+try:
+    from version_control import __version__ as AGENT_VERSION
+except Exception:
+    AGENT_VERSION = "14.6.0"
 
 logger = logging.getLogger("gboc_agent_config")
 router = APIRouter(prefix="/api/v1/agent/config", tags=["Agent Config"])
@@ -12,7 +17,7 @@ async def get_agent_config():
     """Retorna as configurações locais do agente."""
     return {
         "status": "success",
-        "agent_version": "v14.1.0 Enterprise",
+        "agent_version": f"v{AGENT_VERSION} Enterprise",
         "server_url": "http://127.0.0.1:8000",
         "sync_interval_seconds": 30
     }

@@ -1,13 +1,13 @@
 <#
 ==============================================================================
-GBOC System v14.1.0 Enterprise Edition
+GBOC System v14.6.0 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
 #>
 
 # ========================================
-# GBOC Agent 14.1.0 - Force Cleanup External Engines
+# GBOC Agent 14.6.0 - Force Cleanup External Engines
 # ========================================
 # Uso:
 #   .\force_cleanup_external_engines.ps1 -RepositoryId 25
@@ -35,7 +35,7 @@ function Write-Warn($m) { Write-Host "[WARN] $m" -ForegroundColor Yellow }
 function Write-Err($m) { Write-Host "[ERRO] $m" -ForegroundColor Red }
 
 Write-Host "`n========================================" -ForegroundColor Cyan
-Write-Host " GBOC Agent 14.1.0 - Force Cleanup" -ForegroundColor Cyan
+Write-Host " GBOC Agent 14.6.0 - Force Cleanup" -ForegroundColor Cyan
 Write-Host "========================================`n" -ForegroundColor Cyan
 
 $root = Split-Path -Parent $PSScriptRoot

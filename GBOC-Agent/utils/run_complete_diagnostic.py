@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 14.1.0 - Executar Diagnóstico Completo
+GBOC 14.6.0 - Executar Diagnóstico Completo
 Script para executar todos os diagnósticos e gerar relatórios
 """
 
@@ -24,7 +24,7 @@ def main():
     """Executa todos os diagnósticos"""
     
     print("\n" + "=" * 80)
-    print(" GBOC 14.1.0 - DIAGNÓSTICO COMPLETO DO SISTEMA")
+    print(" GBOC 14.6.0 - DIAGNÓSTICO COMPLETO DO SISTEMA")
     print("=" * 80 + "\n")
     
     results = {
@@ -45,7 +45,7 @@ def main():
         results["diagnostics"]["system"] = {"error": str(e)}
     
     # 2. Unificação de versões
-    print("\n[2/4] Unificando versões para 14.1.0...")
+    print("\n[2/4] Unificando versões para 14.6.0...")
     try:
         from version_unifier import VersionUnifier
         unifier = VersionUnifier()
@@ -127,7 +127,7 @@ def main():
             total_issues += len(preempt.get("alerts", []))
             total_warnings += len(preempt.get("warnings", []))
     
-    print(f"\n✓ Sistema diagnosticado: GBOC 14.1.0")
+    print(f"\n✓ Sistema diagnosticado: GBOC 14.6.0")
     print(f"✓ Issues críticos encontrados: {total_issues}")
     print(f"✓ Warnings encontrados: {total_warnings}")
     

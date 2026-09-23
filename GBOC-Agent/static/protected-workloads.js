@@ -1,4 +1,4 @@
-// GBOC System v14.5.0 Enterprise Edition
+// GBOC System v14.6.0 Enterprise Edition
 // Module: Protected Workloads Controller (Database, AD, Tape, Enterprise)
 
 function switchWorkloadTab(tabId) {

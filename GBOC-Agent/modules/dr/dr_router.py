@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v14.1.0 Enterprise Edition
+# GBOC System v14.6.0 Enterprise Edition
 # Module: Agent Disaster Recovery Router
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================
@@ -11,6 +11,11 @@ from typing import Optional
 from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException, Request, Query
 from fastapi.responses import JSONResponse
+
+try:
+    from version_control import __version__ as AGENT_VERSION
+except Exception:
+    AGENT_VERSION = "14.6.0"
 
 from engines.disaster_recovery_engine import dr_engine
 from engines.universal_restore import universal_restore_engine
@@ -347,7 +352,7 @@ async def export_dr_plan(request: Request):
         "status": "success",
         "message": "Plano de DR exportado com sucesso.",
         "dr_plan": {
-            "version": "14.1.0 Enterprise",
+            "version": f"{AGENT_VERSION} Enterprise",
             "system": sys_info,
             "disks": disks,
             "readiness": readiness,

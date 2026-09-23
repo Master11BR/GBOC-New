@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v14.5.0 Enterprise Edition
+# GBOC System v14.6.0 Enterprise Edition
 # Module: Isolated Virtual Lab & Anti-Collision Network Sandbox
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================

@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v14.1.0 Enterprise Edition
+# GBOC System v14.6.0 Enterprise Edition
 # Module: International Audit & Regulatory Compliance Certification Pack
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================
@@ -64,7 +64,7 @@ class AuditCompliancePack:
 
         certificate = {
             "certificate_id": cert_id,
-            "issuer": "GBOC Enterprise Compliance Sentinel v14.1.0",
+            "issuer": "GBOC Enterprise Compliance Sentinel v14.6.0",
             "evaluated_target": target_agent,
             "issued_at": timestamp,
             "valid_until": (datetime.now().replace(year=datetime.now().year + 1)).isoformat(),
