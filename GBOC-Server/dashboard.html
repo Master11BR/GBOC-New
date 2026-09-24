@@ -908,6 +908,7 @@ function gbocToggleSidebarCollapse(){
                     <input type="file" id="import-file" accept=".json" style="display:none" onchange="importSettings(this)">
                     <button class="btn btn-sm" onclick="runCleanup()" title="Limpeza"><i class="fas fa-broom"></i> Manutenção</button>
                     <button class="btn btn-sm" style="color:var(--danger)" onclick="resetAllSettings()" title="Reset"><i class="fas fa-undo"></i> Reset</button>
+                    <button class="btn btn-sm" style="color:#ef4444;border-color:rgba(239,68,68,0.4);background:rgba(239,68,68,0.08);font-weight:600" onclick="typeof gbocConfirmShutdown==='function'?gbocConfirmShutdown('server'):alert('Desligar')" title="Desligar Servidor Central"><i class="fas fa-power-off"></i> Desligar Servidor</button>
                 </div>
             </div>
 

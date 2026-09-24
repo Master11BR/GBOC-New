@@ -4,7 +4,6 @@ GBOC Agent 14.6.0 - Repository Manager
 Refatorado para usar backends de armazenamento modulares.
 """
 
-import psycopg2
 import logging
 import os
 import shutil
@@ -13,6 +12,7 @@ import subprocess
 import contextlib
 import time
 import tempfile
+import re
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from engines.engine_paths import get_engine_path
@@ -21,7 +21,14 @@ from engines.engine_paths import get_engine_path
 from storage_backends.base import StorageBackend
 from storage_backends.local import LocalStorageBackend
 from storage_backends.cloud import CloudStorageBackend
-import psycopg2.extras
+
+try:
+    import psycopg2
+    import psycopg2.extras
+    PSYCOPG2_AVAILABLE = True
+except ImportError:
+    psycopg2 = None
+    PSYCOPG2_AVAILABLE = False
 
 
 logger = logging.getLogger(__name__)
@@ -31,6 +38,59 @@ class RepositoryManager:
     def __init__(self, core):
         self.core = core
         logger.info("✅ RepositoryManager (v2) inicializado")
+
+    def _is_sqlite(self, conn) -> bool:
+        """Verifica se a conexão é SQLite."""
+        import sqlite3
+        return isinstance(conn, sqlite3.Connection) or (type(conn).__name__ == 'Connection' and 'sqlite' in type(conn).__module__)
+
+    def _get_dict_cursor(self, conn):
+        """Retorna cursor com resultado como dict — compatível SQLite e PostgreSQL (RM01)."""
+        import sqlite3
+        if self._is_sqlite(conn):
+            conn.row_factory = sqlite3.Row
+            return conn.cursor()
+        else:
+            if PSYCOPG2_AVAILABLE and hasattr(psycopg2, 'extras'):
+                return conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            return conn.cursor()
+
+    def _integrity_errors(self):
+        """Retorna tupla com tipos de exceção de integridade para SQLite e PostgreSQL."""
+        import sqlite3
+        errs = [sqlite3.IntegrityError]
+        if PSYCOPG2_AVAILABLE and psycopg2:
+            errs.append(psycopg2.IntegrityError)
+        return tuple(errs)
+
+    def _build_config_data(self, data: dict, repo_type: str) -> dict:
+        """
+        Serializa metadados não-sensíveis para o campo config JSON de acordo com o provedor.
+        (RM03: sem contaminação cruzada; RM08: sem credenciais em texto plano no config JSON).
+        """
+        base = {
+            'bucket': data.get('bucket'),
+            'region': data.get('region'),
+            'endpoint': data.get('endpoint'),
+            'prefix': data.get('prefix'),
+        }
+        if repo_type in ('s3', 'wasabi'):
+            ak = data.get('aws_access_key') or data.get('access_key')
+            if ak:
+                base['aws_access_key'] = ak
+        elif repo_type == 'b2':
+            ak = data.get('b2_account_id') or data.get('access_key')
+            if ak:
+                base['b2_account_id'] = ak
+        elif repo_type == 'azure':
+            ak = data.get('azure_account_name') or data.get('access_key')
+            if ak:
+                base['azure_account_name'] = ak
+        elif repo_type == 'gcs':
+            if data.get('gcs_project_id'):
+                base['gcs_project_id'] = data.get('gcs_project_id')
+
+        return {k: v for k, v in base.items() if v is not None and v != ''}
 
     def initialize_repository(self, repo_data: Dict[str, Any]) -> Dict[str, Any]:
         """Inicializa um novo repositório ou valida sua criação."""
@@ -60,26 +120,47 @@ class RepositoryManager:
                     for key, value in config.items():
                         if value is not None and (key not in normalized or not normalized.get(key)):
                             normalized[key] = value
-            except Exception:
-                pass
+            except (json.JSONDecodeError, TypeError) as e:
+                logger.warning(f"[RM] Config JSON inválido para repositório: {e!r} | raw: {str(raw_config)[:100]}")
+            except Exception as e:
+                logger.warning(f"[RM] Erro ao decodificar config JSON: {e!r}")
 
         # Uniformizar todos os campos de senha possíveis para evitar falha de recuperação
         p = (
             normalized.get('motor_password') or 
+            normalized.get('cloud_password') or 
             normalized.get('encryption_password') or 
             normalized.get('password') or 
-            normalized.get('cloud_password') or 
             ''
         )
         if p:
-            if 'motor_password' not in normalized or not normalized.get('motor_password'):
+            if not normalized.get('motor_password'):
                 normalized['motor_password'] = p
-            if 'cloud_password' not in normalized or not normalized.get('cloud_password'):
+            if not normalized.get('cloud_password'):
                 normalized['cloud_password'] = p
-            if 'encryption_password' not in normalized or not normalized.get('encryption_password'):
+            if not normalized.get('encryption_password'):
                 normalized['encryption_password'] = p
-            if 'password' not in normalized or not normalized.get('password'):
+            if not normalized.get('password'):
                 normalized['password'] = p
+            if not normalized.get('secret_key'):
+                normalized['secret_key'] = p
+            if not normalized.get('aws_secret_key'):
+                normalized['aws_secret_key'] = p
+            if not normalized.get('b2_account_key'):
+                normalized['b2_account_key'] = p
+            if not normalized.get('azure_account_key'):
+                normalized['azure_account_key'] = p
+
+        # Uniformizar chave de acesso para provedores de nuvem
+        ak = (
+            normalized.get('access_key') or
+            normalized.get('aws_access_key') or
+            normalized.get('b2_account_id') or
+            normalized.get('azure_account_name') or
+            ''
+        )
+        if ak and not normalized.get('access_key'):
+            normalized['access_key'] = ak
 
         return normalized
 
@@ -121,25 +202,33 @@ class RepositoryManager:
     # ==========================================================================
 
     def list_repositories(self) -> List[Dict[str, Any]]:
-        """Lista todos os repositórios"""
+        """Lista todos os repositórios (compatível SQLite e PostgreSQL)."""
         try:
             with self._get_conn() as conn:
-                cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+                cursor = self._get_dict_cursor(conn)
                 cursor.execute("SELECT * FROM repositories ORDER BY name ASC")
                 rows = cursor.fetchall()
-                return [self._normalize_repository_config(row) for row in rows]
+                results = []
+                for row in rows:
+                    r_dict = dict(row) if hasattr(row, 'keys') else dict(zip([col[0] for col in cursor.description], row))
+                    results.append(self._normalize_repository_config(r_dict))
+                return results
         except Exception as e:
             logger.error(f"Erro ao listar repositórios: {e}")
             return []
 
     def get_repository(self, repo_id: int) -> Optional[Dict[str, Any]]:
-        """Obtém um repositório pelo ID"""
+        """Obtém um repositório pelo ID (compatível SQLite e PostgreSQL)."""
         try:
             with self._get_conn() as conn:
-                cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-                cursor.execute("SELECT * FROM repositories WHERE id = %s", (repo_id,))
+                cursor = self._get_dict_cursor(conn)
+                ph = "?" if self._is_sqlite(conn) else "%s"
+                cursor.execute(f"SELECT * FROM repositories WHERE id = {ph}", (repo_id,))
                 repo = cursor.fetchone()
-                return self._normalize_repository_config(repo) if repo else None
+                if not repo:
+                    return None
+                r_dict = dict(repo) if hasattr(repo, 'keys') else dict(zip([col[0] for col in cursor.description], repo))
+                return self._normalize_repository_config(r_dict)
         except Exception as e:
             logger.error(f"Erro ao buscar repositório {repo_id}: {e}")
             return None
@@ -149,6 +238,7 @@ class RepositoryManager:
         Cria um novo repositório no banco de dados e testa a conexão do backend.
         Novo modelo: determina tipo baseado no engine ou provedores.
         Persiste o provider específico (b2/s3/wasabi/azure) em vez de 'cloud' genérico.
+        Valida tamanho de senha mínimo (RM02) e remove credenciais em texto plano do config JSON (RM08).
         """
         name = data.get('name', '').strip()
         if not name:
@@ -185,8 +275,12 @@ class RepositoryManager:
             else:
                 repo_type = 's3'
 
-        if not data.get('motor_password'):
+        # RM02: Validação de presença e comprimento mínimo da senha do motor
+        pwd = str(data.get('motor_password') or '').strip()
+        if not pwd:
             raise ValueError("Senha do motor é obrigatória")
+        if len(pwd) < 8:
+            raise ValueError("Senha do motor deve ter pelo menos 8 caracteres")
 
         # Configura o path
         path = ""
@@ -252,94 +346,109 @@ class RepositoryManager:
         try:
             with self._get_conn() as conn:
                 cursor = conn.cursor()
-                config_data = {
-                    'bucket': data.get('bucket'),
-                    'region': data.get('region'),
-                    'endpoint': data.get('endpoint'),
-                    'prefix': data.get('prefix'),
-                    'access_key': data.get('access_key') or data.get('aws_access_key') or data.get('b2_account_id'),
-                    'secret_key': data.get('secret_key') or data.get('aws_secret_key') or data.get('b2_account_key'),
-                    'aws_access_key': data.get('aws_access_key') or data.get('access_key'),
-                    'aws_secret_key': data.get('aws_secret_key') or data.get('secret_key'),
-                    'b2_account_id': data.get('b2_account_id') or data.get('access_key'),
-                    'b2_account_key': data.get('b2_account_key') or data.get('secret_key'),
-                    'azure_account_name': data.get('azure_account_name') or data.get('access_key'),
-                    'azure_account_key': data.get('azure_account_key') or data.get('secret_key')
-                }
-                
-                sql = """
-                    INSERT INTO repositories 
-                    (name, type, engine, path, motor_password, cloud_password, config, status, enabled, initialized, created_at, updated_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, true, %s, %s, %s)
-                    RETURNING id;
-                """
-                values = (
-                    name, repo_type, engine, path, data.get('motor_password'),
-                    data.get('motor_password'),  # cloud_password = motor_password (mesma senha de criptografia)
-                    json.dumps({k: v for k, v in config_data.items() if v}),
-                    initial_status, initial_initialized,
-                    now, now
-                )
-                cursor.execute(sql, values)
-                repo_id = cursor.fetchone()[0]
+                config_data = self._build_config_data(data, repo_type)
+                config_json = json.dumps(config_data)
+
+                is_sqlite = self._is_sqlite(conn)
+                if is_sqlite:
+                    sql = """
+                        INSERT INTO repositories 
+                        (name, type, engine, path, motor_password, cloud_password, config, status, enabled, initialized, created_at, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+                    """
+                    values = (
+                        name, repo_type, engine, path, pwd,
+                        pwd,  # cloud_password = motor_password (mesma senha de criptografia)
+                        config_json,
+                        initial_status, 1 if initial_initialized else 0,
+                        now, now
+                    )
+                    cursor.execute(sql, values)
+                    repo_id = cursor.lastrowid
+                else:
+                    sql = """
+                        INSERT INTO repositories 
+                        (name, type, engine, path, motor_password, cloud_password, config, status, enabled, initialized, created_at, updated_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, true, %s, %s, %s)
+                        RETURNING id;
+                    """
+                    values = (
+                        name, repo_type, engine, path, pwd,
+                        pwd,
+                        config_json,
+                        initial_status, initial_initialized,
+                        now, now
+                    )
+                    cursor.execute(sql, values)
+                    repo_id = cursor.fetchone()[0]
+
                 conn.commit()
 
                 logger.info(f"✅ Repositório '{name}' criado com ID: {repo_id}")
                 return {"id": repo_id, "path": path}
 
-        except psycopg2.IntegrityError:
+        except self._integrity_errors():
             raise ValueError(f"Já existe um repositório com o nome '{name}'")
         except Exception as e:
             logger.error(f"Erro ao criar repositório no banco: {e}", exc_info=True)
             raise
 
     def update_repository(self, repo_id: int, data: Dict[str, Any]) -> bool:
-        """Atualiza um repositório."""
+        """Atualiza um repositório mantendo credenciais isoladas de config JSON (RM08)."""
         current_repo = self.get_repository(repo_id)
         if not current_repo:
             raise ValueError(f"Repositório {repo_id} não encontrado.")
 
-        updates = []
+        updates_cols = []
         values = []
         
         config_str = current_repo.get('config', '{}')
         config_data = json.loads(config_str) if isinstance(config_str, str) else config_str or {}
 
-        for key in ['bucket', 'region', 'endpoint', 'prefix', 'access_key', 'secret_key']:
+        # Atualizar metadados não-sensíveis
+        for key in ['bucket', 'region', 'endpoint', 'prefix']:
             if key in data:
                 config_data[key] = data[key]
 
-        # Sincronizar aliases de credenciais para manter config consistente
+        # Preservar chave de acesso pública de acordo com o provedor (RM03)
+        repo_type = (data.get('type') or current_repo.get('type') or 'local').lower()
         if 'access_key' in data:
-            for alias in ['aws_access_key', 'b2_account_id', 'azure_account_name']:
-                if alias in config_data:
-                    config_data[alias] = data['access_key']
-        if 'secret_key' in data:
-            for alias in ['aws_secret_key', 'b2_account_key', 'azure_account_key']:
-                if alias in config_data:
-                    config_data[alias] = data['secret_key']
+            ak_val = data['access_key']
+            if repo_type in ('s3', 'wasabi'):
+                config_data['aws_access_key'] = ak_val
+            elif repo_type == 'b2':
+                config_data['b2_account_id'] = ak_val
+            elif repo_type == 'azure':
+                config_data['azure_account_name'] = ak_val
+            else:
+                config_data['access_key'] = ak_val
+
+        # RM08: Remover senhas e secret keys em texto plano do config JSON
+        for secret_key in ['secret_key', 'aws_secret_key', 'b2_account_key', 'azure_account_key', 'motor_password']:
+            config_data.pop(secret_key, None)
 
         allowed_fields = ['name', 'type', 'engine', 'path', 'motor_password', 'cloud_password', 'enabled']
         for field in allowed_fields:
             if field in data:
-                updates.append(f"{field} = %s")
+                updates_cols.append(field)
                 values.append(data[field])
 
-        updates.append("config = %s")
+        updates_cols.append("config")
         values.append(json.dumps({k: v for k, v in config_data.items() if v is not None and v != ''}))
         
-        updates.append("updated_at = %s")
+        updates_cols.append("updated_at")
         values.append(datetime.now().isoformat())
 
-        if not updates:
+        if not updates_cols:
             return True
 
-        sql = f"UPDATE repositories SET {', '.join(updates)} WHERE id = %s"
         values.append(repo_id)
 
         try:
             with self._get_conn() as conn:
                 cursor = conn.cursor()
+                ph = "?" if self._is_sqlite(conn) else "%s"
+                sql = f"UPDATE repositories SET {', '.join(f'{col} = {ph}' for col in updates_cols)} WHERE id = {ph}"
                 cursor.execute(sql, tuple(values))
                 conn.commit()
             logger.info(f"✅ Repositório {repo_id} atualizado.")
@@ -351,11 +460,13 @@ class RepositoryManager:
     def _safe_delete_by_repository(self, cursor, table_name: str, repo_id: int):
         """Remove dependências por repository_id, ignorando schemas legados sem a tabela."""
         try:
-            cursor.execute(f"DELETE FROM {table_name} WHERE repository_id = %s", (repo_id,))
+            conn = getattr(cursor, 'connection', None)
+            ph = "?" if (conn and self._is_sqlite(conn)) else "%s"
+            cursor.execute(f"DELETE FROM {table_name} WHERE repository_id = {ph}", (repo_id,))
         except Exception as e:
             # Compatibilidade com instalações legadas onde a tabela pode não existir
             msg = str(e).lower()
-            if 'does not exist' in msg or 'undefined table' in msg:
+            if 'does not exist' in msg or 'undefined table' in msg or 'no such table' in msg:
                 return
             raise
 
@@ -408,8 +519,8 @@ class RepositoryManager:
         except Exception as e:
             logger.warning(f"⚠️ Falha ao limpar artefatos de motores: {e}")
 
-    def delete_repository(self, repo_id: int, keep_folder: bool = False) -> None:
-        """Exclui repositório e todos os dados associados."""
+    def delete_repository(self, repo_id: int, keep_folder: bool = False, delete_files: Optional[bool] = None) -> bool:
+        """Exclui repositório e todos os dados associados. Suporta delete_files para limpeza opcional de disco (RM06)."""
         repo = self.get_repository(repo_id)
         if not repo:
             raise ValueError(f"Repositório {repo_id} não encontrado")
@@ -417,35 +528,38 @@ class RepositoryManager:
         try:
             with self._get_conn() as conn:
                 cursor = conn.cursor()
+                ph = "?" if self._is_sqlite(conn) else "%s"
 
                 # Dependências diretas por repository_id (ordem importa)
                 self._safe_delete_by_repository(cursor, 'integrity_checks', repo_id)
                 self._safe_delete_by_repository(cursor, 'restore_history', repo_id)
 
                 # Tarefas associadas
-                cursor.execute("DELETE FROM tasks WHERE repository_id = %s", (repo_id,))
+                cursor.execute(f"DELETE FROM tasks WHERE repository_id = {ph}", (repo_id,))
 
                 # Repositório
-                cursor.execute("DELETE FROM repositories WHERE id = %s", (repo_id,))
+                cursor.execute(f"DELETE FROM repositories WHERE id = {ph}", (repo_id,))
                 conn.commit()
             logger.info(f"✅ Repositório {repo_id} e dependências removidos do banco.")
 
             # Limpeza de artefatos de motores (ex.: Kopia configs)
             self._cleanup_engine_artifacts(repo)
 
-            # Limpeza de diretório local (quando aplicável)
-            if not keep_folder and repo.get('type') == 'local':
+            # Limpeza de diretório local (quando aplicável - RM06)
+            should_delete = bool(delete_files) if delete_files is not None else not keep_folder
+            if should_delete and repo.get('type') == 'local':
                 try:
                     repo_path = str(repo.get('path', '') or '')
                     if repo_path and not repo_path.startswith('enc-v1:'):
                         backend = self._create_backend_from_config(repo)
-                        base_path = getattr(backend, 'base_path', None)
+                        base_path = getattr(backend, 'base_path', None) or repo_path
                         if base_path and os.path.isdir(base_path):
                             shutil.rmtree(base_path, ignore_errors=True)
                             logger.info(f"✅ Pasta do repositório local removida: {base_path}")
                 except Exception as _e_folder:
                     logger.warning(f"⚠️ Não foi possível remover pasta local ao excluir repositório {repo_id}: {_e_folder}")
 
+            return True
         except Exception as e:
             logger.error(f"Erro ao excluir repositório {repo_id}: {e}", exc_info=True)
             raise
@@ -660,12 +774,12 @@ class RepositoryManager:
             auth_args = self._build_duplicati_auth_args(repo)
 
             cmd = [dup_exe, 'find', target_url, *auth_args, '--no-encryption=true']
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
 
             if result.returncode != 0:
                 # Tentar novamente sem --no-encryption para repositórios com passphrase
                 cmd2 = [dup_exe, 'find', target_url, *auth_args]
-                result = subprocess.run(cmd2, capture_output=True, text=True, timeout=120)
+                result = subprocess.run(cmd2, capture_output=True, text=True, timeout=30)
 
             if result.returncode == 0:
                 return {"success": True, "message": "Conexão Duplicati válida"}
@@ -1243,7 +1357,12 @@ class RepositoryManager:
                         [path, "version"],
                         capture_output=True, text=True, timeout=10
                     )
-                    version = out.stdout.strip() if out.returncode == 0 else None
+                    if out.returncode == 0:
+                        raw = out.stdout.strip()
+                        m = re.search(r'(\d+\.\d+[\.\d]*)', raw)
+                        version = m.group(1) if m else raw[:40]
+                    else:
+                        version = None
                 except Exception:
                     pass
 
@@ -1282,7 +1401,12 @@ class RepositoryManager:
         if installed and path:
             try:
                 out = subprocess.run([path, "version"], capture_output=True, text=True, timeout=10)
-                version = out.stdout.strip() if out.returncode == 0 else None
+                if out.returncode == 0:
+                    raw = out.stdout.strip()
+                    m = re.search(r'(\d+\.\d+[\.\d]*)', raw)
+                    version = m.group(1) if m else raw[:40]
+                else:
+                    version = None
             except Exception:
                 pass
 

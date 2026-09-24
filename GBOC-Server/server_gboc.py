@@ -980,6 +980,52 @@ async def get_ui_config_endpoint():
         "AVAILABLE_UI_STYLES": ["minimal", "neumorphism", "claymorphism", "fluent", "nexus-widgets", "nexus-glass", "command-sentinel", "cyber-3d"]
     }
 
+@app.post("/api/v1/system/shutdown", tags=["System"])
+@app.post("/api/system/shutdown", tags=["System"])
+async def shutdown_server(request: Request):
+    """Shutdown controlado do servidor central GBOC."""
+    host = request.client.host if request.client else ""
+    user = _get_server_user_from_request(request)
+    auth_enabled = _is_server_auth_enabled()
+
+    is_local = host in ("127.0.0.1", "::1", "localhost", "testclient")
+    is_admin = bool(user and user.get("role") in ("admin", "superadmin", "administrator"))
+
+    # Verifica rede privada
+    is_private = False
+    if host and not is_local:
+        try:
+            import ipaddress
+            ip = ipaddress.ip_address(host)
+            is_private = ip.is_loopback or ip.is_private
+        except Exception:
+            is_private = False
+
+    if auth_enabled:
+        if not (is_admin or is_local):
+            raise HTTPException(status_code=403, detail="Shutdown permitido apenas localmente ou para administradores autenticados.")
+    else:
+        if not (is_local or is_private):
+            raise HTTPException(status_code=403, detail="Shutdown permitido apenas localmente ou via rede privada autorizada.")
+
+    username = user.get("username") if user else ("local/script" if is_local else host)
+    logger.info(f"[SHUTDOWN] Servidor GBOC recebendo solicitacao de encerramento de host={host}, user={username}")
+
+    async def _stop_soon():
+        await asyncio.sleep(0.8)
+        try:
+            if connection_pool:
+                connection_pool.closeall()
+        except Exception:
+            pass
+        logger.info("[SHUTDOWN] Servidor GBOC finalizado.")
+        os._exit(0)
+
+    asyncio.create_task(_stop_soon())
+    return {"status": "success", "message": "GBOC Server encerrando com sucesso..."}
+
+
+
 # Rota estatica universal para recursos da pasta /static/
 # Ordem de busca (evita "mistura de origens" acidental):
 #   1. GBOC-Server/static/    <- FONTE CANONICA (sincronizada por tools/sync_css.py)

@@ -860,19 +860,52 @@ async def get_server_config():
         logger.error(f"Erro ao obter configuração: {e}")
         return {"status": "error", "message": str(e)}
 
-@app.post("/api/system/shutdown")
+@app.post("/api/v1/system/shutdown", tags=["System"])
+@app.post("/api/system/shutdown", tags=["System"])
 async def shutdown_agent(request: Request):
-    """Shutdown controlado do agente (somente localhost)."""
+    """Shutdown controlado do agente GBOC."""
     host = request.client.host if request.client else ""
-    if host not in ("127.0.0.1", "::1", "localhost"):
-        raise HTTPException(status_code=403, detail="Shutdown permitido apenas localmente")
+    is_local = host in ("127.0.0.1", "::1", "localhost", "testclient")
+
+    is_allowed = is_local
+    if not is_allowed and host:
+        try:
+            import ipaddress
+            ip = ipaddress.ip_address(host)
+            is_allowed = ip.is_loopback or ip.is_private
+        except Exception:
+            is_allowed = False
+
+    if not is_allowed:
+        raise HTTPException(status_code=403, detail="Shutdown permitido apenas localmente ou via rede privada autorizada")
+
+    logger.info(f"[SHUTDOWN] Agente GBOC recebendo solicitacao de encerramento de host={host}")
 
     async def _stop_soon():
-        await asyncio.sleep(0.7)
+        await asyncio.sleep(0.8)
+        try:
+            from engines.ransomware_guardian import get_guardian
+            get_guardian().stop()
+        except Exception:
+            pass
+        try:
+            from engines.ransomware_shield import get_shield
+            get_shield().stop()
+        except Exception:
+            pass
+        try:
+            from shared_core import get_shared_core
+            core = get_shared_core()
+            if hasattr(core, "shutdown"):
+                core.shutdown()
+        except Exception:
+            pass
+        logger.info("[SHUTDOWN] Agente GBOC finalizado.")
         os._exit(0)
 
     asyncio.create_task(_stop_soon())
-    return {"status": "success", "message": "Agente encerrando..."}
+    return {"status": "success", "message": "GBOC Agent encerrando com sucesso..."}
+
 
 
 # ============================================================================== 

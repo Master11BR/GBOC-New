@@ -15,8 +15,8 @@
 ## 📌 Sumário
 1. [Visão Geral e Arquitetura Operacional](#-visão-geral-e-arquitetura-operacional)
 2. [Estrutura Canônica de Navegação (7 Domínios de Negócio)](#-estrutura-canônica-de-navegação)
-3. [Recursos de Destaque (v14.6.1 Enterprise)](#-recursos-de-destaque-v1461-enterprise)
-4. [Arquitetura de Relatórios Flagship v2.0](#-arquitetura-de-relatórios-flagship-v20)
+3. [Recursos de Destaque (v14.7.0 Enterprise)](#-recursos-de-destaque-v1470-enterprise)
+4. [Padrão Oficial de Relatórios v3.0 & Flagships](#-padrão-oficial-de-relatórios-v30--flagships)
 5. [Disaster Recovery & SureRestore Sandbox Zero-Mock](#-disaster-recovery--surerestore-sandbox-zero-mock)
 6. [Cyber Security Sentinel (ClamAV, YARA, Maltrail, Wazuh, Defender)](#-cyber-security-sentinel)
 7. [Assistente de Inteligência Artificial & LLMs (Ollama & Nuvem)](#-assistente-de-inteligência-artificial--llms)
@@ -26,7 +26,7 @@
 
 ## 🏗️ Visão Geral e Arquitetura Operacional
 
-O GBOC v14.6.0 opera sob o ciclo de vida completo e verificável de proteção contínua:
+O GBOC v14.7.0 opera sob o ciclo de vida completo e verificável de proteção contínua:
 
 ```text
 Política → Backup consistente → Armazenamento → Integridade →
@@ -110,8 +110,13 @@ Configuração
 
 ---
 
-## ⚡ Recursos de Destaque (v14.6.0 Full Stable Enterprise)
+## ⚡ Recursos de Destaque (v14.7.0 Full Stable Enterprise)
 
+- **Padrão Oficial de Relatórios v3.0 (Zero-Mock Normative)**:
+  - Eliminação de dados sintéticos e resolução dos 10 bugs de telemetria em `reports_api.py`.
+  - Conformidade comercial com Veeam ONE, Rubrik Radar e Datto RMM.
+  - Schema universal v3.0.0 com `score`, `delta`, `metrics` (com targets e status), parecer analítico cruzado de IA e ações recomendadas priorizadas.
+  - Transparência explícita: relatórios sem sensor local retornam `status: "unavailable"` com guias de configuração, sem fabricar números.
 - **Arquitetura Operacional de DR & SureRestore Zero-Mock**:
   - Eliminação definitiva de declarações ou retornos simulados. Um ponto de restauração só recebe o status de *Aprovado* após boot real em VM isolada com validação de heartbeat e consistência de carga.
   - Estados padronizados: `Protegido`, `Em risco`, `Atenção`, `Falhou`, `Não protegido`.
@@ -134,9 +139,9 @@ Configuração
 
 ---
 
-## 📊 Arquitetura de Relatórios Flagship v2.0
+## 📊 Padrão Oficial de Relatórios v3.0 & Flagships
 
-A partir da versão **14.6.1**, os 50 relatórios técnicos originais passam a atuar como **módulos de dados internos** que alimentam **7 Relatórios Flagship de Mercado**, desenhados para narrativa executiva, clareza visual e conformidade com auditoria:
+A partir da versão **14.7.0**, o sistema adota o padrão normativo v3.0 onde os 50 relatórios técnicos originais atuam com dados 100% reais alimentando **7 Relatórios Flagship de Mercado**, desenhados para narrativa executiva, clareza visual e conformidade com auditoria:
 
 | Código | Relatório Flagship | Categoria | Público Principal | Destaque Visual |
 |---|---|---|---|---|
@@ -148,7 +153,7 @@ A partir da versão **14.6.1**, os 50 relatórios técnicos originais passam a a
 | **`REP-F6`** | **FinOps & Total Cost of Ownership** | FinOps Flagship | CFO, Gerente TI, MSP | Custo em USD/BRL (câmbio BCB em tempo real) |
 | **`REP-F7`** | **Disaster Recovery Readiness** | DR Flagship | CTO, Gestão Continuidade | Matriz de prontidão para DR e gaps de RTO/RPO |
 
-**Pilares Mandatórios da Arquitetura v2.0**:
+**Pilares Mandatórios da Arquitetura v3.0**:
 - **Score Único Destacado**: Cada tela possui 1 número-síntese de 0 a 100 com semáforo de status.
 - **Delta Comparativo**: Bloco automático de 3 bullets ("O que mudou") comparando com o ciclo anterior (`↑`, `↓`, `→`).
 - **Narrativa antes da tabela**: Parecer e insights de IA inline contextuais prévios às tabelas de dados.
@@ -158,7 +163,22 @@ A partir da versão **14.6.1**, os 50 relatórios técnicos originais passam a a
 
 ---
 
-## 📜 Histórico de Mudanças (Changelog v14.6.0 Enterprise)
+## 📜 Histórico de Mudanças (Changelog v14.7.0 Enterprise)
+
+- **Release 14.7.0 — Padrão Oficial de Relatórios v3.0 & Zero-Mock Intelligence**:
+  - Implementação de `v3_reports_engine.py` eliminando dados fictícios em todos os 50 relatórios.
+  - Correção dos 10 bugs de dados: RPO por task, throughput real por engine, retenção de settings, DLQ auditada, uptime via psutil, testes reais de restauração, shield de canários reais, predição por regressão linear e parecer analítico cruzado de IA.
+  - Status transparente `status: "unavailable"` para relatórios sem sensor local.
+  - Higienização de nomes técnicos via `_clean_task_name()`.
+  - Atualização do visualizador `reports.html` com badges semafóricos, dots, metas e ações recomendadas.
+  - Sincronização simétrica dos 7 Flagships no Server e Agent com `schema_version: "3.0.0"`.
+
+- **Release 14.6.1 — Arquitetura de Relatórios Flagship v2.0**:
+  - Consolidação dos 7 Relatórios Flagship executivos.
+
+- **Release 14.6.0 — Operational Backup & DR**:
+  - Reestruturação Canônica de Navegação (7 Domínios de Negócio).
+  - Eliminação de Simulações & Zero-Mock Strict Policy em SureRestore.
 
 - **Reestruturação Canônica de Navegação (7 Domínios de Negócio)**:
   - Alinhamento completo da Sidebar e Topbar no Server e no Agent com os domínios: *Visão Geral, Backup, Disaster Recovery, Proteção, Virtualização & Cloud, Operações e Configuração*.

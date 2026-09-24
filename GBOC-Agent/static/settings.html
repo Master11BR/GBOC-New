@@ -608,6 +608,18 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 <!-- ABA: SISTEMA -->
                 <div id="system" class="gboc-tab-pane">
                     <div class="settings-grid">
+                        <div class="settings-card" style="border: 2px solid var(--danger); background: rgba(239,68,68,.06);">
+                            <h2><i class="fas fa-power-off" style="color:var(--danger)"></i> Desligar Agente GBOC</h2>
+                            <p class="setting-description">
+                                Encerra graciosamente todos os serviços do agente local, sentinela de ransomware, motores de backup e fecha a API web com segurança.
+                            </p>
+                            <div class="settings-actions" style="background: transparent; border: none; padding: 0;">
+                                <button type="button" onclick="typeof gbocConfirmShutdown==='function'?gbocConfirmShutdown('agent'):alert('Desligar')" class="btn btn-danger" style="background:var(--danger);color:#fff;padding:10px 24px;font-weight:700;">
+                                    <i class="fas fa-power-off"></i> Desligar Agente
+                                </button>
+                            </div>
+                        </div>
+
                         <div class="settings-card" style="border: 2px solid var(--danger); background: rgba(245,101,101,.05);">
                             <h2><i class="fas fa-trash-alt" style="color:var(--danger)"></i> Reset de Instalação</h2>
                             <p class="setting-description" style="color:var(--danger)">

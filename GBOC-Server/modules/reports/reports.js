@@ -192,9 +192,11 @@ function filterSrvReports() {
 }
 
 function setSrvCategoryFilter(cat, element) {
-    srvCurrentCategory = cat;
-    document.querySelectorAll('.srv-cat-chip').forEach(el => el.classList.remove('active'));
-    if (element) element.classList.add('active');
+    srvCurrentCategory = cat || 'ALL';
+    const sel = document.getElementById('srvReportCategorySelect');
+    if (sel && sel.value !== srvCurrentCategory) {
+        sel.value = srvCurrentCategory;
+    }
     renderSrvReportsList();
 }
 
@@ -231,6 +233,14 @@ async function runSrvSelectedReport() {
     if (!srvSelectedReportId) return;
 
     const body = document.getElementById('srvViewerBody');
+    const btnRun = document.getElementById('btnSrvRunCurrent');
+    if (!body) return;
+
+    if (btnRun) {
+        btnRun.disabled = true;
+        btnRun.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gerando...';
+    }
+
     body.innerHTML = `
         <div style="text-align:center;padding:60px 20px">
             <i class="fas fa-spinner fa-spin fa-3x" style="color:var(--primary)"></i>
@@ -239,19 +249,66 @@ async function runSrvSelectedReport() {
         </div>
     `;
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
     try {
         const base = window.GBOC_API_BASE || '';
         const r = await fetch(base + '/api/v1/reports/generate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ report_id: srvSelectedReportId })
+            body: JSON.stringify({ report_id: srvSelectedReportId }),
+            signal: controller.signal
         });
+        clearTimeout(timeoutId);
         const data = await r.json();
 
         // Habilitar botões de exportação
-        document.getElementById('btnSrvPrint').disabled = false;
-        document.getElementById('btnSrvCsv').disabled = false;
-        document.getElementById('btnSrvJson').disabled = false;
+        const btnPrint = document.getElementById('btnSrvPrint');
+        const btnCsv = document.getElementById('btnSrvCsv');
+        const btnJson = document.getElementById('btnSrvJson');
+        if (btnPrint) btnPrint.disabled = false;
+        if (btnCsv) btnCsv.disabled = false;
+        if (btnJson) btnJson.disabled = false;
+
+        // Renderizar Score se disponível
+        let scoreHtml = '';
+        if (data.score) {
+            const sc = data.score;
+            const scColor = sc.status === 'OK' ? '#10b981' : (sc.status === 'AT_RISK' ? '#f59e0b' : '#ef4444');
+            scoreHtml = `
+                <div style="background:var(--bg-input);border:1.5px solid var(--border);border-left:5px solid ${scColor};border-radius:8px;padding:12px 18px;margin-bottom:16px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+                        <div style="display:flex;align-items:center;gap:16px;">
+                            <div style="font-size:2em;font-weight:800;color:${scColor};">${sc.value}<span style="font-size:0.5em;color:var(--text-muted)">/100</span></div>
+                            <div>
+                                <div style="font-weight:700;font-size:0.95em;color:var(--text);">Protection & Operations Score</div>
+                                <div style="font-size:0.78em;color:var(--text-muted);">Tendência: <strong>${sc.trend || '0'}pp</strong> vs período anterior • Status: <span class="badge" style="background:${scColor};color:#fff;font-size:0.8em;padding:2px 6px;border-radius:4px;">${sc.status}</span></div>
+                            </div>
+                        </div>
+                        <div style="font-size:0.75em;color:var(--text-muted);text-align:right;">
+                            <div>GBOC Server Enterprise</div>
+                            <code>${data.schema_version || '4.0.0'}</code>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Renderizar Delta se disponível
+        let deltaHtml = '';
+        if (data.delta && data.delta.length > 0) {
+            const bullets = data.delta.map(d => {
+                const ic = d.icon === 'up' ? '<i class="fas fa-arrow-up" style="color:#10b981"></i>' : (d.icon === 'down' ? '<i class="fas fa-arrow-down" style="color:#ef4444"></i>' : '<i class="fas fa-minus" style="color:#0284c7"></i>');
+                return `<li style="display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:0.85em;color:var(--text);">${ic} <span>${d.text}</span></li>`;
+            }).join('');
+            deltaHtml = `
+                <div style="background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:18px;">
+                    <div style="font-size:0.75em;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px;"><i class="fas fa-chart-line"></i> O que mudou vs período anterior:</div>
+                    <ul style="list-style:none;margin:0;padding:0;">${bullets}</ul>
+                </div>
+            `;
+        }
 
         // Renderizar Métricas Principais
         const kpiColors = ["#0284c7", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4"];
@@ -259,6 +316,7 @@ async function runSrvSelectedReport() {
             <div class="srv-metric-card" style="border-left: 4px solid ${kpiColors[idx % kpiColors.length]}; text-align: left;">
                 <div class="lbl" style="font-size:0.72em;">${m.label}</div>
                 <div class="val" style="font-size:1.5em; text-align: left; margin-top:2px;">${m.value}</div>
+                ${m.target ? `<div style="font-size:0.68em;color:var(--text-muted);margin-top:2px">Meta: ${m.target}</div>` : ''}
             </div>
         `).join('');
 
@@ -281,6 +339,27 @@ async function runSrvSelectedReport() {
             `;
         }
 
+        // Renderizar Ações Recomendadas
+        let actionsHtml = '';
+        if (data.recommended_actions && data.recommended_actions.length > 0) {
+            const acts = data.recommended_actions.map(act => {
+                const p = String(act.priority || 'MEDIUM').toUpperCase();
+                return `
+                    <div style="margin-bottom:8px;padding:8px 12px;border-radius:6px;border-left:3px solid ${p === 'HIGH' ? 'var(--danger)' : (p === 'MEDIUM' ? 'var(--warning)' : 'var(--success)')};background:var(--bg-input)">
+                        <div style="display:flex;align-items:center;gap:8px">
+                            <span class="action-badge" style="font-size:0.7em;padding:2px 6px;border-radius:4px;font-weight:700;background:${p === 'HIGH' ? 'var(--danger)' : (p === 'MEDIUM' ? 'var(--warning)' : 'var(--success)')};color:#fff">${p}</span>
+                            <strong style="font-size:0.88em">${act.action}</strong>
+                        </div>
+                        ${act.detail ? `<div style="font-size:0.8em;color:var(--text-muted);margin-top:4px">${act.detail}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+            actionsHtml = `
+                <h4 style="margin:20px 0 12px;font-size:1em;color:var(--text)"><i class="fas fa-bolt" style="color:var(--warning)"></i> Ações Recomendadas:</h4>
+                <div class="actions-list">${acts}</div>
+            `;
+        }
+
         body.innerHTML = `
             <div style="border-bottom:1.5px solid var(--border);padding-bottom:14px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">
                 <div>
@@ -294,8 +373,12 @@ async function runSrvSelectedReport() {
                 <div style="font-size:0.8em;color:var(--text-muted);text-align:right">
                     <div>Emissão: <strong>${new Date(data.generated_at).toLocaleString()}</strong></div>
                     <div style="margin-top:4px"><span style="color:var(--success);font-weight:600"><i class="fas fa-check-circle"></i> 100% Dados Reais</span></div>
+                    ${data.integrity_hash ? `<div>Hash: <code style="font-size:0.85em">${data.integrity_hash.slice(0, 19)}...</code></div>` : ''}
                 </div>
             </div>
+
+            ${scoreHtml}
+            ${deltaHtml}
 
             <h4 style="margin-bottom:12px;font-size:1em;color:var(--text)"><i class="fas fa-chart-bar" style="color:var(--primary)"></i> Métricas do Diagnóstico:</h4>
             <div class="srv-metric-grid">${metricsHtml}</div>
@@ -306,10 +389,30 @@ async function runSrvSelectedReport() {
             </div>
 
             ${tableHtml}
+            ${actionsHtml}
         `;
     } catch (e) {
         console.error('[ReportsModule] Erro ao gerar relatório:', e);
-        body.innerHTML = `<div style="padding:20px;color:var(--danger)">Erro ao gerar relatório: ${e.message}</div>`;
+        clearTimeout(timeoutId);
+        if (body) {
+            const isAbort = e.name === 'AbortError';
+            const msg = isAbort 
+                ? 'Tempo limite de consulta excedido (30s). O PostgreSQL ou serviço remoto pode estar processando alto volume.'
+                : `Erro ao gerar relatório: ${e.message}`;
+            body.innerHTML = `
+                <div style="background:rgba(239,68,68,0.08);border:1.5px solid rgba(239,68,68,0.25);border-radius:8px;padding:24px;text-align:center;margin:20px">
+                    <h4 style="color:var(--danger);margin:0 0 8px;font-size:1.1em"><i class="fas fa-circle-exclamation"></i> Falha na Extração dos Dados</h4>
+                    <p style="color:var(--text);font-size:0.92em;margin:0 0 16px;max-width:550px;margin-left:auto;margin-right:auto">${msg}</p>
+                    <button class="btn btn-primary" onclick="runSrvSelectedReport()" style="padding:8px 20px;font-size:0.9em"><i class="fas fa-rotate"></i> Tentar Novamente</button>
+                </div>
+            `;
+        }
+    } finally {
+        clearTimeout(timeoutId);
+        if (btnRun) {
+            btnRun.disabled = false;
+            btnRun.innerHTML = '<i class="fas fa-play"></i> Gerar Agora';
+        }
     }
 }
 
