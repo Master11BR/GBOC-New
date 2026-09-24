@@ -30,6 +30,8 @@ PUBLIC_PATHS = {
     '/api/system/hardware',
     '/api/v1/system/hardware',
     '/api/v2/system/hardware',
+    '/api/system/shutdown',
+    '/api/v1/system/shutdown',
     '/login.html',
     '/favicon.ico',
     '/.well-known/appspecific/com.chrome.devtools.json',

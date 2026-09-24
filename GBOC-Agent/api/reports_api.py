@@ -7,6 +7,7 @@ Supports HTML (print-to-PDF), CSV, JSON formats.
 
 from fastapi import APIRouter, HTTPException, Request, Query
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.concurrency import run_in_threadpool
 import logging
 import io
 import csv
@@ -16,8 +17,13 @@ from decimal import Decimal
 from typing import Dict, Any, List, Optional
 
 try:
-    from engines.v3_reports_engine import (
-        generate_real_report_data_v3,
+    from version import GBOC_VERSION as AGENT_VERSION
+except ImportError:
+    AGENT_VERSION = "14.6.0"
+
+try:
+    from engines.v4_reports_engine import (
+        generate_real_report_data_v4,
         _clean_task_name,
         _sla_badge,
         get_real_uptime,
@@ -25,14 +31,34 @@ try:
         build_ai_recommendation
     )
 except ImportError:
-    from v3_reports_engine import (
-        generate_real_report_data_v3,
-        _clean_task_name,
-        _sla_badge,
-        get_real_uptime,
-        predict_storage_exhaustion,
-        build_ai_recommendation
-    )
+    try:
+        from v4_reports_engine import (
+            generate_real_report_data_v4,
+            _clean_task_name,
+            _sla_badge,
+            get_real_uptime,
+            predict_storage_exhaustion,
+            build_ai_recommendation
+        )
+    except ImportError:
+        try:
+            from engines.v3_reports_engine import (
+                generate_real_report_data_v3 as generate_real_report_data_v4,
+                _clean_task_name,
+                _sla_badge,
+                get_real_uptime,
+                predict_storage_exhaustion,
+                build_ai_recommendation
+            )
+        except ImportError:
+            from v3_reports_engine import (
+                generate_real_report_data_v3 as generate_real_report_data_v4,
+                _clean_task_name,
+                _sla_badge,
+                get_real_uptime,
+                predict_storage_exhaustion,
+                build_ai_recommendation
+            )
 
 logger = logging.getLogger(__name__)
 # Router sem prefixo fixo para mapear tanto /api/reports quanto /api/v1/reports
@@ -178,9 +204,9 @@ async def get_reports_catalog():
     }
 
 
-def generate_real_report_data(rep_id: int) -> Dict[str, Any]:
-    """Gera o payload oficial com 100% de dados reais e contrato JSON universal v3.0.0."""
-    return generate_real_report_data_v3(rep_id, REPORTS_CATALOG_50)
+def generate_real_report_data(rep_id: int, days: int = 30) -> Dict[str, Any]:
+    """Gera o payload oficial com 100% de dados reais e contrato JSON universal v4.0.0."""
+    return generate_real_report_data_v4(rep_id, catalog_50=REPORTS_CATALOG_50, days=days)
 
 
 @router.post("/api/reports/generate")
@@ -190,26 +216,38 @@ def generate_real_report_data(rep_id: int) -> Dict[str, Any]:
 async def generate_report_by_payload(request: Request, report_id: Optional[int] = None):
     """Gera dados detalhados para qualquer um dos 50 relatórios com dados 100% reais do sistema."""
     rep_id = report_id
-    if rep_id is None and request.method == "POST":
+    days = 30
+    if request.method == "POST":
         try:
             payload = await request.json()
-            rep_id = payload.get("report_id") or payload.get("id")
+            rep_id = payload.get("report_id") or payload.get("id") or rep_id
+            if "days" in payload:
+                try:
+                    days = int(payload.get("days"))
+                except Exception:
+                    days = 30
         except Exception:
             pass
+    elif request.method == "GET":
+        try:
+            days = int(request.query_params.get("days", 30))
+        except Exception:
+            days = 30
 
     try:
         rep_id = int(rep_id or 1)
     except Exception:
         rep_id = 1
 
-    return JSONResponse(generate_real_report_data(rep_id))
+    data = await run_in_threadpool(generate_real_report_data, rep_id, days)
+    return JSONResponse(data)
 
 
 @router.get("/api/reports/export/{report_id}")
 @router.get("/api/v1/reports/export/{report_id}")
 async def export_agent_report(report_id: int, format: str = Query("html", pattern="^(html|csv|json)$")):
     """Exporta relatórios do agente em HTML/PDF, CSV ou JSON."""
-    data = generate_real_report_data(report_id)
+    data = await run_in_threadpool(generate_real_report_data, report_id)
 
     if format == "json":
         return JSONResponse(content=data, headers={
@@ -239,9 +277,12 @@ async def export_agent_report(report_id: int, format: str = Query("html", patter
         )
     else:
         import hashlib
-        payload_str = f"{data.get('code')}-{data.get('report_id')}-{data.get('generated_at')}-{len(data.get('table_rows', []))}"
-        audit_hash = hashlib.sha256(payload_str.encode('utf-8')).hexdigest().upper()
-        audit_hash_short = f"{audit_hash[:8]}-{audit_hash[8:16]}-{audit_hash[16:24]}-{audit_hash[24:32]}"
+        audit_hash = data.get("integrity_hash")
+        if not audit_hash:
+            raw_data = json.dumps(data, sort_keys=True, default=str).encode('utf-8')
+            h = hashlib.sha256(raw_data).hexdigest().upper()
+            audit_hash = f"{h[:8]}-{h[8:16]}-{h[16:24]}-{h[24:32]}"
+        audit_hash_short = audit_hash
 
         score_data = data.get("score") or {}
         score_val = score_data.get("value", 100)
@@ -1080,6 +1121,7 @@ async def export_agent_report(report_id: int, format: str = Query("html", patter
 
 try:
     from engines.flagship_reports import (
+        FLAGSHIPS_CATALOG_8,
         FLAGSHIPS_CATALOG_7,
         build_flagship_report_agent,
         render_flagship_html,
@@ -1087,24 +1129,54 @@ try:
     )
 except ImportError:
     from flagship_reports import (
+        FLAGSHIPS_CATALOG_8,
         FLAGSHIPS_CATALOG_7,
         build_flagship_report_agent,
         render_flagship_html,
         render_flagship_csv,
     )
+
+try:
+    from engines.v4_reports_engine import (
+        NEW_REPORTS_CATALOG_5,
+        detect_anomalies,
+        collect_health_timeline,
+        collect_engine_health,
+        collect_config_drift,
+        compare_periods
+    )
+except ImportError:
+    try:
+        from v4_reports_engine import (
+            NEW_REPORTS_CATALOG_5,
+            detect_anomalies,
+            collect_health_timeline,
+            collect_engine_health,
+            collect_config_drift,
+            compare_periods
+        )
+    except ImportError:
+        NEW_REPORTS_CATALOG_5 = []
+        detect_anomalies = lambda days=30: []
+        collect_health_timeline = lambda days=90: []
+        collect_engine_health = lambda: []
+        collect_config_drift = lambda: []
+        compare_periods = lambda periods=[7, 30, 90]: {"periods": [], "period_labels": []}
+
 from fastapi.responses import Response
 
 
 @router.get("/api/reports/flagships")
 @router.get("/api/v1/reports/flagships")
 async def list_agent_flagship_reports():
-    """Retorna o catálogo dos 7 relatórios flagship executivos no GBOC Agent."""
+    """Retorna o catálogo dos 8 relatórios flagship executivos no GBOC Agent (Schema v4.0.0)."""
     return JSONResponse({
         "status": "success",
-        "version": "2.0.0",
-        "platform": "GBOC Agent v14.6.0",
-        "count": len(FLAGSHIPS_CATALOG_7),
-        "flagships": FLAGSHIPS_CATALOG_7
+        "schema_version": "4.0.0",
+        "platform": f"GBOC Agent v{AGENT_VERSION}",
+        "count": len(FLAGSHIPS_CATALOG_8),
+        "flagships": FLAGSHIPS_CATALOG_8,
+        "new_reports": NEW_REPORTS_CATALOG_5
     })
 
 
@@ -1115,9 +1187,9 @@ async def get_agent_flagship_report(
     format: str = Query("html", pattern="^(html|pdf|csv|json)$"),
     print: Optional[str] = Query(None)
 ):
-    """Gera e retorna um dos 7 relatórios flagship no formato requisitado (html, pdf, csv, json) no Agente."""
+    """Gera e retorna um dos 8 relatórios flagship no formato requisitado (html, pdf, csv, json) no Agente."""
     fid = flagship_id.upper().strip()
-    valid_ids = [f["id"] for f in FLAGSHIPS_CATALOG_7]
+    valid_ids = [f["id"] for f in FLAGSHIPS_CATALOG_8]
     if fid not in valid_ids:
         raise HTTPException(
             status_code=404,
@@ -1125,7 +1197,7 @@ async def get_agent_flagship_report(
         )
 
     try:
-        payload = build_flagship_report_agent(fid)
+        payload = await run_in_threadpool(build_flagship_report_agent, fid)
     except Exception as e:
         logger.error(f"Erro ao gerar payload do Flagship {fid} no agente: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Erro interno ao gerar relatório: {str(e)}")
@@ -1146,4 +1218,196 @@ async def get_agent_flagship_report(
         is_print = (format == "pdf") or (print in ("1", "true", "yes"))
         html_content = render_flagship_html(payload, is_print=is_print)
         return HTMLResponse(content=html_content)
+
+
+# ── NOVAS ROTAS DE RELATÓRIO DO MASTER REPORT STANDARD v4.0 ─────────────────
+
+@router.get("/api/reports/anomalies")
+@router.get("/api/v1/reports/anomalies")
+async def get_anomalies_endpoint(days: int = Query(30, ge=1, le=365)):
+    """REP-N1: Retorna anomalias de volume e duração detectadas via Z-Score."""
+    try:
+        anomalies = await run_in_threadpool(detect_anomalies, days)
+        return JSONResponse({
+            "status": "success",
+            "code": "REP-N1",
+            "title": "Anomaly Detection Report",
+            "period_days": days,
+            "anomalies_count": len(anomalies),
+            "anomalies": anomalies
+        })
+    except Exception as e:
+        logger.error(f"Erro em REP-N1 anomalies: {e}", exc_info=True)
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+
+@router.get("/api/reports/health-timeline")
+@router.get("/api/v1/reports/health-timeline")
+async def get_health_timeline_endpoint(days: int = Query(90, ge=7, le=365)):
+    """REP-N2: Retorna calendário visual com matriz diária de saúde dos backups."""
+    try:
+        timeline = await run_in_threadpool(collect_health_timeline, days)
+        return JSONResponse({
+            "status": "success",
+            "code": "REP-N2",
+            "title": "Backup Health Timeline",
+            "period_days": days,
+            "days_count": len(timeline),
+            "timeline": timeline
+        })
+    except Exception as e:
+        logger.error(f"Erro em REP-N2 health-timeline: {e}", exc_info=True)
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+
+@router.get("/api/reports/engine-health")
+@router.get("/api/v1/reports/engine-health")
+async def get_engine_health_endpoint():
+    """REP-N3: Retorna diagnóstico aprofundado dos motores de backup instalados."""
+    try:
+        engines_data = await run_in_threadpool(collect_engine_health)
+        return JSONResponse({
+            "status": "success",
+            "code": "REP-N3",
+            "title": "Engine Health Report",
+            "engines": engines_data
+        })
+    except Exception as e:
+        logger.error(f"Erro em REP-N3 engine-health: {e}", exc_info=True)
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+
+@router.get("/api/reports/config-drift")
+@router.get("/api/v1/reports/config-drift")
+async def get_config_drift_endpoint():
+    """REP-N4: Rastreia desvios e alterações de configuração dos backups."""
+    try:
+        drift = await run_in_threadpool(collect_config_drift)
+        return JSONResponse({
+            "status": "success",
+            "code": "REP-N4",
+            "title": "Configuration Drift Report",
+            "drift_events": drift
+        })
+    except Exception as e:
+        logger.error(f"Erro em REP-N4 config-drift: {e}", exc_info=True)
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+
+@router.get("/api/reports/compare")
+@router.get("/api/v1/reports/compare")
+async def get_compare_periods_endpoint(periods: str = Query("7,30,90")):
+    """REP-N5: Comparativo analítico multi-período lado a lado."""
+    try:
+        days_list = [int(p.strip()) for p in periods.split(",") if p.strip().isdigit()]
+        if not days_list:
+            days_list = [7, 30, 90]
+        comp = await run_in_threadpool(compare_periods, days_list)
+        return JSONResponse({
+            "status": "success",
+            "code": "REP-N5",
+            "title": "Multi-Period Comparison Report",
+            "data": comp
+        })
+    except Exception as e:
+        logger.error(f"Erro em REP-N5 compare: {e}", exc_info=True)
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+
+@router.get("/api/reports/schema")
+@router.get("/api/v1/reports/schema")
+async def get_reports_schema():
+    """Retorna a especificação normativa Schema v4.0.0 para integrações de BI e API."""
+    return JSONResponse({
+        "schema_version": "4.0.0",
+        "normative_standard": "GBOC Agent Master Report Standard v4.0",
+        "flagships_count": len(FLAGSHIPS_CATALOG_8),
+        "new_reports_count": len(NEW_REPORTS_CATALOG_5),
+        "supported_formats": ["html", "pdf", "csv", "json"],
+        "flagships": FLAGSHIPS_CATALOG_8,
+        "new_reports": NEW_REPORTS_CATALOG_5
+    })
+
+
+@router.get("/api/system/health")
+@router.get("/api/v1/system/health")
+async def get_system_health():
+    """Health check unificado — expõe versão, uptime, integridade do banco e engines ativos."""
+    try:
+        from version import GBOC_VERSION, version_string
+    except ImportError:
+        GBOC_VERSION = "14.6.0"
+        version_string = lambda: "GBOC Agent v14.6.0 Enterprise"
+
+    import psutil, os
+    proc = psutil.Process(os.getpid())
+    elapsed = time.time() - proc.create_time()
+    h, m = int(elapsed // 3600), int((elapsed % 3600) // 60)
+    uptime_info = {
+        "pid": os.getpid(),
+        "uptime_str": f"{h}h {m}m",
+        "uptime_hours": round(elapsed / 3600, 1),
+        "memory_mb": round(proc.memory_info().rss / (1024**2), 1),
+        "cpu_pct": proc.cpu_percent(interval=None),
+        "status": proc.status(),
+    }
+
+    core = _get_core()
+    summary = {"total": 0, "ok": 0, "failed": 0, "success_rate": 100.0}
+    engines = []
+    try:
+        with core.get_db_connection() as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT COUNT(*),
+                       SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END),
+                       SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END)
+                FROM backups WHERE start_time >= datetime('now', '-1 day')
+            """)
+            r = cur.fetchone()
+            if r and r[0]:
+                tot = int(r[0] or 0)
+                ok = int(r[1] or 0)
+                summary = {
+                    "total": tot,
+                    "ok": ok,
+                    "failed": int(r[2] or 0),
+                    "success_rate": round(ok / tot * 100, 1) if tot else 100.0
+                }
+            cur.execute("SELECT engine, path, detected FROM detected_engines LIMIT 10")
+            for erow in cur.fetchall():
+                engines.append({"engine": erow[0], "path": erow[1], "detected": bool(erow[2])})
+    except Exception as db_err:
+        logger.warning(f"Erro ao consultar DB para healthcheck: {db_err}")
+
+    status_str = "healthy" if summary["failed"] == 0 else ("degraded" if summary["success_rate"] >= 80 else "unhealthy")
+
+    return JSONResponse({
+        "status": status_str,
+        "version": GBOC_VERSION,
+        "version_string": version_string(),
+        "uptime": uptime_info,
+        "last_24h": summary,
+        "engines": engines,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    })
+
+
+@router.get("/api/system/version")
+@router.get("/api/v1/system/version")
+async def get_system_version():
+    """Retorna versão oficial, build e metadados de release da plataforma."""
+    try:
+        from version import GBOC_VERSION, GBOC_BUILD, GBOC_EDITION, GBOC_RELEASE_DATE, GBOC_PLATFORM, version_string
+        return JSONResponse({
+            "version": GBOC_VERSION,
+            "build": GBOC_BUILD,
+            "edition": GBOC_EDITION,
+            "release_date": GBOC_RELEASE_DATE,
+            "platform": GBOC_PLATFORM,
+            "string": version_string()
+        })
+    except Exception:
+        return JSONResponse({"version": "14.6.0", "build": "stable", "edition": "Enterprise"})
+
 

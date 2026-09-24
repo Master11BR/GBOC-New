@@ -13,18 +13,58 @@ from typing import Dict, Any, List, Optional
 logger = logging.getLogger(__name__)
 
 
+try:
+    from version_control import __version__ as GBOC_VERSION
+except Exception:
+    GBOC_VERSION = "14.7.0"
+
 def _get_core():
     from shared_core import get_shared_core
     return get_shared_core()
 
 
+def _is_sqlite(conn) -> bool:
+    return not hasattr(conn, 'status') and 'sqlite' in type(conn).__module__.lower()
+
+
+def _detect_exec_table(conn) -> str:
+    """Detecta se a tabela disponível é task_executions ou backups."""
+    cur = conn.cursor()
+    try:
+        if _is_sqlite(conn):
+            cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('task_executions', 'backups')")
+            rows = [r[0] for r in cur.fetchall()]
+        else:
+            cur.execute("SELECT table_name FROM information_schema.tables WHERE table_name IN ('task_executions', 'backups')")
+            rows = [r[0] for r in cur.fetchall()]
+        if 'backups' in rows:
+            return 'backups'
+        if 'task_executions' in rows:
+            return 'task_executions'
+    except Exception as e:
+        logger.warning(f"[REPORTS] Falha ao detectar tabela de execuções: {e}")
+    return 'backups'
+
+
 def _query(sql: str, params: tuple = ()) -> List[Dict]:
     core = _get_core()
-    with core.get_db_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(sql, params)
-        cols = [d[0] for d in cursor.description] if cursor.description else []
-        return [dict(zip(cols, row)) for row in cursor.fetchall()]
+    try:
+        with core.get_db_connection() as conn:
+            cursor = conn.cursor()
+            # Ajustar placeholders de bind conforme tipo do banco
+            is_sq = _is_sqlite(conn)
+            adapted_sql = sql
+            if is_sq and "%s" in adapted_sql:
+                adapted_sql = adapted_sql.replace("%s", "?")
+            elif not is_sq and "?" in adapted_sql:
+                adapted_sql = adapted_sql.replace("?", "%s")
+
+            cursor.execute(adapted_sql, params)
+            cols = [d[0] for d in cursor.description] if cursor.description else []
+            return [dict(zip(cols, row)) for row in cursor.fetchall()]
+    except Exception as e:
+        logger.warning(f"[REPORTS] Query falhou: {e!r} | SQL: {sql[:100]}")
+        return []
 
 
 def _query_one(sql: str, params: tuple = ()) -> Optional[Dict]:
@@ -32,20 +72,47 @@ def _query_one(sql: str, params: tuple = ()) -> Optional[Dict]:
     return rows[0] if rows else None
 
 
+def _sqlite_date(days_back: int) -> str:
+    """Retorna string de data ISO para comparação universal segura."""
+    return (datetime.now() - timedelta(days=days_back)).strftime('%Y-%m-%d %H:%M:%S')
+
+
 # ─── Data Collectors ────────────────────────────────────────────────
 
 def collect_summary(days: int = 30) -> Dict[str, Any]:
-    row = _query_one("""
-        SELECT COUNT(*) as total,
-               SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) as ok,
-               SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) as failed,
-               SUM(COALESCE(bytes_processed,0)) as bytes,
-               SUM(COALESCE(files_processed,0)) as files,
-               AVG(CASE WHEN status='completed' THEN duration_seconds END) as avg_dur,
-               MAX(started_at) as last_exec
-        FROM task_executions
-        WHERE started_at >= NOW() - INTERVAL '%s days'
-    """ % int(days))
+    cutoff = _sqlite_date(days)
+    row = None
+    try:
+        core = _get_core()
+        with core.get_db_connection() as conn:
+            tbl = _detect_exec_table(conn)
+            if tbl == 'backups':
+                row = _query_one("""
+                    SELECT COUNT(*) as total,
+                           SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) as ok,
+                           SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) as failed,
+                           SUM(COALESCE(size_bytes,0)) as bytes,
+                           0 as files,
+                           AVG(CASE WHEN status='completed' THEN (julianday(end_time) - julianday(start_time)) * 86400 END) as avg_dur,
+                           MAX(start_time) as last_exec
+                    FROM backups
+                    WHERE start_time >= ?
+                """, (cutoff,))
+            else:
+                row = _query_one("""
+                    SELECT COUNT(*) as total,
+                           SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) as ok,
+                           SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) as failed,
+                           SUM(COALESCE(bytes_processed,0)) as bytes,
+                           SUM(COALESCE(files_processed,0)) as files,
+                           AVG(CASE WHEN status='completed' THEN duration_seconds END) as avg_dur,
+                           MAX(started_at) as last_exec
+                    FROM task_executions
+                    WHERE started_at >= ?
+                """, (cutoff,))
+    except Exception as err:
+        logger.warning(f"[REPORTS] collect_summary falhou: {err}")
+
     total = (row or {}).get('total', 0) or 0
     ok = (row or {}).get('ok', 0) or 0
     return {
@@ -56,81 +123,170 @@ def collect_summary(days: int = 30) -> Dict[str, Any]:
         "success_rate": round(ok / total * 100, 1) if total else 0,
         "total_bytes": (row or {}).get('bytes', 0) or 0,
         "total_files": (row or {}).get('files', 0) or 0,
-        "avg_duration_sec": round((row or {}).get('avg_dur', 0) or 0, 1),
-        "last_execution": str((row or {}).get('last_exec', '')),
+        "avg_duration_sec": round(float((row or {}).get('avg_dur', 0) or 0), 1),
+        "last_execution": str((row or {}).get('last_exec', '') or ''),
     }
 
 
 def collect_tasks_detail(days: int = 30) -> List[Dict]:
-    return _query("""
-        SELECT t.id, t.name, t.engine,
-               COUNT(te.id) as total,
-               SUM(CASE WHEN te.status='completed' THEN 1 ELSE 0 END) as ok,
-               SUM(CASE WHEN te.status='failed' THEN 1 ELSE 0 END) as fail,
-               SUM(COALESCE(te.bytes_processed,0)) as bytes,
-               AVG(CASE WHEN te.status='completed' THEN te.duration_seconds END) as avg_dur,
-               MAX(te.started_at) as last_run
-        FROM tasks t
-        LEFT JOIN task_executions te ON t.id=te.task_id
-            AND te.started_at >= NOW() - INTERVAL '%s days'
-        GROUP BY t.id, t.name, t.engine
-        ORDER BY t.name
-    """ % int(days))
+    cutoff = _sqlite_date(days)
+    try:
+        core = _get_core()
+        with core.get_db_connection() as conn:
+            tbl = _detect_exec_table(conn)
+            if tbl == 'backups':
+                return _query("""
+                    SELECT t.id, t.name, t.engine,
+                           COUNT(b.id) as total,
+                           SUM(CASE WHEN b.status='completed' THEN 1 ELSE 0 END) as ok,
+                           SUM(CASE WHEN b.status='failed' THEN 1 ELSE 0 END) as fail,
+                           SUM(COALESCE(b.size_bytes,0)) as bytes,
+                           AVG(CASE WHEN b.status='completed' THEN (julianday(b.end_time) - julianday(b.start_time)) * 86400 END) as avg_dur,
+                           MAX(b.start_time) as last_run
+                    FROM tasks t
+                    LEFT JOIN backups b ON t.id=b.task_id AND b.start_time >= ?
+                    GROUP BY t.id, t.name, t.engine
+                    ORDER BY t.name
+                """, (cutoff,))
+            else:
+                return _query("""
+                    SELECT t.id, t.name, t.engine,
+                           COUNT(te.id) as total,
+                           SUM(CASE WHEN te.status='completed' THEN 1 ELSE 0 END) as ok,
+                           SUM(CASE WHEN te.status='failed' THEN 1 ELSE 0 END) as fail,
+                           SUM(COALESCE(te.bytes_processed,0)) as bytes,
+                           AVG(CASE WHEN te.status='completed' THEN te.duration_seconds END) as avg_dur,
+                           MAX(te.started_at) as last_run
+                    FROM tasks t
+                    LEFT JOIN task_executions te ON t.id=te.task_id AND te.started_at >= ?
+                    GROUP BY t.id, t.name, t.engine
+                    ORDER BY t.name
+                """, (cutoff,))
+    except Exception as err:
+        logger.warning(f"[REPORTS] collect_tasks_detail falhou: {err}")
+        return []
 
 
 def collect_daily_trend(days: int = 30) -> List[Dict]:
-    return _query("""
-        SELECT DATE(started_at) as day,
-               COUNT(*) as total,
-               SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) as ok,
-               SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) as fail
-        FROM task_executions
-        WHERE started_at >= NOW() - INTERVAL '%s days'
-        GROUP BY DATE(started_at)
-        ORDER BY day
-    """ % int(days))
+    cutoff = _sqlite_date(days)
+    try:
+        core = _get_core()
+        with core.get_db_connection() as conn:
+            tbl = _detect_exec_table(conn)
+            date_col = "start_time" if tbl == 'backups' else "started_at"
+            return _query(f"""
+                SELECT DATE({date_col}) as day,
+                       COUNT(*) as total,
+                       SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) as ok,
+                       SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) as fail
+                FROM {tbl}
+                WHERE {date_col} >= ?
+                GROUP BY DATE({date_col})
+                ORDER BY day
+            """, (cutoff,))
+    except Exception as err:
+        logger.warning(f"[REPORTS] collect_daily_trend falhou: {err}")
+        return []
 
 
 def collect_engine_comparison(days: int = 30) -> List[Dict]:
-    return _query("""
-        SELECT t.engine,
-               COUNT(te.id) as total,
-               SUM(CASE WHEN te.status='completed' THEN 1 ELSE 0 END) as ok,
-               SUM(COALESCE(te.bytes_processed,0)) as bytes,
-               AVG(CASE WHEN te.status='completed' THEN te.duration_seconds END) as avg_dur
-        FROM tasks t
-        LEFT JOIN task_executions te ON t.id=te.task_id
-            AND te.started_at >= NOW() - INTERVAL '%s days'
-        GROUP BY t.engine
-        ORDER BY t.engine
-    """ % int(days))
+    cutoff = _sqlite_date(days)
+    try:
+        core = _get_core()
+        with core.get_db_connection() as conn:
+            tbl = _detect_exec_table(conn)
+            if tbl == 'backups':
+                return _query("""
+                    SELECT t.engine,
+                           COUNT(b.id) as total,
+                           SUM(CASE WHEN b.status='completed' THEN 1 ELSE 0 END) as ok,
+                           SUM(COALESCE(b.size_bytes,0)) as bytes,
+                           AVG(CASE WHEN b.status='completed' THEN (julianday(b.end_time) - julianday(b.start_time)) * 86400 END) as avg_dur
+                    FROM tasks t
+                    LEFT JOIN backups b ON t.id=b.task_id AND b.start_time >= ?
+                    GROUP BY t.engine
+                    ORDER BY t.engine
+                """, (cutoff,))
+            else:
+                return _query("""
+                    SELECT t.engine,
+                           COUNT(te.id) as total,
+                           SUM(CASE WHEN te.status='completed' THEN 1 ELSE 0 END) as ok,
+                           SUM(COALESCE(te.bytes_processed,0)) as bytes,
+                           AVG(CASE WHEN te.status='completed' THEN te.duration_seconds END) as avg_dur
+                    FROM tasks t
+                    LEFT JOIN task_executions te ON t.id=te.task_id AND te.started_at >= ?
+                    GROUP BY t.engine
+                    ORDER BY t.engine
+                """, (cutoff,))
+    except Exception as err:
+        logger.warning(f"[REPORTS] collect_engine_comparison falhou: {err}")
+        return []
 
 
 def collect_errors(days: int = 30, limit: int = 20) -> List[Dict]:
-    return _query("""
-        SELECT te.error_message, t.name as task_name, t.engine,
-               te.started_at, te.status
-        FROM task_executions te
-        JOIN tasks t ON te.task_id=t.id
-        WHERE te.status='failed'
-          AND te.started_at >= NOW() - INTERVAL '%s days'
-        ORDER BY te.started_at DESC
-        LIMIT %s
-    """ % (int(days), int(limit)))
+    cutoff = _sqlite_date(days)
+    try:
+        core = _get_core()
+        with core.get_db_connection() as conn:
+            tbl = _detect_exec_table(conn)
+            if tbl == 'backups':
+                return _query("""
+                    SELECT b.error_message, t.name as task_name, t.engine,
+                           b.start_time as started_at, b.status
+                    FROM backups b
+                    JOIN tasks t ON b.task_id=t.id
+                    WHERE b.status='failed' AND b.start_time >= ?
+                    ORDER BY b.start_time DESC
+                    LIMIT ?
+                """, (cutoff, int(limit)))
+            else:
+                return _query("""
+                    SELECT te.error_message, t.name as task_name, t.engine,
+                           te.started_at, te.status
+                    FROM task_executions te
+                    JOIN tasks t ON te.task_id=t.id
+                    WHERE te.status='failed' AND te.started_at >= ?
+                    ORDER BY te.started_at DESC
+                    LIMIT ?
+                """, (cutoff, int(limit)))
+    except Exception as err:
+        logger.warning(f"[REPORTS] collect_errors falhou: {err}")
+        return []
 
 
-def collect_sla() -> List[Dict]:
-    rows = _query("""
-        SELECT t.id, t.name, t.engine,
-               COUNT(te.id) as total_30d,
-               SUM(CASE WHEN te.status='completed' THEN 1 ELSE 0 END) as ok_30d,
-               MAX(CASE WHEN te.status='completed' THEN te.started_at END) as last_success,
-               MAX(CASE WHEN te.status='failed' THEN te.started_at END) as last_failure
-        FROM tasks t
-        LEFT JOIN task_executions te ON t.id=te.task_id
-            AND te.started_at >= NOW() - INTERVAL '30 days'
-        GROUP BY t.id, t.name, t.engine
-    """)
+def collect_sla(days: int = 30) -> List[Dict]:
+    cutoff = _sqlite_date(days)
+    rows = []
+    try:
+        core = _get_core()
+        with core.get_db_connection() as conn:
+            tbl = _detect_exec_table(conn)
+            if tbl == 'backups':
+                rows = _query("""
+                    SELECT t.id, t.name, t.engine,
+                           COUNT(b.id) as total_30d,
+                           SUM(CASE WHEN b.status='completed' THEN 1 ELSE 0 END) as ok_30d,
+                           MAX(CASE WHEN b.status='completed' THEN b.start_time END) as last_success,
+                           MAX(CASE WHEN b.status='failed' THEN b.start_time END) as last_failure
+                    FROM tasks t
+                    LEFT JOIN backups b ON t.id=b.task_id AND b.start_time >= ?
+                    GROUP BY t.id, t.name, t.engine
+                """, (cutoff,))
+            else:
+                rows = _query("""
+                    SELECT t.id, t.name, t.engine,
+                           COUNT(te.id) as total_30d,
+                           SUM(CASE WHEN te.status='completed' THEN 1 ELSE 0 END) as ok_30d,
+                           MAX(CASE WHEN te.status='completed' THEN te.started_at END) as last_success,
+                           MAX(CASE WHEN te.status='failed' THEN te.started_at END) as last_failure
+                    FROM tasks t
+                    LEFT JOIN task_executions te ON t.id=te.task_id AND te.started_at >= ?
+                    GROUP BY t.id, t.name, t.engine
+                """, (cutoff,))
+    except Exception as err:
+        logger.warning(f"[REPORTS] collect_sla falhou: {err}")
+
     for r in rows:
         total = r.get('total_30d', 0) or 0
         ok = r.get('ok_30d', 0) or 0
@@ -487,7 +643,7 @@ def generate_executive_summary(days: int = 30) -> str:
 
     html += f"""
 <div class="footer">
-  GBOC Agent 14.6.0 — Relatório gerado automaticamente em {now.strftime('%d/%m/%Y %H:%M:%S')}
+  GBOC Agent v{GBOC_VERSION} — Relatório gerado automaticamente em {now.strftime('%d/%m/%Y %H:%M:%S')}
 </div>
 </div></body></html>"""
     return html
@@ -524,7 +680,7 @@ def generate_sla_report(days: int = 30) -> str:
         <td>{_fmt_date(s.get('last_success'))}</td><td>{_fmt_date(s.get('last_failure'))}</td></tr>"""
 
     html += f"""</tbody></table></div>
-<div class="footer">GBOC Agent 14.6.0 — Relatório SLA gerado em {now.strftime('%d/%m/%Y %H:%M:%S')}</div>
+<div class="footer">GBOC Agent v{GBOC_VERSION} — Relatório SLA gerado em {now.strftime('%d/%m/%Y %H:%M:%S')}</div>
 </div></body></html>"""
     return html
 
@@ -537,10 +693,21 @@ def generate_capacity_report() -> str:
     now = datetime.now()
 
     # Simple growth estimation
-    total_bytes_recent = sum(r.get('total', 0) or 0 for r in _query("""
-        SELECT SUM(bytes_processed) as total FROM task_executions
-        WHERE started_at >= NOW() - INTERVAL '30 days' AND status='completed'
-    """))
+    cutoff_30 = _sqlite_date(30)
+    total_bytes_recent = 0
+    try:
+        core = _get_core()
+        with core.get_db_connection() as conn:
+            tbl = _detect_exec_table(conn)
+            if tbl == 'backups':
+                row_b = _query_one("SELECT SUM(size_bytes) as total FROM backups WHERE start_time >= ? AND status='completed'", (cutoff_30,))
+                total_bytes_recent = (row_b or {}).get('total', 0) or 0
+            else:
+                row_b = _query_one("SELECT SUM(bytes_processed) as total FROM task_executions WHERE started_at >= ? AND status='completed'", (cutoff_30,))
+                total_bytes_recent = (row_b or {}).get('total', 0) or 0
+    except Exception as err:
+        logger.warning(f"[REPORTS] Falha no cálculo de crescimento: {err}")
+        total_bytes_recent = 0
     daily_growth_gb = round((total_bytes_recent or 0) / (1024**3) / 30, 2)
     days_until_full = int(capacity['free_gb'] / daily_growth_gb) if daily_growth_gb > 0 else None
 
@@ -579,7 +746,7 @@ def generate_capacity_report() -> str:
         <td><span class="badge {st}">{r['status']}</span></td><td>{r.get('task_count',0)}</td></tr>"""
 
     html += f"""</tbody></table></div>
-<div class="footer">GBOC Agent 14.6.0 — Relatório de Capacidade gerado em {now.strftime('%d/%m/%Y %H:%M:%S')}</div>
+<div class="footer">GBOC Agent v{GBOC_VERSION} — Relatório de Capacidade gerado em {now.strftime('%d/%m/%Y %H:%M:%S')}</div>
 </div></body></html>"""
     return html
 
@@ -621,7 +788,7 @@ def generate_error_report(days: int = 30) -> str:
             </div>"""
         html += "</div>"
 
-    html += f"""<div class="footer">GBOC Agent 14.6.0 — Relatório de Erros gerado em {now.strftime('%d/%m/%Y %H:%M:%S')}</div>
+    html += f"""<div class="footer">GBOC Agent v{GBOC_VERSION} — Relatório de Erros gerado em {now.strftime('%d/%m/%Y %H:%M:%S')}</div>
 </div></body></html>"""
     return html
 

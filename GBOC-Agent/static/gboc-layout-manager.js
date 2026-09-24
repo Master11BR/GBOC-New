@@ -631,5 +631,103 @@ Zero-Overflow & Smart Sidebar Presence Detection.
         _bootstrap();
     }
 
+    // ── Global Shutdown Handler ───────────────────────────────────────────────
+    window.gbocConfirmShutdown = async function (target) {
+        if (!target) {
+            const isAgent = window.location.port === '9200' ||
+                            window.location.port === '8081' ||
+                            window.location.pathname.includes('/settings.html') ||
+                            window.location.pathname.includes('/diagnostic.html') ||
+                            window.location.pathname.includes('/reports.html') ||
+                            window.location.pathname.includes('/restore.html') ||
+                            window.location.pathname.includes('/tasks.html') ||
+                            window.location.pathname.includes('/ransomware.html') ||
+                            window.location.pathname.includes('/storage-usage.html');
+            target = isAgent ? 'agent' : 'server';
+        }
+
+        const isServer = target === 'server';
+        const title = isServer ? 'Desligar Servidor Central GBOC' : 'Desligar Agente GBOC';
+        const entityName = isServer ? 'Servidor Central' : 'Agente';
+        const message = isServer
+            ? 'Tem certeza de que deseja desligar o Servidor Central GBOC? A central de monitoramento, painéis web e a recepção de telemetria dos agentes serão interrompidos.'
+            : 'Tem certeza de que deseja desligar o GBOC Agent? Todos os processos de monitoramento, proteção em tempo real e rotinas de backup locais serão interrompidos.';
+
+        let confirmed = false;
+        if (window.GBOCModal && typeof window.GBOCModal.confirm === 'function') {
+            confirmed = await window.GBOCModal.confirm({
+                title: title,
+                message: message,
+                type: 'danger',
+                danger: true,
+                icon: 'fas fa-power-off',
+                confirmText: `Sim, Desligar ${entityName}`,
+                cancelText: 'Cancelar',
+                badge: 'Controle de Processo'
+            });
+        } else {
+            confirmed = window.confirm(`[GBOC] ${title}\n\n${message}\n\nPressione OK para confirmar o desligamento.`);
+        }
+
+        if (!confirmed) return;
+
+        // Visual shutdown overlay
+        const overlay = document.createElement('div');
+        overlay.id = 'gboc-shutdown-overlay';
+        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(15,23,42,0.96);backdrop-filter:blur(10px);z-index:9999999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;text-align:center;padding:24px;box-sizing:border-box;';
+        overlay.innerHTML = `
+            <div style="width:76px;height:76px;border-radius:50%;background:rgba(239,68,68,0.18);border:2px solid #ef4444;display:flex;align-items:center;justify-content:center;margin-bottom:20px;font-size:34px;color:#ef4444;">
+                <i class="fas fa-power-off"></i>
+            </div>
+            <h2 style="font-size:24px;margin:0 0 10px 0;font-weight:700;letter-spacing:-0.5px;">Encerrando ${entityName}...</h2>
+            <p style="font-size:15px;color:#94a3b8;max-width:500px;margin:0 0 24px 0;line-height:1.6;" id="gboc-shutdown-msg">
+                Os serviços estão sendo finalizados graciosamente. Aguarde um instante...
+            </p>
+            <div style="display:flex;align-items:center;gap:10px;font-size:14px;color:#cbd5e1;" id="gboc-shutdown-spinner">
+                <i class="fas fa-circle-notch fa-spin" style="color:var(--primary,#6366f1);"></i> Finalizando processos do sistema...
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        const apiBase = (window.GBOC_API_BASE || '').replace(/\/+$/, '');
+        const endpoints = [
+            `${apiBase}/api/v1/system/shutdown`,
+            `${apiBase}/api/system/shutdown`,
+            '/api/v1/system/shutdown',
+            '/api/system/shutdown'
+        ];
+
+        let reqSent = false;
+        for (const ep of endpoints) {
+            try {
+                const resp = await fetch(ep, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include'
+                });
+                if (resp.ok || resp.status === 200 || resp.status === 401 || resp.status === 403) {
+                    reqSent = true;
+                    break;
+                }
+            } catch (err) {
+                // Se a conexao cair porque o processo morreu de imediato, ja eh o resultado esperado
+                reqSent = true;
+                break;
+            }
+        }
+
+        const msgEl = document.getElementById('gboc-shutdown-msg');
+        const spinnerEl = document.getElementById('gboc-shutdown-spinner');
+        if (msgEl) {
+            msgEl.innerHTML = `<strong>${entityName} foi desligado com sucesso.</strong><br>O processo foi finalizado. Você já pode fechar esta aba com segurança.`;
+            msgEl.style.color = '#34d399';
+        }
+        if (spinnerEl) {
+            spinnerEl.innerHTML = '<i class="fas fa-check-circle" style="color:#10b981;font-size:18px;"></i> Processo encerrado com sucesso';
+            spinnerEl.style.color = '#94a3b8';
+        }
+    };
+    window.gbocShutdownSystem = window.gbocConfirmShutdown;
+
     console.log('[GBOCLayout] ✅ Motor de Layout Ativo (Zero-Overflow) — Layout:', _currentLayout, '| Tema:', _currentColorTheme, '| Style:', _currentUiStyle);
 })();

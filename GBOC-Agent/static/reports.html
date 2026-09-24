@@ -71,32 +71,69 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             color: var(--text-muted);
         }
 
-        .cat-filters {
-            display: flex;
-            gap: 6px;
-            overflow-x: auto;
-            padding-bottom: 8px;
+        .cat-select-wrapper {
+            position: relative;
             margin-bottom: 12px;
-            scrollbar-width: none;
         }
 
-        .cat-chip {
-            padding: 5px 12px;
-            border-radius: 20px;
+        .cat-select-wrapper i.filter-icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 0.85em;
+            pointer-events: none;
+            transition: color 0.2s;
+        }
+
+        .cat-select-wrapper select {
+            width: 100%;
+            padding: 9px 34px 9px 34px;
+            border-radius: 8px;
             background: var(--bg-input);
             border: 1px solid var(--border);
-            font-size: 0.78em;
-            color: var(--text-muted);
+            color: var(--text);
+            font-size: 0.85em;
+            font-weight: 500;
+            outline: none;
+            box-sizing: border-box;
             cursor: pointer;
-            white-space: nowrap;
-            transition: all .2s;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
         }
 
-        .cat-chip:hover,
-        .cat-chip.active {
-            background: var(--primary);
-            color: #fff;
+        .cat-select-wrapper select:focus {
             border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(99,102,241,0.15);
+        }
+
+        .cat-select-wrapper select:hover {
+            border-color: var(--border-hover, var(--primary));
+        }
+
+        .cat-select-wrapper select:focus + .select-chevron,
+        .cat-select-wrapper select:hover + .select-chevron {
+            color: var(--primary);
+        }
+
+        .cat-select-wrapper select option {
+            background: var(--bg-card, #1e293b);
+            color: var(--text, #f8fafc);
+            padding: 8px 10px;
+        }
+
+        .cat-select-wrapper .select-chevron {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 0.75em;
+            pointer-events: none;
+            transition: color 0.2s;
         }
 
         .reports-list {
@@ -486,14 +523,18 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                                     onkeyup="filterReports()">
                             </div>
 
-                            <div class="cat-filters" id="categoryChips">
-                                <span class="cat-chip active" onclick="setCategoryFilter('ALL', this)">Todos (50)</span>
-                                <span class="cat-chip" onclick="setCategoryFilter('Executive', this)">Executivos</span>
-                                <span class="cat-chip" onclick="setCategoryFilter('Performance', this)">Performance</span>
-                                <span class="cat-chip" onclick="setCategoryFilter('Storage', this)">Storage</span>
-                                <span class="cat-chip" onclick="setCategoryFilter('Security', this)">Segurança</span>
-                                <span class="cat-chip" onclick="setCategoryFilter('AI Predictive', this)">IA Preditiva</span>
-                                <span class="cat-chip" onclick="setCategoryFilter('AI Executive', this)">IA Executiva</span>
+                            <div class="cat-select-wrapper">
+                                <i class="fas fa-filter filter-icon"></i>
+                                <select id="reportCategorySelect" onchange="setCategoryFilter(this.value)">
+                                    <option value="ALL">📁 Todas as Categorias (50 relatórios)</option>
+                                    <option value="Executive">👔 Executivos</option>
+                                    <option value="Performance">⚡ Performance</option>
+                                    <option value="Storage">💾 Storage</option>
+                                    <option value="Security">🛡️ Segurança</option>
+                                    <option value="AI Predictive">🤖 IA Preditiva</option>
+                                    <option value="AI Executive">🧠 IA Executiva</option>
+                                </select>
+                                <i class="fas fa-chevron-down select-chevron"></i>
                             </div>
 
                             <div class="reports-list" id="reportsList">
@@ -614,12 +655,13 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 
             const iconMap = {
                 'REP-F1': 'fa-shield-halved',
-                'REP-F2': 'fa-biohazard',
+                'REP-F2': 'fa-gauge-high',
                 'REP-F3': 'fa-hard-drive',
-                'REP-F4': 'fa-scale-balanced',
-                'REP-F5': 'fa-gauge-high',
-                'REP-F6': 'fa-coins',
-                'REP-F7': 'fa-truck-medical'
+                'REP-F4': 'fa-biohazard',
+                'REP-F5': 'fa-scale-balanced',
+                'REP-F6': 'fa-brain',
+                'REP-F7': 'fa-coins',
+                'REP-F8': 'fa-truck-medical'
             };
 
             grid.innerHTML = agentFlagships.map(f => {
@@ -719,9 +761,11 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         }
 
         function setCategoryFilter(cat, element) {
-            currentCategory = cat;
-            document.querySelectorAll('.cat-chip').forEach(el => el.classList.remove('active'));
-            if (element) element.classList.add('active');
+            currentCategory = cat || 'ALL';
+            const sel = document.getElementById('reportCategorySelect');
+            if (sel && sel.value !== currentCategory) {
+                sel.value = currentCategory;
+            }
             renderReports();
         }
 
@@ -749,33 +793,73 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         `;
         }
 
+        function showReportLoading() {
+            const body = document.getElementById('viewerBody');
+            body.innerHTML = `
+                <div class="report-skeleton" style="padding:15px;">
+                    <div style="height:26px;width:45%;background:var(--bg-input);border-radius:6px;margin-bottom:14px;opacity:0.6;"></div>
+                    <div style="height:60px;background:var(--bg-input);border-radius:8px;margin-bottom:14px;opacity:0.6;"></div>
+                    <div class="sk-kpi-row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px;">
+                        <div style="height:80px;background:var(--bg-input);border-radius:8px;opacity:0.6;"></div>
+                        <div style="height:80px;background:var(--bg-input);border-radius:8px;opacity:0.6;"></div>
+                        <div style="height:80px;background:var(--bg-input);border-radius:8px;opacity:0.6;"></div>
+                        <div style="height:80px;background:var(--bg-input);border-radius:8px;opacity:0.6;"></div>
+                    </div>
+                    <div style="height:160px;background:var(--bg-input);border-radius:8px;opacity:0.6;"></div>
+                    <p style="text-align:center;margin-top:14px;color:var(--text-muted);font-size:0.88em;"><i class="fas fa-spinner fa-spin"></i> Processando dados e compilando auditoria...</p>
+                </div>
+            `;
+        }
+
         async function runCurrentSelectedReport() {
             if (!selectedReportId) return;
             const body = document.getElementById('viewerBody');
-            body.innerHTML = '<div style="text-align:center;padding:50px"><i class="fas fa-spinner fa-spin fa-2x" style="color:var(--primary)"></i><p style="margin-top:12px;color:var(--text-muted)">Processando dados e consultando IA GBOC...</p></div>';
+            const btnRun = document.getElementById('btnRunCurrent');
+            if (!body) return;
+
+            showReportLoading();
+            if (btnRun) {
+                btnRun.disabled = true;
+                btnRun.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gerando...';
+            }
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000);
 
             try {
-                let r = await fetch('/api/reports/generate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ report_id: selectedReportId })
-                });
-                if (!r.ok) {
+                let r = null;
+                try {
+                    r = await fetch('/api/reports/generate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ report_id: selectedReportId }),
+                        signal: controller.signal
+                    });
+                } catch (err1) {
+                    if (err1.name === 'AbortError') throw err1;
+                }
+
+                if (!r || !r.ok) {
                     r = await fetch((window.GBOC_API_BASE || '') + '/api/v1/reports/generate', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ report_id: selectedReportId })
+                        body: JSON.stringify({ report_id: selectedReportId }),
+                        signal: controller.signal
                     });
                 }
+                clearTimeout(timeoutId);
                 const data = await r.json();
 
                 if (!data || data.status === 'error' || (!data.title && !data.code)) {
                     throw new Error((data && (data.message || data.detail || data.reason)) || 'Erro ao comunicar com a engine do agente.');
                 }
 
-                document.getElementById('btnPrint').disabled = false;
-                document.getElementById('btnCsv').disabled = false;
-                document.getElementById('btnJson').disabled = false;
+                const btnPrint = document.getElementById('btnPrint');
+                const btnCsv = document.getElementById('btnCsv');
+                const btnJson = document.getElementById('btnJson');
+                if (btnPrint) btnPrint.disabled = false;
+                if (btnCsv) btnCsv.disabled = false;
+                if (btnJson) btnJson.disabled = false;
 
                 if (data.status === 'unavailable') {
                     body.innerHTML = `
@@ -793,19 +877,34 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 if (data.score) {
                     const sc = data.score;
                     const scColor = sc.status === 'OK' ? '#10b981' : (sc.status === 'AT_RISK' ? '#f59e0b' : '#ef4444');
+                    let breakdownHtml = '';
+                    if (sc.breakdown) {
+                        breakdownHtml = `
+                            <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;font-size:0.75em;color:var(--text-muted)">
+                                ${Object.entries(sc.breakdown).map(([k, v]) => `
+                                    <span style="background:var(--bg-card);padding:2px 8px;border-radius:4px;border:1px solid var(--border)">
+                                        ${k.replace('_', ' ')}: <strong>${v.value}%</strong> (peso ${v.weight}%)
+                                    </span>
+                                `).join('')}
+                            </div>
+                        `;
+                    }
                     scoreHtml = `
-                        <div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg-input);border:1.5px solid var(--border);border-left:5px solid ${scColor};border-radius:8px;padding:12px 18px;margin-bottom:16px;">
-                            <div style="display:flex;align-items:center;gap:16px;">
-                                <div style="font-size:2em;font-weight:800;color:${scColor};">${sc.value}<span style="font-size:0.5em;color:var(--text-muted)">/100</span></div>
-                                <div>
-                                    <div style="font-weight:700;font-size:0.95em;color:var(--text);">Protection & Operations Score</div>
-                                    <div style="font-size:0.78em;color:var(--text-muted);">Tendência: <strong>${sc.trend}pp</strong> vs período anterior • Status: <span class="badge" style="background:${scColor};color:#fff;font-size:0.8em;padding:2px 6px;border-radius:4px;">${sc.status}</span></div>
+                        <div style="background:var(--bg-input);border:1.5px solid var(--border);border-left:5px solid ${scColor};border-radius:8px;padding:12px 18px;margin-bottom:16px;">
+                            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+                                <div style="display:flex;align-items:center;gap:16px;">
+                                    <div style="font-size:2em;font-weight:800;color:${scColor};">${sc.value}<span style="font-size:0.5em;color:var(--text-muted)">/100</span></div>
+                                    <div>
+                                        <div style="font-weight:700;font-size:0.95em;color:var(--text);">Protection & Operations Score</div>
+                                        <div style="font-size:0.78em;color:var(--text-muted);">Tendência: <strong>${sc.trend || '0'}pp</strong> vs período anterior • Status: <span class="badge" style="background:${scColor};color:#fff;font-size:0.8em;padding:2px 6px;border-radius:4px;">${sc.status}</span></div>
+                                    </div>
+                                </div>
+                                <div style="font-size:0.75em;color:var(--text-muted);text-align:right;">
+                                    <div>GBOC Engine v4.0</div>
+                                    <code>${data.schema_version || '4.0.0'}</code>
                                 </div>
                             </div>
-                            <div style="font-size:0.75em;color:var(--text-muted);text-align:right;">
-                                <div>GBOC Engine v3.0</div>
-                                <code>${data.schema_version || '3.0.0'}</code>
-                            </div>
+                            ${breakdownHtml}
                         </div>
                     `;
                 }
@@ -871,9 +970,12 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                     const acts = data.recommended_actions.map(act => {
                         const p = String(act.priority || 'MEDIUM').toUpperCase();
                         return `
-                            <div class="action-item action-${p.toLowerCase()}">
-                                <span class="action-badge">${p}</span>
-                                <span class="action-text">${act.action}</span>
+                            <div class="action-item action-${p.toLowerCase()}" style="margin-bottom:8px;padding:8px 12px;border-radius:6px;border-left:3px solid ${p === 'HIGH' ? 'var(--danger)' : (p === 'MEDIUM' ? 'var(--warning)' : 'var(--success)')};background:var(--bg-input)">
+                                <div style="display:flex;align-items:center;gap:8px">
+                                    <span class="action-badge" style="font-size:0.7em;padding:2px 6px;border-radius:4px;font-weight:700;background:${p === 'HIGH' ? 'var(--danger)' : (p === 'MEDIUM' ? 'var(--warning)' : 'var(--success)')};color:#fff">${p}</span>
+                                    <strong style="font-size:0.88em">${act.action}</strong>
+                                </div>
+                                ${act.detail ? `<div style="font-size:0.8em;color:var(--text-muted);margin-top:4px">${act.detail}</div>` : ''}
                             </div>
                         `;
                     }).join('');
@@ -891,7 +993,8 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                     </div>
                     <div style="text-align:right;font-size:0.8em;color:var(--text-muted)">
                         <div>Data: <strong>${new Date(data.generated_at || Date.now()).toLocaleString()}</strong></div>
-                        <div>Plataforma: <strong>GBOC Agent v14.7.0</strong></div>
+                        <div>Plataforma: <strong>GBOC Agent v14.6.0 Enterprise</strong></div>
+                        ${data.integrity_hash ? `<div>Hash: <code style="font-size:0.85em">${data.integrity_hash.slice(0, 19)}...</code></div>` : ''}
                     </div>
                 </div>
 
@@ -912,7 +1015,26 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 ${actionsHtml}
             `;
             } catch (e) {
-                body.innerHTML = `<p style="color:var(--danger);padding:20px;text-align:center">Erro ao gerar relatório: ${e.message}</p>`;
+                clearTimeout(timeoutId);
+                if (body) {
+                    const isAbort = e.name === 'AbortError';
+                    const msg = isAbort 
+                        ? 'Tempo limite de geração excedido (30s). A engine do agente pode estar ocupada ou processando grande volume de telemetria.'
+                        : `Erro ao gerar relatório: ${e.message}`;
+                    body.innerHTML = `
+                        <div style="background:rgba(239,68,68,0.08);border:1.5px solid rgba(239,68,68,0.25);border-radius:8px;padding:24px;text-align:center;margin:20px">
+                            <h4 style="color:var(--danger);margin:0 0 8px;font-size:1.1em"><i class="fas fa-circle-exclamation"></i> Falha na Extração dos Dados</h4>
+                            <p style="color:var(--text);font-size:0.92em;margin:0 0 16px;max-width:550px;margin-left:auto;margin-right:auto">${msg}</p>
+                            <button class="btn btn-primary" onclick="runCurrentSelectedReport()" style="padding:8px 20px;font-size:0.9em"><i class="fas fa-rotate"></i> Tentar Novamente</button>
+                        </div>
+                    `;
+                }
+            } finally {
+                clearTimeout(timeoutId);
+                if (btnRun) {
+                    btnRun.disabled = false;
+                    btnRun.innerHTML = '<i class="fas fa-play"></i> Gerar Agora';
+                }
             }
         }
 

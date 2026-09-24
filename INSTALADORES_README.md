@@ -1,6 +1,6 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.6.0 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.7.0 Enterprise. Todos os direitos reservados. -->
 
-# 📦 GBOC System v14.6.0 Enterprise — Guia Oficial de Instaladores & Implantação
+# 📦 GBOC System v14.7.0 Enterprise — Guia Oficial de Instaladores & Implantação
 
 Este guia detalha a instalação e implantação do **GBOC Server (Servidor Central)** e do **GBOC Agent (Agente Local e Remoto LAN)**.
 

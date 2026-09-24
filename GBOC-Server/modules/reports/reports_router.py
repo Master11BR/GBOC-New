@@ -1908,11 +1908,12 @@ async def get_report_schedules():
 
 
 # =====================================================================
-# GBOC v2.0 FLAGSHIP REPORTS (7 Relatórios Executivos de Mercado)
+# GBOC v4.0 FLAGSHIP REPORTS (8 Relatórios Executivos de Mercado)
 # =====================================================================
 
 try:
     from modules.reports.flagship_reports import (
+        FLAGSHIPS_CATALOG_8,
         FLAGSHIPS_CATALOG_7,
         build_flagship_report_server,
         render_flagship_html,
@@ -1920,6 +1921,7 @@ try:
     )
 except ImportError:
     from flagship_reports import (
+        FLAGSHIPS_CATALOG_8,
         FLAGSHIPS_CATALOG_7,
         build_flagship_report_server,
         render_flagship_html,
@@ -1929,13 +1931,13 @@ except ImportError:
 
 @router.get("/flagships")
 async def list_flagship_reports():
-    """Retorna o catálogo dos 7 relatórios flagship executivos da Arquitetura v2.0."""
+    """Retorna o catálogo dos 8 relatórios flagship executivos da Arquitetura v4.0."""
     return JSONResponse({
         "status": "success",
-        "version": "2.0.0",
+        "schema_version": "4.0.0",
         "platform": f"GBOC Server v{SERVER_VERSION}",
-        "count": len(FLAGSHIPS_CATALOG_7),
-        "flagships": FLAGSHIPS_CATALOG_7
+        "count": len(FLAGSHIPS_CATALOG_8),
+        "flagships": FLAGSHIPS_CATALOG_8
     })
 
 
@@ -1945,9 +1947,9 @@ async def get_flagship_report_endpoint(
     format: str = Query("html", pattern="^(html|pdf|csv|json)$"),
     print: Optional[str] = Query(None)
 ):
-    """Gera e retorna um dos 7 relatórios flagship no formato requisitado (html, pdf, csv, json)."""
+    """Gera e retorna um dos 8 relatórios flagship no formato requisitado (html, pdf, csv, json)."""
     fid = flagship_id.upper().strip()
-    valid_ids = [f["id"] for f in FLAGSHIPS_CATALOG_7]
+    valid_ids = [f["id"] for f in FLAGSHIPS_CATALOG_8]
     if fid not in valid_ids:
         raise HTTPException(
             status_code=404,

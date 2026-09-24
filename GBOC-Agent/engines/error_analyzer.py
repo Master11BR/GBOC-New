@@ -170,17 +170,29 @@ class ErrorAnalyzer:
         
         return diagnosis
     
+    def _get_exec_table(self) -> str:
+        try:
+            cur = self.db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('task_executions', 'backups')")
+            names = [r[0] for r in cur.fetchall()]
+            if 'backups' in names:
+                return 'backups'
+        except Exception:
+            pass
+        return 'task_executions'
+
     def analyze_task_failures(self, task_id: int) -> Dict[str, Any]:
         """
         Analisa histórico de falhas de uma tarefa
         """
         try:
+            tbl = self._get_exec_table()
+            time_col = "end_time" if tbl == "backups" else "completed_at"
             # Buscar execuções com falha
-            cursor = self.db.execute("""
-                SELECT error_message, completed_at
-                FROM task_executions
+            cursor = self.db.execute(f"""
+                SELECT error_message, {time_col}
+                FROM {tbl}
                 WHERE task_id = ? AND status = 'failed'
-                ORDER BY completed_at DESC
+                ORDER BY {time_col} DESC
                 LIMIT 10
             """, (task_id,))
             
@@ -272,12 +284,16 @@ class ErrorAnalyzer:
                 'recommendations': []
             }
             
+            tbl = self._get_exec_table()
+            time_col = "start_time" if tbl == "backups" else "completed_at"
+            ok_val = "'completed'" if tbl == "backups" else "'success'"
+
             # 1. Verificar tarefas com falhas recentes
-            cursor = self.db.execute("""
+            cursor = self.db.execute(f"""
                 SELECT task_id, COUNT(*) as failures
-                FROM task_executions
+                FROM {tbl}
                 WHERE status = 'failed' 
-                    AND completed_at > datetime('now', '-7 days')
+                    AND {time_col} > datetime('now', '-7 days')
                 GROUP BY task_id
                 HAVING failures > 2
             """)
@@ -294,13 +310,13 @@ class ErrorAnalyzer:
             # TODO: Adicionar verificação de conectividade
             
             # 3. Estatísticas gerais
-            stats_cursor = self.db.execute("""
+            stats_cursor = self.db.execute(f"""
                 SELECT 
                     COUNT(*) as total_executions,
-                    SUM(CASE WHEN status='success' THEN 1 ELSE 0 END) as successes,
+                    SUM(CASE WHEN status={ok_val} THEN 1 ELSE 0 END) as successes,
                     SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) as failures
-                FROM task_executions
-                WHERE completed_at > datetime('now', '-30 days')
+                FROM {tbl}
+                WHERE {time_col} > datetime('now', '-30 days')
             """)
             
             stats = stats_cursor.fetchone()
