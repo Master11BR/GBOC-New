@@ -519,6 +519,163 @@ body {
     transform: var(--btn-transform-active) !important;
 }
 
+/* ── Dynamic Menu Button Style Adaptation (User Master Standard) ───────── */
+/* In all 8 styles, the button format morphs to the active component style,
+   while strictly preserving and illuminating the left accent detail pill. */
+
+/* Style 1: Minimal */
+[data-ui-style="minimal"] .sidebar .nav-link {
+    border-radius: var(--btn-radius, 6px) !important;
+}
+[data-ui-style="minimal"] .sidebar .nav-link.active,
+[data-ui-style="minimal"] .sidebar .nav-link.in-focus {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+    box-shadow: var(--btn-shadow, 0 1px 3px rgba(0, 0, 0, 0.2)) !important;
+}
+
+/* Style 2: Neumorphism (Soft Embossed Surface) */
+[data-ui-style="neumorphism"] .sidebar .nav-link {
+    border-radius: var(--btn-radius, 12px) !important;
+    background: var(--nm-bg) !important;
+    box-shadow: 3px 3px 7px var(--nm-shadow-dark), -3px -3px 7px var(--nm-shadow-light) !important;
+    border: none !important;
+}
+[data-ui-style="neumorphism"] .sidebar .nav-link:hover {
+    box-shadow: 4px 4px 10px var(--nm-shadow-dark), -4px -4px 10px var(--nm-shadow-light) !important;
+}
+[data-ui-style="neumorphism"] .sidebar .nav-link.active,
+[data-ui-style="neumorphism"] .sidebar .nav-link.in-focus {
+    background: var(--nm-bg) !important;
+    box-shadow: inset 4px 4px 8px var(--nm-shadow-dark), inset -4px -4px 8px var(--nm-shadow-light) !important;
+    border: none !important;
+}
+[data-ui-style="neumorphism"] .sidebar .nav-link.active::before,
+[data-ui-style="neumorphism"] .sidebar .nav-link.in-focus::before {
+    box-shadow: 2px 0 6px var(--nm-shadow-dark), 0 0 10px var(--group-glow) !important;
+}
+
+/* Style 3: Claymorphism (3D Chunky Inflated Pill) */
+[data-ui-style="claymorphism"] .sidebar .nav-link {
+    border-radius: var(--btn-radius, 20px) !important;
+    background: var(--clay-bg) !important;
+    border: 1.5px solid rgba(255, 255, 255, 0.12) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
+}
+[data-ui-style="claymorphism"] .sidebar .nav-link:hover {
+    transform: translateY(-2px) scale(1.02) !important;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35) !important;
+}
+[data-ui-style="claymorphism"] .sidebar .nav-link.active,
+[data-ui-style="claymorphism"] .sidebar .nav-link.in-focus {
+    background: var(--clay-bg) !important;
+    box-shadow: var(--clay-shadow-drop), var(--clay-shadow-inset) !important;
+    border-color: rgba(255, 255, 255, 0.25) !important;
+    transform: scale(0.98) !important;
+}
+[data-ui-style="claymorphism"] .sidebar .nav-link.active::before,
+[data-ui-style="claymorphism"] .sidebar .nav-link.in-focus::before {
+    box-shadow: 0 4px 12px var(--group-glow) !important;
+    width: 8px !important;
+}
+
+/* Style 4: Fluent Design (Acrylic Glass & Mica Blur) */
+[data-ui-style="fluent"] .sidebar .nav-link {
+    border-radius: var(--btn-radius, 8px) !important;
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+[data-ui-style="fluent"] .sidebar .nav-link:hover {
+    background: rgba(255, 255, 255, 0.07) !important;
+    border-color: rgba(255, 255, 255, 0.16) !important;
+}
+[data-ui-style="fluent"] .sidebar .nav-link.active,
+[data-ui-style="fluent"] .sidebar .nav-link.in-focus {
+    background: var(--fluent-glass-bg) !important;
+    backdrop-filter: blur(16px) saturate(160%) !important;
+    -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
+    border: var(--fluent-border) !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Style 5: Cyber 3D Glass (Holographic Perspective 3D & Laser Glow) */
+[data-ui-style="cyber-3d"] .sidebar .nav-link {
+    border-radius: var(--btn-radius, 10px) !important;
+    background: rgba(15, 23, 42, 0.65) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+[data-ui-style="cyber-3d"] .sidebar .nav-link:hover {
+    border-color: var(--group-accent) !important;
+    box-shadow: 0 0 14px var(--group-glow) !important;
+    transform: perspective(600px) rotateX(2deg) translateY(-1px) !important;
+}
+[data-ui-style="cyber-3d"] .sidebar .nav-link.active,
+[data-ui-style="cyber-3d"] .sidebar .nav-link.in-focus {
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.92) 0%, rgba(15, 23, 42, 0.98) 100%) !important;
+    border: 1px solid var(--group-accent) !important;
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.6), 0 0 20px var(--group-glow) !important;
+    transform: perspective(600px) rotateX(1deg) translateY(-1px) !important;
+}
+[data-ui-style="cyber-3d"] .sidebar .nav-link.active::before,
+[data-ui-style="cyber-3d"] .sidebar .nav-link.in-focus::before {
+    box-shadow: 0 0 16px var(--group-accent), 0 0 32px var(--group-glow) !important;
+    width: 8px !important;
+}
+
+/* Style 6: Nexus Widgets (Modular Card Tech) */
+[data-ui-style="nexus-widgets"] .sidebar .nav-link {
+    border-radius: var(--btn-radius, 8px) !important;
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid var(--border-color) !important;
+}
+[data-ui-style="nexus-widgets"] .sidebar .nav-link:hover {
+    border-color: var(--group-accent) !important;
+}
+[data-ui-style="nexus-widgets"] .sidebar .nav-link.active,
+[data-ui-style="nexus-widgets"] .sidebar .nav-link.in-focus {
+    background: var(--bg-card) !important;
+    border-color: rgba(255, 255, 255, 0.18) !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28) !important;
+}
+
+/* Style 7: Nexus Glass (Frosted Translucent Reflection) */
+[data-ui-style="nexus-glass"] .sidebar .nav-link {
+    border-radius: var(--btn-radius, 12px) !important;
+    background: rgba(30, 41, 59, 0.4) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+[data-ui-style="nexus-glass"] .sidebar .nav-link:hover {
+    background: rgba(30, 41, 59, 0.55) !important;
+    border-color: rgba(255, 255, 255, 0.18) !important;
+}
+[data-ui-style="nexus-glass"] .sidebar .nav-link.active,
+[data-ui-style="nexus-glass"] .sidebar .nav-link.in-focus {
+    background: rgba(30, 41, 59, 0.72) !important;
+    backdrop-filter: blur(20px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.22) !important;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45) !important;
+}
+
+/* Style 8: Command Sentinel (Tactical Monospace Military HUD) */
+[data-ui-style="command-sentinel"] .sidebar .nav-link {
+    border-radius: var(--btn-radius, 4px) !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    background: #090d16 !important;
+    border: 1px solid #1e293b !important;
+}
+[data-ui-style="command-sentinel"] .sidebar .nav-link:hover {
+    border-color: var(--group-accent) !important;
+}
+[data-ui-style="command-sentinel"] .sidebar .nav-link.active,
+[data-ui-style="command-sentinel"] .sidebar .nav-link.in-focus {
+    background: #020617 !important;
+    border-color: var(--group-accent) !important;
+    box-shadow: 0 0 14px var(--group-glow), inset 0 0 12px rgba(0,0,0,0.85) !important;
+}
+
 /* ── 6. LIGHT MODE HIGH CONTRAST TYPOGRAPHY ENFORCEMENT ─────────────────── */
 [data-theme="light"], [data-color-theme="light"] {
     color-scheme: light !important;

@@ -234,30 +234,55 @@ class UnifiedSidebar {
      */
     _updateActiveLink() {
         const navLinks = document.querySelectorAll(SIDEBAR_CONFIG.SELECTORS.NAV_LINK);
-        navLinks.forEach(link => link.classList.remove('active'));
+        navLinks.forEach(link => link.classList.remove('active', 'in-focus'));
+
+        const savedHref = (() => {
+            try { return sessionStorage.getItem('gboc_active_nav'); } catch(_) { return null; }
+        })();
 
         let activeFound = false;
         let activeEl = null;
-        navLinks.forEach(link => {
-            const href = link.getAttribute('href');
-            if (this._isActiveLink(href)) {
-                link.classList.add('active');
-                activeFound = true;
-                activeEl = link;
-            }
-        });
+
+        // Prioridade 1: link salvo via clique se coincidir com página atual
+        if (savedHref) {
+            navLinks.forEach(link => {
+                if (!activeFound && link.getAttribute('href') === savedHref && this._isActiveLink(savedHref)) {
+                    link.classList.add('active', 'in-focus');
+                    activeFound = true;
+                    activeEl = link;
+                }
+            });
+        }
+
+        // Prioridade 2: validação padrão de URL
+        if (!activeFound) {
+            navLinks.forEach(link => {
+                const href = link.getAttribute('href');
+                if (!activeFound && this._isActiveLink(href)) {
+                    link.classList.add('active', 'in-focus');
+                    activeFound = true;
+                    activeEl = link;
+                }
+            });
+        }
 
         // fallback defensivo: marca dashboard se nada casar
         if (!activeFound) {
             const home = document.querySelector(`${SIDEBAR_CONFIG.SELECTORS.NAV_LINK}[href="/"]`) ||
                          document.querySelector(`${SIDEBAR_CONFIG.SELECTORS.NAV_LINK}[href="/index.html"]`);
             if (home) {
-                home.classList.add('active');
+                home.classList.add('active', 'in-focus');
                 activeEl = home;
             }
         }
 
         if (activeEl) {
+            const parentGroup = activeEl.closest('.nav-group');
+            if (parentGroup) {
+                parentGroup.classList.remove('collapsed');
+                const hdr = parentGroup.querySelector('.nav-group-header');
+                if (hdr) hdr.classList.add('has-active-child');
+            }
             try {
                 setTimeout(() => {
                     activeEl.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
@@ -282,15 +307,36 @@ class UnifiedSidebar {
         };
 
         const currentPath = normalize(window.location.pathname);
-        const target = normalize(href);
+        const currentSearch = window.location.search.toLowerCase();
+        const currentFullPath = currentPath + currentSearch;
+        const target = href.toLowerCase();
 
-        // Dashboard também representa páginas unificadas
-        if (target === '/') {
-            return currentPath === '/' || currentPath === '/index.html' ||
-                   currentPath === '/overview.html' || currentPath === '/statistics.html';
+        // 1. Se o href possui query string (ex: /disaster-recovery.html?tab=instant-vm)
+        if (target.includes('?')) {
+            return currentFullPath === target || currentFullPath.endsWith(target);
         }
 
-        return currentPath === target;
+        // 2. Dashboard estrito (não deve casar falsamente com /overview ou /statistics)
+        if (target === '/' || target === '/index.html') {
+            return currentPath === '/' || currentPath === '/index.html';
+        }
+
+        // 3. Casamento de caminho exato ou sem extensão .html
+        const cleanPath = currentPath.replace(/\.html$/, '');
+        const cleanTarget = target.replace(/\.html$/, '');
+
+        if (cleanPath === cleanTarget || currentPath === target) {
+            return true;
+        }
+
+        // 4. Casamento por nome de arquivo final
+        const currentFilename = currentPath.split('/').filter(Boolean).pop() || '';
+        const targetFilename = target.split('/').filter(Boolean).pop() || '';
+        if (currentFilename && targetFilename && (currentFilename === targetFilename || currentFilename.replace(/\.html$/, '') === targetFilename.replace(/\.html$/, ''))) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -303,8 +349,22 @@ class UnifiedSidebar {
             link.addEventListener('click', (e) => {
                 const clickedLink = e.target.closest(SIDEBAR_CONFIG.SELECTORS.NAV_LINK);
                 if (!clickedLink) return;
-                navLinks.forEach(l => l.classList.remove('active'));
-                clickedLink.classList.add('active');
+                navLinks.forEach(l => l.classList.remove('active', 'in-focus'));
+                clickedLink.classList.add('active', 'in-focus');
+
+                const href = clickedLink.getAttribute('href');
+                if (href) {
+                    try {
+                        sessionStorage.setItem('gboc_active_nav', href);
+                    } catch (_) {}
+                }
+
+                const parentGroup = clickedLink.closest('.nav-group');
+                if (parentGroup) {
+                    parentGroup.classList.remove('collapsed');
+                    const hdr = parentGroup.querySelector('.nav-group-header');
+                    if (hdr) hdr.classList.add('has-active-child');
+                }
             });
         });
     }
@@ -339,7 +399,7 @@ class UnifiedSidebar {
         const fallbackHtml = `
         <aside class="sidebar">
             <nav class="nav" id="gboc-nav" style="padding-top:14px">
-                <div class="nav-group" id="fb-grp-overview">
+                <div class="nav-group" id="fb-grp-overview" data-group="overview">
                     <button class="nav-group-header" onclick="toggleNavGroup('fb-grp-overview')"><span><i class="fas fa-chart-pie nav-icon" style="color:#3b82f6"></i> Visão Geral</span><i class="fas fa-chevron-down nav-group-arrow"></i></button>
                     <div class="nav-group-items open" id="items-fb-grp-overview">
                         <a href="/index.html" class="nav-link nav-sub"><i class="fas fa-home nav-icon"></i> <span>Dashboard Principal</span></a>
@@ -347,8 +407,8 @@ class UnifiedSidebar {
                         <a href="/statistics.html" class="nav-link nav-sub"><i class="fas fa-chart-line nav-icon"></i> <span>Estatísticas de Backup</span></a>
                     </div>
                 </div>
-                <div class="nav-group" id="fb-grp-backup">
-                    <button class="nav-group-header" onclick="toggleNavGroup('fb-grp-backup')"><span><i class="fas fa-box-archive nav-icon" style="color:#6366f1"></i> Backup</span><i class="fas fa-chevron-down nav-group-arrow"></i></button>
+                <div class="nav-group" id="fb-grp-backup" data-group="backup">
+                    <button class="nav-group-header" onclick="toggleNavGroup('fb-grp-backup')"><span><i class="fas fa-box-archive nav-icon" style="color:#f59e0b"></i> Backup</span><i class="fas fa-chevron-down nav-group-arrow"></i></button>
                     <div class="nav-group-items open" id="items-fb-grp-backup">
                         <a href="/tasks.html" class="nav-link nav-sub"><i class="fas fa-list-check nav-icon"></i> <span>Jobs e Políticas</span></a>
                         <a href="/protected-workloads.html" class="nav-link nav-sub"><i class="fas fa-cubes-stacked nav-icon"></i> <span>Cargas Protegidas</span></a>
@@ -356,7 +416,7 @@ class UnifiedSidebar {
                         <a href="/restore.html" class="nav-link nav-sub"><i class="fas fa-undo nav-icon"></i> <span>Restaurar e Validar</span></a>
                     </div>
                 </div>
-                <div class="nav-group" id="fb-grp-dr">
+                <div class="nav-group" id="fb-grp-dr" data-group="dr">
                     <button class="nav-group-header" onclick="toggleNavGroup('fb-grp-dr')"><span><i class="fas fa-life-ring nav-icon" style="color:#ef4444"></i> Disaster Recovery</span><i class="fas fa-chevron-down nav-group-arrow"></i></button>
                     <div class="nav-group-items open" id="items-fb-grp-dr">
                         <a href="/disaster-recovery.html?tab=readiness" class="nav-link nav-sub"><i class="fas fa-heartbeat nav-icon"></i> <span>Prontidão e Plano</span></a>
@@ -365,7 +425,7 @@ class UnifiedSidebar {
                         <a href="/disaster-recovery.html?tab=virtual-lab" class="nav-link nav-sub"><i class="fas fa-flask nav-icon"></i> <span>Laboratório e Validação</span></a>
                     </div>
                 </div>
-                <div class="nav-group" id="fb-grp-prot">
+                <div class="nav-group" id="fb-grp-prot" data-group="defense">
                     <button class="nav-group-header" onclick="toggleNavGroup('fb-grp-prot')"><span><i class="fas fa-shield-alt nav-icon" style="color:#10b981"></i> Proteção</span><i class="fas fa-chevron-down nav-group-arrow"></i></button>
                     <div class="nav-group-items open" id="items-fb-grp-prot">
                         <a href="/ransomware.html" class="nav-link nav-sub"><i class="fas fa-shield-virus nav-icon"></i> <span>Ransomware Guardian</span></a>
@@ -373,7 +433,7 @@ class UnifiedSidebar {
                         <a href="/audit.html" class="nav-link nav-sub"><i class="fas fa-clipboard-list nav-icon"></i> <span>Auditoria</span></a>
                     </div>
                 </div>
-                <div class="nav-group" id="fb-grp-virt">
+                <div class="nav-group" id="fb-grp-virt" data-group="virt">
                     <button class="nav-group-header" onclick="toggleNavGroup('fb-grp-virt')"><span><i class="fas fa-cloud nav-icon" style="color:#38bdf8"></i> Virtualização e Cloud</span><i class="fas fa-chevron-down nav-group-arrow"></i></button>
                     <div class="nav-group-items open" id="items-fb-grp-virt">
                         <a href="/virtualization.html" class="nav-link nav-sub"><i class="fas fa-server nav-icon"></i> <span>VMware, Hyper-V, Proxmox</span></a>
@@ -382,8 +442,8 @@ class UnifiedSidebar {
                         <a href="/replication.html" class="nav-link nav-sub"><i class="fas fa-exchange-alt nav-icon"></i> <span>Replicação</span></a>
                     </div>
                 </div>
-                <div class="nav-group" id="fb-grp-ops">
-                    <button class="nav-group-header" onclick="toggleNavGroup('fb-grp-ops')"><span><i class="fas fa-chart-line nav-icon" style="color:#f59e0b"></i> Operações</span><i class="fas fa-chevron-down nav-group-arrow"></i></button>
+                <div class="nav-group" id="fb-grp-ops" data-group="ops">
+                    <button class="nav-group-header" onclick="toggleNavGroup('fb-grp-ops')"><span><i class="fas fa-chart-line nav-icon" style="color:#f97316"></i> Operações</span><i class="fas fa-chevron-down nav-group-arrow"></i></button>
                     <div class="nav-group-items open" id="items-fb-grp-ops">
                         <a href="/alerts.html" class="nav-link nav-sub"><i class="fas fa-bell nav-icon"></i> <span>Alertas e Falhas</span></a>
                         <a href="/failed-jobs.html" class="nav-link nav-sub" style="color:var(--danger)"><i class="fas fa-exclamation-triangle nav-icon"></i> <span>Jobs com Falha</span></a>
@@ -393,7 +453,7 @@ class UnifiedSidebar {
                         <a href="javascript:void(0)" onclick="if(typeof toggleHardwareHUD==='function')toggleHardwareHUD()" class="nav-link nav-sub"><i class="fas fa-microchip nav-icon"></i> <span>Telemetria Hardware HUD</span></a>
                     </div>
                 </div>
-                <div class="nav-group" id="fb-grp-cfg">
+                <div class="nav-group" id="fb-grp-cfg" data-group="config">
                     <button class="nav-group-header" onclick="toggleNavGroup('fb-grp-cfg')"><span><i class="fas fa-sliders-h nav-icon" style="color:#a855f7"></i> Configuração</span><i class="fas fa-chevron-down nav-group-arrow"></i></button>
                     <div class="nav-group-items open" id="items-fb-grp-cfg">
                         <a href="/users.html" class="nav-link nav-sub"><i class="fas fa-users-cog nav-icon"></i> <span>Usuários & Permissões</span></a>
