@@ -483,12 +483,12 @@ body.sidebar-collapsed .sidebar .nav-link i {
     color: var(--text-primary, #f8fafc);
 }
 .sidebar .nav-group-header.has-active-child {
-    background: var(--primary-soft, rgba(99, 102, 241, 0.16)) !important;
-    color: var(--primary-color, #6366f1) !important;
+    background: var(--group-soft, rgba(99, 102, 241, 0.16)) !important;
+    color: var(--group-accent, var(--primary-color, #6366f1)) !important;
     font-weight: 700 !important;
 }
 .sidebar .nav-group-header.has-active-child .nav-group-arrow {
-    color: var(--primary-color, #6366f1) !important;
+    color: var(--group-accent, var(--primary-color, #6366f1)) !important;
 }
 .sidebar .nav-group-arrow {
     font-size: 0.72em;
@@ -501,65 +501,221 @@ body.sidebar-collapsed .sidebar .nav-link i {
 .sidebar .nav-group-items {
     display: none;
     flex-direction: column;
-    margin-left: 12px;
-    padding-left: 8px;
+    margin-left: 10px;
+    padding-left: 6px;
     border-left: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
 }
 .sidebar .nav-group-items.open {
     display: flex;
 }
 
+/* ── Universal Menu Group Accent Identity ───────────────────────────────── */
+.nav-group,
+.sidebar .nav-group {
+    --group-accent: var(--primary-color, #6366f1);
+    --group-glow: var(--primary-glow, rgba(99, 102, 241, 0.4));
+    --group-soft: var(--primary-soft, rgba(99, 102, 241, 0.14));
+}
+
+/* 1. Visão Geral (Overview) - Royal Blue */
+.nav-group[data-group="overview"],
+.sidebar #grp-overview,
+.sidebar #sgrp-overview {
+    --group-accent: #3b82f6;
+    --group-glow: rgba(59, 130, 246, 0.45);
+    --group-soft: rgba(59, 130, 246, 0.16);
+}
+
+/* 2. Backup & Políticas (Jobs, Cargas, Repositórios, Restore) - Amber / Golden Orange (User Standard) */
+.nav-group[data-group="backup"],
+.sidebar #grp-backup,
+.sidebar #sgrp-backup {
+    --group-accent: #f59e0b;
+    --group-glow: rgba(245, 158, 11, 0.45);
+    --group-soft: rgba(245, 158, 11, 0.16);
+}
+
+/* 3. Disaster Recovery - Vibrant Red */
+.nav-group[data-group="dr"],
+.sidebar #grp-dr,
+.sidebar #sgrp-dr {
+    --group-accent: #ef4444;
+    --group-glow: rgba(239, 68, 68, 0.45);
+    --group-soft: rgba(239, 68, 68, 0.16);
+}
+
+/* 4. Proteção & Segurança (Ransomware, Compliance, Auditoria) - Emerald Green */
+.nav-group[data-group="defense"],
+.nav-group[data-group="security"],
+.sidebar #grp-defense,
+.sidebar #sgrp-security {
+    --group-accent: #10b981;
+    --group-glow: rgba(16, 185, 129, 0.45);
+    --group-soft: rgba(16, 185, 129, 0.16);
+}
+
+/* 5. Virtualização e Cloud (VMware, Hyper-V, M365, SaaS) - Cyan / Sky */
+.nav-group[data-group="virt"],
+.sidebar #grp-virt,
+.sidebar #sgrp-virt {
+    --group-accent: #06b6d4;
+    --group-glow: rgba(6, 182, 212, 0.45);
+    --group-soft: rgba(6, 182, 212, 0.16);
+}
+
+/* 6. Operações (Alertas, Falhas, Logs, Diagnósticos, Relatórios) - Vibrant Coral Orange */
+.nav-group[data-group="ops"],
+.sidebar #grp-ops,
+.sidebar #sgrp-ops {
+    --group-accent: #f97316;
+    --group-glow: rgba(249, 115, 22, 0.45);
+    --group-soft: rgba(249, 115, 22, 0.16);
+}
+
+/* 7. Configuração & Sistema (Users, Notificações, Motores, Temas) - Purple / Violet */
+.nav-group[data-group="config"],
+.nav-group[data-group="system"],
+.sidebar #grp-config,
+.sidebar #sgrp-system {
+    --group-accent: #a855f7;
+    --group-glow: rgba(168, 85, 247, 0.45);
+    --group-soft: rgba(168, 85, 247, 0.16);
+}
+
+/* ── Botão de Navegação / Menu Item Padrão Unificado ───────────────────── */
 .sidebar .nav-link {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 8px 12px;
-    margin: 2px 0;
-    border-radius: 8px;
+    gap: 12px;
+    padding: 9px 14px 9px 18px;
+    margin: 3px 6px;
+    border-radius: var(--btn-radius, 8px);
     font-family: inherit;
     font-size: 0.84em;
     font-weight: 500;
     color: var(--text-secondary, #cbd5e1);
     text-decoration: none;
-    transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+    transition: background 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+                color 0.2s ease,
+                transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+                box-shadow 0.2s ease,
+                border-color 0.2s ease;
     cursor: pointer;
     position: relative;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    border: 1px solid transparent;
+    user-select: none;
+    -webkit-user-select: none;
 }
+
 .sidebar .nav-link.nav-sub {
-    padding-left: 12px !important;
+    padding-left: 20px !important;
     font-size: 0.82em;
 }
+
 .sidebar .nav-link i {
-    font-size: 1em;
-    width: 18px;
+    font-size: 1.05em;
+    width: 20px;
     text-align: center;
-    color: var(--primary-color, #6366f1);
+    color: var(--group-accent, var(--primary-color, #6366f1));
     flex-shrink: 0;
-    transition: transform 0.15s ease, color 0.15s ease;
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s ease, filter 0.2s ease;
+    opacity: 0.88;
 }
-.sidebar .nav-link:hover {
-    background: var(--primary-soft, rgba(99, 102, 241, 0.14));
-    color: var(--text-primary, #f8fafc);
-}
-.sidebar .nav-link:hover i { transform: scale(1.1); color: var(--primary-color, #6366f1); }
-.sidebar .nav-link.active {
-    background: var(--primary-soft, rgba(99, 102, 241, 0.22)) !important;
-    color: var(--text-primary, #ffffff) !important;
-    font-weight: 700 !important;
-}
-.sidebar .nav-link.active::before {
+
+/* ── Detalhe do Lado Esquerdo (Extruded Pill Tab - User Master Standard) ── */
+.sidebar .nav-link::before {
     content: '';
     position: absolute;
     left: 0;
-    top: 4px;
-    bottom: 4px;
-    width: 3px;
-    border-radius: 0 4px 4px 0;
-    background: var(--primary-color, #6366f1);
-    box-shadow: 0 0 8px var(--primary-glow);
+    top: 0;
+    bottom: 0;
+    width: 6px;
+    border-top-left-radius: inherit;
+    border-bottom-left-radius: inherit;
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+    background: var(--group-accent, var(--primary-color, #6366f1));
+    opacity: 0;
+    transform: scaleY(0.3);
+    transition: opacity 0.2s ease,
+                transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+                box-shadow 0.25s ease,
+                width 0.2s ease;
+    box-shadow: 0 0 10px var(--group-glow, rgba(99, 102, 241, 0.4));
+    pointer-events: none;
+    z-index: 2;
+}
+
+/* Hover state */
+.sidebar .nav-link:hover {
+    background: var(--group-soft, rgba(99, 102, 241, 0.12));
+    color: var(--text-primary, #f8fafc);
+}
+.sidebar .nav-link:hover::before {
+    opacity: 0.55;
+    transform: scaleY(0.75);
+}
+.sidebar .nav-link:hover i {
+    opacity: 1;
+    transform: scale(1.12);
+    color: var(--group-accent, var(--primary-color, #6366f1));
+}
+
+/* Active & In-Focus State (Permanece até a próxima mudança) */
+.sidebar .nav-link.active,
+.sidebar .nav-link.in-focus,
+.sidebar .nav-link:focus-visible {
+    background: var(--group-soft, rgba(99, 102, 241, 0.22)) !important;
+    color: #ffffff !important;
+    font-weight: 700 !important;
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+    outline: none !important;
+}
+
+.sidebar .nav-link.active::before,
+.sidebar .nav-link.in-focus::before,
+.sidebar .nav-link:focus-visible::before {
+    opacity: 1 !important;
+    transform: scaleY(1) !important;
+    width: 7px !important;
+    background: var(--group-accent, var(--primary-color, #6366f1)) !important;
+    box-shadow: 0 0 14px var(--group-glow, rgba(99, 102, 241, 0.5)), 0 0 4px var(--group-accent) !important;
+}
+
+.sidebar .nav-link.active i,
+.sidebar .nav-link.in-focus i {
+    opacity: 1 !important;
+    color: var(--group-accent, var(--primary-color, #6366f1)) !important;
+    transform: scale(1.14);
+    filter: drop-shadow(0 0 6px var(--group-glow));
+}
+
+.sidebar .nav-link.active span,
+.sidebar .nav-link.in-focus span {
+    color: #ffffff !important;
+    font-weight: 700 !important;
+}
+
+/* Light Theme High Contrast Override */
+[data-theme="light"] .sidebar .nav-link.active,
+[data-theme="light"] .sidebar .nav-link.in-focus,
+[data-color-theme="light"] .sidebar .nav-link.active,
+[data-color-theme="light"] .sidebar .nav-link.in-focus {
+    background: var(--group-soft, rgba(59, 130, 246, 0.15)) !important;
+    color: var(--text-primary, #0f172a) !important;
+    border-color: rgba(0, 0, 0, 0.08) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+}
+[data-theme="light"] .sidebar .nav-link.active span,
+[data-theme="light"] .sidebar .nav-link.in-focus span,
+[data-color-theme="light"] .sidebar .nav-link.active span,
+[data-color-theme="light"] .sidebar .nav-link.in-focus span {
+    color: var(--text-primary, #0f172a) !important;
+    font-weight: 700 !important;
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
