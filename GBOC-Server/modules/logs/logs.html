@@ -7,50 +7,434 @@
     
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.6.0">
-    <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=14.6.0">
-    <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=14.6.0">
-    <link rel="stylesheet" href="/static/ui/models/modern/components.css?v=14.6.0">
-    <link rel="stylesheet" href="/static/ui/models/modern/layout.css?v=14.6.0">
-    <link rel="stylesheet" href="/static/style.css?v=14.6.0">
-    <link rel="stylesheet" href="/static/gboc-themes.css?v=14.6.0">
-    <link rel="stylesheet" href="/static/gboc-layout.css?v=14.6.0">
-    <script src="/static/gboc-perf.js?v=14.6.0"></script>
-    <script src="/static/gboc-layout-manager.js?v=14.6.0"></script>
-    <script src="/static/gboc-modal.js?v=14.6.0"></script>
-<script src="/modules/logs/logs.js"></script>
+    <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.7.2">
+    <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=14.7.2">
+    <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=14.7.2">
+    <link rel="stylesheet" href="/static/ui/models/modern/components.css?v=14.7.2">
+    <link rel="stylesheet" href="/static/ui/models/modern/layout.css?v=14.7.2">
+    <link rel="stylesheet" href="/static/style.css?v=14.7.2">
+    <link rel="stylesheet" href="/static/gboc-themes.css?v=14.7.2">
+    <link rel="stylesheet" href="/static/gboc-layout.css?v=14.7.2">
+    <script src="/static/gboc-perf.js?v=14.7.2"></script>
+    <script src="/static/gboc-layout-manager.js?v=14.7.2"></script>
+    <script src="/static/gboc-modal.js?v=14.7.2"></script>
+    <script src="/modules/logs/logs.js?v=14.7.2" defer></script>
+    <style>
+        /* ==========================================================================
+           GBOC UNIVERSAL TOAST NOTIFICATION & LOGS SYSTEM (Kyle Zantos Premium UI)
+           ========================================================================== */
+        .log-toast-panel {
+            position: relative;
+            padding: 22px;
+            border-radius: 24px;
+            background: var(--surface, rgba(24, 32, 53, 0.72));
+            border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+        }
+
+        .filters {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 18px;
+        }
+
+        .filter {
+            appearance: none;
+            -webkit-appearance: none;
+            border: 0;
+            cursor: pointer;
+            color: #ffffff !important;
+            font-size: 13px;
+            font-weight: 800;
+            padding: 10px 18px;
+            border-radius: 9px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+            transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease, opacity 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            outline: none;
+            user-select: none;
+        }
+
+        .filter:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 7px 16px rgba(0, 0, 0, 0.35);
+            filter: brightness(1.12);
+        }
+
+        .filter:active {
+            transform: translateY(0);
+        }
+
+        .filter.active {
+            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.9), 0 8px 20px rgba(0, 0, 0, 0.45);
+            transform: scale(1.04);
+        }
+
+        .filter[data-filter="all"] {
+            background: linear-gradient(135deg, #475569, #64748b) !important;
+        }
+
+        .filter[data-filter="success"] {
+            background: linear-gradient(135deg, #09aa60, #18c979) !important;
+        }
+
+        .filter[data-filter="info"] {
+            background: linear-gradient(135deg, #1768e8, #4389ff) !important;
+        }
+
+        .filter[data-filter="warning"] {
+            background: linear-gradient(135deg, #d97706, #f59e0b) !important;
+        }
+
+        .filter[data-filter="error"] {
+            background: linear-gradient(135deg, #dc2626, #ef4444) !important;
+        }
+
+        .log-controls {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .search-box {
+            position: relative;
+            flex: 1;
+            min-width: 240px;
+        }
+
+        .search-box .search-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted, #94a3b8);
+            font-size: 13px;
+            pointer-events: none;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 10px 14px 10px 38px;
+            border-radius: 10px;
+            border: 1px solid var(--border, rgba(255, 255, 255, 0.14));
+            background: var(--bg-input, rgba(0, 0, 0, 0.28));
+            color: var(--text, #f8fafc);
+            font-size: 13px;
+            outline: none;
+            box-sizing: border-box;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .search-box input:focus {
+            border-color: var(--primary, #4fa3e8);
+            box-shadow: 0 0 0 2px rgba(79, 163, 232, 0.3);
+        }
+
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 4px 6px 14px;
+            color: var(--text-muted, #94a3b8);
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .toolbar button {
+            border: 0;
+            background: transparent;
+            color: var(--text-muted, #94a3b8);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 800;
+            transition: color 0.2s ease, text-decoration 0.2s ease;
+        }
+
+        .toolbar button:hover {
+            color: var(--text, #ffffff);
+            text-decoration: underline;
+        }
+
+        .list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-height: 61px;
+        }
+
+        .toast {
+            --c: #16b968;
+            --c2: #59dfa0;
+            position: relative;
+            display: grid;
+            grid-template-columns: 39px 1fr auto;
+            align-items: center;
+            gap: 12px;
+            min-height: 61px;
+            padding: 10px 14px 10px 12px;
+            overflow: hidden;
+            border-radius: 14px;
+            color: #ffffff !important;
+            background: linear-gradient(112deg, var(--c), var(--c2)) !important;
+            box-shadow: 0 8px 20px color-mix(in srgb, var(--c) 28%, transparent), 0 2px 6px rgba(0, 0, 0, 0.2);
+            isolation: isolate;
+            animation: appear 0.42s cubic-bezier(0.18, 0.84, 0.25, 1) both;
+            transition: opacity 0.25s ease, transform 0.25s ease, filter 0.25s ease, max-height 0.35s ease, margin 0.35s ease;
+            border: none !important;
+        }
+
+        .toast[data-type="success"] {
+            --c: #08ae64;
+            --c2: #54d99a;
+        }
+
+        .toast[data-type="info"] {
+            --c: #1d70ee;
+            --c2: #5795ff;
+        }
+
+        .toast[data-type="warning"] {
+            --c: #d97706;
+            --c2: #f59e0b;
+        }
+
+        .toast[data-type="error"] {
+            --c: #dc2626;
+            --c2: #ef4444;
+        }
+
+        /* Glass bubbles */
+        .toast::before,
+        .toast::after {
+            content: "";
+            position: absolute;
+            z-index: -1;
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        .toast::before {
+            width: 135px;
+            height: 135px;
+            right: -27px;
+            bottom: -77px;
+            background: rgba(255, 255, 255, 0.16);
+            box-shadow: -43px -47px 0 -15px rgba(255, 255, 255, 0.09);
+        }
+
+        .toast::after {
+            width: 95px;
+            height: 95px;
+            right: 50px;
+            top: -58px;
+            background: rgba(255, 255, 255, 0.11);
+        }
+
+        /* Frosted glass icon container */
+        .icon {
+            width: 37px;
+            height: 37px;
+            border-radius: 11px;
+            display: grid;
+            place-items: center;
+            font-size: 18px;
+            font-weight: 900;
+            background: rgba(255, 255, 255, 0.24);
+            border: 1px solid rgba(255, 255, 255, 0.32);
+            box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.32), 0 4px 9px rgba(0, 0, 0, 0.14);
+            color: #ffffff;
+            flex-shrink: 0;
+        }
+
+        /* Copy text */
+        .copy {
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .copy strong {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 7px;
+            font-size: 13.5px;
+            line-height: 1.25;
+            margin-bottom: 3px;
+            color: #ffffff;
+            font-weight: 800;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+        }
+
+        .copy .msg-text {
+            display: block;
+            font-size: 12.5px;
+            line-height: 1.35;
+            color: rgba(255, 255, 255, 0.96);
+            word-break: break-word;
+            font-weight: 400;
+        }
+
+        .meta-badge {
+            background: rgba(255, 255, 255, 0.22);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 5px;
+            padding: 1px 6px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .time-badge {
+            font-weight: 500;
+            font-size: 11px;
+            opacity: 0.88;
+            letter-spacing: 0;
+        }
+
+        /* Actions container */
+        .toast-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+            margin-left: 8px;
+        }
+
+        .dismiss {
+            width: 31px;
+            height: 31px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.18);
+            color: #ffffff;
+            cursor: pointer;
+            font-size: 17px;
+            font-weight: 700;
+            line-height: 1;
+            display: grid;
+            place-items: center;
+            transition: background 0.18s ease, transform 0.18s ease;
+            padding: 0;
+        }
+
+        .dismiss:hover {
+            background: rgba(255, 255, 255, 0.32);
+            transform: scale(1.08);
+        }
+
+        .toast.removing {
+            animation: disappear 0.32s ease forwards;
+        }
+
+        /* Empty state */
+        .empty {
+            display: none;
+            text-align: center;
+            padding: 32px 10px;
+            color: var(--text-muted, #89919a);
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .empty.show {
+            display: block;
+            animation: appear 0.3s ease;
+        }
+
+        .count {
+            font-variant-numeric: tabular-nums;
+        }
+
+        @keyframes appear {
+            from {
+                opacity: 0;
+                transform: translateY(-14px) scale(0.97);
+                filter: blur(3px);
+            }
+            to {
+                opacity: 1;
+                transform: none;
+                filter: blur(0);
+            }
+        }
+
+        @keyframes disappear {
+            to {
+                opacity: 0;
+                transform: translateX(24px) scale(0.95);
+                filter: blur(2px);
+                max-height: 0;
+                min-height: 0;
+                padding-top: 0;
+                padding-bottom: 0;
+                margin-top: -10px;
+            }
+        }
+
+        @media(max-width: 580px) {
+            .toast {
+                grid-template-columns: 34px 1fr auto;
+                gap: 8px;
+                padding: 8px 10px;
+            }
+            .icon {
+                width: 32px;
+                height: 32px;
+                font-size: 15px;
+            }
+            .filter {
+                padding: 7px 12px;
+                font-size: 12px;
+            }
+        }
+    </style>
 </head>
 <body class="layout-vertical">
-    <main class="main-content" style="padding:24px">
-        <h2 style="font-size:1.4em;margin-bottom:20px;display:flex;align-items:center;gap:10px">
-            <i class="fas fa-terminal" style="color:var(--primary)"></i> Logs Globais do Sistema &amp; Agentes
-        </h2>
-        <div class="panel" style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px">
-            <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap">
-                <select id="log-level" style="padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text)">
-                    <option value="">Todos os Níveis</option>
-                    <option value="ERROR">Apenas Erros (ERROR)</option>
-                    <option value="WARNING">Avisos (WARNING)</option>
-                    <option value="INFO">Informação (INFO)</option>
-                </select>
-                <input type="text" id="log-search" placeholder="Buscar nos logs..." style="padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);flex:1">
-                <button class="btn btn-primary" onclick="loadLogsData()"><i class="fas fa-search"></i> Filtrar</button>
+    <main class="main-content" style="padding:24px;max-width:960px;margin:0 auto;width:100%;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+            <h2 style="font-size:1.4em;margin:0;display:flex;align-items:center;gap:10px">
+                <i class="fas fa-terminal" style="color:var(--primary)"></i> Logs Globais do Sistema &amp; Agentes
+            </h2>
+            <div style="display:flex;gap:8px">
+                <button class="btn btn-secondary" onclick="loadLogsData()"><i class="fas fa-sync-alt"></i> Atualizar</button>
             </div>
-            <table class="data-table" style="width:100%">
-                <thead>
-                    <tr>
-                        <th>Nível</th>
-                        <th>Agente</th>
-                        <th>Fonte</th>
-                        <th>Mensagem</th>
-                        <th>Timestamp</th>
-                    </tr>
-                </thead>
-                <tbody id="table-logs">
-                    <tr><td colspan="5" style="text-align:center;color:var(--text-muted)">Carregando logs do sistema...</td></tr>
-                </tbody>
-            </table>
         </div>
+
+        <section class="panel log-toast-panel">
+            <nav class="filters" aria-label="Filtro de notificações de logs">
+                <button class="filter active" data-filter="all"><i class="fas fa-layer-group"></i> Todos</button>
+                <button class="filter" data-filter="success"><i class="fas fa-check-circle"></i> Success</button>
+                <button class="filter" data-filter="info"><i class="fas fa-info-circle"></i> Info</button>
+                <button class="filter" data-filter="warning"><i class="fas fa-exclamation-triangle"></i> Warning</button>
+                <button class="filter" data-filter="error"><i class="fas fa-times-circle"></i> Error</button>
+            </nav>
+
+            <div class="log-controls">
+                <div class="search-box">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" id="log-search" placeholder="Buscar nos registros de logs..." oninput="handleSearchInput()">
+                </div>
+            </div>
+
+            <div class="toolbar">
+                <span>Notificações &amp; Registros <span class="count" id="count"></span></span>
+                <button id="clear">Limpar visíveis</button>
+            </div>
+
+            <section class="list" id="list" aria-live="polite"></section>
+            <div class="empty" id="empty">Nenhuma notificação deste tipo encontrada.</div>
+        </section>
     </main>
 </body>
 </html>

@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Tuple
 
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 try:
     from version_control import __version__ as VERSION
 except Exception:

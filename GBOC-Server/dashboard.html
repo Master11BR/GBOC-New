@@ -815,32 +815,42 @@ function gbocToggleSidebarCollapse(){
 
         <!-- TAB: LOGS -->
         <div id="tab-logs" class="tab-section">
-            <h2 style="font-size:1.3em;margin-bottom:20px"><i class="fas fa-file-alt" style="color:var(--primary);margin-right:8px"></i> Logs dos Agentes</h2>
-            <div class="panel" style="margin-bottom:16px">
-                <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
-                    <select id="log-level" onchange="loadLogs()" style="background:var(--bg-input);color:var(--text);border:1px solid var(--border);padding:8px 12px;border-radius:6px;font-size:.9em">
-                        <option value="">Todos os Níveis</option>
-                        <option value="ERROR">ERROR</option>
-                        <option value="WARNING">WARNING</option>
-                        <option value="INFO">INFO</option>
-                        <option value="DEBUG">DEBUG</option>
-                    </select>
-                    <select id="log-agent" onchange="loadLogs()" style="background:var(--bg-input);color:var(--text);border:1px solid var(--border);padding:8px 12px;border-radius:6px;font-size:.9em">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+                <h2 style="font-size:1.3em;margin:0"><i class="fas fa-file-alt" style="color:var(--primary);margin-right:8px"></i> Logs dos Agentes &amp; Servidor</h2>
+                <div style="display:flex;gap:8px">
+                    <button class="btn btn-secondary" onclick="loadLogs()"><i class="fas fa-sync-alt"></i> Atualizar</button>
+                </div>
+            </div>
+
+            <section class="panel log-toast-panel">
+                <nav class="filters" aria-label="Filtro de notificações de logs">
+                    <button class="filter active" data-filter="all" onclick="filterServerLogs('all', this)"><i class="fas fa-list"></i> Todos</button>
+                    <button class="filter" data-filter="success" onclick="filterServerLogs('success', this)"><i class="fas fa-check-circle"></i> Success</button>
+                    <button class="filter" data-filter="info" onclick="filterServerLogs('info', this)"><i class="fas fa-info-circle"></i> Info</button>
+                    <button class="filter" data-filter="warning" onclick="filterServerLogs('warning', this)"><i class="fas fa-exclamation-triangle"></i> Warning</button>
+                    <button class="filter" data-filter="error" onclick="filterServerLogs('error', this)"><i class="fas fa-times-circle"></i> Error</button>
+                </nav>
+
+                <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+                    <div style="position:relative;flex:1;min-width:240px;">
+                        <i class="fas fa-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:12px;"></i>
+                        <input type="text" id="log-search" placeholder="Buscar nos logs..." oninput="handleServerLogSearch()" onkeyup="if(event.key==='Enter')loadLogs()" style="width:100%;background:var(--bg-input);color:var(--text);border:1px solid var(--border);padding:9px 14px 9px 34px;border-radius:8px;font-size:.9em;outline:none;">
+                    </div>
+                    <select id="log-agent" onchange="loadLogs()" style="background:var(--bg-input);color:var(--text);border:1px solid var(--border);padding:9px 14px;border-radius:8px;font-size:.9em;outline:none;cursor:pointer;">
                         <option value="">Todos os Agentes</option>
                     </select>
-                    <input type="text" id="log-search" placeholder="Buscar nos logs..." onkeyup="if(event.key==='Enter')loadLogs()" style="background:var(--bg-input);color:var(--text);border:1px solid var(--border);padding:8px 12px;border-radius:6px;font-size:.9em;flex:1;min-width:200px">
-                    <button class="btn btn-primary" onclick="loadLogs()"><i class="fas fa-search"></i> Filtrar</button>
                 </div>
-            </div>
-            <div class="panel">
-                <div id="log-stats" style="display:flex;gap:16px;margin-bottom:16px;font-size:.85em;color:var(--text-muted)"></div>
-                <div id="logs-container" style="max-height:600px;overflow-y:auto">
-                    <table class="data-table">
-                        <thead><tr><th>Nível</th><th>Agente</th><th>Fonte</th><th>Mensagem</th><th>Data</th></tr></thead>
-                        <tbody id="table-logs"><tr><td colspan="5" style="text-align:center;color:var(--text-muted)">Clique em Filtrar para carregar</td></tr></tbody>
-                    </table>
+
+                <div id="log-stats" style="display:flex;gap:16px;margin-bottom:14px;font-size:.85em;color:var(--text-muted);flex-wrap:wrap"></div>
+
+                <div class="toolbar">
+                    <span>Notificações &amp; Registros <span class="count" id="server-toast-count"></span></span>
+                    <button id="server-clear-toasts" onclick="clearServerVisibleToasts()">Limpar visíveis</button>
                 </div>
-            </div>
+
+                <section class="list" id="server-toast-list" aria-live="polite" style="max-height:650px;overflow-y:auto;padding-right:4px"></section>
+                <div class="empty" id="server-toast-empty">Nenhum log encontrado para o filtro selecionado.</div>
+            </section>
         </div>
 
         <!-- TAB: REPORTS -->
@@ -2274,50 +2284,158 @@ function gbocToggleSidebarCollapse(){
             }catch(e){console.error('loadLogAgentFilter:',e)}
         }
 
+        let _serverActiveLogFilter = 'all';
+        let _serverAllLogs = [];
+        let _serverLogSearchTerm = '';
+
+        function filterServerLogs(level, btn) {
+            _serverActiveLogFilter = level;
+            document.querySelectorAll('#tab-logs .filter').forEach(b => {
+                b.classList.toggle('active', b === btn);
+            });
+            renderServerLogs(true);
+        }
+
+        function handleServerLogSearch() {
+            _serverLogSearchTerm = document.getElementById('log-search')?.value?.trim() || '';
+            renderServerLogs(false);
+        }
+
+        function mapLogToType(level) {
+            const lvl = (level || 'info').toLowerCase();
+            if (lvl.includes('err') || lvl.includes('crit') || lvl.includes('fatal')) return 'error';
+            if (lvl.includes('warn')) return 'warning';
+            if (lvl.includes('succ') || lvl.includes('ok')) return 'success';
+            return 'info';
+        }
+
+        function getLogIcon(type) {
+            if (type === 'success') return '✓';
+            if (type === 'info') return 'i';
+            if (type === 'warning') return '!';
+            if (type === 'error') return '×';
+            return 'i';
+        }
+
+        function visibleServerLogs() {
+            return _serverAllLogs.filter(n => {
+                const matchType = _serverActiveLogFilter === 'all' || n.type === _serverActiveLogFilter;
+                if (!matchType) return false;
+                if (!_serverLogSearchTerm) return true;
+                const term = _serverLogSearchTerm.toLowerCase();
+                return (n.message && n.message.toLowerCase().includes(term)) ||
+                       (n.title && n.title.toLowerCase().includes(term)) ||
+                       (n.source && n.source.toLowerCase().includes(term)) ||
+                       (n.agent && n.agent.toLowerCase().includes(term));
+            });
+        }
+
+        function renderServerLogs(animate = true) {
+            const list = document.getElementById('server-toast-list');
+            const empty = document.getElementById('server-toast-empty');
+            const count = document.getElementById('server-toast-count');
+            if (!list) return;
+
+            const items = visibleServerLogs();
+            list.innerHTML = '';
+
+            items.forEach((n, index) => {
+                const el = document.createElement('article');
+                el.className = 'toast';
+                el.dataset.type = n.type;
+                el.dataset.id = n.id;
+                if (!animate) el.style.animation = 'none';
+
+                el.innerHTML = `
+                    <div class="icon" aria-hidden="true">${n.icon}</div>
+                    <div class="copy">
+                        <strong>
+                            <span>${n.title}</span>
+                            <span class="meta-badge">${escapeHtml(n.agent)}</span>
+                            ${n.source ? `<span class="meta-badge" style="opacity:0.85">${escapeHtml(n.source)}</span>` : ''}
+                            ${n.timestamp ? `<span style="font-weight:500;font-size:11px;opacity:0.88;letter-spacing:0">${n.timestamp}</span>` : ''}
+                        </strong>
+                        <span>${escapeHtml(n.message)}</span>
+                    </div>
+                    <button class="dismiss" aria-label="Remover notificação" title="Dispensar">×</button>
+                `;
+
+                el.style.animationDelay = `${Math.min(index * 45, 600)}ms`;
+
+                el.querySelector('.dismiss').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    removeServerToast(n.id, el);
+                });
+                list.appendChild(el);
+            });
+
+            if (count) count.textContent = `(${items.length})`;
+            if (empty) empty.classList.toggle('show', items.length === 0);
+        }
+
+        function removeServerToast(id, element) {
+            const i = _serverAllLogs.findIndex(n => n.id === id);
+            if (i >= 0) _serverAllLogs.splice(i, 1);
+
+            element.classList.add('removing');
+            element.addEventListener('animationend', () => renderServerLogs(false), { once: true });
+        }
+
+        function clearServerVisibleToasts() {
+            const items = visibleServerLogs();
+            if (!items.length) return;
+            const ids = new Set(items.map(n => n.id));
+            for (let i = _serverAllLogs.length - 1; i >= 0; i--) {
+                if (ids.has(_serverAllLogs[i].id)) _serverAllLogs.splice(i, 1);
+            }
+            renderServerLogs(true);
+        }
+
         async function loadLogs(){
             try{
-                const level=document.getElementById('log-level').value;
-                const agent=document.getElementById('log-agent').value;
-                const search=document.getElementById('log-search').value;
-                let url=`${API}/logs?limit=200`;
-                if(level)url+=`&level=${level}`;
-                if(agent)url+=`&agent_id=${agent}`;
-                if(search)url+=`&search=${encodeURIComponent(search)}`;
+                const agent = document.getElementById('log-agent')?.value || '';
+                const search = document.getElementById('log-search')?.value || '';
+                _serverLogSearchTerm = search;
+                let url = `${API}/logs?limit=300`;
+                if(agent) url += `&agent_id=${agent}`;
+                if(search) url += `&search=${encodeURIComponent(search)}`;
 
-                const [logsRes, statsRes]=await Promise.allSettled([
+                const [logsRes, statsRes] = await Promise.allSettled([
                     fetch(url).then(r=>r.json()),
                     fetch(`${API}/logs/stats`).then(r=>r.json())
                 ]);
 
-                if(statsRes.status==='fulfilled'){
-                    const s=statsRes.value;
-                    document.getElementById('log-stats').innerHTML=`
-                        <span><i class="fas fa-list"></i> Total: <strong>${(s.total||0).toLocaleString()}</strong></span>
-                        <span style="color:var(--danger)"><i class="fas fa-times-circle"></i> Erros: <strong>${(s.errors||0).toLocaleString()}</strong></span>
-                        <span style="color:var(--warning)"><i class="fas fa-exclamation-triangle"></i> Avisos: <strong>${(s.warnings||0).toLocaleString()}</strong></span>
-                        <span style="color:var(--success)"><i class="fas fa-info-circle"></i> Info: <strong>${(s.info||0).toLocaleString()}</strong></span>
-                    `;
+                if(statsRes.status === 'fulfilled'){
+                    const s = statsRes.value;
+                    const statsEl = document.getElementById('log-stats');
+                    if (statsEl) {
+                        statsEl.innerHTML = `
+                            <span><i class="fas fa-list"></i> Total: <strong>${(s.total||0).toLocaleString()}</strong></span>
+                            <span style="color:var(--danger)"><i class="fas fa-times-circle"></i> Erros: <strong>${(s.errors||0).toLocaleString()}</strong></span>
+                            <span style="color:var(--warning)"><i class="fas fa-exclamation-triangle"></i> Avisos: <strong>${(s.warnings||0).toLocaleString()}</strong></span>
+                            <span style="color:var(--success)"><i class="fas fa-info-circle"></i> Info: <strong>${(s.info||0).toLocaleString()}</strong></span>
+                        `;
+                    }
                 }
 
-                if(logsRes.status==='fulfilled'){
-                    const data=logsRes.value;
-                    const logs=data.logs||[];
-                    const tbody=document.getElementById('table-logs');
-                    if(logs.length===0){
-                        tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--text-muted)">Nenhum log encontrado</td></tr>';
-                        return;
-                    }
-                    tbody.innerHTML=logs.map(l=>{
-                        const lvl=l.level||'INFO';
-                        const cls=lvl==='ERROR'?'badge-error':lvl==='WARNING'?'badge-warning':'badge-success';
-                        return `<tr>
-                            <td><span class="badge ${cls}">${lvl}</span></td>
-                            <td style="font-weight:600;font-size:.85em">${l.agent_name||'N/A'}</td>
-                            <td style="font-size:.82em;color:var(--text-muted)">${l.source||''}</td>
-                            <td style="font-size:.85em;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(l.message||'').replace(/"/g,'&quot;')}">${l.message||''}</td>
-                            <td style="font-size:.82em;color:var(--text-muted);white-space:nowrap">${l.timestamp?fmtDateTime(l.timestamp):''}</td>
-                        </tr>`;
-                    }).join('');
+                if(logsRes.status === 'fulfilled'){
+                    const data = logsRes.value;
+                    const rawLogs = data.logs || [];
+                    _serverAllLogs = rawLogs.map((l, idx) => {
+                        const type = mapLogToType(l.level);
+                        return {
+                            id: l.id || `${Date.now()}_${idx}`,
+                            type: type,
+                            icon: getLogIcon(type),
+                            title: (l.level || type).toUpperCase(),
+                            agent: l.agent_name || l.agent_id || 'Servidor',
+                            source: l.source || 'core',
+                            message: l.message || '',
+                            timestamp: l.timestamp ? fmtDateTime(l.timestamp) : ''
+                        };
+                    });
+
+                    renderServerLogs(true);
                 }
             }catch(e){console.error('loadLogs:',e)}
         }
