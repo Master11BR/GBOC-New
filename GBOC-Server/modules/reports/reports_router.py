@@ -10,6 +10,7 @@ from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, HTTPException, Request, Response, Query
 from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse
 from psycopg2.extras import RealDictCursor
+from database import db_manager
 
 try:
     from version_control import __version__ as SERVER_VERSION
@@ -773,7 +774,7 @@ def build_report_data_from_db(rep_id: int) -> Dict[str, Any]:
         # Calcular crescimento real baseado em execuções de backup
         recent_execs = []
         try:
-            with core.get_db_connection() as conn:
+            with db_manager.get_connection() as conn:
                 cur = conn.cursor()
                 cur.execute("SELECT bytes_processed, started_at FROM agent_task_executions ORDER BY id DESC LIMIT 30")
                 recent_execs = cur.fetchall()
@@ -791,7 +792,7 @@ def build_report_data_from_db(rep_id: int) -> Dict[str, Any]:
         table_headers = ["Repositório / Host", "Volume Registrado", "Crescimento Médio Execução", "Projeção Esgotamento", "Diagnóstico IA"]
         table_rows = []
         try:
-            with core.get_db_connection() as conn:
+            with db_manager.get_connection() as conn:
                 cur = conn.cursor()
                 cur.execute("SELECT name, path, type FROM agent_repositories")
                 r_rows = cur.fetchall()
@@ -814,7 +815,7 @@ def build_report_data_from_db(rep_id: int) -> Dict[str, Any]:
     elif rep_id == 34: # IA: Blast Radius & Score de Risco Ransomware
         active_alerts = 0
         try:
-            with core.get_db_connection() as conn:
+            with db_manager.get_connection() as conn:
                 cur = conn.cursor()
                 cur.execute("SELECT COUNT(*) FROM system_events WHERE level IN ('error', 'critical', 'warning')")
                 active_alerts = cur.fetchone()[0] or 0
@@ -838,7 +839,7 @@ def build_report_data_from_db(rep_id: int) -> Dict[str, Any]:
     elif rep_id == 35: # IA: Otimizador FinOps de Nuvem & Tiering
         cloud_repos = []
         try:
-            with core.get_db_connection() as conn:
+            with db_manager.get_connection() as conn:
                 cur = conn.cursor()
                 cur.execute("SELECT name, type, path FROM agent_repositories WHERE type IN ('cloud', 's3', 'b2', 'wasabi', 'azure')")
                 cloud_repos = cur.fetchall()
@@ -877,7 +878,7 @@ def build_report_data_from_db(rep_id: int) -> Dict[str, Any]:
     elif rep_id == 37: # IA: Otimização Inteligente de Janelas de Backup
         peak_executions = 0
         try:
-            with core.get_db_connection() as conn:
+            with db_manager.get_connection() as conn:
                 cur = conn.cursor()
                 cur.execute("SELECT COUNT(*) FROM agent_task_executions WHERE EXTRACT(HOUR FROM started_at) BETWEEN 18 AND 23")
                 peak_executions = cur.fetchone()[0] or 0
@@ -901,7 +902,7 @@ def build_report_data_from_db(rep_id: int) -> Dict[str, Any]:
     elif rep_id == 38: # IA: Auditoria de Auto-Recuperação & Auto-Healing
         heal_events = []
         try:
-            with core.get_db_connection() as conn:
+            with db_manager.get_connection() as conn:
                 cur = conn.cursor()
                 cur.execute("SELECT timestamp, source, message FROM system_events WHERE message LIKE '%heal%' OR message LIKE '%repair%' OR source LIKE '%Healer%' ORDER BY id DESC LIMIT 10")
                 heal_events = cur.fetchall()
@@ -940,7 +941,7 @@ def build_report_data_from_db(rep_id: int) -> Dict[str, Any]:
         table_headers = ["Data Execução", "Agente / Tarefa", "Volume Processado", "Variação %", "Diagnóstico IA"]
         table_rows = []
         try:
-            with core.get_db_connection() as conn:
+            with db_manager.get_connection() as conn:
                 cur = conn.cursor()
                 cur.execute("SELECT started_at, task_id, bytes_processed, status FROM agent_task_executions ORDER BY id DESC LIMIT 10")
                 exec_rows = cur.fetchall()
@@ -979,7 +980,7 @@ def build_report_data_from_db(rep_id: int) -> Dict[str, Any]:
         # Obter repositórios reais cadastrados no banco de dados
         real_repos = []
         try:
-            with core.get_db_connection() as conn:
+            with db_manager.get_connection() as conn:
                 cur = conn.cursor()
                 cur.execute("SELECT id, name, engine, path FROM repositories")
                 real_repos = cur.fetchall()
@@ -1040,7 +1041,7 @@ def build_report_data_from_db(rep_id: int) -> Dict[str, Any]:
     elif rep_id == 46: # IA: Resiliência Cloud Real & Destinos de Réplica
         cloud_targets = []
         try:
-            with core.get_db_connection() as conn:
+            with db_manager.get_connection() as conn:
                 cur = conn.cursor()
                 cur.execute("SELECT id, name, type, bucket FROM storage_destinations")
                 cloud_targets = cur.fetchall()

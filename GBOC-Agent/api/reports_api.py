@@ -1339,7 +1339,7 @@ async def get_system_health():
         GBOC_VERSION = "14.6.0"
         version_string = lambda: "GBOC Agent v14.6.0 Enterprise"
 
-    import psutil, os
+    import psutil, os, time
     proc = psutil.Process(os.getpid())
     elapsed = time.time() - proc.create_time()
     h, m = int(elapsed // 3600), int((elapsed % 3600) // 60)

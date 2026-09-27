@@ -40,6 +40,7 @@ from typing import Dict, Any, Optional, Generator
 from contextlib import contextmanager
 from queue import Queue, Empty
 from functools import wraps
+from pathlib import Path
 
 # === PATHS ESTRUTURAIS ===
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))

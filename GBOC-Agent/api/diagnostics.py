@@ -4,7 +4,7 @@
 Responsável por: Rotas para sistema de diagnóstico
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from typing import Dict, Any, List
 import asyncio
 import platform
@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import psutil
 import os
+import time
 from datetime import datetime
 import logging
 

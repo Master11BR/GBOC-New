@@ -9,9 +9,12 @@ import os
 import io
 import csv
 import json
+import logging
 import hashlib
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List, Optional
+
+logger = logging.getLogger(__name__)
 
 try:
     from version_control import __version__ as SERVER_VERSION

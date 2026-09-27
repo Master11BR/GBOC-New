@@ -5,6 +5,7 @@ Valida a instalação e conectividade dos motores de backup (Restic, Kopia, Dupl
 """
 
 import subprocess
+import shutil
 import os
 import logging
 from typing import Dict, List, Optional, Tuple

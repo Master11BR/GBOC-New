@@ -8,6 +8,7 @@ import os
 import json
 import logging
 import subprocess
+import psycopg2
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 from datetime import datetime

@@ -13,47 +13,437 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     <title>GBOC Agent - Logs do Sistema</title>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.6.0">
-    <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=14.6.0">
-    <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=14.6.0">
-    <link rel="stylesheet" href="/static/ui/models/modern/components.css?v=14.6.0">
-    <link rel="stylesheet" href="/static/ui/models/modern/layout.css?v=14.6.0">
-    <link rel="stylesheet" href="/static/style.css?v=14.6.0">
-    <link rel="stylesheet" href="/static/gboc-themes.css?v=14.6.0">
-    <link rel="stylesheet" href="/static/gboc-layout.css?v=14.6.0">
-    <script src="/static/gboc-perf.js?v=14.6.0"></script>
-    <script src="/static/gboc-layout-manager.js?v=14.6.0"></script>
-    <script src="/static/gboc-modal.js?v=14.6.0"></script>
-<style>
-        /* Todos os estilos usam variáveis do tema — não há hardcode de cor */
-        .log-container { background: var(--bg-card); border-radius: 8px; padding: 20px; border: 1px solid var(--border); }
-        .log-controls { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
-        .log-viewer {
-            background: var(--bg-input);
-            color: var(--text);
-            padding: 15px;
-            border-radius: 6px;
-            font-family: 'Courier New', monospace;
-            font-size: 0.9em;
-            max-height: 600px;
-            overflow-y: auto;
-            border: 1px solid var(--border);
+    <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.7.2">
+    <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=14.7.2">
+    <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=14.7.2">
+    <link rel="stylesheet" href="/static/ui/models/modern/components.css?v=14.7.2">
+    <link rel="stylesheet" href="/static/ui/models/modern/layout.css?v=14.7.2">
+    <link rel="stylesheet" href="/static/style.css?v=14.7.2">
+    <link rel="stylesheet" href="/static/gboc-themes.css?v=14.7.2">
+    <link rel="stylesheet" href="/static/gboc-layout.css?v=14.7.2">
+    <script src="/static/gboc-perf.js?v=14.7.2"></script>
+    <script src="/static/gboc-layout-manager.js?v=14.7.2"></script>
+    <script src="/static/gboc-modal.js?v=14.7.2"></script>
+    <style>
+        /* ==========================================================================
+           GBOC UNIVERSAL TOAST NOTIFICATION & LOGS SYSTEM (Kyle Zantos Premium UI)
+           ========================================================================== */
+        .log-toast-panel {
+            position: relative;
+            padding: 22px;
+            border-radius: 24px;
+            background: var(--surface, rgba(24, 32, 53, 0.72));
+            border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
         }
-        [data-theme="light"] .log-viewer { background: var(--bg-input); color: var(--text); }
-        .log-line { padding: 3px 0; border-bottom: 1px solid var(--border); }
-        .log-line:hover { background: var(--card-hover); }
-        .log-error   { color: var(--danger); }
-        .log-warning { color: var(--warning); }
-        .log-info    { color: var(--primary); }
-        .log-success { color: var(--success); }
-        .log-timestamp { color: var(--text-muted); margin-right: 10px; }
-        .filter-badge { padding: 6px 12px; border-radius: 4px; cursor: pointer; border: 1px solid var(--border); color: var(--text); background: var(--bg-card); transition: all 0.2s; font-size: 0.88em; }
-        .filter-badge:hover { background: var(--card-hover); }
-        .filter-badge.active { background: var(--primary); color: var(--bg-dark); border-color: var(--primary); }
-        .module-select { padding: 6px 12px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: .85em; }
-        .log-divider { border-left: 1px solid var(--border); margin: 0 6px; height: 24px; display: inline-block; vertical-align: middle; }
+
+        .filters {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 18px;
+        }
+
+        .filter {
+            appearance: none;
+            -webkit-appearance: none;
+            border: 0;
+            cursor: pointer;
+            color: #ffffff !important;
+            font-size: 13px;
+            font-weight: 800;
+            padding: 10px 18px;
+            border-radius: 9px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+            transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease, opacity 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            outline: none;
+            user-select: none;
+        }
+
+        .filter:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 7px 16px rgba(0, 0, 0, 0.35);
+            filter: brightness(1.12);
+        }
+
+        .filter:active {
+            transform: translateY(0);
+        }
+
+        .filter.active {
+            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.9), 0 8px 20px rgba(0, 0, 0, 0.45);
+            transform: scale(1.04);
+        }
+
+        .filter[data-filter="all"] {
+            background: linear-gradient(135deg, #475569, #64748b) !important;
+        }
+
+        .filter[data-filter="success"] {
+            background: linear-gradient(135deg, #09aa60, #18c979) !important;
+        }
+
+        .filter[data-filter="info"] {
+            background: linear-gradient(135deg, #1768e8, #4389ff) !important;
+        }
+
+        .filter[data-filter="warning"] {
+            background: linear-gradient(135deg, #d97706, #f59e0b) !important;
+        }
+
+        .filter[data-filter="error"] {
+            background: linear-gradient(135deg, #dc2626, #ef4444) !important;
+        }
+
+        .log-controls {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .search-box {
+            position: relative;
+            flex: 1;
+            min-width: 240px;
+        }
+
+        .search-box .search-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted, #94a3b8);
+            font-size: 13px;
+            pointer-events: none;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 10px 14px 10px 38px;
+            border-radius: 10px;
+            border: 1px solid var(--border, rgba(255, 255, 255, 0.14));
+            background: var(--bg-input, rgba(0, 0, 0, 0.28));
+            color: var(--text, #f8fafc);
+            font-size: 13px;
+            outline: none;
+            box-sizing: border-box;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .search-box input:focus {
+            border-color: var(--primary, #4fa3e8);
+            box-shadow: 0 0 0 2px rgba(79, 163, 232, 0.3);
+        }
+
+        .module-select {
+            padding: 9px 14px;
+            background: var(--bg-input, rgba(0, 0, 0, 0.28));
+            border: 1px solid var(--border, rgba(255, 255, 255, 0.14));
+            border-radius: 10px;
+            color: var(--text, #f8fafc);
+            font-size: 13px;
+            font-weight: 600;
+            outline: none;
+            cursor: pointer;
+            transition: border-color 0.2s ease;
+        }
+
+        .module-select:focus {
+            border-color: var(--primary, #4fa3e8);
+        }
+
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 4px 6px 14px;
+            color: var(--text-muted, #94a3b8);
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .toolbar button {
+            border: 0;
+            background: transparent;
+            color: var(--text-muted, #94a3b8);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 800;
+            transition: color 0.2s ease, text-decoration 0.2s ease;
+        }
+
+        .toolbar button:hover {
+            color: var(--text, #ffffff);
+            text-decoration: underline;
+        }
+
+        .list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-height: 61px;
+        }
+
+        .toast {
+            --c: #16b968;
+            --c2: #59dfa0;
+            position: relative;
+            display: grid;
+            grid-template-columns: 39px 1fr auto;
+            align-items: center;
+            gap: 12px;
+            min-height: 61px;
+            padding: 10px 14px 10px 12px;
+            overflow: hidden;
+            border-radius: 14px;
+            color: #ffffff !important;
+            background: linear-gradient(112deg, var(--c), var(--c2)) !important;
+            box-shadow: 0 8px 20px color-mix(in srgb, var(--c) 28%, transparent), 0 2px 6px rgba(0, 0, 0, 0.2);
+            isolation: isolate;
+            animation: appear 0.42s cubic-bezier(0.18, 0.84, 0.25, 1) both;
+            transition: opacity 0.25s ease, transform 0.25s ease, filter 0.25s ease, max-height 0.35s ease, margin 0.35s ease;
+            border: none !important;
+        }
+
+        .toast[data-type="success"] {
+            --c: #08ae64;
+            --c2: #54d99a;
+        }
+
+        .toast[data-type="info"] {
+            --c: #1d70ee;
+            --c2: #5795ff;
+        }
+
+        .toast[data-type="warning"] {
+            --c: #d97706;
+            --c2: #f59e0b;
+        }
+
+        .toast[data-type="error"] {
+            --c: #dc2626;
+            --c2: #ef4444;
+        }
+
+        /* Glass bubbles */
+        .toast::before,
+        .toast::after {
+            content: "";
+            position: absolute;
+            z-index: -1;
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        .toast::before {
+            width: 135px;
+            height: 135px;
+            right: -27px;
+            bottom: -77px;
+            background: rgba(255, 255, 255, 0.16);
+            box-shadow: -43px -47px 0 -15px rgba(255, 255, 255, 0.09);
+        }
+
+        .toast::after {
+            width: 95px;
+            height: 95px;
+            right: 50px;
+            top: -58px;
+            background: rgba(255, 255, 255, 0.11);
+        }
+
+        /* Frosted glass icon container */
+        .icon {
+            width: 37px;
+            height: 37px;
+            border-radius: 11px;
+            display: grid;
+            place-items: center;
+            font-size: 18px;
+            font-weight: 900;
+            background: rgba(255, 255, 255, 0.24);
+            border: 1px solid rgba(255, 255, 255, 0.32);
+            box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.32), 0 4px 9px rgba(0, 0, 0, 0.14);
+            color: #ffffff;
+            flex-shrink: 0;
+        }
+
+        /* Copy text */
+        .copy {
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .copy strong {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 7px;
+            font-size: 13.5px;
+            line-height: 1.25;
+            margin-bottom: 3px;
+            color: #ffffff;
+            font-weight: 800;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+        }
+
+        .copy .msg-text {
+            display: block;
+            font-size: 12.5px;
+            line-height: 1.35;
+            color: rgba(255, 255, 255, 0.96);
+            word-break: break-word;
+            font-weight: 400;
+        }
+
+        .meta-badge {
+            background: rgba(255, 255, 255, 0.22);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 5px;
+            padding: 1px 6px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .time-badge {
+            font-weight: 500;
+            font-size: 11px;
+            opacity: 0.88;
+            letter-spacing: 0;
+        }
+
+        /* Actions container */
+        .toast-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+            margin-left: 8px;
+        }
+
+        .ai-btn {
+            border: 1px solid rgba(255, 255, 255, 0.38);
+            background: rgba(255, 255, 255, 0.22);
+            color: #ffffff;
+            border-radius: 7px;
+            padding: 5px 9px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .ai-btn:hover {
+            background: rgba(255, 255, 255, 0.35);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .dismiss {
+            width: 31px;
+            height: 31px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.18);
+            color: #ffffff;
+            cursor: pointer;
+            font-size: 17px;
+            font-weight: 700;
+            line-height: 1;
+            display: grid;
+            place-items: center;
+            transition: background 0.18s ease, transform 0.18s ease;
+            padding: 0;
+        }
+
+        .dismiss:hover {
+            background: rgba(255, 255, 255, 0.32);
+            transform: scale(1.08);
+        }
+
+        .toast.removing {
+            animation: disappear 0.32s ease forwards;
+        }
+
+        /* Empty state */
+        .empty {
+            display: none;
+            text-align: center;
+            padding: 32px 10px;
+            color: var(--text-muted, #89919a);
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .empty.show {
+            display: block;
+            animation: appear 0.3s ease;
+        }
+
+        .count {
+            font-variant-numeric: tabular-nums;
+        }
+
+        @keyframes appear {
+            from {
+                opacity: 0;
+                transform: translateY(-14px) scale(0.97);
+                filter: blur(3px);
+            }
+            to {
+                opacity: 1;
+                transform: none;
+                filter: blur(0);
+            }
+        }
+
+        @keyframes disappear {
+            to {
+                opacity: 0;
+                transform: translateX(24px) scale(0.95);
+                filter: blur(2px);
+                max-height: 0;
+                min-height: 0;
+                padding-top: 0;
+                padding-bottom: 0;
+                margin-top: -10px;
+            }
+        }
+
+        @media(max-width: 580px) {
+            .toast {
+                grid-template-columns: 34px 1fr auto;
+                gap: 8px;
+                padding: 8px 10px;
+            }
+            .icon {
+                width: 32px;
+                height: 32px;
+                font-size: 15px;
+            }
+            .filter {
+                padding: 7px 12px;
+                font-size: 12px;
+            }
+        }
     </style>
-    <script src="/static/auth_interceptor.js"></script>
+    <script src="/static/auth_interceptor.js?v=14.7.2"></script>
 </head>
 <body>
     <div class="app">
@@ -63,37 +453,33 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             <header class="header">
                 <div>
                     <h1 class="page-title">Logs do Sistema</h1>
-                    <div class="page-subtitle">Eventos e diagnósticos do GBOC Agent</div>
+                    <div class="page-subtitle">Eventos e diagnósticos em tempo real do GBOC Agent</div>
                 </div>
                 <div class="header-actions">
                     <button class="btn btn-secondary" onclick="refreshLogs()">
                         <i class="fas fa-sync-alt"></i> Atualizar
                     </button>
-                    <button class="btn btn-secondary" onclick="clearLogs()">
-                        <i class="fas fa-trash"></i> Limpar
+                    <button class="btn btn-secondary" onclick="clearAllBackendLogs()">
+                        <i class="fas fa-trash"></i> Limpar Tudo
                     </button>
                 </div>
             </header>
 
-            <div class="content">
-                <div class="log-container">
+            <div class="content" style="max-width:960px;margin:0 auto;width:100%;">
+                <section class="panel log-toast-panel">
+                    <nav class="filters" aria-label="Filtro de notificações de logs">
+                        <button class="filter active" data-filter="all"><i class="fas fa-layer-group"></i> Todos</button>
+                        <button class="filter" data-filter="success"><i class="fas fa-check-circle"></i> Success</button>
+                        <button class="filter" data-filter="info"><i class="fas fa-info-circle"></i> Info</button>
+                        <button class="filter" data-filter="warning"><i class="fas fa-exclamation-triangle"></i> Warning</button>
+                        <button class="filter" data-filter="error"><i class="fas fa-times-circle"></i> Error</button>
+                    </nav>
+
                     <div class="log-controls">
-                        <span class="filter-badge active" data-level="all" onclick="filterLogs('all')">
-                            <i class="fas fa-list"></i> Todos
-                        </span>
-                        <span class="filter-badge" data-level="error" onclick="filterLogs('error')">
-                            <i class="fas fa-times-circle"></i> Erros
-                        </span>
-                        <span class="filter-badge" data-level="warning" onclick="filterLogs('warning')">
-                            <i class="fas fa-exclamation-triangle"></i> Avisos
-                        </span>
-                        <span class="filter-badge" data-level="info" onclick="filterLogs('info')">
-                            <i class="fas fa-info-circle"></i> Info
-                        </span>
-                        <span class="filter-badge" data-level="success" onclick="filterLogs('success')">
-                            <i class="fas fa-check-circle"></i> Sucesso
-                        </span>
-                        <span class="log-divider"></span>
+                        <div class="search-box">
+                            <i class="fas fa-search search-icon"></i>
+                            <input type="text" id="logSearch" placeholder="Buscar nos registros de logs..." oninput="handleSearchInput()">
+                        </div>
                         <select id="moduleFilter" onchange="loadLogs()" class="module-select">
                             <option value="">Todos os Módulos</option>
                             <option value="backup">Backup</option>
@@ -106,23 +492,45 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                         </select>
                     </div>
 
-                    <div class="log-viewer" id="logViewer">
-                        <div class="log-line log-info">
-                            <span class="log-timestamp">[Carregando...]</span>
-                            <span>Aguardando dados dos logs...</span>
-                        </div>
+                    <div class="toolbar">
+                        <span>Notificações &amp; Registros <span class="count" id="count"></span></span>
+                        <button id="clear">Limpar visíveis</button>
                     </div>
-                </div>
+
+                    <section class="list" id="list" aria-live="polite"></section>
+                    <div class="empty" id="empty">Nenhuma notificação deste tipo encontrada.</div>
+                    <div id="aiLogDiagModal" style="display:none;margin-top:16px;padding:14px;border-radius:12px;background:rgba(99,102,241,0.12);border:1px solid var(--primary);font-size:0.88em;color:var(--text);"></div>
+                </section>
             </div>
         </main>
     </div>
 
     <script>
-        let currentFilter = 'all';
+        const list = document.getElementById('list');
+        const empty = document.getElementById('empty');
+        const count = document.getElementById('count');
+        let activeFilter = 'all';
         let allLogs = [];
         let isLoading = false;
         let refreshTimer = null;
-        let lastTopLogId = null;
+        let searchTerm = '';
+
+        function mapLogToType(level, message = '') {
+            const lvl = (level || 'info').toLowerCase();
+            const msg = (message || '').toLowerCase();
+            if (lvl.includes('err') || lvl.includes('crit') || lvl.includes('fatal') || msg.includes('[error]') || msg.includes('[critical]') || msg.includes('falha') || msg.includes('error:')) return 'error';
+            if (lvl.includes('warn') || msg.includes('[warning]') || msg.includes('[warn]') || msg.includes('alerta') || msg.includes('threshold=') || msg.includes('[perf-slow]')) return 'warning';
+            if (lvl.includes('succ') || lvl.includes('ok') || msg.includes('[success]') || msg.includes('[ok]') || msg.includes('sucesso') || msg.includes('concluíd') || msg.includes('concluido') || msg.includes('migrada com sucesso') || msg.includes('iniciado com sucesso')) return 'success';
+            return 'info';
+        }
+
+        function getLogIcon(type) {
+            if (type === 'success') return '✓';
+            if (type === 'info') return 'i';
+            if (type === 'warning') return '!';
+            if (type === 'error') return '×';
+            return 'i';
+        }
 
         function formatTimestamp(ts) {
             if (!ts) return '';
@@ -131,6 +539,108 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 if (isNaN(d.getTime())) return ts;
                 return d.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit' });
             } catch(e) { return ts; }
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function visibleItems() {
+            return allLogs.filter(n => {
+                const matchType = activeFilter === 'all' || n.type === activeFilter;
+                if (!matchType) return false;
+                if (!searchTerm) return true;
+                const term = searchTerm.toLowerCase();
+                return (n.message && n.message.toLowerCase().includes(term)) ||
+                       (n.title && n.title.toLowerCase().includes(term)) ||
+                       (n.source && n.source.toLowerCase().includes(term));
+            });
+        }
+
+        function render(animate = true) {
+            const items = visibleItems();
+            list.innerHTML = '';
+
+            items.forEach((n, index) => {
+                const el = document.createElement('article');
+                el.className = 'toast';
+                el.dataset.type = n.type;
+                el.dataset.id = n.id;
+                if (!animate) el.style.animation = 'none';
+
+                const isWarnOrErr = n.type === 'error' || n.type === 'warning';
+                const aiBtnHtml = isWarnOrErr ? `
+                    <button class="ai-btn" onclick="event.stopPropagation(); diagnoseLogMessage('${escapeHtml(n.rawMessage || n.message)}')" title="Diagnóstico IA do Erro">
+                        <i class="fas fa-brain"></i> IA Diagnóstico
+                    </button>
+                ` : '';
+
+                el.innerHTML = `
+                    <div class="icon" aria-hidden="true">${n.icon}</div>
+                    <div class="copy">
+                        <strong>
+                            <span>${n.title}</span>
+                            ${n.source ? `<span class="meta-badge">${escapeHtml(n.source)}</span>` : ''}
+                            ${n.timestamp ? `<span class="time-badge">${n.timestamp}</span>` : ''}
+                        </strong>
+                        <span class="msg-text">${escapeHtml(n.message)}</span>
+                    </div>
+                    <div class="toast-actions">
+                        ${aiBtnHtml}
+                        <button class="dismiss" aria-label="Remover notificação" title="Dispensar">×</button>
+                    </div>
+                `;
+
+                el.style.animationDelay = `${Math.min(index * 45, 600)}ms`;
+
+                el.querySelector('.dismiss').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    remove(n.id, el);
+                });
+                list.appendChild(el);
+            });
+
+            count.textContent = `(${items.length})`;
+            empty.classList.toggle('show', items.length === 0);
+        }
+
+        function remove(id, element) {
+            const i = allLogs.findIndex(n => n.id === id);
+            if (i >= 0) allLogs.splice(i, 1);
+
+            element.classList.add('removing');
+            element.addEventListener('animationend', () => render(false), { once: true });
+        }
+
+        document.querySelectorAll('.filter').forEach(button => {
+            button.addEventListener('click', () => {
+                activeFilter = button.dataset.filter;
+
+                document.querySelectorAll('.filter').forEach(b => {
+                    b.classList.toggle('active', b === button);
+                });
+
+                // Re-renderiza somente a categoria escolhida,
+                // com animação individual e sem recarregar a página.
+                render(true);
+            });
+        });
+
+        document.getElementById('clear').addEventListener('click', () => {
+            const items = visibleItems();
+            const ids = new Set(items.map(n => n.id));
+            for (let i = allLogs.length - 1; i >= 0; i--) {
+                if (ids.has(allLogs[i].id)) allLogs.splice(i, 1);
+            }
+            render(true);
+        });
+
+        function handleSearchInput() {
+            searchTerm = document.getElementById('logSearch')?.value?.trim() || '';
+            render(false);
         }
 
         async function loadLogs() {
@@ -146,25 +656,45 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 if (!response.ok) throw new Error('HTTP ' + response.status);
 
                 const data = await response.json();
-                const newLogs = data.logs || [];
+                const rawLogs = data.logs || [];
 
-                if (newLogs.length === 0 && allLogs.length > 0) {
-                    // API retornou vazio mas tínhamos logs — manter os anteriores
-                    return;
-                }
+                allLogs = rawLogs.map((log, idx) => {
+                    const msg = log.message || '';
+                    const type = mapLogToType(log.level, msg);
+                    const origLevel = (log.level || '').toUpperCase();
+                    let displayTitle = origLevel || type.toUpperCase();
+                    if (type === 'success' && origLevel === 'INFO') {
+                        displayTitle = 'SUCCESS';
+                    }
+                    return {
+                        id: log.id || `${Date.now()}_${idx}`,
+                        type: type,
+                        icon: getLogIcon(type),
+                        title: displayTitle,
+                        source: log.source || '',
+                        message: msg,
+                        rawMessage: msg,
+                        timestamp: formatTimestamp(log.timestamp)
+                    };
+                });
 
-                allLogs = newLogs;
-                renderLogs();
+                render(true);
             } catch (error) {
                 console.error('Erro ao carregar logs:', error);
-                // Se já temos logs, manter e mostrar aviso discreto, não sobrescrever
                 if (allLogs.length === 0) {
-                    document.getElementById('logViewer').innerHTML = `
-                        <div class="log-line log-error">
-                            <span class="log-timestamp">[${new Date().toLocaleTimeString('pt-BR')}]</span>
-                            <span>❌ Erro ao carregar logs: ${error.message}</span>
-                        </div>
+                    list.innerHTML = `
+                        <article class="toast" data-type="error">
+                            <div class="icon">×</div>
+                            <div class="copy">
+                                <strong>FALHA DE COMUNICAÇÃO</strong>
+                                <span class="msg-text">Não foi possível carregar os registros: ${escapeHtml(error.message)}</span>
+                            </div>
+                            <div class="toast-actions">
+                                <button class="dismiss" onclick="this.closest('.toast').remove()">×</button>
+                            </div>
+                        </article>
                     `;
+                    empty.classList.remove('show');
                 }
             } finally {
                 isLoading = false;
@@ -174,88 +704,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 
         function scheduleRefresh() {
             if (refreshTimer) clearTimeout(refreshTimer);
-            refreshTimer = setTimeout(loadLogs, 10000);
-        }
-
-        function renderLogs() {
-            const viewer = document.getElementById('logViewer');
-            if (!viewer) return;
-
-            // Guardar se o usuário estava no topo (para preservar scroll ao atualizar)
-            const wasAtTop = viewer.scrollTop < 50;
-
-            if (allLogs.length === 0) {
-                viewer.innerHTML = '<div class="log-line log-info"><span>Nenhum log disponível</span></div>';
-                return;
-            }
-
-            const filtered = currentFilter === 'all'
-                ? allLogs
-                : allLogs.filter(log => {
-                    const logLevel = (log.level || '').toLowerCase();
-                    return logLevel === currentFilter;
-                });
-
-            if (filtered.length === 0) {
-                viewer.innerHTML = '<div class="log-line log-info"><span>Nenhum log encontrado para o filtro selecionado</span></div>';
-                return;
-            }
-
-            // Logs já vêm do backend em ordem DESC (mais recente primeiro)
-            const html = filtered.map((log, idx) => {
-                const lvl = (log.level || 'info').toLowerCase();
-                const levelClass = `log-${lvl}`;
-                const icon = getLogIcon(log.level);
-                const source = log.source ? `<span class="log-timestamp" style="font-size:.8em">[${escapeHtml(log.source)}]</span> ` : '';
-                const ts = formatTimestamp(log.timestamp);
-                const isWarnOrErr = lvl === 'error' || lvl === 'warning';
-                
-                return `<div class="log-line ${levelClass}" style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;margin-bottom:4px;border-radius:6px;background:var(--bg-card);">
-                    <div><span class="log-timestamp">[${ts}]</span> ${icon} ${source}<span>${escapeHtml(log.message || '')}</span></div>
-                    ${isWarnOrErr ? `<button class="btn btn-sm btn-outline-danger" onclick="diagnoseLogMessage('${escapeHtml(log.message || '')}')" style="font-size:0.75em;padding:4px 8px;margin-left:10px;"><i class="fas fa-brain"></i> Diagnóstico IA</button>` : ''}
-                </div>`;
-            }).join('') + '<div id="aiLogDiagModal" style="display:none;margin-top:15px;padding:12px;border-radius:8px;background:rgba(99,102,241,0.12);border:1px solid var(--primary);font-size:0.85em;"></div>';
-
-            viewer.innerHTML = html;
-
-            // Manter scroll no topo (registros mais recentes) — não rolar para o fundo
-            if (wasAtTop) {
-                viewer.scrollTop = 0;
-            }
-        }
-
-        function filterLogs(level) {
-            currentFilter = level;
-            document.querySelectorAll('.filter-badge').forEach(badge => {
-                badge.classList.remove('active');
-            });
-            const target = document.querySelector(`[data-level="${level}"]`);
-            if (target) target.classList.add('active');
-            renderLogs();
-        }
-
-        function getLogIcon(level) {
-            const levelLower = (level || '').toLowerCase();
-            const icons = {
-                error: '<i class="fas fa-times-circle"></i>',
-                warning: '<i class="fas fa-exclamation-triangle"></i>',
-                info: '<i class="fas fa-info-circle"></i>',
-                success: '<i class="fas fa-check-circle"></i>'
-            };
-            return icons[levelLower] || icons.info;
-        }
-
-        function diagnoseLogMessage(msg) {
-            const box = document.getElementById('aiLogDiagModal');
-            if (!box) return;
-            box.style.display = 'block';
-            box.innerHTML = `<i class="fas fa-robot" style="color:var(--primary);"></i> <strong>Diagnóstico IA do Erro:</strong> "${msg}"<br><br><em>Causa provável:</em> Bloqueio de arquivo por processo ativo ou tempo limite de resposta de rede.<br><br><strong>Ação Recomendada:</strong> Ativar o assistente VSS de arquivos abertos ou re-executar a tarefa com o Auto-Heal habilitado.`;
-        }
-
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
+            refreshTimer = setTimeout(loadLogs, 15000);
         }
 
         function refreshLogs() {
@@ -264,25 +713,42 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             loadLogs();
         }
 
-        async function clearLogs() {
-            if (!confirm('Deseja realmente limpar os logs?')) return;
+        async function clearAllBackendLogs() {
+            if (!confirm('Deseja realmente limpar todos os logs do sistema no banco de dados?')) return;
             try {
                 const response = await fetch('/api/logs/clear', { method: 'POST' });
                 if (response.ok) {
                     allLogs = [];
-                    renderLogs();
-                    alert('✅ Logs limpos com sucesso!');
+                    render(true);
                     loadLogs();
                 }
             } catch (error) {
-                alert('❌ Erro ao limpar logs: ' + error.message);
+                alert('Erro ao limpar logs: ' + error.message);
             }
         }
 
-        // Carregar logs iniciais
+        function diagnoseLogMessage(msg) {
+            const box = document.getElementById('aiLogDiagModal');
+            if (!box) return;
+            box.style.display = 'block';
+            box.innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                    <strong style="color:var(--primary);display:flex;align-items:center;gap:6px">
+                        <i class="fas fa-robot"></i> Diagnóstico IA do Evento
+                    </strong>
+                    <button onclick="document.getElementById('aiLogDiagModal').style.display='none'" style="border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:16px;">×</button>
+                </div>
+                <div style="margin-bottom:6px"><em>Evento analisado:</em> "${escapeHtml(msg)}"</div>
+                <div style="margin-bottom:6px"><strong>Causa provável:</strong> Bloqueio temporário de recurso, variação de I/O de disco ou latência de resposta do subsistema.</div>
+                <div><strong>Ação recomendada:</strong> Verificar disponibilidade do caminho de destino e manter as rotinas preventivas de Auto-Heal ativas.</div>
+            `;
+            box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        // Inicializar
         loadLogs();
     </script>
 
-    <script src="/static/sidebar.js"></script>
+    <script src="/static/sidebar.js?v=14.7.2"></script>
 </body>
 </html>

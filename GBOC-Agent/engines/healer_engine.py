@@ -5,6 +5,7 @@ Engine para recuperação e correção automática de problemas
 """
 
 import os
+import time
 import logging
 import psutil
 from datetime import datetime, timedelta

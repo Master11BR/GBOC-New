@@ -14,7 +14,7 @@ import logging
 import re
 import time
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from api.audit_api import audit_login, audit_security_event
 
