@@ -11,7 +11,6 @@ Copia de forma limpa os componentes Server, Agent, manifestos e instalador
 para uma pasta de distribuição externa.
 """
 
-import os
 import sys
 import shutil
 import json
@@ -69,7 +68,20 @@ def copy_component(source_dir: Path, target_dir: Path, component_name: str):
     print(f"  [OK] {component_name} copiado com sucesso!")
     return True
 
-def generate_manifest(output_dir: Path, version: str = "14.6.0 Full Stable Enterprise"):
+def get_current_version(source_root: Path) -> str:
+    vc_path = source_root / "GBOC-Agent" / "version_control.py"
+    if vc_path.exists():
+        try:
+            agent_dir = str(source_root / "GBOC-Agent")
+            if agent_dir not in sys.path:
+                sys.path.insert(0, agent_dir)
+            import version_control
+            return f"v{version_control.__version__} Full Stable Enterprise"
+        except Exception:
+            pass
+    return "v14.7.3 Full Stable Enterprise"
+
+def generate_manifest(output_dir: Path, version: str = "v14.7.3 Full Stable Enterprise"):
     """Gera um arquivo de manifesto com metadados do pacote gerado."""
     manifest = {
         "system": "GBOC System",
@@ -96,8 +108,9 @@ def generate_manifest(output_dir: Path, version: str = "14.6.0 Full Stable Enter
 
 def build_package(source_root: Path, output_dir: Path, clean: bool = False):
     """Executa a criacao do pacote de distribuicao."""
+    current_version = get_current_version(source_root)
     print("=" * 70)
-    print("  GBOC System - Gerador de Pacote de Distribuicao & Instalador")
+    print(f"  GBOC System ({current_version}) - Gerador de Pacote & Instalador")
     print("=" * 70)
     print(f"Origem do Codigo: {source_root}")
     print(f"Destino do Pacote: {output_dir}\n")
@@ -154,10 +167,10 @@ def build_package(source_root: Path, output_dir: Path, clean: bool = False):
     )
 
     # 4. Gerar manifesto
-    generate_manifest(output_dir)
+    generate_manifest(output_dir, version=current_version)
 
     # 5. Gerar LEIAME_INSTALACAO.md
-    readme_content = """# GBOC System v14.6.0 Enterprise — Pacote de Instalacao
+    readme_content = f"""# GBOC System {current_version} — Pacote de Instalacao
 
 Este pacote contem todos os arquivos e dependencias para instalar o GBOC Server, o GBOC Agent ou Ambos.
 

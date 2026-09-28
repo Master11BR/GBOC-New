@@ -1,8 +1,76 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.7.0 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.7.3 Enterprise. Todos os direitos reservados. -->
 
 # GBOC — Changelog de Atualizações
 
 > Histórico completo de versões, correções e melhorias do sistema GBOC (Agente + Servidor).
+
+---
+
+## 14.7.3 — 2026-09-28 (AI Copilot Router Modernization, Security Auth Enforcement & Predictive Fallback Precision)
+
+### 🤖 Modernização do Server AI Copilot & Resolução de Falhas de Integração (Bugs 11, 12 e 13)
+- **Bug 11 — Extração da Função Standalone Reutilizável `query_server_ai_assistant`**:
+  - Toda a lógica de inferência multi-provedor (DeepSeek V3/R1, Ollama Local On-Premises, Groq Cloud, OpenAI GPT-4o, Google Gemini, Anthropic Claude + Fallback preditivo nativo) foi extraída para a função independente `query_server_ai_assistant(prompt: str, provider_override: Optional[str] = None) -> Dict[str, Any]`.
+  - Retorno normalizado em dicionário Python estruturado (`dict`), desacoplado de objetos `JSONResponse`.
+  - Resolução definitiva do `ImportError` crônico em [GBOC-Server/modules/v2/ai_v2_router.py](file:///d:/GBOC-New/GBOC-New/GBOC-Server/modules/v2/ai_v2_router.py), restaurando a rota oficial `/api/v2/ai/query` (retornando envelope oficial padronizado com status HTTP 200).
+- **Bug 12 — Imposição Rigorosa de Autenticação em Todos os 7 Endpoints de IA (OWASP API Security)**:
+  - Eliminação de superfícies desprotegidas e vetores potenciais de Server-Side Request Forgery (SSRF) nas configurações de `ollama_url` e consulta de modelos.
+  - Implementação dos helpers `_get_current_user_from_req(request)` e `_require_auth(request)` validando token de sessão (`Bearer <token>` ou cookie `gboc_server_token`) na tabela `server_auth_tokens`.
+  - Cobertura de autenticação obrigatória (HTTP 401 para acessos anônimos) em:
+    1. `POST /api/v1/ai/query`
+    2. `GET /api/v1/ai/config`
+    3. `POST /api/v1/ai/config`
+    4. `POST /api/v1/ai/diagnose`
+    5. `POST /api/v1/ai/auto_fix`
+    6. `GET / POST /api/v1/ai/ollama/models`
+    7. `POST /api/v1/ai/ollama/models/pull`
+- **Bug 13 — Precisão Analítica do Fallback Preditivo Nativo (Eliminação de Contradição Semântica)**:
+  - Refatoração do coletor operacional `_build_server_system_context() -> Tuple[str, int]` para retornar tupla com texto contextual e a contagem real de jobs com falha (`failed_jobs_count`).
+  - Correção semântica no motor preditivo nativo de fallback:
+    - Quando houver incidentes (`failed_jobs_count > 0`): emite sinalização precisa `🔴 {failed_jobs_count} job(s) com falha registrado(s) nos últimos 7 dias / 24h` com recomendação de auditoria técnica.
+    - Quando não houver incidentes (`failed_jobs_count == 0`): emite confirmação de conformidade `🟢 Nenhum erro de backup foi registrado nos últimos 7 dias`.
+- **Validação de Testes Automatizados**:
+  - 100% de aprovação na suíte de testes de regressão com `FastAPI TestClient`, `pyflakes` (0 erros) e `py_compile`.
+
+---
+
+## 14.7.2 — 2026-09-27 (Logs Sentinel UI, Kyle Zantos Motion Principles & Core Engine Runtime Fixes)
+
+### 🩺 Integridade de Runtime & Correção de Exceções pyflakes (10 Correções Críticas)
+- **Eliminação Total de NameError e Saneamento de Módulos Core**:
+  - **`GBOC-Agent/utils/diagnostic_report.py`**: Instanciação explícita de `logger = logging.getLogger("DiagnosticReport")`, eliminando falha ao registrar erros de diagnóstico de restore.
+  - **`GBOC-Server/modules/reports/flagship_reports.py`**: Inclusão de `import logging` e instância do `logger`, corrigindo exceção ao emitir logs analíticos nos 7 Relatórios Flagship.
+  - **`GBOC-Server/modules/reports/reports_router.py`**: Importação de `db_manager` e saneamento de 9 referências quebradas a `core.get_db_connection()`, garantindo que os relatórios executivos consultem o banco de dados sem interrupção.
+  - **`GBOC-Agent/api/diagnostics.py`**: Importação de `Request` e módulo `time` ausentes, restaurando integridade do endpoint de diagnóstico em tempo real.
+  - **`GBOC-Agent/api/auth.py`**: Importação de `timezone` ausente do módulo `datetime`, corrigindo expiração de tokens e autenticação segura de sessões.
+  - **`GBOC-Agent/shared_core.py`**: Importação de `Path` do módulo `pathlib`, eliminando NameError durante inicialização defensiva de repositórios locais.
+  - **`GBOC-Agent/engines/healer_engine.py`**: Importação de `time` no módulo de autorrecuperação, estabilizando retentativas automáticas e cálculo de latência.
+  - **`GBOC-Agent/engines/engine_validator.py`**: Importação de `shutil` ausente para validação e checagem de binários de motores de backup no host.
+  - **`GBOC-Agent/engines/backup_engine_manager.py`**: Importação de `psycopg2` ausente, prevenindo NameError durante inicialização da base de dados dos motores de backup.
+  - **`GBOC-Agent/api/reports_api.py`**: Importação de `time` ausente, corrigindo cálculo de benchmarks de execução de relatórios.
+  - **Auditoria Estática**: 0 erros em `py_compile` e `pyflakes` em todos os 275+ módulos Python do repositório.
+
+### 🎨 Logs Sentinel UI & Kyle Zantos Motion Principles
+- **Arquitetura Visual Toast Notification Premium**:
+  - Implementação completa em [GBOC-Agent/static/logs.html](file:///d:/GBOC-New/GBOC-New/GBOC-Agent/static/logs.html) e [GBOC-Server/modules/logs/logs.html](file:///d:/GBOC-New/GBOC-New/GBOC-Server/modules/logs/logs.html) com estética Modern Glassmorphism (painel com `backdrop-filter: blur(16px)` e bordas translúcidas).
+  - Pseudo-elementos flutuantes `.toast::before` e `.toast::after` proporcionando profundidade óptica com círculos translúcidos dinâmicos.
+  - Contêiner de ícone frosted glass (37×37px) com relevo e glifos centralizados (`✓`, `i`, `!`, `×`).
+  - Transições e animações fluidas baseadas nos Princípios de Movimento de Kyle Zantos: entrada em cascata com atraso progressivo (`@keyframes appear`) e saída suave com descarte fluido (`@keyframes disappear`).
+- **Layout de Grade Horizontal Estruturado (3 Colunas)**:
+  - Resolução do bug de empilhamento vertical (onde ícone, mensagem e botão quebravam em 4 linhas separadas).
+  - Estruturação estrita em 3 colunas: Coluna 1 (Ícone: 39px) | Coluna 2 (Conteúdo e Metadados: 1fr) | Coluna 3 (Contêiner de Ações com Diagnóstico IA e botão Dismiss: auto).
+- **Filtros Cromáticos Semafóricos & Mapeamento Inteligente**:
+  - Botões de cápsula com gradientes táteis para `Todos` (cinza ardósia), `Success` (verde esmeralda), `Info` (azul royal), `Warning` (âmbar vibrante) e `Error` (vermelho carmim).
+  - Mapeamento analítico inteligente no banco de dados: reconhecimento de status de sucesso em eventos com nível `INFO` contendo `[SUCCESS]`, `[OK]`, `sucesso` ou `concluída`.
+  - Agrupamento de alertas de desempenho `[PERF-SLOW]` e limites de latência em `Warning`.
+
+### 🌐 Universal CSS Architecture Policy & Distribuição
+- **Sincronização 100% Canônica (Zero-Isolated CSS)**:
+  - Inclusão das classes `.log-toast-panel`, `.toast`, `.filters`, `.toast-actions` e animações no arquivo canônico [shared-css/style.css](file:///d:/GBOC-New/GBOC-New/shared-css/style.css).
+  - Propagação via `tools/sync_css.py` para as instâncias de Agent e Server.
+  - Injeção das regras prioritárias em `<style>` nos cabeçalhos para neutralizar agressividade de cache de navegadores com versão de cache-busting `?v=14.7.2`.
+- **Empacotamento de Distribuição Atualizado**:
+  - Geração completa do pacote em `D:\GBOC-New\GBOC-Distribution` via [build_installer_package.ps1](file:///d:/GBOC-New/GBOC-New/build_installer_package.ps1).
 
 ---
 

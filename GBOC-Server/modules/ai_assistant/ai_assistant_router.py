@@ -1,19 +1,73 @@
-# GBOC System v14.6.0 Enterprise Edition
+# GBOC System v14.7.3 Enterprise Edition
 # Module: Server AI Copilot Assistant (Multi-Provider: Ollama Local, DeepSeek, Groq Free, Gemini, OpenAI, Claude)
 
 import os
-import sys
 import json
 import logging
 import requests
 import time
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import JSONResponse
 
+try:
+    from database import db_manager
+    def get_db(): return db_manager.get_connection()
+    def release_db(conn): db_manager.release_connection(conn)
+except Exception:
+    def get_db(): return None
+    def release_db(conn): pass
+
 logger = logging.getLogger("gboc_server_ai_copilot")
 router = APIRouter(prefix="/api/v1/ai", tags=["Server AI Copilot"])
+
+
+def _get_current_user_from_req(request: Request) -> Optional[Dict[str, Any]]:
+    """Obtém o usuário logado com base no token da requisição."""
+    auth_header = request.headers.get("Authorization", "")
+    token = None
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:].strip()
+    else:
+        token = request.cookies.get("gboc_server_token")
+    
+    if not token:
+        return None
+        
+    conn = None
+    try:
+        conn = get_db()
+        if not conn:
+            return None
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT u.id, u.username, u.display_name, u.role, u.tenant_id
+            FROM server_auth_tokens t
+            JOIN server_auth_users u ON t.user_id = u.id
+            WHERE t.token = %s AND t.expires_at > LOCALTIMESTAMP
+        """, (token,))
+        row = cur.fetchone()
+        cur.close()
+        if row:
+            return {"id": row[0], "username": row[1], "display_name": row[2], "role": row[3], "tenant_id": row[4]}
+    except Exception as e:
+        logger.warning(f"[SERVER AI COPILOT] Erro ao autenticar via token local: {e}")
+    finally:
+        if conn: release_db(conn)
+    return None
+
+
+def _require_auth(request: Request) -> Dict[str, Any]:
+    """Valida autenticação do usuário para os endpoints do Server AI Copilot."""
+    user = _get_current_user_from_req(request)
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Não autenticado. Forneça um token válido no header Authorization ou cookie gboc_server_token."
+        )
+    return user
+
 
 DEFAULT_SERVER_AI_CONFIG = {
     "provider": "ollama_local",
@@ -52,8 +106,10 @@ def save_server_ai_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         json.dump(current, f, indent=2, ensure_ascii=False)
     return current
 
-def _build_server_system_context() -> str:
-    """Coleta informações operacionais em tempo real do GBOC Server para alimentar a IA."""
+def _build_server_system_context() -> Tuple[str, int]:
+    """Coleta informações operacionais em tempo real do GBOC Server para alimentar a IA.
+    Retorna tupla com (contexto_texto, contagem_jobs_com_falha).
+    """
     try:
         data_dir = os.path.join(os.getcwd(), "data")
         agents_file = os.path.join(data_dir, "agents.json")
@@ -91,9 +147,9 @@ def _build_server_system_context() -> str:
         )
         if failed_list_summary:
             ctx += f"Lista de Incidentes Recentes:\n{failed_list_summary}\n"
-        return ctx
+        return ctx, failed_jobs_count
     except Exception:
-        return "Servidor GBOC Enterprise operacional."
+        return "Servidor GBOC Enterprise operacional.", 0
 
 def _try_ollama_fallback(prompt: str, full_system: str, preferred_model: Optional[str] = None, cfg: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
     """
@@ -169,21 +225,22 @@ def _try_ollama_fallback(prompt: str, full_system: str, preferred_model: Optiona
 
     return None
 
-@router.post("/query")
-async def server_ai_query(request: Request):
-    """Processa perguntas ou comandos via IA generativa no Servidor Central com Fallback Inteligente."""
+
+def query_server_ai_assistant(prompt: str, provider_override: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Função standalone multi-provedor (DeepSeek, Ollama, Groq, OpenAI, Gemini, Claude + fallback nativo).
+    Retorna um dicionário estruturado com o resultado da inferência ou diagnóstico preditivo.
+    Utilizada tanto pela API v1 (/api/v1/ai/query) quanto pela API v2 (/api/v2/ai/query).
+    """
+    clean_prompt = (prompt or "").strip()
+    if not clean_prompt:
+        return {"status": "error", "message": "Prompt vazio"}
+
     try:
-        body = await request.json()
-        prompt = (body.get("prompt") or "").strip()
-        provider_override = body.get("provider")
-
-        if not prompt:
-            return JSONResponse({"status": "error", "message": "Prompt vazio"}, status_code=400)
-
         cfg = load_server_ai_config()
         raw_provider = (provider_override or cfg.get("provider") or "ollama_local").lower().strip()
         sys_prompt = cfg.get("system_prompt", DEFAULT_SERVER_AI_CONFIG["system_prompt"])
-        context_info = _build_server_system_context()
+        context_info, failed_jobs_count = _build_server_system_context()
         full_system = f"{sys_prompt}\n\n[CONTEXTO ATUAL DO SERVIDOR CENTRAL GBOC]:\n{context_info}"
         
         start_time = time.time()
@@ -236,14 +293,20 @@ async def server_ai_query(request: Request):
                         "model": actual_model,
                         "messages": [
                             {"role": "system", "content": full_system},
-                            {"role": "user", "content": prompt}
+                            {"role": "user", "content": clean_prompt}
                         ],
                         "temperature": 0.3
                     }
                     res = requests.post(target_url, json=payload, headers=headers, timeout=30)
                     if res.status_code == 200:
                         ans_text = res.json()["choices"][0]["message"]["content"]
-                        return JSONResponse({"status": "success", "provider": f"DeepSeek ({actual_model})", "model": actual_model, "answer": ans_text, "duration_seconds": round(time.time() - start_time, 2)})
+                        return {
+                            "status": "success",
+                            "provider": f"DeepSeek ({actual_model})",
+                            "model": actual_model,
+                            "answer": ans_text,
+                            "duration_seconds": round(time.time() - start_time, 2)
+                        }
                     else:
                         config_error_detail = f"Falha na API DeepSeek (HTTP {res.status_code}: {res.text[:180]}). Verifique se sua API Key está correta."
                 except Exception as e_ds:
@@ -251,17 +314,17 @@ async def server_ai_query(request: Request):
 
         # 2. OLLAMA LOCAL (On-Premises)
         elif provider == "ollama":
-            ollama_res = _try_ollama_fallback(prompt, full_system, preferred_model=model_name, cfg=cfg)
+            ollama_res = _try_ollama_fallback(clean_prompt, full_system, preferred_model=model_name, cfg=cfg)
             if ollama_res:
-                return JSONResponse({
+                return {
                     "status": "success",
                     "provider": f"Ollama Local ({ollama_res['model']})",
                     "model": ollama_res["model"],
                     "answer": ollama_res["answer"],
                     "duration_seconds": round(time.time() - start_time, 2)
-                })
+                }
             else:
-                config_error_detail = f"O serviço Ollama Local está inacessível no servidor (tentado em http://localhost:11434)."
+                config_error_detail = "O serviço Ollama Local está inacessível no servidor (tentado em http://localhost:11434)."
 
         # 3. GROQ CLOUD
         elif provider == "groq":
@@ -271,11 +334,17 @@ async def server_ai_query(request: Request):
                 try:
                     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
                     actual_model = cfg.get("groq_model") or cfg.get("model") or "llama-3.3-70b-versatile"
-                    payload = {"model": actual_model, "messages": [{"role": "system", "content": full_system}, {"role": "user", "content": prompt}]}
+                    payload = {"model": actual_model, "messages": [{"role": "system", "content": full_system}, {"role": "user", "content": clean_prompt}]}
                     res = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers, timeout=20)
                     if res.status_code == 200:
                         ans_text = res.json()["choices"][0]["message"]["content"]
-                        return JSONResponse({"status": "success", "provider": "Groq Cloud", "model": actual_model, "answer": ans_text, "duration_seconds": round(time.time() - start_time, 2)})
+                        return {
+                            "status": "success",
+                            "provider": "Groq Cloud",
+                            "model": actual_model,
+                            "answer": ans_text,
+                            "duration_seconds": round(time.time() - start_time, 2)
+                        }
                     else:
                         config_error_detail = f"Falha na API Groq Cloud (HTTP {res.status_code}: {res.text[:180]})."
                 except Exception as e_groq:
@@ -289,11 +358,17 @@ async def server_ai_query(request: Request):
                 try:
                     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
                     actual_model = cfg.get("openai_model") or cfg.get("model") or "gpt-4o-mini"
-                    payload = {"model": actual_model, "messages": [{"role": "system", "content": full_system}, {"role": "user", "content": prompt}]}
+                    payload = {"model": actual_model, "messages": [{"role": "system", "content": full_system}, {"role": "user", "content": clean_prompt}]}
                     res = requests.post("https://api.openai.com/v1/chat/completions", json=payload, headers=headers, timeout=25)
                     if res.status_code == 200:
                         ans_text = res.json()["choices"][0]["message"]["content"]
-                        return JSONResponse({"status": "success", "provider": "OpenAI API", "model": actual_model, "answer": ans_text, "duration_seconds": round(time.time() - start_time, 2)})
+                        return {
+                            "status": "success",
+                            "provider": "OpenAI API",
+                            "model": actual_model,
+                            "answer": ans_text,
+                            "duration_seconds": round(time.time() - start_time, 2)
+                        }
                     else:
                         config_error_detail = f"Falha na API OpenAI (HTTP {res.status_code}: {res.text[:180]})."
                 except Exception as e_oai:
@@ -307,11 +382,17 @@ async def server_ai_query(request: Request):
                 try:
                     actual_model = cfg.get("model") or "gemini-1.5-flash"
                     url = f"https://generativelanguage.googleapis.com/v1beta/models/{actual_model}:generateContent?key={api_key}"
-                    payload = {"contents": [{"parts": [{"text": f"{full_system}\n\nUsuário: {prompt}"}]}]}
+                    payload = {"contents": [{"parts": [{"text": f"{full_system}\n\nUsuário: {clean_prompt}"}]}]}
                     res = requests.post(url, json=payload, timeout=20)
                     if res.status_code == 200:
                         ans_text = res.json()["candidates"][0]["content"]["parts"][0]["text"]
-                        return JSONResponse({"status": "success", "provider": "Google Gemini", "model": actual_model, "answer": ans_text, "duration_seconds": round(time.time() - start_time, 2)})
+                        return {
+                            "status": "success",
+                            "provider": "Google Gemini",
+                            "model": actual_model,
+                            "answer": ans_text,
+                            "duration_seconds": round(time.time() - start_time, 2)
+                        }
                     else:
                         config_error_detail = f"Falha na API Gemini (HTTP {res.status_code}: {res.text[:180]})."
                 except Exception as e_gem:
@@ -333,19 +414,25 @@ async def server_ai_query(request: Request):
                     payload = {
                         "model": actual_model,
                         "max_tokens": 512,
-                        "messages": [{"role": "user", "content": f"{full_system}\n\nUsuário: {prompt}"}]
+                        "messages": [{"role": "user", "content": f"{full_system}\n\nUsuário: {clean_prompt}"}]
                     }
                     res = requests.post(url, json=payload, headers=headers, timeout=20)
                     if res.status_code == 200:
                         ans_text = res.json()["content"][0]["text"]
-                        return JSONResponse({"status": "success", "provider": "Anthropic Claude", "model": actual_model, "answer": ans_text, "duration_seconds": round(time.time() - start_time, 2)})
+                        return {
+                            "status": "success",
+                            "provider": "Anthropic Claude",
+                            "model": actual_model,
+                            "answer": ans_text,
+                            "duration_seconds": round(time.time() - start_time, 2)
+                        }
                     else:
                         config_error_detail = f"Falha na API Claude (HTTP {res.status_code}: {res.text[:180]})."
                 except Exception as e_claude:
                     config_error_detail = f"Falha de conexão com Anthropic Claude API: {str(e_claude)}"
 
         # FALLBACK AUTOMÁTICO PARA OLLAMA LOCAL QUANDO O PROVEDOR PRINCIPAL FALHAR OU NÃO POSSUIR API KEY
-        ollama_fallback = _try_ollama_fallback(prompt, full_system, preferred_model=model_name, cfg=cfg) if provider != "ollama" else None
+        ollama_fallback = _try_ollama_fallback(clean_prompt, full_system, preferred_model=model_name, cfg=cfg) if provider != "ollama" else None
 
         err_msg = config_error_detail or f"Erro de conexão com a API do provedor {provider_label}."
 
@@ -357,28 +444,33 @@ async def server_ai_query(request: Request):
                 f"🔄 **FALLBACK AUTOMÁTICO ATIVADO (Ollama Local - Modelo {ollama_fallback['model']})**:\n"
                 f"{ollama_fallback['answer']}"
             )
-            return JSONResponse({
+            return {
                 "status": "success",
                 "provider": f"Ollama Local (Fallback - {ollama_fallback['model']})",
                 "model": ollama_fallback['model'],
                 "answer": answer_text,
                 "duration_seconds": round(time.time() - start_time, 2)
-            })
+            }
 
         # FALLBACK SECUNDÁRIO: MOTOR PREDITIVO NATIVO DO SERVIDOR GBOC COM TELEMETRIA REAL
-        p_lower = prompt.lower()
+        p_lower = clean_prompt.lower()
         if any(w in p_lower for w in ["semana", "última semana", "ultima semana", "7 dias", "dias", "falha", "falhas", "falhos", "falhar", "erro", "erros", "executado", "não executado", "nao executado", "deu erro", "pendente", "24h", "relatório"]):
+            if failed_jobs_count > 0:
+                status_summary = f"🔴 **{failed_jobs_count} job(s) com falha registrado(s)** nos últimos 7 dias / 24h. Recomenda-se investigar os agentes afetados e os logs de execução."
+            else:
+                status_summary = "🟢 **Nenhum erro de backup foi registrado nos últimos 7 dias.** Todos os agentes ativos reportaram execução concluída com sucesso."
+
             native_body = (
                 f"🔍 **Relatório Diagnóstico de Backups e Execuções (Últimos 7 dias / 24h)**:\n\n"
                 f"• **Diagnóstico de Execução**: Consulta realizada nos logs do Servidor Central.\n"
                 f"{context_info}\n"
-                f"• **Status Consolidado**: 🟢 **Nenhum erro de backup foi registrado nos últimos 7 dias.** Todos os agentes ativos reportaram execução concluída com sucesso.\n\n"
+                f"• **Status Consolidado**: {status_summary}\n\n"
                 f"📍 **COMO NAVEGAR E CHEGAR À INFORMAÇÃO NO SISTEMA**:\n"
                 f"1. **Central de Alertas**: Acesse no menu lateral **Monitor de Alerta de Jobs** (`/modules/job_alert/`) para ver o relatório completo de alertas ativos e resoluções.\n"
                 f"2. **Monitor de Storage**: Acesse **Monitor de Storage** (`/modules/storage/`) para verificar o crescimento volumétrico dos backups.\n"
                 f"3. **Histórico de Agentes**: Vá em **Agentes Registrados** (`/modules/agents/`) para auditar o log individual de cada servidor monitorado."
             )
-        elif any(w in p_lower for w in ["status", "saúde", "agente", "agentes", "geral", "infraestrutura"]):
+        elif any(w in p_lower for w in ["status", "saúde", "saude", "agente", "agentes", "geral", "infraestrutura"]):
             native_body = (
                 f"📊 **Status Geral da Infraestrutura GBOC**:\n"
                 f"{context_info}\n"
@@ -388,7 +480,7 @@ async def server_ai_query(request: Request):
         else:
             native_body = (
                 f"ℹ️ **Assistente GBOC Server**:\n"
-                f"Recebi sua pergunta: '{prompt}'.\n\n"
+                f"Recebi sua pergunta: '{clean_prompt}'.\n\n"
                 f"{context_info}\n"
                 f"📍 **COMO NAVEGAR NO SISTEMA**:\n"
                 f"• Para gerenciar tarefas: Acesse **Tarefas** no menu lateral.\n"
@@ -404,18 +496,43 @@ async def server_ai_query(request: Request):
             f"{native_body}"
         )
 
-        return JSONResponse({
+        return {
             "status": "success",
             "provider": "Motor Preditivo GBOC Server (Nativo)",
             "model": "GBOC Server Core AI",
             "answer": answer_text,
             "duration_seconds": round(time.time() - start_time, 2)
-        })
+        }
+    except Exception as e:
+        logger.error(f"[SERVER AI COPILOT] Erro ao processar inferência de IA: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@router.post("/query")
+async def server_ai_query(request: Request):
+    """Processa perguntas ou comandos via IA generativa no Servidor Central com Fallback Inteligente."""
+    _require_auth(request)
+    try:
+        body = await request.json()
+        prompt = (body.get("prompt") or "").strip()
+        provider_override = body.get("provider")
+
+        if not prompt:
+            return JSONResponse({"status": "error", "message": "Prompt vazio"}, status_code=400)
+
+        result = query_server_ai_assistant(prompt, provider_override=provider_override)
+        status_code = 200 if result.get("status") == "success" else 500
+        return JSONResponse(result, status_code=status_code)
+    except HTTPException:
+        raise
     except Exception as e:
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
+
 @router.get("/config")
-async def get_server_ai_config():
+async def get_server_ai_config(request: Request):
+    """Retorna as configurações atuais do módulo de IA do Servidor Central (chaves mascaradas)."""
+    _require_auth(request)
     cfg = load_server_ai_config()
     for k in ["groq_api_key", "gemini_api_key", "openai_api_key", "deepseek_api_key"]:
         if cfg.get(k):
@@ -423,15 +540,20 @@ async def get_server_ai_config():
             cfg[k] = val[:4] + "..." + val[-4:] if len(val) > 8 else "***"
     return JSONResponse({"status": "success", "config": cfg})
 
+
 @router.post("/config")
 async def save_server_ai_config_endpoint(request: Request):
+    """Salva configurações do módulo de IA do Servidor Central."""
+    _require_auth(request)
     body = await request.json()
     saved = save_server_ai_config(body)
     return JSONResponse({"status": "success", "config": saved})
 
+
 @router.post("/diagnose")
 async def server_ai_diagnose(request: Request):
     """Diagnóstico preditivo por IA para qualquer módulo do Servidor Central."""
+    _require_auth(request)
     try:
         body = await request.json() if request.headers.get("content-type") == "application/json" else {}
         error_context = body.get("error_context") or body.get("module") or "Diagnóstico geral do Servidor Central"
@@ -450,12 +572,16 @@ async def server_ai_diagnose(request: Request):
             "ai_insights": ai_res.get("analysis", "Diagnóstico processado com sucesso."),
             "result": ai_res
         })
+    except HTTPException:
+        raise
     except Exception as e:
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
 
 @router.post("/auto_fix")
 async def server_ai_auto_fix(request: Request):
     """Correção e remediação autônoma via IA no Servidor Central."""
+    _require_auth(request)
     try:
         body = await request.json()
         issue = body.get("issue") or "Ação corretiva geral"
@@ -464,13 +590,17 @@ async def server_ai_auto_fix(request: Request):
             "message": f"🤖 Ação de auto-remediação executada para: '{issue}'. Parâmetros operacionais e integridade revalidados com sucesso.",
             "fixed": True
         })
+    except HTTPException:
+        raise
     except Exception as e:
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
 
 @router.get("/ollama/models")
 @router.post("/ollama/models")
 async def get_ollama_models(request: Request):
     """Busca modelos instalados no serviço Ollama local/remoto configurado."""
+    _require_auth(request)
     host = request.query_params.get("host")
     if not host and request.method == "POST":
         try:
@@ -526,9 +656,11 @@ async def get_ollama_models(request: Request):
         "message": f"Servidor Ollama local inacessível em {target_host} ou 127.0.0.1:11434."
     })
 
+
 @router.post("/ollama/models/pull")
 async def pull_ollama_model(request: Request):
     """Dispara o download/pull de um modelo Ollama em segundo plano no servidor."""
+    _require_auth(request)
     try:
         body = await request.json()
         host = body.get("host") or "http://localhost:11434"
@@ -552,5 +684,8 @@ async def pull_ollama_model(request: Request):
         t.start()
         
         return JSONResponse({"status": "downloading", "message": f"O download do modelo '{model}' foi iniciado em segundo plano no servidor."})
+    except HTTPException:
+        raise
     except Exception as e:
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+

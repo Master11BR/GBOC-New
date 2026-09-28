@@ -1,21 +1,21 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.7.0 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.7.3 Enterprise. Todos os direitos reservados. -->
 
-# 🚀 GBOC - Gestão & Backup Operations Center (v14.7.0 Enterprise Edition)
+# 🚀 GBOC - Gestão & Backup Operations Center (v14.7.3 Enterprise Edition)
 
-[![GBOC System Version](https://img.shields.io/badge/version-14.7.0--Enterprise-blue.svg)](https://github.com/Master11BR/GBOC-New)
+[![GBOC System Version](https://img.shields.io/badge/version-14.7.3--Enterprise-blue.svg)](https://github.com/Master11BR/GBOC-New)
 [![Python Version](https://img.shields.io/badge/python-3.11%2B%20%7C%203.14-green.svg)](https://www.python.org/)
 [![PostgreSQL](https://img.shields.io/badge/postgresql-16-blue.svg)](https://www.postgresql.org/)
 [![UI Model](https://img.shields.io/badge/UI__MODEL-modern%20(Official)-indigo.svg)]()
 [![Status](https://img.shields.io/badge/status-production--ready-brightgreen.svg)]()
 
-> **GBOC (Gestão & Backup Operations Center v14.7.0 Enterprise Edition)** é a mais avançada plataforma corporativa de orquestração de backup, Disaster Recovery (DR) 100% verificável ponta a ponta, RMM, telemetria real (Zero-Mock Strict), modelo visual universal **Modern UI (UnoCSS)**, **Padrão Oficial de Relatórios v3.0 & Flagships** e resposta cibernética a incidentes.
+> **GBOC (Gestão & Backup Operations Center v14.7.3 Enterprise Edition)** é a mais avançada plataforma corporativa de orquestração de backup, Disaster Recovery (DR) 100% verificável ponta a ponta, RMM, telemetria real (Zero-Mock Strict), modelo visual universal **Modern UI (UnoCSS)**, **Padrão Oficial de Relatórios v3.0 & Flagships** e resposta cibernética a incidentes.
 
 ---
 
 ## 📌 Sumário
 1. [Visão Geral e Arquitetura Operacional](#-visão-geral-e-arquitetura-operacional)
 2. [Estrutura Canônica de Navegação (7 Domínios de Negócio)](#-estrutura-canônica-de-navegação)
-3. [Recursos de Destaque (v14.7.0 Enterprise)](#-recursos-de-destaque-v1470-enterprise)
+3. [Recursos de Destaque (v14.7.3 Enterprise)](#-recursos-de-destaque-v1473-enterprise)
 4. [Padrão Oficial de Relatórios v3.0 & Flagships](#-padrão-oficial-de-relatórios-v30--flagships)
 5. [Disaster Recovery & SureRestore Sandbox Zero-Mock](#-disaster-recovery--surerestore-sandbox-zero-mock)
 6. [Cyber Security Sentinel (ClamAV, YARA, Maltrail, Wazuh, Defender)](#-cyber-security-sentinel)
@@ -26,7 +26,7 @@
 
 ## 🏗️ Visão Geral e Arquitetura Operacional
 
-O GBOC v14.7.0 opera sob o ciclo de vida completo e verificável de proteção contínua:
+O GBOC v14.7.3 opera sob o ciclo de vida completo e verificável de proteção contínua:
 
 ```text
 Política → Backup consistente → Armazenamento → Integridade →
@@ -110,7 +110,7 @@ Configuração
 
 ---
 
-## ⚡ Recursos de Destaque (v14.7.0 Full Stable Enterprise)
+## ⚡ Recursos de Destaque (v14.7.3 Full Stable Enterprise)
 
 - **Padrão Oficial de Relatórios v3.0 (Zero-Mock Normative)**:
   - Eliminação de dados sintéticos e resolução dos 10 bugs de telemetria em `reports_api.py`.
@@ -163,7 +163,18 @@ A partir da versão **14.7.0**, o sistema adota o padrão normativo v3.0 onde os
 
 ---
 
-## 📜 Histórico de Mudanças (Changelog v14.7.0 Enterprise)
+## 📜 Histórico de Mudanças (Changelog v14.7.3 Enterprise)
+
+- **Release 14.7.3 — AI Copilot Router Modernization, Security Auth Enforcement & Predictive Fallback Precision**:
+  - **Função Standalone Multi-Provedor (`query_server_ai_assistant`)**: Desacoplamento da inferência de IA (DeepSeek, Ollama, Groq, OpenAI, Gemini, Claude) em função reutilizável retornando `dict`, restabelecendo a operação da rota oficial `/api/v2/ai/query` (eliminação definitiva do erro `ImportError`).
+  - **Imposição de Autenticação Segura em 7 Endpoints de IA**: Blindagem contra explorações não autenticadas e SSRF em `/query`, `/config` (GET/POST), `/diagnose`, `/auto_fix`, `/ollama/models` (GET/POST) e `/ollama/models/pull`, exigindo token de sessão válido (`Bearer` ou cookie `gboc_server_token`).
+  - **Precisão Semântica do Fallback Preditivo**: Retorno de tupla com telemetria de falhas em `_build_server_system_context()`, reportando `🔴 {N} job(s) com falha registrado(s)` quando incidentes reais são detectados e `🟢 Nenhum erro` apenas sob conformidade estrita comprovada.
+
+- **Release 14.7.2 — Logs Sentinel UI, Kyle Zantos Motion Principles & Core Engine Runtime Fixes**:
+  - Resolução de 10 exceções de runtime `NameError` identificadas por auditoria estática (pyflakes): inicialização de logger em `diagnostic_report.py` e `flagship_reports.py`, importação de `db_manager` e saneamento de 9 referências quebradas em `reports_router.py`, importação de `Request` e `time` em `diagnostics.py`, timezone em `auth.py`, `Path` em `shared_core.py`, `time` em `healer_engine.py`, `shutil` em `engine_validator.py`, `psycopg2` em `backup_engine_manager.py` e `time` em `reports_api.py`.
+  - Nova interface Premium Toast Notification para Logs do Sistema (`logs.html` e `modules/logs/logs.html`), aplicando Kyle Zantos Motion Principles (animações suaves `@keyframes appear` e `@keyframes disappear`), isolamento por grid horizontal estruturado em 3 colunas, pseudo-elementos flutuantes `::before`/`::after` com efeito de bolhas translúcidas e ícones frosted glass.
+  - Filtros cromáticos semafóricos por severidade real (`Success`, `Info`, `Warning`, `Error`) com gradientes táteis vivos, busca em tempo real e mapeamento analítico de eventos no banco de dados.
+  - Paridade Universal CSS (Universal CSS Architecture Policy) sincronizada entre `shared-css`, `GBOC-Agent` e `GBOC-Server`.
 
 - **Release 14.7.0 — Padrão Oficial de Relatórios v3.0 & Zero-Mock Intelligence**:
   - Implementação de `v3_reports_engine.py` eliminando dados fictícios em todos os 50 relatórios.
