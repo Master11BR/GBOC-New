@@ -67,7 +67,7 @@ try:
     from version_control import __version__ as AGENT_VERSION, get_version_info, auto_increment_build
     auto_increment_build()
 except Exception:
-    AGENT_VERSION = "14.7.4"
+    AGENT_VERSION = "14.6.0"
     def get_version_info():
         return {"raw_version": AGENT_VERSION, "semver": AGENT_VERSION}
 
@@ -352,6 +352,11 @@ async def lifespan(app: FastAPI):
         logger.info(f"[HERMES] ✅ P2P LAN Mesh ativo (mDNS/UDP broadcast — agente: {_agent_id})")
     except Exception as _he:
         logger.warning(f"[HERMES] ⚠️ Falha ao iniciar LAN Mesh: {_he}")
+
+    try:
+        get_version_info()
+    except Exception:
+        pass
 
     logger.info("[ACCESS] http://localhost:9200")
     logger.info("=" * 50)
@@ -725,12 +730,28 @@ async def get_server_status():
         return {"status": "error", "message": str(e)}
 
 @app.post("/api/server/configure")
-async def configure_server(server_url: str, api_key: str = "gboc-local-server-key", tenant_id: Optional[str] = None):
-    """Configura conexão com servidor central"""
+async def configure_server(request: Request, server_url: Optional[str] = None, api_key: Optional[str] = None,
+                           tenant_id: Optional[str] = None):
+    """Configura conexão com servidor central (aceita JSON no corpo ou query string).
+    api_key = chave de pareamento exibida no GBOC Server; vazio mantém a chave já salva."""
     try:
+        body = {}
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        if not isinstance(body, dict):
+            body = {}
+        server_url = (body.get("server_url") or server_url or "").strip()
+        api_key = (body.get("api_key") or api_key or "").strip() or (central_client.api_key or "")
+        tenant_id = body.get("tenant_id", tenant_id)
+        if not server_url:
+            return {"status": "error", "success": False, "message": "Informe a URL do Servidor Central"}
         result = central_client.configure_server(server_url, api_key, tenant_id)
         if result.get("success"):
             logger.info(f"✅ Servidor central configurado: {server_url} (tenant: {tenant_id})")
+        result.setdefault("status", "success" if result.get("success") else "error")
+        result.setdefault("message", result.get("error") or "")
         return result
     except Exception as e:
         logger.error(f"Erro ao configurar servidor: {e}")

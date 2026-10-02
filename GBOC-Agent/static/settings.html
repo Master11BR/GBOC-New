@@ -363,8 +363,9 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                         </div>
                         
                         <div class="setting-item">
-                            <label>Chave de API (Token)</label>
-                            <input type="password" id="server-key" class="form-control" placeholder="gboc_at_xxxxxxxxxxxx">
+                            <label>Chave de Pareamento</label>
+                            <input type="password" id="server-key" class="form-control" placeholder="gboc_pk_... (deixe vazio para manter a atual)" autocomplete="off">
+                            <small class="text-muted">Copie no GBOC Server em Configurações Gerais &gt; Pareamento de Agentes. Sem ela o Server recusa heartbeat, sincronização e comandos RMM.</small>
                         </div>
 
                         <div class="setting-item">
@@ -826,7 +827,12 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                     body: JSON.stringify({ server_url: url, api_key: key })
                 });
                 const result = await response.json();
-                alert(result.message || 'Configurado com sucesso');
+                if (!response.ok || result.success === false || result.status === 'error') {
+                    alert('Falha ao configurar servidor: ' + (result.message || result.error || ('HTTP ' + response.status)));
+                } else {
+                    document.getElementById('server-key').value = '';
+                    alert(result.message || 'Configurado com sucesso');
+                }
             } catch (e) {
                 alert('Erro ao configurar servidor: ' + e.message);
             }
@@ -1685,6 +1691,22 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 fb.innerHTML = '❌ Erro de busca: ' + e.message;
             }
         }
+
+        // Pré-preenche a URL do Servidor Central e indica se a chave de pareamento está configurada
+        document.addEventListener('DOMContentLoaded', async function() {
+            try {
+                const r = await fetch('/api/server/status');
+                if (!r.ok) return;
+                const d = await r.json();
+                const srv = d.server || {};
+                const urlEl = document.getElementById('server-url');
+                if (urlEl && srv.server_url && !urlEl.value) urlEl.value = srv.server_url;
+                const keyEl = document.getElementById('server-key');
+                if (keyEl) keyEl.placeholder = srv.paired
+                    ? 'Chave configurada (deixe vazio para manter)'
+                    : 'Chave de pareamento NÃO configurada — cole a chave do Server';
+            } catch (e) { /* status indisponível: mantém campos vazios */ }
+        });
 
         document.addEventListener('DOMContentLoaded', function() {
             loadSettings();

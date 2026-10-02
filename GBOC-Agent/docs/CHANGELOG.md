@@ -1,4 +1,4 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.7.4 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.7.3 Enterprise. Todos os direitos reservados. -->
 
 # GBOC — Changelog de Atualizações
 
@@ -6,7 +6,31 @@
 
 ---
 
-## 14.7.4 — 2026-10-01 (Auditoria das Funções de IA: Zero-Mock, Segurança, Provedores Atuais e Empacotamento de Distribuição)
+## 14.7.5 — 2026-10-02 (Segurança Server↔Agente, Relatórios reais e UI padronizada) — pendente de build
+
+### 🔐 Segurança
+- **Chave de pareamento Server↔Agente** (`X-GBOC-Agent-Key`): gerada automaticamente pelo Server (tabela `server_secrets`, fora do export de configurações) e exibida em *Configurações Gerais > Pareamento de Agentes* (somente admin, com “Gerar nova”). O Agente a recebe em *Configurações > Servidor Central > Chave de Pareamento* e a envia em heartbeat, sync e WebSocket. A chave legada `gboc-local-server-key` nunca é aceita. Pode ser fixada por `GBOC_AGENT_PAIRING_KEY`.
+- Agente: `/api/v1/rmm/`, `/api/ransomware/`, `/api/v2/`, diagnósticos, integridade e power-tools **deixaram de ser públicos** — exigem sessão ou a chave de pareamento. Shutdown só sem sessão via loopback.
+- Server: novo guarda global (`modules/users/auth_guard.py`) — toda rota `/api/` exige sessão; rotas de ingestão dos agentes exigem a chave; RMM exige perfil admin/operator.
+- Server: corrigido *path traversal* nas rotas de arquivos estáticos (era possível baixar `config.py` e `data/*.json` sem login).
+- Proxy RMM não repassa mais o cookie/token do usuário do Server ao Agente.
+
+### 🧾 Zero-Mock
+- Relatórios Flagship F1–F8 (Server e Agente) refeitos com dados reais; sem dados mostram “N/D / SEM DADOS”.
+- RMM: removido o fallback para `127.0.0.1` (Server e Agente podem estar em máquinas diferentes) e os valores fixos do espelho (3,2 GB / 40%).
+- Ransomware: `scans_7d` real (eventos `scan_*` sincronizados); SureRestore no Server retorna 501 (roda no Agente).
+- Virtual Lab: não registra mais “validação executada com sucesso” quando nada foi validado.
+- Migração de motores: removidos repositórios/credenciais fictícios.
+- `server_gboc.py`: removidas definições duplicadas de handlers de tempo real.
+
+### 🎨 Interface (Server + Agente)
+- Novo **UI Contract** (fim de `gboc-layout.css`): uma família de tokens (apelidos legados `--primary`, `--text`, `--border`… apontam para os canônicos), fonte única, tamanhos e alturas padronizados de botões, inputs, badges, tabelas e abas; cores sempre do tema ativo.
+- Menu lateral: submenus retráteis (acordeão); o item selecionado fica fixo, destacado e visível até a próxima navegação (inclusive após recarregar); nomes não são mais cortados; páginas internas marcam o item “pai” correto.
+- Modo horizontal: navegação em segunda linha — não sobrepõe mais os botões da direita; item ativo destacado; submenu não some ao mover o mouse; fecha após escolher.
+- Botão ☰ corrigido (havia dois handlers e o clique se anulava); no celular abre o menu lateral/horizontal.
+- Removidos CSS duplicados de menu em `_sidebar.html` e `dashboard.html`; botões com cores fixas passaram a usar as variantes do tema.
+
+## 14.7.4 — 2026-10-01 (Auditoria das Funções de IA: Zero-Mock, Segurança e Provedores Atuais) — pendente de build
 
 ### 🤖 Camada única de provedores de IA (Server + Agent)
 - Novo `ai_providers.py` idêntico em `GBOC-Server/modules/ai_assistant/` e `GBOC-Agent/engines/`: Ollama (`/api/chat`), OpenAI, Groq, Gemini (header `x-goog-api-key` + `systemInstruction`), Claude (campo `system`), DeepSeek, Grok, Kimi, Mistral e Cohere v2.
@@ -38,14 +62,6 @@
 - Rotas de IA de diagnóstico do Agent movidas de `agent_gboc.py` para `api/diagnostics.py` (entrypoint mais enxuto).
 - Removidas rotas de `agent_gboc.py` que importavam módulos vazios (`core/cbt_vss.py`, `core/agent_dr_sync.py`) e **sobrepunham** as rotas reais de `modules/cbt` e `modules/dr` (botão "Exportar Runbook" de DR sempre falhava).
 - Novos testes: `tests/test_ai_providers.py` (28 testes).
-
-### 📦 Empacotamento, Instalador e Documentação (v14.7.4)
-- Instalador unificado (`Setup.bat` e `Setup.ps1` em `tools/installer_assets/`) atualizado para GBOC System v14.7.4 Enterprise.
-- Sincronização e geração de requisitos unificados em `tools/make_distribution.py` com manifesto oficial `package_manifest.json` (v14.7.4).
-- Execução e validação do script `build_installer_package.ps1` gerando o pacote consolidado em `GBOC-Distribution`.
-- Atualização dos guias normativos e técnicos: `DOCUMENTACAO_SISTEMA_ISO.md` (Seção 2.5), `SYSTEM_CONFIG_GUIDE.md`, `README.md`, `INSTALADORES_README.md`, `PROJECT_CONTEXT.md` e `arch_contract.json`.
-- Atualização dos módulos centrais de controle de versão (`version_control.py`, `version.py`, `server_gboc.py`, `agent_gboc.py`) e incremento de build.
-- Suíte de testes automatizados com validação estrita de paridade Server/Agent (`tests/test_ai_providers.py` — 28/28 passed).
 
 ## 14.7.3 — 2026-09-28 (AI Copilot Router Modernization, Security Auth Enforcement & Predictive Fallback Precision)
 

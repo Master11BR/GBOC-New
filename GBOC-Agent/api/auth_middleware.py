@@ -30,8 +30,6 @@ PUBLIC_PATHS = {
     '/api/system/hardware',
     '/api/v1/system/hardware',
     '/api/v2/system/hardware',
-    '/api/system/shutdown',
-    '/api/v1/system/shutdown',
     '/login.html',
     '/favicon.ico',
     '/.well-known/appspecific/com.chrome.devtools.json',
@@ -40,9 +38,14 @@ PUBLIC_PATHS = {
 
 PUBLIC_PREFIXES = [
     '/static/',
+]
+
+# Rotas chamadas pelo GBOC Server (outra máquina, sem sessão de usuário):
+# antes eram públicas — agora exigem a chave de pareamento (X-GBOC-Agent-Key)
+# ou uma sessão válida. Ver core/agent_pairing.py.
+SERVER_CALLABLE_PREFIXES = [
     '/api/v1/rmm/',
     '/api/rmm/',
-    # '/api/v1/ai/' e '/api/ai/' removidos: Copilot exige sessão (expunha config/chaves de IA).
     '/api/ransomware/',
     '/api/v2/',
     '/api/v1/diagnostics/',
@@ -54,6 +57,10 @@ PUBLIC_PREFIXES = [
     '/api/v1/power-tools/',
     '/api/power-tools/',
 ]
+
+# Shutdown: liberado sem sessão apenas para o script local (loopback).
+LOOPBACK_PATHS = {'/api/system/shutdown', '/api/v1/system/shutdown'}
+_LOOPBACK_HOSTS = {'127.0.0.1', '::1', 'localhost', 'testclient'}
 
 # ── Global Rate Limiting ──────────────────────────────────────────
 
@@ -89,6 +96,19 @@ class AuthMiddleware(BaseHTTPMiddleware):
         for prefix in PUBLIC_PREFIXES:
             if path.startswith(prefix):
                 return await call_next(request)
+
+        if path in LOOPBACK_PATHS and client_ip in _LOOPBACK_HOSTS:
+            return await call_next(request)
+
+        # Chamada do GBOC Server autenticada pela chave de pareamento (qualquer rota protegida,
+        # pois o proxy RMM do Server repassa subcaminhos arbitrários).
+        try:
+            from core.agent_pairing import request_has_valid_server_key
+            if request_has_valid_server_key(request.headers):
+                request.state.user = {"username": "gboc-server", "role": "server", "via": "pairing-key"}
+                return await call_next(request)
+        except Exception as e:
+            logger.error(f"Pairing key check error: {e}")
 
         try:
             from api.auth import is_auth_enabled, get_current_user

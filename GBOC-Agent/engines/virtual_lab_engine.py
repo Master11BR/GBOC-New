@@ -77,12 +77,14 @@ class VirtualLabSandboxEngine:
                 Write-Output "SWITCH_READY"
             }
         """
+        switch_ready = False
         try:
             net_res = subprocess.run(
                 ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_net],
                 capture_output=True, text=True, timeout=20
             )
             if "SWITCH_READY" in net_res.stdout:
+                switch_ready = True
                 logs.append("✅ Switch virtual privado 'GBOC-Isolated-Lab' ativo (100% isolado da produção).")
             else:
                 logs.append("⚠️ Aviso: Falha ao confirmar switch virtual privado Hyper-V.")
@@ -101,11 +103,12 @@ class VirtualLabSandboxEngine:
 
         if not resolved_disk or not os.path.exists(resolved_disk):
             logs.append(f"⚠️ Disco virtual de recuperação para snapshot {snapshot_id} não localizado em disco.")
-            logs.append("ℹ️ Validação de integridade estática executada com sucesso. Validação de boot dinâmico pendente de geração VHDX.")
+            logs.append("ℹ️ Nenhuma validação de boot foi executada: gere/exporte o VHDX de recuperação e repita o teste.")
             duration = round(time.time() - start_time, 2)
             return {
-                "success": True,
+                "success": False,
                 "status": "Inconclusivo",
+                "error": "VHDX de recuperação não encontrado — boot não validado.",
                 "lab_id": lab_id,
                 "snapshot_id": snapshot_id,
                 "vm_name": name,
@@ -113,7 +116,7 @@ class VirtualLabSandboxEngine:
                 "duration_seconds": duration,
                 "evidence": {
                     "hyperv_available": True,
-                    "switch_isolated": True,
+                    "switch_isolated": switch_ready,
                     "disk_attached": False,
                     "reason": "VHDX de recuperação não encontrado para boot dinâmico."
                 },

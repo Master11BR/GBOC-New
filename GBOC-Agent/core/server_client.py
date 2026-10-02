@@ -33,6 +33,7 @@ import websockets
 import websockets.exceptions
 
 from server_config import config_manager
+from core.agent_pairing import outbound_headers, AGENT_KEY_HEADER, LEGACY_DEFAULT_KEY
 from shared_core import SharedCore
 
 try:
@@ -77,6 +78,15 @@ class CentralServerClient:
 
         # Carregar configuração sem testar conexão
         self._load_configuration_silent()
+        self._apply_auth_headers()
+
+    def _apply_auth_headers(self):
+        """Aplica a chave de pareamento (X-GBOC-Agent-Key) em todas as chamadas ao Server."""
+        self._session.headers.pop(AGENT_KEY_HEADER, None)
+        self._session.headers.update(outbound_headers(self.agent_id, self.api_key or ""))
+        if not self.api_key or self.api_key == LEGACY_DEFAULT_KEY:
+            logger.warning("🔑 Chave de pareamento não configurada: o Server recusará heartbeat/sync. "
+                           "Copie a chave em Server > Configurações Gerais > Pareamento de Agentes.")
 
     def start_threads(self):
         """Inicia threads de fundo (heartbeat, WebSocket, etc) após a inicialização principal."""
@@ -255,6 +265,7 @@ class CentralServerClient:
                 logger.info(f"⏱️ Heartbeat: {config_manager.get_heartbeat_interval()} min")
                 logger.info(f"🔄 Sincronização: {config_manager.get_sync_interval()} min")
 
+                self._apply_auth_headers()
                 # Testar conexão com o servidor
                 self._test_server_connection(self.server_url, self.api_key or "")
             else:
@@ -313,29 +324,21 @@ class CentralServerClient:
             if not test_result['success']:
                 return test_result
             
-            # Salvar configuração
-            config_file = Path("C:/ProgramData/GBOC/central_config.json") if os.name == 'nt' else Path.home() / ".gboc" / "config.json"
-            config_file.parent.mkdir(parents=True, exist_ok=True)
-            
-            config = {
+            # Salvar configuração no mesmo arquivo lido pelo config_manager (central_config.json),
+            # preservando os demais campos (intervalos, flags) já configurados.
+            config_manager.update({
                 "server_url": server_url.rstrip('/'),
                 "api_key": api_key,
                 "tenant_id": tenant_id,
                 "enabled": True,
-                "heartbeat_interval_minutes": 5,
-                "sync_interval_minutes": 30,
-                "send_logs": True,
-                "send_metrics": True,
                 "configured_at": datetime.now().isoformat()
-            }
-            
-            with open(config_file, 'w') as f:
-                json.dump(config, f, indent=2)
-            
+            })
+
             # Atualizar configuração ativa
             self.server_url = server_url.rstrip('/')
             self.api_key = api_key
             self.tenant_id = tenant_id
+            self._apply_auth_headers()
             
             # Registrar agente
             registration_result = self._register_agent()
@@ -370,13 +373,28 @@ class CentralServerClient:
                 timeout=10
             )
 
-            if response.status_code == 200:
-                return {"success": True, "message": "Conexão estabelecida"}
-            else:
+            if response.status_code != 200:
                 return {
                     "success": False,
                     "error": f"Servidor retornou status {response.status_code}"
                 }
+
+            # Validar a chave de pareamento (rota protegida do Server)
+            if not api_key or api_key == LEGACY_DEFAULT_KEY:
+                return {"success": False, "error": "Informe a chave de pareamento exibida no GBOC Server "
+                                                  "(Configurações Gerais > Pareamento de Agentes)."}
+            check = self._session.get(
+                f"{server_url}/api/v1/agents/pairing/check",
+                headers={**headers, **outbound_headers(self.agent_id, api_key)},
+                timeout=10
+            )
+            if check.status_code == 401:
+                return {"success": False, "error": "Chave de pareamento recusada pelo Server."}
+            if check.status_code == 404:
+                return {"success": False, "error": "Server sem suporte a pareamento — atualize o GBOC Server."}
+            if check.status_code != 200:
+                return {"success": False, "error": f"Falha ao validar chave: HTTP {check.status_code}"}
+            return {"success": True, "message": "Conexão estabelecida e chave de pareamento validada"}
 
         except requests.exceptions.Timeout:
             return {"success": False, "error": "Timeout na conexão"}
@@ -554,7 +572,12 @@ class CentralServerClient:
                 _ssl_ctx.check_hostname = False
                 _ssl_ctx.verify_mode = ssl.CERT_NONE
 
-            async with websockets.connect(ws_url, ssl=_ssl_ctx) as websocket:
+            _hdrs = outbound_headers(self.agent_id, self.api_key or "")
+            try:
+                _ws_cm = websockets.connect(ws_url, ssl=_ssl_ctx, additional_headers=_hdrs)
+            except TypeError:  # websockets < 14
+                _ws_cm = websockets.connect(ws_url, ssl=_ssl_ctx, extra_headers=_hdrs)
+            async with _ws_cm as websocket:
                 self.websocket = websocket
                 self.websocket_connected = True
                 logger.info(f"🔗 WebSocket conectado: {ws_url}")
@@ -1392,6 +1415,7 @@ class CentralServerClient:
         """Obtém status da conexão com servidor"""
         return {
             "configured": bool(self.server_url and self.api_key),
+            "paired": bool(self.api_key and self.api_key != LEGACY_DEFAULT_KEY),
             "server_url": self.server_url,
             "agent_id": self.agent_id,
             "is_registered": self.is_registered,
