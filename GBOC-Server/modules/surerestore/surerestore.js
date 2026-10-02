@@ -11,17 +11,20 @@ async function runSureRestoreTest() {
         const r = await fetch(window.GBOC_API_BASE + '/api/v1/surerestore/verify', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({agent_id: 'agente-local', job_id: 'job-hourly-01'})
+            body: JSON.stringify({})
         });
-        const d = await r.json();
-        const osHeartbeat = (d.stages && d.stages.os_heartbeat && d.stages.os_heartbeat.detail) ? d.stages.os_heartbeat.detail : 'OK (Pulso de SO detectado)';
-        const appConsistency = (d.stages && d.stages.app_consistency_check && d.stages.app_consistency_check.detail) ? d.stages.app_consistency_check.detail : 'OK (Consistência VSS 100%)';
+        const d = await r.json().catch(() => ({}));
+        const esc = (v) => String(v ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
+        if (!r.ok) {
+            details.innerHTML = `<span style="color:var(--warning)"><strong>${esc(d.overall_state || 'Inconclusivo')}:</strong> ${esc(d.error?.message || d.detail || ('HTTP ' + r.status))}</span>`;
+            return;
+        }
+        const stages = Object.entries(d.stages || {}).map(([k, v]) => `<p><strong>${esc(k)}:</strong> ${esc(v.status)} — ${esc(v.detail)}</p>`).join('');
         details.innerHTML = `
-            <p><strong>ID da Verificação:</strong> ${d.verification_id || 'v-sandbox-01'}</p>
-            <p><strong>Tempo de Boot Sandbox:</strong> ${d.execution_time_seconds || 4.2}s</p>
-            <p><strong>Heartbeat do SO:</strong> ${osHeartbeat}</p>
-            <p><strong>Consistência de Aplicação:</strong> ${appConsistency}</p>
-            <p style="color:var(--success)"><strong>Resultado:</strong> ${d.summary || 'SureRestore Verification PASSED'}</p>
+            <p><strong>ID da Verificação:</strong> ${esc(d.verification_id || '—')}</p>
+            <p><strong>Duração:</strong> ${d.execution_time_seconds != null ? esc(d.execution_time_seconds) + 's' : '—'}</p>
+            ${stages}
+            <p><strong>Resultado:</strong> ${esc(d.summary || d.overall_state || '—')}</p>
         `;
     } catch(e) {
         details.innerHTML = `<span style="color:var(--danger)">Erro no SureRestore: ${e.message}</span>`;

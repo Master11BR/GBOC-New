@@ -6,6 +6,39 @@
 
 ---
 
+## 14.7.4 — 2026-10-01 (Auditoria das Funções de IA: Zero-Mock, Segurança e Provedores Atuais) — pendente de build
+
+### 🤖 Camada única de provedores de IA (Server + Agent)
+- Novo `ai_providers.py` idêntico em `GBOC-Server/modules/ai_assistant/` e `GBOC-Agent/engines/`: Ollama (`/api/chat`), OpenAI, Groq, Gemini (header `x-goog-api-key` + `systemInstruction`), Claude (campo `system`), DeepSeek, Grok, Kimi, Mistral e Cohere v2.
+- Cada provedor usa **somente a sua própria chave e modelo** (antes a primeira chave preenchida era enviada a qualquer provedor e modelos do Ollama, ex. `llama3:latest`, eram enviados à OpenAI/Groq).
+- Modelos padrão atualizados (out/2026): `openai/gpt-oss-120b` (Groq — `llama-3.3-70b-versatile` foi descontinuado), `gemini-flash-latest` (Gemini 1.5/2.0 desligados), `claude-sonnet-5-5`, `deepseek-flash`, `grok-4.7`, `kimi-k2.6`, `command-a-plus-05-2026`.
+- Timeouts realistas (Ollama 180 s; nuvem 60 s) — antes 6 s, o que fazia quase toda resposta local cair no fallback.
+- Regra fixa de ancoragem anexada ao prompt de sistema: a IA não pode afirmar números/status fora do contexto real.
+
+### 🛡️ Zero-Mock (AI_RULES §11)
+- Copilot Server: contexto lido do PostgreSQL (`agents`, `agent_task_executions`) — antes lia `agents.json`/`failed_jobs.json` inexistentes e afirmava "Nenhum erro… todos os agentes OK".
+- Copilot Agent: removida a frase fixa "Nenhum erro de backup foi registrado na última semana… 100% de integridade"; agora usa `task_executions`, `tasks` e status real do Ransomware Guardian.
+- `/diagnose`: telemetria real (psutil) em vez de CPU/RAM/Disco fixos (22/58/42 e 18/52/38).
+- `/auto_fix` (Server/Agent) e `/api/v2/system/auto-heal`: retornam **501** explícito com procedimento manual (antes devolviam "corrigido com sucesso" sem executar nada).
+- `ai-repair` (Agent): deixou de reescrever execuções `failed` como `repaired` (falsificava o histórico); executa manutenção real (limpeza de `data/temp`, `ANALYZE`, detecção de execuções presas) e reporta ✓/✗ por etapa.
+- `ai-analyze-sla`/`ai-analyze-risk`: erros retornam erro (antes SLA 100% / causa inventada).
+- REP-F6 *AI Predictive Suite* (Server e Agent): reescrito com `ai_predictive.py` (regressão linear com R², Z-Score, canários/incidentes, janela por hora) — antes todos os valores eram fixos (score 91, "confiança 95%", "22h–04h").
+- `modules/analytics/analytics_router.py`: removida resposta fixa (12 agentes, 100%).
+- Frontend: removidos textos de sucesso fabricados em `diagnostic.html`, `tasks.html`, `index.html` e `dashboard.html`; score `null` exibido como "indisponível" (antes `?? 100`).
+
+### 🔐 Segurança
+- Agent: `/api/ai/*` e `/api/v1/ai/*` deixaram de ser públicos; `/api/v1/diagnostics/ai-config` exigia nada e **retornava as chaves de API em texto puro** — agora exige sessão e mascara.
+- Server: `/api/v2/ai/*` sem autenticação → exige sessão; gravação de configuração e *pull* de modelos exigem perfil administrador.
+- Rotas duplicadas `/api/v1/server/ai-config` (memória/variáveis de ambiente, sem auth) unificadas na configuração real.
+- Chaves mascaradas (`sk-a...wxyz`) não sobrescrevem mais a chave real ao salvar; URLs do Ollama validadas (somente http/https).
+- XSS corrigido no widget do Copilot e nas telas que exibiam respostas da IA via `innerHTML`.
+- Middleware de autenticação do Agent agora é *fail-closed*.
+
+### 🧩 Arquitetura / correções gerais
+- Rotas de IA de diagnóstico do Agent movidas de `agent_gboc.py` para `api/diagnostics.py` (entrypoint mais enxuto).
+- Removidas rotas de `agent_gboc.py` que importavam módulos vazios (`core/cbt_vss.py`, `core/agent_dr_sync.py`) e **sobrepunham** as rotas reais de `modules/cbt` e `modules/dr` (botão "Exportar Runbook" de DR sempre falhava).
+- Novos testes: `tests/test_ai_providers.py` (28 testes).
+
 ## 14.7.3 — 2026-09-28 (AI Copilot Router Modernization, Security Auth Enforcement & Predictive Fallback Precision)
 
 ### 🤖 Modernização do Server AI Copilot & Resolução de Falhas de Integração (Bugs 11, 12 e 13)

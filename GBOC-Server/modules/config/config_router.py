@@ -6,6 +6,7 @@ import os
 import json
 import time
 import urllib.request
+from datetime import datetime
 from typing import Dict, Any
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
@@ -19,6 +20,18 @@ _REPORTS_CONFIG_CACHE = {
     "auto_currency_conversion": True,
     "target_currency": "BRL"
 }
+
+
+def get_usd_to_brl_rate_info() -> Dict[str, Any]:
+    """Cotação USD->BRL com a origem do valor (ao vivo, cache ou valor de referência)."""
+    rate = get_usd_to_brl_rate()
+    live = _EXCHANGE_RATE_CACHE["timestamp"] > 0
+    return {
+        "rate": rate,
+        "live": live,
+        "source": "AwesomeAPI (economia.awesomeapi.com.br)" if live else "valor de referência (cotação ao vivo indisponível)",
+        "fetched_at": datetime.fromtimestamp(_EXCHANGE_RATE_CACHE["timestamp"]).isoformat() if live else None,
+    }
 
 
 def get_usd_to_brl_rate() -> float:
@@ -58,13 +71,19 @@ async def get_server_settings():
     usd_per_tb = _REPORTS_CONFIG_CACHE["cloud_storage_cost_usd_per_tb"]
     brl_per_tb = round(usd_per_tb * rate, 2)
 
+    # Provedor/modelo de IA lidos da configuração real (data/server_ai_config.json)
+    from modules.ai_assistant.ai_assistant_router import load_server_ai_config
+    from modules.ai_assistant.ai_providers import normalize_provider, resolve_model
+    _ai_cfg = load_server_ai_config()
+    _ai_model = resolve_model(_ai_cfg, normalize_provider(_ai_cfg.get("provider")))
+
     return JSONResponse({
         "status": "success",
         "settings": {
             "server_title": "GBOC Operations Center v14.6.0 Enterprise",
             "http_port": int(os.getenv("SERVER_PORT", "8000")),
-            "ai_provider": os.getenv("GBOC_AI_PROVIDER", "ollama"),
-            "ai_model": os.getenv("GBOC_AI_MODEL", "llama3"),
+            "ai_provider": _ai_cfg.get("provider", ""),
+            "ai_model": _ai_model,
             "tls_enabled": True,
             "reports": {
                 "cloud_storage_cost_usd_per_tb": usd_per_tb,

@@ -11,7 +11,7 @@ import asyncio
 import json
 from typing import Optional
 from fastapi import APIRouter, Request, Query
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from modules.v2.envelope import build_v2_response
 
 try:
@@ -28,8 +28,8 @@ def _get_host_telemetry():
     """Coleta métricas 100% reais do host operacional."""
     uptime_sec = int(time.time() - _SERVER_START_TIME)
     
-    cpu_percent = psutil.cpu_percent(interval=0.1) if PSUTIL_AVAILABLE else 0.0
-    cpu_count = psutil.cpu_count(logical=True) if PSUTIL_AVAILABLE else 1
+    cpu_percent = psutil.cpu_percent(interval=0.1) if PSUTIL_AVAILABLE else None
+    cpu_count = psutil.cpu_count(logical=True) if PSUTIL_AVAILABLE else None
     
     memory_data = {}
     if PSUTIL_AVAILABLE:
@@ -161,8 +161,9 @@ async def get_system_health_v2(request: Request):
             "latency_ms": db_latency_ms
         },
         "host": {
-            "cpu_ok": psutil.cpu_percent() < 95 if PSUTIL_AVAILABLE else True,
-            "memory_ok": (psutil.virtual_memory().percent < 95) if PSUTIL_AVAILABLE else True
+            "cpu_ok": psutil.cpu_percent() < 95 if PSUTIL_AVAILABLE else None,
+            "memory_ok": (psutil.virtual_memory().percent < 95) if PSUTIL_AVAILABLE else None,
+            "telemetry_available": PSUTIL_AVAILABLE
         }
     }
     
@@ -183,42 +184,39 @@ async def stream_system_telemetry_v2(interval: int = Query(2, ge=1, le=60)):
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
+_MANUAL_REMEDIATION = {
+    "prune_lock": "No agente afetado: Repositórios > selecione o repositório > 'Desbloquear' (restic unlock / kopia maintenance) e reexecute o job.",
+    "rebuild_index": "No agente afetado: Repositórios > 'Verificar/Reparar índice' (restic rebuild-index / kopia index recover).",
+    "purge_logs": "No Servidor: aplique a retenção de logs em Configurações > Logs.",
+    "restart_agent_service": "No host do agente: reinicie o serviço 'GBOC Agent' (services.msc ou Restart-Service).",
+    "test_credentials": "Em Armazenamento, reinforme e teste as credenciais do destino.",
+    "vss_shadow_copy": "No host do agente: verifique 'vssadmin list writers' e habilite VSS na tarefa.",
+}
+
+
 @router.post("/auto-heal")
 async def auto_heal_action_v2(request: Request):
-    """Executa ações automatizadas de Auto-Healing no Servidor Central (API v2)."""
+    """
+    O Servidor Central não executa remediação automática destas ações (elas dependem do agente/host).
+    Responde com erro explícito e o procedimento manual, em vez de simular sucesso (Política Zero-Mock).
+    """
     t0 = time.perf_counter()
+    from modules.ai_assistant.ai_assistant_router import _require_auth
+    _require_auth(request)
     try:
+        body = await request.json()
+    except ValueError:
         body = {}
-        try:
-            body = await request.json()
-        except Exception:
-            pass
-        action = body.get("action", "auto_heal")
-        
-        executed_details = []
-        if action == "prune_lock":
-            executed_details.append("Varredura e remoção de arquivos .lock obsoletos concluída nos repositórios.")
-        elif action in ("rebuild_index", "purge_logs"):
-            executed_details.append("Higienização de logs temporários e verificação de integridade de índices realizada.")
-        elif action == "restart_agent_service":
-            executed_details.append("Sinal de reset enviado aos barramentos de mensageria dos agentes.")
-        else:
-            executed_details.append("Verificação proativa de memória e reconexão de sockets executada com sucesso.")
-
-        elapsed = round((time.perf_counter() - t0) * 1000, 2)
-        return build_v2_response(
-            data={
-                "status": "SUCCESS",
-                "action": action,
-                "message": f"Ação de Auto-Healing '{action}' executada com sucesso.",
-                "details": executed_details
-            },
-            execution_time_ms=elapsed
-        )
-    except Exception as e:
-        elapsed = round((time.perf_counter() - t0) * 1000, 2)
-        return build_v2_response(
+    action = str((body or {}).get("action") or "none")
+    elapsed = round((time.perf_counter() - t0) * 1000, 2)
+    return JSONResponse(
+        build_v2_response(
             success=False,
-            error={"code": "AUTO_HEAL_FAILED", "message": str(e)},
-            execution_time_ms=elapsed
-        )
+            data={"action": action, "executed": False,
+                  "manual_steps": _MANUAL_REMEDIATION.get(action, "Siga a solução indicada no diagnóstico.")},
+            error={"code": "AUTO_HEAL_NOT_IMPLEMENTED",
+                   "message": f"Nenhuma ação foi executada automaticamente para '{action}'. Execute o procedimento manual indicado."},
+            execution_time_ms=elapsed,
+        ),
+        status_code=501,
+    )

@@ -921,16 +921,18 @@ async function runSLA_AI_Analysis() {
     if (box) box.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <strong>Assistente IA:</strong> Analisando métricas de SLA e cumprimento de RPO/RTO...';
     try {
         const r = await fetch(window.GBOC_API_BASE + '/api/v1/diagnostics/ai-analyze-sla', { method: 'POST' });
-        const data = await r.json();
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data.detail || data.message || `HTTP ${r.status}`);
         if (box) {
-            const recs = (data.recommendations || []).map(rc => `<li>${rc}</li>`).join('');
+            const recs = (data.recommendations || []).map(rc => `<li>${esc(rc)}</li>`).join('');
+            const src = data.is_llm_real ? esc(data.provider || 'LLM') : 'análise sem LLM';
             box.innerHTML = `
-                <div style="color:var(--text);margin-bottom:8px;"><i class="fas fa-robot" style="color:var(--primary)"></i> <strong>Diagnóstico SLA via IA:</strong> ${data.analysis || 'Métricas de SLA verificadas com sucesso.'}</div>
-                <div style="font-size:0.85em;color:var(--text-muted)"><strong>Recomendações da IA:</strong><ul style="margin:4px 0 0 20px;">${recs}</ul></div>
+                <div style="color:var(--text);margin-bottom:8px;white-space:pre-wrap"><i class="fas fa-robot" style="color:var(--primary)"></i> <strong>Diagnóstico SLA (${src}):</strong> ${esc(data.analysis || 'Sem análise retornada.')}</div>
+                ${recs ? `<div style="font-size:0.85em;color:var(--text-muted)"><strong>Recomendações:</strong><ul style="margin:4px 0 0 20px;">${recs}</ul></div>` : ''}
             `;
         }
     } catch(e) {
-        if (box) box.innerHTML = `<span style="color:var(--danger)">Erro ao analisar SLA: ${e.message}</span>`;
+        if (box) box.innerHTML = `<span style="color:var(--danger)">Erro ao analisar SLA: ${esc(e.message)}</span>`;
     }
 }
 
@@ -950,53 +952,37 @@ async function runAlertAIAnalysis(alertMsg) {
 
 async function runAIRepair(action, target) {
     const box = document.getElementById('aiDiagnosticBox');
-    if (box) box.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <strong>Assistente IA:</strong> Executando auto-reparo de repositório, consistência de schema e liberação de travas VSS...';
-    
-    const endpoints = ['/api/v1/diagnostics/ai-repair', '/api/diagnostics/ai-repair'];
+    if (box) box.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <strong>Assistente IA:</strong> Executando manutenção automatizada (temporários, estatísticas do banco e execuções presas)...';
+
     let resData = null;
-
-    for (const ep of endpoints) {
-        try {
-            const r = await fetch(ep, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({action: action || 'auto', target: target || 'system'})
-            });
-            if (r.ok) {
-                resData = await r.json();
-                if (resData) break;
-            }
-        } catch(e) {}
+    let errorMsg = '';
+    try {
+        const r = await fetch((window.GBOC_API_BASE || '') + '/api/v1/diagnostics/ai-repair', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({action: action || 'auto', target: target || 'system'})
+        });
+        resData = await r.json().catch(() => null);
+        if (!r.ok) errorMsg = (resData && (resData.detail || resData.message)) || `HTTP ${r.status}`;
+    } catch(e) {
+        errorMsg = e.message;
     }
 
-    if (!resData) {
-        resData = {
-            status: 'success',
-            message: 'Auto-reparo e otimização de rotina executados com sucesso!',
-            actions_taken: [
-                '✓ Re-indexação de metadados de repositórios locais verificada [OK]',
-                '✓ Consistência das tabelas SQLite/Logs auditada [OK]',
-                '✓ Varredura de arquivos temporários e liberação de travas VSS executada [OK]',
-                '✓ Fila de sincronização e retentativas redefinida com sucesso [OK]'
-            ]
-        };
+    if (!box) return;
+    if (errorMsg || !resData) {
+        box.innerHTML = `<div style="color:var(--danger)"><i class="fas fa-times-circle"></i> A manutenção não foi executada: ${esc(errorMsg || 'resposta inválida')}</div>`;
+        return;
     }
-
-    const details = (resData.actions_taken || [
-        '✓ Re-indexação de metadados de repositórios locais verificada [OK]',
-        '✓ Consistência das tabelas auditada [OK]',
-        '✓ Liberação de travas VSS executada [OK]'
-    ]).map(a => `<div style="padding:2px 0;color:var(--success);">${a}</div>`).join('');
-
-    if (box) {
-        box.innerHTML = `
-            <div style="background:rgba(72,187,120,0.1);border:1px solid var(--success);padding:14px;border-radius:8px">
-                <h4 style="color:var(--success);margin:0 0 6px"><i class="fas fa-check-circle"></i> Auto-reparo Concluído com Sucesso!</h4>
-                <div style="font-size:0.88em;color:var(--text);margin-bottom:8px">${resData.message || 'Procedimentos automatizados concluídos.'}</div>
-                <div style="font-family:monospace;font-size:0.82em;background:var(--bg-input);padding:8px 12px;border-radius:6px">${details}</div>
-            </div>
-        `;
-    }
+    const ok = resData.status === 'success';
+    const color = ok ? 'var(--success)' : 'var(--warning)';
+    const details = (resData.results || []).map(r =>
+        `<div style="padding:2px 0;color:${r.ok ? 'var(--success)' : 'var(--warning)'};">${r.ok ? '✓' : '✗'} ${esc(r.action)}: ${esc(r.detail)}</div>`).join('');
+    box.innerHTML = `
+        <div style="border:1px solid ${color};padding:14px;border-radius:8px">
+            <h4 style="color:${color};margin:0 0 6px"><i class="fas ${ok ? 'fa-check-circle' : 'fa-exclamation-triangle'}"></i> ${esc(resData.message || '')}</h4>
+            <div style="font-family:monospace;font-size:0.82em;background:var(--bg-input);padding:8px 12px;border-radius:6px">${details}</div>
+        </div>
+    `;
     loadAll();
 }
 
@@ -1194,6 +1180,10 @@ async function runAIDiagnostic(customPrompt) {
     const alertsData = await api('/api/preemptive/alerts');
     const activeAlerts = (alertsData && alertsData.alerts) ? alertsData.alerts : [];
 
+    if (!customPrompt && !alertsData) {
+        box.innerHTML = '<span style="color:var(--warning)"><i class="fas fa-exclamation-triangle"></i> Não foi possível consultar os alertas preventivos — o estado do sistema não pôde ser verificado.</span>';
+        return;
+    }
     if (!customPrompt && activeAlerts.length === 0) {
         box.innerHTML = `
             <div style="background:rgba(72,187,120,0.1);border:1px solid var(--success);padding:12px 16px;border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:15px">
@@ -1215,17 +1205,19 @@ async function runAIDiagnostic(customPrompt) {
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({prompt: targetPrompt})
         });
+        const data = await res.json().catch(() => ({}));
         if (res.ok) {
-            const data = await res.json();
+            const src = data.is_llm_real ? esc(data.provider || 'LLM') : `${esc(data.provider || 'heurística')}`;
+            const sol = data.solution ? `<div style="margin-top:8px;white-space:pre-wrap"><strong>O que fazer:</strong>\n${esc(data.solution)}</div>` : '';
             box.innerHTML = `
-                <i class="fas fa-robot" style="color:var(--primary);"></i> <strong>Diagnóstico da IA:</strong> ${data.analysis || 'Sistema auditado com sucesso.'}<br><br>
-                <button class="btn btn-sm btn-primary" onclick="runAIRepair('auto', 'system')"><i class="fas fa-wrench"></i> Aplicar Correções Recomendadas</button>
+                <div style="white-space:pre-wrap"><i class="fas fa-robot" style="color:var(--primary);"></i> <strong>Diagnóstico (${src}):</strong> ${esc(data.analysis || 'Sem análise retornada.')}</div>${sol}<br>
+                <button class="btn btn-sm btn-primary" onclick="runAIRepair('auto', 'system')"><i class="fas fa-wrench"></i> Executar Manutenção Automatizada</button>
             `;
         } else {
-            box.innerHTML = '<i class="fas fa-robot"></i> <strong>Assistente GBOC:</strong> Análise de IA concluída. Repositórios e rotinas em conformidade.';
+            box.innerHTML = `<span style="color:var(--danger)"><i class="fas fa-times-circle"></i> Falha na análise de IA: ${esc(data.detail || data.message || 'HTTP ' + res.status)}</span>`;
         }
     } catch (e) {
-        box.innerHTML = '<i class="fas fa-robot"></i> <strong>Assistente GBOC:</strong> Análise de rotina concluída. Todos os repositórios e serviços estão operacionais.';
+        box.innerHTML = `<span style="color:var(--danger)"><i class="fas fa-times-circle"></i> Falha de comunicação com o módulo de IA: ${esc(e.message)}</span>`;
     }
 }
 

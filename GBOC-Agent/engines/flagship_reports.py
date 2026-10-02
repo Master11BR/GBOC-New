@@ -176,9 +176,7 @@ def _get_agent_data() -> Dict[str, Any]:
                             "last_run": r[6].isoformat() if hasattr(r[6], 'isoformat') else str(r[6]) if r[6] else None,
                             "last_status": r[7] or "IDLE",
                             "status": r[7] or "IDLE",
-                            "retention_days": r[8] or 30,
-                            "last_duration": 18.0,
-                            "last_size": 0
+                            "retention_days": r[8]
                         })
                 except Exception as err:
                     logger.warning(f"Erro ao consultar tasks no agente: {err}")
@@ -227,9 +225,9 @@ def _get_agent_data() -> Dict[str, Any]:
                             "bytes": int(r[5] or 0),
                             "end_time": r[6].isoformat() if hasattr(r[6], 'isoformat') else str(r[6]) if r[6] else None,
                             "error": r[7],
-                            "compression_ratio": float(r[8] or 1.0),
+                            "compression_ratio": float(r[8]) if r[8] else None,
                             "bytes_added": int(r[9] or 0),
-                            "engine": "Restic"
+                            "engine": None
                         })
                 except Exception as err:
                     logger.warning(f"Erro ao consultar task_executions no agente: {err}")
@@ -258,7 +256,7 @@ def _get_agent_data() -> Dict[str, Any]:
                             "verified_at": r[7].isoformat() if hasattr(r[7], 'isoformat') else str(r[7]) if r[7] else None,
                             "boot_ok": bool(r[4] and r[4] > 0),
                             "integrity_ok": (str(r[3]).lower() in ['passed', 'success', 'ok']),
-                            "status": r[3] or "PASSED"
+                            "status": r[3]
                         })
                 except Exception:
                     conn.rollback()
@@ -270,9 +268,9 @@ def _get_agent_data() -> Dict[str, Any]:
                         data["audit_logs"].append({
                             "id": r[0],
                             "action": r[1],
-                            "user": r[2] or "admin",
+                            "user": r[2],
                             "timestamp": r[3].isoformat() if hasattr(r[3], 'isoformat') else str(r[3]) if r[3] else None,
-                            "ip": r[4] or "127.0.0.1",
+                            "ip": r[4],
                             "details": r[5]
                         })
                 except Exception:
@@ -307,7 +305,7 @@ def _get_agent_data() -> Dict[str, Any]:
         }
     except Exception as e:
         logger.warning(f"Erro ao obter telemetria do host: {e}")
-        data["telemetry"] = {"cpu_percent": 0.0, "ram_percent": 0.0, "disks": []}
+        data["telemetry"] = {"available": False, "disks": []}
 
     return data
 
@@ -321,517 +319,75 @@ def _compute_hash(payload: Dict[str, Any]) -> str:
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
-def _build_rep_f1(data: Dict[str, Any]) -> Dict[str, Any]:
-    tasks = data["tasks"]
-    execs = data["executions"]
-    verifs = data["verifications"]
-    repos = data["repositories"]
-
-    total_tasks = len(tasks)
-    active_tasks = sum(1 for t in tasks if t["status"] in ("SUCCESS", "OK", "IDLE", "RUNNING"))
-    coverage_pct = round((active_tasks / total_tasks * 100), 1) if total_tasks > 0 else 100.0
-
-    recent_execs = [e for e in execs if e["status"] in ("SUCCESS", "FAILED")]
-    success_execs = sum(1 for e in recent_execs if e["status"] == "SUCCESS")
-    sla_compliance_pct = round((success_execs / len(recent_execs) * 100), 1) if recent_execs else 98.5
-
-    tested_tasks = len(set(v["task_id"] for v in verifs if v.get("integrity_ok")))
-    restore_tested_pct = round((tested_tasks / total_tasks * 100), 1) if total_tasks > 0 else 75.0
-
-    has_immutable = any(r.get("is_immutable") for r in repos)
-    immutability_active = has_immutable or True
-
-    ransomware_exposure = "LOW"
-    if any(c.get("status") != "OK" for c in data["canaries"]):
-        ransomware_exposure = "MEDIUM"
-
-    score_val = int(
-        (sla_compliance_pct * 0.30) +
-        (coverage_pct * 0.25) +
-        (restore_tested_pct * 0.20) +
-        ((100 if immutability_active else 50) * 0.15) +
-        ((100 if ransomware_exposure == "LOW" else 60) * 0.10)
-    )
-    score_val = max(10, min(100, score_val))
-
-    task_name_map = {t["id"]: t["name"] for t in tasks}
-
-    assets = []
-    for t in tasks:
-        t_execs = [e for e in execs if e["task_id"] == t["id"]]
-        last_e = t_execs[0] if t_execs else None
-        duration = int(last_e["duration_sec"]) if last_e else int(t["last_duration"])
-        rto_sec = max(5, duration)
-        sla_stat = "COMPLIANT"
-        if last_e and last_e["status"] == "FAILED":
-            sla_stat = "NON_COMPLIANT"
-        elif rto_sec > 180:
-            sla_stat = "AT_RISK"
-
-        assets.append({
-            "name": t["name"],
-            "engine": t["engine"],
-            "last_backup": t["last_run"] or (last_e["start_time"] if last_e else None),
-            "rpo_target_min": 60,
-            "rto_actual_sec": rto_sec,
-            "criticality": "HIGH" if "banco" in t["name"].lower() or "db" in t["name"].lower() else "MEDIUM",
-            "sla_status": sla_stat
-        })
-
-    failures_count = sum(1 for e in recent_execs if e["status"] == "FAILED")
-    last_restore_str = verifs[0]["verified_at"] if verifs else "Validado nas últimas 24h"
-
-    actions = [
-        {"priority": "ALTA", "description": "Executar teste de restauração nas tarefas sem validação recente", "owner": "Administrador Local", "deadline": "48 horas"},
-        {"priority": "MÉDIA", "description": "Verificar políticas de imutabilidade nos repositórios secundários", "owner": "Segurança da Informação", "deadline": "5 dias"},
-        {"priority": "BAIXA", "description": "Otimizar janelas de retenção para liberar espaço", "owner": "Operações", "deadline": "15 dias"}
-    ]
-
-    return {
-        "protection_score": score_val,
-        "score_trend": 3,
-        "sla_compliance_pct": sla_compliance_pct,
-        "asset_coverage_pct": coverage_pct,
-        "restore_tested_pct": restore_tested_pct,
-        "immutability_active": immutability_active,
-        "ransomware_exposure": ransomware_exposure,
-        "kpis": [
-            {"label": "Conformidade SLA", "value": f"{sla_compliance_pct}%", "target": "≥ 95%", "status": "OK" if sla_compliance_pct >= 95 else "ATENÇÃO"},
-            {"label": "Cobertura de Tarefas", "value": f"{coverage_pct}%", "target": "100%", "status": "OK" if coverage_pct >= 90 else "ATENÇÃO"},
-            {"label": "Falhas no Período", "value": str(failures_count), "target": "0", "status": "OK" if failures_count == 0 else "CRÍTICO"},
-            {"label": "Último Restore Testado", "value": "100% Íntegro", "target": "Semanal", "status": "OK"},
-            {"label": "Imutabilidade WORM", "value": "Ativa", "target": "Ativa", "status": "OK"},
-            {"label": "Score vs Meta", "value": f"{score_val} / 100", "target": "≥ 85", "status": "OK" if score_val >= 85 else "ATENÇÃO"}
-        ],
-        "delta": [
-            {"type": "improvement", "icon": "↑", "text": f"Conformidade de SLA mantida em {sla_compliance_pct}% com {len(tasks)} rotinas ativas no agente."},
-            {"type": "warning", "icon": "↓", "text": f"{failures_count} falhas operacionais registradas exigiram re-tentativa automática." if failures_count > 0 else "Nenhuma falha crítica no ciclo recente de tarefas."},
-            {"type": "trend", "icon": "→", "text": "Volume de dados locais protegido com crescimento controlado de 1.8%."}
-        ],
-        "analytical_summary": f"O score de proteção do agente local está em {score_val}/100 com {len(tasks)} tarefas monitoradas. A conformidade de SLA de RPO permanece em {sla_compliance_pct}%.",
-        "assets": assets,
-        "uncovered_assets": [],
-        "recommended_actions": actions
-    }
-
-
-def _build_rep_f2(data: Dict[str, Any]) -> Dict[str, Any]:
-    canaries = data["canaries"]
-    incidents = data["incidents"]
-    execs = data["executions"]
-
-    threat_score = 15
-    if canaries and any(c.get("status") != "OK" for c in canaries):
-        threat_score += 40
-    if incidents:
-        threat_score += len(incidents) * 15
-    threat_score = min(95, max(5, threat_score))
-
-    events = []
-    now = datetime.now(timezone.utc)
-    events.append({
-        "ts": now.strftime("%d/%m %H:%M"),
-        "type": "CANARY",
-        "description": f"Auditoria de arquivos canários (Honeyfiles) íntegra. {len(canaries)} verificados.",
-        "status": "OK"
-    })
-    events.append({
-        "ts": (now - timedelta(hours=3)).strftime("%d/%m %H:%M"),
-        "type": "WORM",
-        "description": "Repositório local com flag de proteção contra sobrescrita e integridade verificada.",
-        "status": "OK"
-    })
-    events.append({
-        "ts": (now - timedelta(hours=7)).strftime("%d/%m %H:%M"),
-        "type": "HASH",
-        "description": "Verificação de assinatura SHA-256 e integridade de blocos desduplicados.",
-        "status": "OK"
-    })
-
-    return {
-        "threat_score": threat_score,
-        "blast_radius_assets": 0 if threat_score < 30 else 1,
-        "blast_radius_tb": 0.05,
-        "clean_restore_point": (datetime.now(timezone.utc) - timedelta(hours=4)).strftime("%d/%m/%Y %H:%M"),
-        "kpis": [
-            {"label": "Threat Score", "value": f"{threat_score}/100", "target": "< 25", "status": "OK" if threat_score < 25 else "ATENÇÃO"},
-            {"label": "Canários Ativos", "value": f"{max(4, len(canaries))} Unidades", "target": "≥ 4", "status": "OK"},
-            {"label": "Repositório WORM", "value": "Protegido", "target": "Ativo", "status": "OK"},
-            {"label": "SureRestore Sandbox", "value": "100% Sucesso", "target": "100%", "status": "OK"}
-        ],
-        "delta": [
-            {"type": "improvement", "icon": "↑", "text": "Canários de ransomware sem alteração ou encriptação maliciosa detectada."},
-            {"type": "warning", "icon": "↓", "text": "Recomendado ativar checagem contínua de entropia para detecção em tempo real."},
-            {"type": "trend", "icon": "→", "text": "Isolamento de credenciais administrativas mantido em padrão de menor privilégio."}
-        ],
-        "analytical_summary": f"Nenhuma intrusão de ransomware detectada no agente. O score de exposição é de {threat_score}/100 com mecanismos de honeypot e hash Merkle operantes.",
-        "events": events,
-        "defenses": {
-            "worm_lock": "ACTIVE",
-            "honeyfiles": "ACTIVE",
-            "hash_chain": "VERIFIED",
-            "air_gap": "CONNECTED"
-        },
-        "recommended_actions": [
-            {"priority": "ALTA", "description": "Isolar credenciais do repositório secundário fora do escopo local", "owner": "SecOps", "deadline": "24 horas"},
-            {"priority": "MÉDIA", "description": "Configurar canários em diretórios compartilhados de rede", "owner": "Administrador Local", "deadline": "3 dias"}
-        ]
-    }
-
-
-def _build_rep_f3(data: Dict[str, Any]) -> Dict[str, Any]:
-    repos = data["repositories"]
-    telemetry = data["telemetry"]
-    rate = get_usd_to_brl_rate()
-
-    total_used_gb = sum(r["used_bytes"] for r in repos) / (1024**3)
-    if total_used_gb == 0 and telemetry.get("disks"):
-        total_used_gb = sum(d["used_gb"] for d in telemetry["disks"])
-
-    total_cap_gb = sum(r["total_bytes"] for r in repos) / (1024**3)
-    if total_cap_gb == 0 and telemetry.get("disks"):
-        total_cap_gb = sum(d["total_gb"] for d in telemetry["disks"])
-
-    occ_pct = round((total_used_gb / total_cap_gb * 100), 1) if total_cap_gb > 0 else 45.0
-    days_left = max(15, int((100 - occ_pct) * 2.5))
-
-    repo_list = []
-    for r in repos:
-        u_gb = round(r["used_bytes"] / (1024**3), 2)
-        raw_gb = round(u_gb * 2.2, 2)
-        repo_list.append({
-            "name": r["name"],
-            "raw_gb": raw_gb,
-            "stored_gb": u_gb,
-            "dedup_ratio": 2.2,
-            "algorithm": r["engine"] or "ZSTD"
-        })
-
-    if not repo_list:
-        repo_list.append({
-            "name": "Repositório Local Principal",
-            "raw_gb": round(total_used_gb * 2.1, 2),
-            "stored_gb": round(total_used_gb, 2),
-            "dedup_ratio": 2.1,
-            "algorithm": "ZSTD + FastCDC"
-        })
-
-    return {
-        "storage_health_pct": occ_pct,
-        "days_until_full": days_left,
-        "days_until_full_ai": max(10, days_left - 4),
-        "economy_gb": round(total_used_gb * 1.1, 2),
-        "usd_brl_rate": rate,
-        "kpis": [
-            {"label": "Ocupação de Storage", "value": f"{occ_pct}%", "target": "< 80%", "status": "OK" if occ_pct < 80 else "ATENÇÃO"},
-            {"label": "Esgotamento Estimado", "value": f"{days_left} dias", "target": "> 30 dias", "status": "OK" if days_left > 30 else "CRÍTICO"},
-            {"label": "Taxa de Deduplicação", "value": "2.2x", "target": "≥ 2.0x", "status": "OK"},
-            {"label": "Economia Total", "value": f"{round(total_used_gb * 1.1, 1)} GB", "target": "Contínua", "status": "OK"}
-        ],
-        "delta": [
-            {"type": "improvement", "icon": "↑", "text": f"Algoritmo de compressão ZSTD gerou economia de {round(total_used_gb * 1.1, 1)} GB."},
-            {"type": "warning", "icon": "↓", "text": f"Projeção preditiva aponta saturação em ~{days_left} dias se o crescimento médio diário persistir."},
-            {"type": "trend", "icon": "→", "text": "Taxa média de deduplicação estável em 2.2x nos snapshots recentes."}
-        ],
-        "analytical_summary": f"A ocupação atual dos repositórios do agente é de {occ_pct}%. Modelo preditivo de IA estima esgotamento em {days_left} dias.",
-        "repositories": repo_list,
-        "cloud_costs": [
-            {"provider": "Wasabi Cloud", "cost_usd": 6.99, "cost_brl": round(6.99 * rate, 2)},
-            {"provider": "AWS S3 Standard", "cost_usd": 18.50, "cost_brl": round(18.50 * rate, 2)}
-        ],
-        "recommended_actions": [
-            {"priority": "ALTA", "description": "Configurar retenção 'keep-daily 7, keep-weekly 4' para liberar 15% de blocos expirados", "owner": "Administrador", "deadline": "7 dias"},
-            {"priority": "MÉDIA", "description": "Habilitar Compactação FastCDC em repositórios Restic/Kopia", "owner": "Engenharia", "deadline": "10 dias"}
-        ]
-    }
-
-
-def _build_rep_f4(data: Dict[str, Any]) -> Dict[str, Any]:
-    tasks = data["tasks"]
-    repos = data["repositories"]
-    audit_logs = data["audit_logs"]
-
-    sla_tasks = []
-    for t in tasks:
-        rto_sec = int(t["last_duration"])
-        rpo_min = 60
-        stat = "COMPLIANT" if t["status"] in ("SUCCESS", "OK", "IDLE") else "NON_COMPLIANT"
-        sla_tasks.append({
-            "task_name": t["name"],
-            "rpo_target_min": rpo_min,
-            "rpo_actual_min": 5,
-            "status": stat,
-            "last_backup": t["last_run"] or "Recentemente"
-        })
-
-    return {
-        "compliance_score": 93,
-        "kpis": [
-            {"label": "Score de Governança", "value": "93 / 100", "target": "≥ 90", "status": "OK"},
-            {"label": "Conformidade LGPD", "value": "Auditada", "target": "100%", "status": "OK"},
-            {"label": "Criptografia AES-256", "value": "Ativa", "target": "Ativa", "status": "OK"},
-            {"label": "Trilha de Auditoria", "value": f"{len(audit_logs)} Eventos", "target": "Integral", "status": "OK"}
-        ],
-        "delta": [
-            {"type": "improvement", "icon": "↑", "text": "Criptografia AES-256 ativa em 100% dos repositórios de dados confidenciais."},
-            {"type": "warning", "icon": "↓", "text": "1 política de descarte automático pendente de validação legal."},
-            {"type": "trend", "icon": "→", "text": "Auditoria de integridade operacional em conformidade com as diretrizes do Marco Civil e LGPD."}
-        ],
-        "analytical_summary": "Ambiente local auditado com 93/100 de conformidade regulatória. Todas as operações administrativas registradas em trilha segura.",
-        "sla_tasks": sla_tasks,
-        "retention_policies": [
-            {"policy": "Politica-Diaria", "snapshots": 28, "discarded": 4, "freed_gb": 12.4},
-            {"policy": "Politica-Mensal", "snapshots": 12, "discarded": 1, "freed_gb": 48.0}
-        ],
-        "lgpd_checks": {
-            "aes256_active": True,
-            "secure_delete": True,
-            "repos_without_policy": 0
-        },
-        "audit_log": audit_logs[:10],
-        "recommended_actions": [
-            {"priority": "ALTA", "description": "Exportar relatório de conformidade assinado com hash para auditoria externa", "owner": "DPO / Auditoria", "deadline": "2 dias"},
-            {"priority": "MÉDIA", "description": "Revisar permissões de usuários locais no painel do agente", "owner": "Segurança", "deadline": "7 dias"}
-        ]
-    }
-
-
-def _build_rep_f5(data: Dict[str, Any]) -> Dict[str, Any]:
-    execs = data["executions"]
-    telemetry = data["telemetry"]
-    tasks = data["tasks"]
-    task_name_map = {t["id"]: t["name"] for t in tasks}
-
-    jobs = []
-    for e in execs:
-        t_name = task_name_map.get(e["task_id"], f"Tarefa #{e['task_id']}")
-        vol_gb = round(e["bytes"] / (1024**3), 3)
-        dur = max(1.0, e["duration_sec"])
-        mbps = round((vol_gb * 1024) / dur, 1) if vol_gb > 0 else 12.5
-        jobs.append({
-            "task_name": t_name,
-            "engine": e["engine"] or "Restic",
-            "type": "INCREMENTAL",
-            "started_at": e["start_time"],
-            "duration_sec": int(dur),
-            "volume_gb": vol_gb,
-            "throughput_mbps": mbps,
-            "status": e["status"]
-        })
-
-    tot_jobs = len(jobs)
-    success_rate = round((sum(1 for j in jobs if j["status"] == "SUCCESS") / tot_jobs * 100), 1) if tot_jobs > 0 else 100.0
-
-    return {
-        "jobs": jobs,
-        "operational_score": int(success_rate),
-        "kpis": [
-            {"label": "Jobs Analisados", "value": str(tot_jobs), "target": "Contínuo", "status": "OK"},
-            {"label": "Taxa de Sucesso", "value": f"{success_rate}%", "target": "≥ 98%", "status": "OK" if success_rate >= 98 else "ATENÇÃO"},
-            {"label": "CPU do Host", "value": f"{telemetry.get('cpu_percent', 15.0)}%", "target": "< 75%", "status": "OK"},
-            {"label": "RAM Utilizada", "value": f"{telemetry.get('ram_percent', 35.0)}%", "target": "< 85%", "status": "OK"}
-        ],
-        "delta": [
-            {"type": "improvement", "icon": "↑", "text": f"Taxa de sucesso operacional de {success_rate}% nas rotinas recentes do agente."},
-            {"type": "warning", "icon": "↓", "text": "Pico de processamento identificado durante a inicialização de snapshots pesados."},
-            {"type": "trend", "icon": "→", "text": "Throughput médio de transferência mantido em velocidade adequada ao link de storage."}
-        ],
-        "analytical_summary": f"O agente executou {tot_jobs} operações com {success_rate}% de conclusão bem-sucedida. O consumo de CPU do host permaneceu controlado.",
-        "recommended_actions": [
-            {"priority": "ALTA", "description": "Ajustar concorrência de jobs para evitar sobreposição em horários de pico", "owner": "NOC / Operações", "deadline": "48 horas"},
-            {"priority": "MÉDIA", "description": "Verificar volume de arquivos temporários nos diretórios de cache dos motores", "owner": "SysAdmin", "deadline": "5 dias"}
-        ]
-    }
-
-
-def _build_rep_f6(data: Dict[str, Any]) -> Dict[str, Any]:
-    rate = get_usd_to_brl_rate()
-    repos = data["repositories"]
-    total_gb = sum(r["used_bytes"] for r in repos) / (1024**3)
-    if total_gb == 0:
-        total_gb = 120.0
-
-    cloud_usd = round(max(5.0, (total_gb / 1024) * 7.99), 2)
-    cloud_brl = round(cloud_usd * rate, 2)
-    trad_brl = round(cloud_brl * 2.8, 2)
-    economy_brl = round(trad_brl - cloud_brl, 2)
-    roi_pct = round((economy_brl / max(1.0, cloud_brl)) * 100, 1)
-
-    return {
-        "total_cost_brl": cloud_brl,
-        "economy_brl": economy_brl,
-        "roi_pct": roi_pct,
-        "finops_score": 92,
-        "usd_brl_rate": rate,
-        "kpis": [
-            {"label": "Custo Mensal (BRL)", "value": f"R$ {cloud_brl:,.2f}", "target": "Otimizado", "status": "OK"},
-            {"label": "Economia Gerada", "value": f"R$ {economy_brl:,.2f}", "target": "Maximizada", "status": "OK"},
-            {"label": "ROI Operacional", "value": f"+{roi_pct}%", "target": "> 50%", "status": "OK"},
-            {"label": "Cotação USD (BCB)", "value": f"R$ {rate:.2f}", "target": "Tempo Real", "status": "OK"}
-        ],
-        "delta": [
-            {"type": "improvement", "icon": "↑", "text": f"Deduplicação reduziu transferência em rede gerando economia de R$ {economy_brl:,.2f}."},
-            {"type": "warning", "icon": "↓", "text": "Oscilação cambial impacta diretamente o valor final faturado em USD."},
-            {"type": "trend", "icon": "→", "text": "Eficiência energética estimada em redução de 14.5 kWh/mês com jobs incrementais."}
-        ],
-        "analytical_summary": f"Custo operacional do agente estimado em R$ {cloud_brl:,.2f}/mês com economia de R$ {economy_brl:,.2f} versus soluções convencionais.",
-        "cloud_costs": [
-            {"provider": "Wasabi Cloud Storage", "cost_usd": cloud_usd, "cost_brl": cloud_brl},
-            {"provider": "Transferência Egress Estimada", "cost_usd": 0.00, "cost_brl": 0.00}
-        ],
-        "recommended_actions": [
-            {"priority": "MÉDIA", "description": "Ativar retenção inteligente para snapshots com mais de 90 dias", "owner": "FinOps", "deadline": "15 dias"},
-            {"priority": "BAIXA", "description": "Consolidar múltiplos diretórios em repositório único otimizado", "owner": "Operações", "deadline": "30 dias"}
-        ]
-    }
-
-
-def _build_rep_f7(data: Dict[str, Any]) -> Dict[str, Any]:
-    tasks = data["tasks"]
-    verifs = data["verifications"]
-
-    dr_score = 82
-    if not verifs:
-        dr_score -= 10
-
-    gaps = []
-    for t in tasks:
-        rto_meta = 60
-        rto_real = max(5, int(t["last_duration"]))
-        gap_sec = rto_real - rto_meta
-        gaps.append({
-            "asset": t["name"],
-            "criticality": "HIGH" if "db" in t["name"].lower() else "MEDIUM",
-            "rpo_target_min": 60,
-            "rpo_actual_min": 10,
-            "rto_target_min": 1,
-            "rto_actual_sec": rto_real,
-            "status": "CONFORME" if gap_sec <= 0 else "ATENÇÃO"
-        })
-
-    return {
-        "dr_readiness_score": dr_score,
-        "assets_without_dr": 0,
-        "kpis": [
-            {"label": "DR Readiness Score", "value": f"{dr_score} / 100", "target": "≥ 80", "status": "OK" if dr_score >= 80 else "ATENÇÃO"},
-            {"label": "RTO Médio de Restore", "value": "18 seg", "target": "< 60 seg", "status": "OK"},
-            {"label": "SureRestore Sandbox", "value": "Validado", "target": "100%", "status": "OK"},
-            {"label": "Replicação Offsite", "value": "Sincronizada", "target": "Ativa", "status": "OK"}
-        ],
-        "delta": [
-            {"type": "improvement", "icon": "↑", "text": "Testes de restauração granular executados com sucesso no laboratório de validação."},
-            {"type": "warning", "icon": "↓", "text": "Recomendado simular failover completo de sistema operacional a cada trimestre."},
-            {"type": "trend", "icon": "→", "text": "Lag de sincronização com o storage secundário abaixo de 10 minutos."}
-        ],
-        "analytical_summary": f"O score de prontidão para Disaster Recovery (DR) está em {dr_score}/100. Restauração granular e integridade de VSS confirmadas.",
-        "rto_rpo_gaps": gaps,
-        "recommended_actions": [
-            {"priority": "ALTA", "description": "Executar simulado de restauração em máquina de homologação", "owner": "DR Lead", "deadline": "7 dias"},
-            {"priority": "MÉDIA", "description": "Documentar ordem de boot de serviços para contingência local", "owner": "SysAdmin", "deadline": "14 dias"}
-        ]
-    }
+# REP-F1..F5, F7 e F8: engines/flagship_agent_builders.py (dados reais do banco do Agente).
+# Os construtores antigos deste arquivo retornavam valores fixos e foram removidos (AI_RULES.md §11).
 
 
 def _build_rep_f6_ai(data: Dict[str, Any]) -> Dict[str, Any]:
-    tasks = data["tasks"]
+    """REP-F6 AI Predictive Suite — modelos estatísticos sobre dados reais (engines/ai_predictive.py)."""
+    try:
+        from engines.ai_predictive import build_predictive_suite
+    except ImportError:
+        from ai_predictive import build_predictive_suite
+
     execs = data["executions"]
-    repos = data["repositories"]
-    telemetry = data["telemetry"]
-    canaries = data["canaries"]
+    disks = data["telemetry"].get("disks", [])
+    processed = [{"start": e.get("start_time"), "bytes": e.get("bytes", 0), "status": e.get("status")} for e in execs]
+    added = [{"start": e.get("start_time"), "bytes": e.get("bytes_added", 0), "status": e.get("status")} for e in execs]
 
-    # Modelos Estatísticos e Preditivos de IA
-    total_used_gb = sum(r["used_bytes"] for r in repos) / (1024**3)
-    if total_used_gb == 0 and telemetry.get("disks"):
-        total_used_gb = sum(d["used_gb"] for d in telemetry["disks"])
-    total_cap_gb = sum(r["total_bytes"] for r in repos) / (1024**3)
-    if total_cap_gb == 0 and telemetry.get("disks"):
-        total_cap_gb = sum(d["total_gb"] for d in telemetry["disks"])
-    free_gb = max(0.0, total_cap_gb - total_used_gb)
+    ransomware: Dict[str, Any] = {"available": False}
+    try:
+        from engines.ransomware_detector import get_protection_status
+        st = get_protection_status()
+        ransomware = {"available": True,
+                      "canaries_total": st.get("canaries", {}).get("total", 0),
+                      "canaries_compromised": st.get("canaries", {}).get("compromised", 0),
+                      "incidents_30d": None}
+    except Exception as err:
+        logger.warning(f"Status ransomware indisponível para o REP-F6: {err}")
 
-    # Taxa de crescimento estimada e dias para saturação
-    growth_rate_day = round(max(0.1, total_used_gb * 0.008), 2)
-    days_exhaustion = int(free_gb / growth_rate_day) if growth_rate_day > 0 and free_gb > 0 else 180
-    exhaustion_date = (datetime.now() + timedelta(days=days_exhaustion)).strftime('%d/%m/%Y')
+    # Crescimento de storage usa o volume efetivamente adicionado ao repositório (pós-dedup)
+    suite = build_predictive_suite(processed, disks, ransomware, capacity_points=added)
+    cap = suite["capacity"]
 
-    # Detecção estatística de anomalias (Z-Score > 2.5)
-    anomalies_detected = 0
-    if execs:
-        sizes = [e["bytes"] for e in execs if e.get("bytes", 0) > 0]
-        if len(sizes) >= 3:
-            avg_sz = sum(sizes) / len(sizes)
-            variance = sum((s - avg_sz) ** 2 for s in sizes) / len(sizes)
-            std_dev = math.sqrt(variance) if variance > 0 else 0
-            if std_dev > 0:
-                for s in sizes:
-                    if abs(s - avg_sz) / std_dev > 2.5:
-                        anomalies_detected += 1
-
-    ai_score = 92 if anomalies_detected == 0 else 78
-
-    models = [
-        {
-            "name": "Predição Linear de Capacidade Storage",
-            "type": "Regressão Linear",
-            "status": "OPERACIONAL",
-            "confidence": "95%",
-            "detail": f"Crescimento de {growth_rate_day} GB/dia. Esgotamento projetado para {exhaustion_date} (~{days_exhaustion} dias)."
-        },
-        {
-            "name": "Detecção de Anomalias de Volume (Z-Score)",
-            "type": "Desvio Estatístico (Z > 2.5)",
-            "status": "OPERACIONAL" if anomalies_detected == 0 else "ALERTA",
-            "confidence": "96%",
-            "detail": f"{anomalies_detected} anomalia(s) de volume detectada(s) nas execuções recentes."
-        },
-        {
-            "name": "Score de Exposição Ransomware",
-            "type": "Regras Heurísticas & Canários",
-            "status": "OPERACIONAL",
-            "confidence": "99%",
-            "detail": f"{len(canaries)} canários digitais íntegros. Repositórios com integridade verificada."
-        },
-        {
-            "name": "Otimização de Janela de Backup",
-            "type": "Densidade Temporal por Hora",
-            "status": "OPERACIONAL",
-            "confidence": "92%",
-            "detail": "Janela recomendada entre 22h e 04h com concorrência máxima de 2 tarefas simultâneas."
-        },
-        {
-            "name": "FinOps Glacier Tiering Auto-Detection",
-            "type": "Machine Learning Externo",
-            "status": "UNAVAILABLE",
-            "confidence": "N/A",
-            "detail": "Requer credenciais AWS S3 Lifecycle ou Wasabi Cold Storage configuradas em Configurações > Storage."
-        },
-        {
-            "name": "Green Backup / kWh Efficiency",
-            "type": "Telemetria de Hardware",
-            "status": "UNAVAILABLE",
-            "confidence": "N/A",
-            "detail": "Requer sensor IPMI/ACPI de consumo energético no host."
-        }
+    score = suite["score"]
+    ano = suite["anomaly"]
+    kpis = [
+        {"label": "AI Predictive Score", "value": f"{score} / 100" if score is not None else "Indisponível",
+         "target": "≥ 85", "status": "N/D" if score is None else ("OK" if score >= 85 else "ATENÇÃO")},
+        {"label": "Modelos com Dados", "value": f"{suite['operational_count']} de 4", "target": "4",
+         "status": "OK" if suite["operational_count"] == 4 else "ATENÇÃO"},
+        {"label": "Esgotamento Projetado",
+         "value": f"{cap['days_to_exhaustion']} dias" if cap.get("days_to_exhaustion") is not None else ("Sem crescimento" if cap["status"] != "UNAVAILABLE" else "Indisponível"),
+         "target": "> 60 dias", "status": cap["status"].replace("OPERACIONAL", "OK").replace("UNAVAILABLE", "N/D")},
+        {"label": "Anomalias Detectadas", "value": str(ano["anomalies"]) if ano.get("anomalies") is not None else "Indisponível",
+         "target": "0", "status": "N/D" if ano.get("anomalies") is None else ("OK" if ano["anomalies"] == 0 else "CRÍTICO")},
     ]
+    delta = [{"type": "trend" if m["status"] == "OPERACIONAL" else "warning",
+              "icon": "→" if m["status"] == "OPERACIONAL" else "↓", "text": f"{m['name']}: {m['detail']}"}
+             for m in suite["models"][:4]]
+    actions = []
+    if cap["status"] == "ALERTA":
+        actions.append({"priority": "ALTA", "description": "Expandir o storage ou revisar a retenção: esgotamento projetado em menos de 60 dias.", "owner": "Administrador de Backup", "deadline": "7 dias"})
+    if ano.get("anomalies"):
+        actions.append({"priority": "ALTA", "description": "Investigar as execuções com volume atípico (possível alteração em massa de arquivos).", "owner": "Segurança / Backup", "deadline": "24 horas"})
+    if suite["ransomware"]["status"] == "ALERTA":
+        actions.append({"priority": "CRÍTICA", "description": "Canários comprometidos: isolar o host e validar pontos de restauração limpos.", "owner": "SOC", "deadline": "Imediato"})
+    unavailable = [m["name"] for m in suite["models"][:4] if m["status"] == "UNAVAILABLE"]
+    if unavailable:
+        actions.append({"priority": "MÉDIA", "description": "Acumular histórico/dados para habilitar: " + ", ".join(unavailable) + ".", "owner": "Administrador de Backup", "deadline": "30 dias"})
 
     return {
-        "ai_predictive_score": ai_score,
-        "kpis": [
-            {"label": "AI Predictive Score", "value": f"{ai_score} / 100", "target": "≥ 85", "status": "OK" if ai_score >= 85 else "ATENÇÃO"},
-            {"label": "Modelos Ativos", "value": "4 Operacionais", "target": "≥ 4", "status": "OK"},
-            {"label": "Esgotamento Projetado", "value": f"{days_exhaustion} dias", "target": "> 60 dias", "status": "OK" if days_exhaustion > 60 else "ATENÇÃO"},
-            {"label": "Anomalias Detectadas", "value": str(anomalies_detected), "target": "0", "status": "OK" if anomalies_detected == 0 else "CRÍTICO"}
-        ],
-        "delta": [
-            {"type": "improvement", "icon": "↑", "text": f"Algoritmo de regressão linear projetou saturação estável para {exhaustion_date}."},
-            {"type": "warning", "icon": "↓", "text": "2 modelos de IA externa em status UNAVAILABLE por ausência de telemetria externa."},
-            {"type": "trend", "icon": "→", "text": "Curva de crescimento de dados mantida em taxa previsível de ~0.8% ao dia."}
-        ],
-        "analytical_summary": f"A suíte preditiva avaliou {len(tasks)} rotinas e {len(execs)} execuções locais. Modelos estatísticos de saturação de disco e anomalias de volume operam com índice de confiança de 95%.",
-        "predictive_models": models,
-        "recommended_actions": [
-            {"priority": "MÉDIA", "description": "Expandir histórico de execuções para aumentar a acurácia da regressão linear para 98%", "owner": "Administrador de Backup", "deadline": "15 dias"},
-            {"priority": "BAIXA", "description": "Habilitar telemetria de sensores ACPI para ativar o modelo de eficiência energética Green Backup", "owner": "Engenharia de Infraestrutura", "deadline": "30 dias"}
-        ]
+        "ai_predictive_score": score,
+        "kpis": kpis,
+        "delta": delta,
+        "analytical_summary": (
+            f"Modelos estatísticos aplicados a {suite['executions_analyzed']} execução(ões) reais do agente "
+            f"({suite['failed_executions']} com falha). {suite['operational_count']} de 4 modelos possuem dados suficientes. "
+            f"Score heurístico: {suite['score_method']}."
+        ),
+        "predictive_models": [{k: m[k] for k in ("name", "type", "status", "confidence", "detail")} for m in suite["models"]],
+        "recommended_actions": actions,
     }
 
 
@@ -871,24 +427,34 @@ def build_flagship_report_agent(flagship_id: str) -> Dict[str, Any]:
         "format": "html"
     }
 
-    if fid == "REP-F1":
-        content = _build_rep_f1(raw_data)
-    elif fid == "REP-F2":
-        content = _build_rep_f5(raw_data)  # Operational Performance
-    elif fid == "REP-F3":
-        content = _build_rep_f3(raw_data)  # Storage Intelligence
-    elif fid == "REP-F4":
-        content = _build_rep_f2(raw_data)  # Security & Resilience
-    elif fid == "REP-F5":
-        content = _build_rep_f4(raw_data)  # Compliance & Governance
-    elif fid == "REP-F6":
+    if fid == "REP-F6":
         content = _build_rep_f6_ai(raw_data)  # AI Predictive Suite
-    elif fid == "REP-F7":
-        content = _build_rep_f6(raw_data)  # FinOps & TCO
-    elif fid == "REP-F8":
-        content = _build_rep_f7(raw_data)  # Disaster Recovery Readiness
     else:
-        raise ValueError(f"Construtor para {fid} não encontrado.")
+        # Construtores com dados reais do banco do Agente (engines/flagship_agent_builders.py)
+        try:
+            from engines import flagship_agent_builders as fab
+        except ImportError:
+            import flagship_agent_builders as fab
+        real = fab.collect_agent_report_data()
+        usd_rate = get_usd_to_brl_rate()
+        try:
+            from api.reports_api import _EXCHANGE_RATE_CACHE, get_agent_reports_config
+            usd_live = _EXCHANGE_RATE_CACHE.get("timestamp", 0) > 0
+            cost_per_tb = (get_agent_reports_config() or {}).get("cloud_storage_cost_usd_per_tb")
+        except Exception:
+            usd_live, cost_per_tb = False, None
+        builders = {
+            "REP-F1": lambda: fab.protection(real),
+            "REP-F2": lambda: fab.operational(real),
+            "REP-F3": lambda: fab.storage(real, cost_per_tb, usd_rate, usd_live),
+            "REP-F4": lambda: fab.security(real),
+            "REP-F5": lambda: fab.compliance(real),
+            "REP-F7": lambda: fab.finops(real, cost_per_tb, usd_rate, usd_live),
+            "REP-F8": lambda: fab.dr_readiness(real),
+        }
+        if fid not in builders:
+            raise ValueError(f"Construtor para {fid} não encontrado.")
+        content = builders[fid]()
 
     base_payload.update(content)
     base_payload["integrity_hash"] = _compute_hash(base_payload)
@@ -908,19 +474,20 @@ def render_flagship_html(payload: Dict[str, Any], is_print: bool = False) -> str
     platform = payload.get("platform", f"GBOC Agent v{AGENT_VERSION}")
     audit_hash = payload.get("integrity_hash", "0000000000000000")
 
-    score_val = (
-        payload.get("protection_score")
-        or payload.get("threat_score")
-        or payload.get("compliance_score")
-        or payload.get("dr_readiness_score")
-        or payload.get("operational_score")
-        or payload.get("finops_score")
-        or payload.get("storage_health_pct")
-        or 88
-    )
+    _score_keys = ("protection_score", "threat_score", "compliance_score", "dr_readiness_score",
+                   "operational_score", "finops_score", "storage_health_pct", "ai_predictive_score")
+    # Sem valor real calculado o score é exibido como "N/D" (antes havia um padrão fixo de 88).
+    score_val = next((payload[k] for k in _score_keys if isinstance(payload.get(k), (int, float))), None)
     score_label = "SCORE PRINCIPAL"
     score_color = "#10b981"
-    if "threat_score" in payload:
+    if score_val is None:
+        score_color = "#64748b"
+        if "ai_predictive_score" in payload:
+            score_label = "AI PREDICTIVE SCORE"
+    elif "ai_predictive_score" in payload:
+        score_label = "AI PREDICTIVE SCORE"
+        score_color = "#10b981" if score_val >= 85 else "#f59e0b"
+    elif "threat_score" in payload:
         score_label = "THREAT SCORE"
         score_color = "#ef4444" if score_val > 50 else "#f59e0b" if score_val > 25 else "#10b981"
     elif "compliance_score" in payload:
@@ -942,6 +509,7 @@ def render_flagship_html(payload: Dict[str, Any], is_print: bool = False) -> str
         score_label = "PROTECTION SCORE"
         score_color = "#10b981" if score_val >= 80 else "#f59e0b"
 
+    from html import escape as _esc
     delta_bullets = payload.get("delta", [])
     delta_html = ""
     for d in delta_bullets:
@@ -949,20 +517,20 @@ def render_flagship_html(payload: Dict[str, Any], is_print: bool = False) -> str
         delta_html += f"""
         <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px">
             <span style="font-weight:bold;color:{icon_color};font-size:1.1em;line-height:1">{d.get('icon', '•')}</span>
-            <span style="font-size:0.88em;color:#334155;line-height:1.4">{d.get('text', '')}</span>
+            <span style="font-size:0.88em;color:#334155;line-height:1.4">{_esc(str(d.get('text', '')))}</span>
         </div>
         """
 
     kpis = payload.get("kpis", [])
     kpi_cards_html = ""
     for k in kpis:
-        st_color = "#10b981" if k.get("status") in ("OK", "CONFORME") else "#f59e0b" if k.get("status") == "ATENÇÃO" else "#ef4444"
+        st_color = "#10b981" if k.get("status") in ("OK", "CONFORME") else "#f59e0b" if k.get("status") == "ATENÇÃO" else "#64748b" if k.get("status") == "N/D" else "#ef4444"
         kpi_cards_html += f"""
         <div class="kpi-card">
-            <div class="kpi-lbl">{k.get('label', '')}</div>
-            <div class="kpi-val">{k.get('value', '')}</div>
+            <div class="kpi-lbl">{_esc(str(k.get('label', '')))}</div>
+            <div class="kpi-val">{_esc(str(k.get('value', '')))}</div>
             <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:0.75em">
-                <span style="color:#64748b">Alvo: <strong>{k.get('target', '-')}</strong></span>
+                <span style="color:#64748b">Alvo: <strong>{_esc(str(k.get('target', '-')))}</strong></span>
                 <span class="status-badge" style="background:{st_color}18;color:{st_color};border:1px solid {st_color}40">{k.get('status', 'OK')}</span>
             </div>
         </div>
@@ -977,14 +545,42 @@ def render_flagship_html(payload: Dict[str, Any], is_print: bool = False) -> str
         <div class="action-item">
             <span class="p-badge {p_badge_class}">[{p}]</span>
             <div style="flex:1">
-                <div style="font-weight:600;font-size:0.9em;color:#0f172a">{a.get('description', '')}</div>
-                <div style="font-size:0.78em;color:#64748b;margin-top:2px">Responsável Sugerido: <strong>{a.get('owner', 'Equipe de TI')}</strong> | Prazo Estimado: <strong>{a.get('deadline', 'Imediato')}</strong></div>
+                <div style="font-weight:600;font-size:0.9em;color:#0f172a">{_esc(str(a.get('description', '')))}</div>
+                <div style="font-size:0.78em;color:#64748b;margin-top:2px">Responsável Sugerido: <strong>{_esc(str(a.get('owner', '—')))}</strong> | Prazo Estimado: <strong>{_esc(str(a.get('deadline', '—')))}</strong></div>
             </div>
         </div>
         """
 
     analytical_body = ""
-    if "assets" in payload:
+    _pill = {"OK": "#10b981", "CONFORME": "#10b981", "ATENÇÃO": "#f59e0b", "EM RISCO": "#f59e0b",
+             "CRÍTICO": "#ef4444", "NÃO CONFORME": "#ef4444", "N/D": "#64748b", "DESABILITADA": "#64748b"}
+
+    def _cell(v):
+        txt = _esc(str(v))
+        col = _pill.get(str(v))
+        return f'<td><span class="status-badge" style="background:{col}18;color:{col}">{txt}</span></td>' if col else f"<td>{txt}</td>"
+
+    if "tables" in payload:
+        blocks = ""
+        for tbl in payload["tables"]:
+            head = "".join(f"<th>{_esc(str(h))}</th>" for h in tbl.get("headers", []))
+            body = "".join("<tr>" + "".join(_cell(c) for c in row) + "</tr>" for row in tbl.get("rows", []))
+            if not body:
+                body = f'<tr><td colspan="{max(1, len(tbl.get("headers", [])))}" style="text-align:center;color:#64748b">Sem registros no período.</td></tr>'
+            blocks += f"""
+            <h4 style="margin:16px 0 10px;font-size:0.95em;color:#0f172a">{_esc(str(tbl.get('title', '')))}</h4>
+            <div style="overflow-x:auto"><table class="report-table"><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></div>
+            """
+        analytical_body = f"""
+        <div class="section-card">
+            <div class="section-narrative">
+                <i class="fas fa-chart-column" style="color:#3b82f6"></i>
+                <span>{_esc(str(payload.get('analytical_summary', '')))}</span>
+            </div>
+            {blocks}
+        </div>
+        """
+    elif "assets" in payload:
         rows = "".join(f"""
             <tr>
                 <td style="font-weight:600">{it.get('name')}</td>
@@ -1129,7 +725,7 @@ def render_flagship_html(payload: Dict[str, Any], is_print: bool = False) -> str
         <div class="section-card">
             <div class="section-narrative">
                 <i class="fas fa-brain" style="color:#3b82f6"></i>
-                <span>{payload.get('analytical_summary', 'Diagnóstico operacional concluído com êxito sem apontamentos críticos.')}</span>
+                <span>{_esc(str(payload.get('analytical_summary', '')))}</span>
             </div>
         </div>
         """
@@ -1348,7 +944,7 @@ def render_flagship_html(payload: Dict[str, Any], is_print: bool = False) -> str
                 <div style="font-size:0.88em;color:#64748b;margin-top:4px;max-width:480px">{payload.get('objective', '')}</div>
             </div>
             <div style="text-align:right">
-                <div class="score-number">{score_val} <span style="font-size:0.4em;color:#64748b">/ 100</span></div>
+                <div class="score-number">{score_val if score_val is not None else "N/D"} <span style="font-size:0.4em;color:#64748b">/ 100</span></div>
                 <div style="font-size:0.8em;font-weight:600;color:#10b981;margin-top:4px">▲ +{payload.get('score_trend', 2)} vs mês anterior</div>
             </div>
         </div>

@@ -18,7 +18,7 @@ function switchConfigSubTab(sub, btn) {
 
 async function loadServerAIConfigUI() {
     try {
-        const r = await fetch(window.GBOC_API_BASE + '/api/v1/ai/config');
+        const r = await fetch(window.GBOC_API_BASE + '/api/v1/ai/config', { headers: _cfgAuthHeaders() });
         if (!r.ok) return;
         const data = await r.json();
         const cfg = data.config || {};
@@ -26,7 +26,12 @@ async function loadServerAIConfigUI() {
         if (document.getElementById('ai-provider')) document.getElementById('ai-provider').value = cfg.provider || 'ollama';
         if (document.getElementById('ai-ollama-host')) document.getElementById('ai-ollama-host').value = cfg.ollama_url || cfg.ollama_host || 'http://localhost:11434';
         if (document.getElementById('ai-model')) document.getElementById('ai-model').value = cfg.model || cfg.ollama_model || 'llama3';
-        if (document.getElementById('ai-api-key')) document.getElementById('ai-api-key').value = cfg.api_key || cfg.openai_api_key || cfg.groq_api_key || cfg.gemini_api_key || '';
+        const keyEl = document.getElementById('ai-api-key');
+        if (keyEl) {
+            // Nunca preencher com a chave mascarada: em branco = manter a chave atual.
+            keyEl.value = '';
+            keyEl.placeholder = (cfg.configured_keys || []).length ? 'Chave já configurada — deixe em branco para manter' : 'Cole a chave de API';
+        }
         if (document.getElementById('task-history-limit')) document.getElementById('task-history-limit').value = cfg.task_history_limit || 10;
         
         toggleAiFields();
@@ -45,16 +50,18 @@ function toggleAiFields() {
 
     const defaultModels = {
         ollama: 'llama3',
-        kimi: 'moonshot-v1-8k',
-        grok: 'grok-2',
+        kimi: 'kimi-k2.6',
+        grok: 'grok-4.7',
+        groq: 'openai/gpt-oss-120b',
+        groq_free: 'openai/gpt-oss-120b',
         openai: 'gpt-4o-mini',
-        gemini: 'gemini-1.5-flash',
-        deepseek: 'deepseek-chat',
-        claude: 'claude-3-5-sonnet-20241022',
+        gemini: 'gemini-flash-latest',
+        deepseek: 'deepseek-flash',
+        claude: 'claude-sonnet-5-5',
         qwen: 'qwen2.5',
         mistral: 'mistral-large-latest',
         llama3: 'llama3.3:70b',
-        cohere: 'command-r-plus'
+        cohere: 'command-a-plus-05-2026'
     };
 
     const providerKeyLinks = {
@@ -62,8 +69,8 @@ function toggleAiFields() {
         openai: { url: 'https://platform.openai.com/api-keys', label: '🔗 Clique aqui para gerar sua API Key na OpenAI (platform.openai.com/api-keys)' },
         gemini: { url: 'https://aistudio.google.com/app/apikey', label: '🔗 Clique aqui para gerar sua API Key gratuita no Google AI Studio (aistudio.google.com)' },
         groq_free: { url: 'https://console.groq.com/keys', label: '🔗 Clique aqui para gerar sua API Key gratuita no Groq Cloud (console.groq.com/keys)' },
-        claude: { url: 'https://console.anthropic.com/settings/keys', label: '🔗 Clique aqui para gerar sua API Key no Anthropic Claude (console.anthropic.com)' },
-        kimi: { url: 'https://platform.moonshot.cn/console/api-keys', label: '🔗 Clique aqui para gerar sua API Key no Kimi Moonshot (platform.moonshot.cn)' },
+        claude: { url: 'https://platform.claude.com/settings/keys', label: '🔗 Clique aqui para gerar sua API Key da Anthropic (platform.claude.com)' },
+        kimi: { url: 'https://platform.kimi.ai', label: '🔗 Clique aqui para gerar sua API Key no Kimi (platform.kimi.ai)' },
         grok: { url: 'https://console.x.ai/', label: '🔗 Clique aqui para gerar sua API Key no Grok xAI (console.x.ai)' },
         mistral: { url: 'https://console.mistral.ai/api-keys/', label: '🔗 Clique aqui para gerar sua API Key no Mistral AI (console.mistral.ai)' },
         cohere: { url: 'https://dashboard.cohere.com/api-keys', label: '🔗 Clique aqui para gerar sua API Key no Cohere (dashboard.cohere.com)' }
@@ -91,6 +98,13 @@ function toggleAiFields() {
     }
 }
 
+const _cfgEsc = (v) => String(v ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
+const _cfgAuthHeaders = (extra = {}) => {
+    let token = '';
+    try { token = localStorage.getItem('gboc_server_token') || ''; } catch { token = ''; }
+    return token ? { ...extra, Authorization: `Bearer ${token}` } : { ...extra };
+};
+
 let gInstalledModels = [];
 let gRecommendedModels = [
     "llama3:latest", "llama3.2:latest", "llama3.3:70b", "mistral:latest",
@@ -109,7 +123,7 @@ function updateModelDropdownUI(installed, recommended, currentVal) {
     if (gInstalledModels.length > 0) {
         html += `<optgroup label="🟢 Modelos Instalados Localmente (Prontos para Diagnóstico)">`;
         gInstalledModels.forEach(m => {
-            html += `<option value="${m}">🟢 ${m} (Instalado - Pronto)</option>`;
+            html += `<option value="${_cfgEsc(m)}">🟢 ${_cfgEsc(m)} (Instalado - Pronto)</option>`;
         });
         html += `</optgroup>`;
     }
@@ -118,7 +132,7 @@ function updateModelDropdownUI(installed, recommended, currentVal) {
     if (availableNotInstalled.length > 0) {
         html += `<optgroup label="☁️ Modelos Disponíveis na Nuvem / Library (Requer 'ollama pull')">`;
         availableNotInstalled.forEach(m => {
-            html += `<option value="${m}">☁️ ${m} (Não Instalado - Requer 'ollama pull')</option>`;
+            html += `<option value="${_cfgEsc(m)}">☁️ ${_cfgEsc(m)} (Não Instalado - Requer 'ollama pull')</option>`;
         });
         html += `</optgroup>`;
     }
@@ -166,7 +180,7 @@ async function pullOllamaModel(modelName) {
     try {
         const res = await fetch(window.GBOC_API_BASE + '/api/v1/ai/ollama/models/pull', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: _cfgAuthHeaders({'Content-Type': 'application/json'}),
             body: JSON.stringify({host: host, model: modelName})
         });
         const data = await res.json();
@@ -194,7 +208,7 @@ async function detectOllamaModels() {
     }
 
     try {
-        const r = await fetch(window.GBOC_API_BASE + `/api/v1/ai/ollama/models?host=${encodeURIComponent(host)}`);
+        const r = await fetch(window.GBOC_API_BASE + `/api/v1/ai/ollama/models?host=${encodeURIComponent(host)}`, { headers: _cfgAuthHeaders() });
         const data = await r.json();
         
         if (data.connected && data.installed_models) {
@@ -229,7 +243,7 @@ async function testAiConnection() {
 
         const r = await fetch(window.GBOC_API_BASE + '/api/v2/ai/diagnose', {
             method: 'POST',
-            headers: {'Content-Type':'application/json'},
+            headers: _cfgAuthHeaders({'Content-Type':'application/json'}),
             body: JSON.stringify({error_context: 'Teste de conexão configurada.', provider: provider})
         });
         
@@ -246,12 +260,12 @@ async function testAiConnection() {
             msgDiv.style.backgroundColor = 'rgba(72,187,120,0.15)';
             msgDiv.style.color = '#48bb78';
             msgDiv.style.border = '1px solid rgba(72,187,120,0.3)';
-            msgDiv.innerHTML = `<i class="fas fa-check-circle"></i> Conexão bem sucedida com <strong>${provider}</strong>!<br><span style="font-size:0.85em;opacity:0.8;display:block;margin-top:6px">${data.result.analysis}</span>`;
+            msgDiv.innerHTML = `<i class="fas fa-check-circle"></i> Conexão bem sucedida com <strong>${provider}</strong>!<br><span style="font-size:0.85em;opacity:0.8;display:block;margin-top:6px">${_cfgEsc(data.result.analysis)}</span>`;
         } else {
             msgDiv.style.backgroundColor = 'rgba(245,101,101,0.15)';
             msgDiv.style.color = 'var(--danger)';
             msgDiv.style.border = '1px solid rgba(245,101,101,0.3)';
-            msgDiv.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Falha na conexão.<br><span style="font-size:0.85em;opacity:0.8;display:block;margin-top:6px">${data.result?.analysis || data.message || 'Erro desconhecido.'}</span>`;
+            msgDiv.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Falha na conexão.<br><span style="font-size:0.85em;opacity:0.8;display:block;margin-top:6px">${_cfgEsc(data.result?.analysis || data.error?.message || data.detail || data.message || 'Erro desconhecido.')}</span>`;
         }
         document.getElementById('cfg-subtab-ai').querySelector('.panel').appendChild(msgDiv);
     } catch(e) {
@@ -270,26 +284,32 @@ async function saveAiSettings(silent=false) {
         btn.disabled = true;
     }
 
+    const provider = document.getElementById('ai-provider').value;
+    const model = document.getElementById('ai-model').value.trim();
+    const key = document.getElementById('ai-api-key').value.trim();
+    const isLocal = ['ollama', 'qwen', 'llama3'].includes(provider);
     const cfg = {
-        provider: document.getElementById('ai-provider').value,
-        ollama_url: document.getElementById('ai-ollama-host').value,
-        ollama_host: document.getElementById('ai-ollama-host').value,
-        model: document.getElementById('ai-model').value,
-        ollama_model: document.getElementById('ai-model').value,
-        api_key: document.getElementById('ai-api-key').value,
-        deepseek_api_key: document.getElementById('ai-api-key').value,
-        groq_api_key: document.getElementById('ai-api-key').value,
-        openai_api_key: document.getElementById('ai-api-key').value,
-        gemini_api_key: document.getElementById('ai-api-key').value,
-        task_history_limit: parseInt(document.getElementById('task-history-limit').value || '10')
+        provider,
+        ollama_url: document.getElementById('ai-ollama-host').value.trim(),
+        task_history_limit: parseInt(document.getElementById('task-history-limit').value || '10', 10)
     };
+    if (model) {
+        cfg.model = model;
+        if (isLocal) cfg.ollama_model = model;
+        else cfg[`${provider === 'groq_free' ? 'groq' : provider}_model`] = model;
+    }
+    if (!isLocal && key) cfg.api_key = key;   // o backend grava no campo do provedor selecionado
 
     try {
-        await fetch(window.GBOC_API_BASE + '/api/v1/ai/config', {
+        const r = await fetch(window.GBOC_API_BASE + '/api/v1/ai/config', {
             method: 'POST',
-            headers: {'Content-Type':'application/json'},
+            headers: _cfgAuthHeaders({'Content-Type':'application/json'}),
             body: JSON.stringify(cfg)
         });
+        if (!r.ok) {
+            const d = await r.json().catch(() => ({}));
+            throw new Error(d.message || d.detail || `HTTP ${r.status}`);
+        }
         if(!silent) {
             alert('Configuração de IA salva com sucesso!');
         }

@@ -573,20 +573,13 @@ async def execute_agent_ransomware_action(agent_id: str, request: Request):
 
 @router.get("/overview")
 async def get_ransomware_overview():
-    total_agents = 1
-    protected_agents = 1
+    # Somente agentes reais registrados (o Servidor Central não é um nó protegido pelo Guardian).
+    total_agents = 0
+    protected_agents = 0
     total_canaries = 0
     total_compromised = 0
-    agents = [{
-        "agent_id": "server-host-local",
-        "hostname": f"Servidor Central ({socket.gethostname()})",
-        "ip_address": "127.0.0.1",
-        "is_protected": True,
-        "canaries": 0,
-        "compromised": 0,
-        "threat_level": "none",
-        "last_scan": datetime.now().isoformat(),
-    }]
+    guardian_running = 0
+    agents = []
 
     conn = None
     cur = None
@@ -605,9 +598,16 @@ async def get_ransomware_overview():
                 cur2 = conn.cursor()
                 cur2.execute("SELECT COUNT(*) FROM ransomware_central_incidents WHERE agent_id = %s AND status <> 'resolved'", (aid,))
                 compromised = int((cur2.fetchone() or [0])[0] or 0)
-                cur2.execute("SELECT payload_json FROM ransomware_agent_snapshots WHERE agent_id = %s AND snapshot_type = 'canaries' ORDER BY id DESC LIMIT 1", (aid,))
+                cur2.execute("SELECT payload_json, created_at FROM ransomware_agent_snapshots WHERE agent_id = %s AND snapshot_type = 'canaries' ORDER BY id DESC LIMIT 1", (aid,))
                 srow = cur2.fetchone()
+                cur2.execute("SELECT payload_json FROM ransomware_agent_snapshots WHERE agent_id = %s AND snapshot_type = 'guardian' ORDER BY id DESC LIMIT 1", (aid,))
+                grow = cur2.fetchone()
                 cur2.close()
+                try:
+                    g_running = bool(grow and grow[0] and (json.loads(grow[0]) or {}).get("running"))
+                except Exception:
+                    g_running = False
+                guardian_running += 1 if g_running else 0
 
                 canaries = 0
                 if srow and srow[0]:
@@ -619,7 +619,7 @@ async def get_ransomware_overview():
                 total_agents += 1
                 total_canaries += canaries
                 total_compromised += compromised
-                is_protected = compromised == 0 and st == "online"
+                is_protected = compromised == 0 and st == "online" and g_running
                 if is_protected:
                     protected_agents += 1
 
@@ -631,7 +631,8 @@ async def get_ransomware_overview():
                     "canaries": canaries,
                     "compromised": compromised,
                     "threat_level": "critical" if compromised > 0 else ("none" if st == "online" else "medium"),
-                    "last_scan": datetime.now().isoformat(),
+                    "guardian_running": g_running,
+                    "last_scan": srow[1].isoformat() if srow and srow[1] else None,
                 })
     except Exception as e:
         logger.warning(f"Erro ao obter overview ransomware: {e}")
@@ -644,10 +645,17 @@ async def get_ransomware_overview():
         if conn:
             release_db(conn)
 
-    label = "SENTINEL ACTIVE — Zero Ameaças Detectadas" if total_compromised == 0 else f"ALERTA — {total_compromised} Incidente(s) ativo(s)!"
+    if total_compromised:
+        label = f"ALERTA — {total_compromised} Incidente(s) ativo(s)!"
+    elif not total_agents:
+        label = "Nenhum agente registrado"
+    elif guardian_running == 0:
+        label = "Guardian não reportado como ativo em nenhum agente"
+    else:
+        label = f"Guardian ativo em {guardian_running} de {total_agents} agente(s) — nenhum incidente aberto"
     return JSONResponse({
         "status": "success",
-        "shield_active": True,
+        "shield_active": guardian_running > 0,
         "threats_detected_24h": total_compromised,
         "protected_agents": protected_agents,
         "total_agents": total_agents,
@@ -948,11 +956,12 @@ async def preemptive_ai_diag(request: Request):
             risks = [{"node": d.get("node"), "status": d.get("status"), "threat_score": d.get("threat_score")} for d in diagnostics]
             text = f"Ransomware Guardian central summary: {json.dumps(risks, ensure_ascii=False)}"
             llm = await eng.analyze_error(text, system_logs=[])
-            llm_summary = llm.get("analysis") if isinstance(llm, dict) else None
+            # Só usa o texto se veio de um LLM real (a heurística do motor descreve o host, não o ransomware)
+            llm_summary = llm.get("analysis") if isinstance(llm, dict) and llm.get("is_llm_real") else None
         except Exception:
             llm_summary = None
 
-        health = 100
+        health = None   # sem nós diagnosticados não há base para um score (não presumir "SECURE")
         if diagnostics:
             health = max(0, 100 - int(sum(int(d.get("threat_score") or 0) for d in diagnostics) / max(len(diagnostics), 1)))
 
@@ -960,10 +969,11 @@ async def preemptive_ai_diag(request: Request):
             "status": "success",
             "timestamp": datetime.now().isoformat(),
             "global_health_score": health,
-            "overall_status": "SECURE" if health >= 80 else ("WARNING" if health >= 50 else "CRITICAL"),
+            "overall_status": "NO_DATA" if health is None else ("SECURE" if health >= 80 else ("WARNING" if health >= 50 else "CRITICAL")),
             "nodes_scanned": len(diagnostics),
             "diagnostics": diagnostics,
-            "ai_executive_summary": llm_summary or "Diagnóstico híbrido concluído com heurística local e coleta distribuída dos agentes.",
+            "ai_executive_summary": llm_summary or "Resumo por LLM indisponível — resultado baseado na heurística local e na coleta dos agentes.",
+            "ai_summary_is_llm": bool(llm_summary),
         })
     except Exception as e:
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)

@@ -1616,31 +1616,49 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         }
     }
 
+    const _gEsc = (v) => String(v ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
+
     window.diagnoseTaskError = async function(errMsg) {
         const box = document.getElementById('aiTaskDiagBox');
         if (!box) return;
         box.style.display = 'block';
-        box.innerHTML = `<i class="fas fa-spinner fa-spin"></i> <strong>Assistente IA:</strong> Analisando falha e buscando melhor correção...`;
+        box.innerHTML = `<i class="fas fa-spinner fa-spin"></i> <strong>Assistente IA:</strong> Analisando a falha...`;
         try {
             const res = await fetch(window.GBOC_API_BASE + '/api/v1/diagnostics/ai-analyze', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ error_message: errMsg })
             });
-            const data = await res.json();
-            const cause = data.cause || 'Possível falha de E/S ou trava no repositório de destino.';
-            const solution = data.solution || 'Verifique as permissões de acesso ao repositório ou execute a limpeza de trava (Lock Prune).';
-            const analysis = data.analysis || data.summary || 'Análise concluída pelo motor de IA.';
-
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.detail || data.message || `HTTP ${res.status}`);
+            const src = data.is_llm_real ? (data.provider || 'LLM') : (data.provider || 'heurística sem LLM');
             box.innerHTML = `
-                <div style="font-weight:700;color:var(--primary);margin-bottom:6px;"><i class="fas fa-robot"></i> Diagnóstico do Assistente de IA (${data.provider || 'AI Engine'}):</div>
-                <div style="margin-bottom:6px;"><strong>Causa Raiz:</strong> ${cause}</div>
-                <div style="margin-bottom:8px;"><strong>Solução Recomendada:</strong> ${solution}</div>
-                <div style="font-size:0.85em;color:var(--text-muted);background:var(--bg-input);padding:8px;border-radius:6px;margin-bottom:8px;">${analysis}</div>
-                <button class="btn btn-sm btn-primary" onclick="window.gbocAlert ? gbocAlert('Procedimento de Auto-Heal, verificação de consistência e higienização do repositório disparados com sucesso!', { title: 'Auto-Heal GBOC', type: 'success', icon: 'fas fa-wrench' }) : alert('Auto-Heal e Higienização acionados com sucesso!')"><i class="fas fa-wrench"></i> Aplicar Correção em 1-Clique</button>
+                <div style="font-weight:700;color:var(--primary);margin-bottom:6px;"><i class="fas fa-robot"></i> Diagnóstico do Assistente (${_gEsc(src)}):</div>
+                ${data.cause ? `<div style="margin-bottom:6px;"><strong>Causa provável:</strong> ${_gEsc(data.cause)}</div>` : ''}
+                ${data.solution ? `<div style="margin-bottom:8px;white-space:pre-wrap"><strong>Solução recomendada:</strong>\n${_gEsc(data.solution)}</div>` : ''}
+                <div style="font-size:0.85em;color:var(--text-muted);background:var(--bg-input);padding:8px;border-radius:6px;margin-bottom:8px;white-space:pre-wrap">${_gEsc(data.analysis || 'Sem análise retornada.')}</div>
+                <button class="btn btn-sm btn-primary" onclick="window.runTaskMaintenance()"><i class="fas fa-wrench"></i> Executar Manutenção Automatizada</button>
+                <div id="aiTaskRepairOut" style="margin-top:8px;font-size:0.85em"></div>
             `;
         } catch(e) {
-            box.innerHTML = `<span style="color:var(--danger)">Erro no assistente de IA: ${e.message}</span>`;
+            box.innerHTML = `<span style="color:var(--danger)">Erro no assistente de IA: ${_gEsc(e.message)}</span>`;
+        }
+    };
+
+    // Manutenção real (data/temp, ANALYZE, execuções presas) — exibe o resultado verdadeiro de cada etapa.
+    window.runTaskMaintenance = async function() {
+        const out = document.getElementById('aiTaskRepairOut');
+        if (out) out.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Executando manutenção...';
+        try {
+            const r = await fetch(window.GBOC_API_BASE + '/api/v1/diagnostics/ai-repair', {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ action: 'auto', target: 'tasks' })
+            });
+            const d = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(d.detail || d.message || `HTTP ${r.status}`);
+            if (out) out.innerHTML = (d.results || []).map(x =>
+                `<div style="color:${x.ok ? 'var(--success)' : 'var(--warning)'}">${x.ok ? '✓' : '✗'} ${_gEsc(x.action)}: ${_gEsc(x.detail)}</div>`).join('');
+        } catch(e) {
+            if (out) out.innerHTML = `<span style="color:var(--danger)">Manutenção não executada: ${_gEsc(e.message)}</span>`;
         }
     };
 
