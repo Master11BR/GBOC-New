@@ -2499,13 +2499,14 @@ function gbocToggleSidebarCollapse(){
                                     <option value="kimi">Kimi AI / Moonshot (Nuvem)</option>
                                     <option value="grok">Grok xAI (Nuvem)</option>
                                     <option value="openai">OpenAI (GPT-4o / GPT-4o-mini)</option>
-                                    <option value="gemini">Google Gemini (Gemini 1.5 / 2.0)</option>
+                                    <option value="groq">Groq Cloud (GPT-OSS / Qwen)</option>
+                                    <option value="gemini">Google Gemini (Flash)</option>
                                     <option value="deepseek">DeepSeek (V3 / R1 Nuvem)</option>
-                                    <option value="claude">Anthropic Claude (3.5 Sonnet)</option>
+                                    <option value="claude">Anthropic Claude (Sonnet)</option>
                                     <option value="qwen">Qwen 2.5 (Alibaba / Ollama)</option>
                                     <option value="mistral">Mistral AI (Codestral / Le Chat)</option>
                                     <option value="llama3">Meta Llama 3.3 (70B Local/Cloud)</option>
-                                    <option value="cohere">Cohere (Command R+)</option>
+                                    <option value="cohere">Cohere (Command A+)</option>
                                 </select>
                             </div>
 
@@ -2623,19 +2624,7 @@ function gbocToggleSidebarCollapse(){
             const apiKeyGroup = document.getElementById('group-api-key-server');
             const modelInput = document.getElementById('cfg-ai-model');
 
-            const defaultModels = {
-                ollama: 'llama3',
-                kimi: 'moonshot-v1-8k',
-                grok: 'grok-2',
-                openai: 'gpt-4o-mini',
-                gemini: 'gemini-1.5-flash',
-                deepseek: 'deepseek-chat',
-                claude: 'claude-3-5-sonnet-20241022',
-                qwen: 'qwen2.5',
-                mistral: 'mistral-large-latest',
-                llama3: 'llama3.3:70b',
-                cohere: 'command-r-plus'
-            };
+            const defaultModels = window.GBOC_AI_DEFAULT_MODELS_SERVER;
 
             if (modelInput && defaultModels[provider]) {
                 modelInput.placeholder = `Ex: ${defaultModels[provider]}`;
@@ -2659,7 +2648,7 @@ function gbocToggleSidebarCollapse(){
             if (gServerInstalledModels.length > 0) {
                 html += `<optgroup label="🟢 Modelos Instalados Localmente (Prontos)">`;
                 gServerInstalledModels.forEach(m => {
-                    html += `<option value="${m}">🟢 ${m} (Instalado - Pronto)</option>`;
+                    html += `<option value="${_aiEsc(m)}">🟢 ${_aiEsc(m)} (Instalado - Pronto)</option>`;
                 });
                 html += `</optgroup>`;
             }
@@ -2667,7 +2656,7 @@ function gbocToggleSidebarCollapse(){
             if (availableNotInstalled.length > 0) {
                 html += `<optgroup label="☁️ Modelos Disponíveis na Nuvem / Library (Requer 'ollama pull')">`;
                 availableNotInstalled.forEach(m => {
-                    html += `<option value="${m}">☁️ ${m} (Não Instalado - Requer 'ollama pull')</option>`;
+                    html += `<option value="${_aiEsc(m)}">☁️ ${_aiEsc(m)} (Não Instalado - Requer 'ollama pull')</option>`;
                 });
                 html += `</optgroup>`;
             }
@@ -2750,21 +2739,58 @@ function gbocToggleSidebarCollapse(){
             }
         }
 
+        // ── IA & LLMs (Servidor Central) ─────────────────────────────────────────
+        window.GBOC_AI_DEFAULT_MODELS_SERVER = {
+            ollama: 'llama3', qwen: 'qwen2.5', llama3: 'llama3.3:70b',
+            kimi: 'kimi-k2.6', grok: 'grok-4.7', openai: 'gpt-4o-mini', groq: 'openai/gpt-oss-120b',
+            gemini: 'gemini-flash-latest', deepseek: 'deepseek-flash', claude: 'claude-sonnet-5-5',
+            mistral: 'mistral-large-latest', cohere: 'command-a-plus-05-2026'
+        };
+        const _AI_LOCAL_PROVIDERS = ['ollama', 'qwen', 'llama3'];
+        const _aiEsc = (v) => String(v ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
+        function _aiNormalizeProvider(raw){
+            const v = String(raw ?? '').toLowerCase();
+            const map = [['deepseek',['deepseek']],['groq',['groq']],['grok',['grok','xai']],['openai',['openai','gpt']],
+                ['gemini',['gemini','google']],['claude',['claude','anthropic']],['kimi',['kimi','moonshot']],
+                ['mistral',['mistral']],['cohere',['cohere']],['qwen',['qwen']],['ollama',['ollama','local','llama','gemma']]];
+            for (const [id, words] of map) if (words.some(w => v.includes(w))) return id;
+            return 'ollama';
+        }
+        async function _aiApi(path, options = {}){
+            const headers = { ...(options.headers || {}) };
+            if (options.body) headers['Content-Type'] = 'application/json';
+            const r = await fetch(`${API}${path}`, { ...options, headers });
+            const d = await r.json().catch(() => ({}));
+            if (!r.ok) {
+                const err = new Error(d.message || d.detail || d.error?.message || `HTTP ${r.status}`);
+                err.status = r.status;
+                throw err;
+            }
+            return d;
+        }
+        let _aiServerCfg = {};
+
         async function loadAIConfigServer(){
             try {
-                const r = await fetch(`${API}/ai/config`);
-                if(!r.ok) return;
-                const d = await r.json();
-                const cfg = d.config || {};
-                if(document.getElementById('cfg-ai-provider')) document.getElementById('cfg-ai-provider').value = cfg.provider || 'ollama';
-                if(document.getElementById('cfg-ai-model')) document.getElementById('cfg-ai-model').value = cfg.ollama_model || cfg.model || 'llama3:latest';
+                const d = await _aiApi('/ai/config');
+                const cfg = _aiServerCfg = d.config || {};
+                const provider = _aiNormalizeProvider(cfg.provider);
+                const isLocal = _AI_LOCAL_PROVIDERS.includes(provider);
+                if(document.getElementById('cfg-ai-provider')) document.getElementById('cfg-ai-provider').value = provider;
+                if(document.getElementById('cfg-ai-model')) document.getElementById('cfg-ai-model').value = isLocal ? (cfg.ollama_model || '') : (cfg[`${provider}_model`] || '');
                 if(document.getElementById('cfg-ai-endpoint')) document.getElementById('cfg-ai-endpoint').value = cfg.ollama_url || cfg.ollama_host || 'http://localhost:11434';
-                if(document.getElementById('cfg-ai-key')) document.getElementById('cfg-ai-key').value = cfg.api_key || cfg.groq_api_key || cfg.openai_api_key || cfg.gemini_api_key || '';
+                const keyEl = document.getElementById('cfg-ai-key');
+                if(keyEl){
+                    keyEl.value = '';   // nunca preencher com a máscara: chave em branco = manter a atual
+                    keyEl.placeholder = (cfg.configured_keys || []).includes(provider) ? 'Chave já configurada — deixe em branco para manter' : 'Cole a chave de API';
+                }
                 if(document.getElementById('cfg-task-history-limit')) document.getElementById('cfg-task-history-limit').value = cfg.task_history_limit || 10;
-                
                 toggleAiFieldsServer();
-                detectOllamaModelsServer();
-            } catch(e){ console.error('loadAIConfigServer:', e); }
+                if (isLocal) detectOllamaModelsServer();
+            } catch(e){
+                const statusEl = document.getElementById('ai-cfg-status');
+                if(statusEl) statusEl.innerHTML = `<span style="color:var(--danger)"><i class="fas fa-times-circle"></i> Não foi possível carregar a configuração de IA: ${_aiEsc(e.message)}</span>`;
+            }
         }
 
         async function saveAIConfigServer(){
@@ -2772,58 +2798,48 @@ function gbocToggleSidebarCollapse(){
             if(statusEl) statusEl.innerHTML = '<span style="color:var(--text-muted)"><i class="fas fa-spinner fa-spin"></i> Salvando configurações de IA...</span>';
             try {
                 const provider = document.getElementById('cfg-ai-provider').value;
-                const model = document.getElementById('cfg-ai-model').value;
-                const key = document.getElementById('cfg-ai-key').value;
-                const endpoint = document.getElementById('cfg-ai-endpoint').value;
+                const model = document.getElementById('cfg-ai-model').value.trim();
+                const key = document.getElementById('cfg-ai-key').value.trim();
+                const endpoint = document.getElementById('cfg-ai-endpoint').value.trim();
                 const limit = parseInt(document.getElementById('cfg-task-history-limit').value || '10', 10);
+                const isLocal = _AI_LOCAL_PROVIDERS.includes(provider);
 
-                const payload = {
-                    provider: provider,
-                    ollama_url: endpoint,
-                    ollama_host: endpoint,
-                    model: model,
-                    ollama_model: model,
-                    groq_model: model,
-                    openai_model: model,
-                    custom_endpoint: endpoint,
-                    api_key: key,
-                    groq_api_key: key,
-                    openai_api_key: key,
-                    gemini_api_key: key,
-                    task_history_limit: limit
-                };
+                const payload = { provider, task_history_limit: limit, ollama_url: endpoint || 'http://localhost:11434' };
+                if (model) {
+                    payload.model = model;
+                    payload[isLocal ? 'ollama_model' : `${provider}_model`] = model;
+                }
+                if (!isLocal && key) payload.api_key = key;   // o backend grava no campo do provedor selecionado
 
-                const r = await fetch(`${API}/ai/config`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(payload)
-                });
-                const d = await r.json();
-                if(statusEl) statusEl.innerHTML = '<span style="color:var(--success)"><i class="fas fa-check-circle"></i> Configurações de IA do Servidor salvas com sucesso!</span>';
+                await _aiApi('/ai/config', { method: 'POST', body: JSON.stringify(payload) });
+                if(statusEl) statusEl.innerHTML = '<span style="color:var(--success)"><i class="fas fa-check-circle"></i> Configurações de IA do Servidor salvas.</span>';
+                await loadAIConfigServer();
+                return true;
             } catch(e){
-                if(statusEl) statusEl.innerHTML = `<span style="color:var(--danger)"><i class="fas fa-times-circle"></i> Erro ao salvar: ${e.message}</span>`;
+                if(statusEl) statusEl.innerHTML = `<span style="color:var(--danger)"><i class="fas fa-times-circle"></i> Erro ao salvar: ${_aiEsc(e.message)}</span>`;
+                return false;
             }
         }
 
         async function testAIConfigServer(){
             const statusEl = document.getElementById('ai-cfg-status');
+            if (!(await saveAIConfigServer())) return;
             if(statusEl) statusEl.innerHTML = '<span style="color:var(--text-muted)"><i class="fas fa-spinner fa-spin"></i> Testando comunicação com o Provedor de IA...</span>';
             try {
                 const provider = document.getElementById('cfg-ai-provider').value;
-                
-                // Save temporarily to test
-                await saveAIConfigServer();
-                
-                const r = await fetch(`${API}/ai/query`, {
+                const d = await _aiApi('/ai/query', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({prompt: 'Responda com apenas OK se o provedor de IA esta operando normalmente.', provider: provider})
+                    body: JSON.stringify({prompt: 'Responda apenas com OK.', provider})
                 });
-                const d = await r.json();
-                const respText = d.answer || d.response || d.message || JSON.stringify(d);
-                if(statusEl) statusEl.innerHTML = `<span style="color:var(--success)"><i class="fas fa-check-circle"></i> Conexão estabelecida com sucesso! Resposta: ${respText.substring(0,250)}</span>`;
+                const respText = String(d.answer || '').substring(0, 300);
+                if (d.is_llm_real && !d.fallback) {
+                    statusEl.innerHTML = `<span style="color:var(--success)"><i class="fas fa-check-circle"></i> ${_aiEsc(d.provider)} respondeu em ${_aiEsc(d.duration_seconds)}s: ${_aiEsc(respText)}</span>`;
+                } else {
+                    const reason = d.primary_error || 'O provedor configurado não respondeu.';
+                    statusEl.innerHTML = `<span style="color:var(--danger)"><i class="fas fa-times-circle"></i> Falha no provedor configurado: ${_aiEsc(reason)}${d.fallback ? ' (o Ollama local respondeu como fallback)' : ''}</span>`;
+                }
             } catch(e){
-                if(statusEl) statusEl.innerHTML = `<span style="color:var(--danger)"><i class="fas fa-times-circle"></i> Erro no teste de IA: ${e.message}</span>`;
+                if(statusEl) statusEl.innerHTML = `<span style="color:var(--danger)"><i class="fas fa-times-circle"></i> Erro no teste de IA: ${_aiEsc(e.message)}</span>`;
             }
         }
 
@@ -3393,10 +3409,10 @@ function gbocToggleSidebarCollapse(){
                     content.innerHTML = `
                         <div style="background:var(--bg-dark);padding:16px;border-radius:10px;border:1px solid var(--border);margin-bottom:16px">
                             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-                                <span style="font-weight:700;font-size:1.1em">Score Global de Segurança: <span style="color:var(--success)">${d.global_health_score}/100</span></span>
-                                <span class="badge badge-success">${d.overall_status}</span>
+                                <span style="font-weight:700;font-size:1.1em">Score Global de Segurança: <span style="color:${d.global_health_score == null ? 'var(--text-muted)' : d.global_health_score >= 80 ? 'var(--success)' : 'var(--warning)'}">${d.global_health_score == null ? 'sem dados' : _aiEsc(d.global_health_score) + '/100'}</span></span>
+                                <span class="badge ${d.overall_status === 'SECURE' ? 'badge-success' : 'badge-warning'}">${_aiEsc(d.overall_status)}</span>
                             </div>
-                            <div style="font-size:0.88em;line-height:1.5">${d.ai_executive_summary}</div>
+                            <div style="font-size:0.88em;line-height:1.5;white-space:pre-wrap">${_aiEsc(d.ai_executive_summary)}</div>
                         </div>
                         <h4 style="font-size:0.95em;margin-bottom:10px;color:var(--primary)"><i class="fas fa-server"></i> Diagnóstico de Nós Escaneados (${d.nodes_scanned})</h4>
                         <div style="display:flex;flex-direction:column;gap:8px">
@@ -3879,19 +3895,21 @@ function gbocToggleSidebarCollapse(){
         }
 
         window.triggerAutoHealAction = async function(action) {
-            if (typeof showToast === 'function') showToast('Executando ação corretiva: ' + action, 'info');
             try {
                 const res = await fetch((window.GBOC_API_BASE || '') + '/api/v2/system/auto-heal', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: action })
                 });
-                const d = await res.json();
-                const msg = (d.data && d.data.message) || d.message || 'Auto-Heal concluído com sucesso.';
-                if (typeof showToast === 'function') showToast(msg, 'success');
-                runAIDiagnostic();
+                const d = await res.json().catch(() => ({}));
+                if (res.ok && d.success) {
+                    if (typeof showToast === 'function') showToast((d.data && d.data.message) || 'Ação executada.', 'success');
+                } else {
+                    const steps = (d.data && d.data.manual_steps) ? ' Procedimento: ' + d.data.manual_steps : '';
+                    if (typeof showToast === 'function') showToast(((d.error && d.error.message) || `HTTP ${res.status}`) + steps, 'warning');
+                }
             } catch(err) {
-                if (typeof showToast === 'function') showToast('Falha na execução do Auto-Heal: ' + err.message, 'warning');
+                if (typeof showToast === 'function') showToast('Falha ao solicitar a correção: ' + err.message, 'warning');
             }
         };
 
@@ -3905,22 +3923,25 @@ function gbocToggleSidebarCollapse(){
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ module: 'Servidor Central' })
                 });
-                const res = await r.json();
+                const res = await r.json().catch(() => ({}));
+                if (!r.ok || res.success === false) throw new Error(res.detail || res.error?.message || `HTTP ${r.status}`);
                 const d = res.data || res;
                 const result = d.result || {};
                 
-                const healthScore = d.health_score ?? 100;
-                const statusText = d.status || (healthScore >= 80 ? 'HEALTHY' : 'WARNING');
-                const insights = d.ai_insights || result.analysis || 'Diagnóstico concluído.';
-                const cause = result.cause || '';
-                const solution = result.solution || '';
-                const recAction = result.recommended_action || 'auto_heal';
+                const hasScore = typeof d.health_score === 'number';
+                const healthScore = hasScore ? d.health_score : null;
+                const statusText = _aiEsc(d.status || 'UNAVAILABLE');
+                const llmTag = result.is_llm_real ? '' : `\n\n(${result.provider || 'Análise sem LLM'}${result.llm_error ? ' — ' + result.llm_error : ''})`;
+                const insights = _aiEsc((d.ai_insights || result.analysis || 'Sem análise retornada.') + llmTag);
+                const cause = _aiEsc(result.cause || '');
+                const solution = _aiEsc(result.solution || '');
+                const recAction = String(result.recommended_action || 'none').replace(/[^a-z_]/g, '');
                 
                 let html = `
                     <div style="background:var(--bg-card);padding:16px;border-radius:var(--card-radius, 10px);border:var(--card-border, 1px solid var(--border));box-shadow:var(--card-shadow);margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">
                         <div>
                             <span style="font-weight:700;font-size:1.15em">Score de Saúde do Sistema: </span>
-                            <span style="font-size:1.25em;font-weight:800;color:${healthScore >= 85 ? 'var(--success, #10b981)' : healthScore >= 70 ? 'var(--warning, #f59e0b)' : 'var(--danger, #ef4444)'}">${healthScore}/100</span>
+                            <span style="font-size:1.25em;font-weight:800;color:${!hasScore ? 'var(--text-muted)' : healthScore >= 85 ? 'var(--success, #10b981)' : healthScore >= 70 ? 'var(--warning, #f59e0b)' : 'var(--danger, #ef4444)'}">${hasScore ? healthScore + '/100' : 'indisponível'}</span>
                         </div>
                         <span class="badge ${statusText === 'HEALTHY' ? 'badge-success' : 'badge-danger'}" style="padding:6px 12px;font-size:0.9em;border-radius:20px">${statusText}</span>
                     </div>
@@ -3945,12 +3966,12 @@ function gbocToggleSidebarCollapse(){
                 html += `
                     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
                         <button class="btn btn-secondary" onclick="runAIDiagnostic()"><i class="fas fa-sync"></i> Reanalisar Agora</button>
-                        <button class="btn btn-primary" onclick="triggerAutoHealAction('${recAction}')"><i class="fas fa-magic"></i> Executar Correção Automática</button>
+                        ${recAction !== 'none' ? `<button class="btn btn-primary" onclick="triggerAutoHealAction('${recAction}')"><i class="fas fa-magic"></i> Correção sugerida: ${recAction}</button>` : ''}
                     </div>
                 `;
                 container.innerHTML = html;
             } catch(e) {
-                container.innerHTML = `<p style="color:var(--danger)">Erro ao executar diagnóstico de IA: ${e.message}</p>`;
+                container.innerHTML = `<p style="color:var(--danger)">Erro ao executar diagnóstico de IA: ${_aiEsc(e.message)}</p>`;
             }
         }
 
@@ -4277,17 +4298,20 @@ function gbocToggleSidebarCollapse(){
                 const r = await fetch(window.GBOC_API_BASE + '/api/v1/surerestore/verify', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({agent_id: 'agente-local', job_id: 'job-hourly-01'})
+                    body: JSON.stringify({})
                 });
-                const d = await r.json();
-                const osHeartbeat = (d.stages && d.stages.os_heartbeat && d.stages.os_heartbeat.detail) ? d.stages.os_heartbeat.detail : 'OK (Pulso de SO detectado)';
-                const appConsistency = (d.stages && d.stages.app_consistency_check && d.stages.app_consistency_check.detail) ? d.stages.app_consistency_check.detail : 'OK (Consistência VSS 100%)';
+                const d = await r.json().catch(() => ({}));
+                const esc = (v) => String(v ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
+                if (!r.ok) {
+                    details.innerHTML = `<span style="color:var(--warning)"><strong>${esc(d.overall_state || 'Inconclusivo')}:</strong> ${esc(d.error?.message || d.detail || ('HTTP ' + r.status))}</span>`;
+                    return;
+                }
+                const stages = Object.entries(d.stages || {}).map(([k, v]) => `<p><strong>${esc(k)}:</strong> ${esc(v.status)} — ${esc(v.detail)}</p>`).join('');
                 details.innerHTML = `
-                    <p><strong>ID da Verificação:</strong> ${d.verification_id || 'v-sandbox-01'}</p>
-                    <p><strong>Tempo de Boot Sandbox:</strong> ${d.execution_time_seconds || 4.2}s</p>
-                    <p><strong>Heartbeat do SO:</strong> ${osHeartbeat}</p>
-                    <p><strong>Consistência de Aplicação:</strong> ${appConsistency}</p>
-                    <p style="color:var(--success)"><strong>Resultado:</strong> ${d.summary || 'SureRestore Verification PASSED'}</p>
+                    <p><strong>ID da Verificação:</strong> ${esc(d.verification_id || '—')}</p>
+                    <p><strong>Duração:</strong> ${d.execution_time_seconds != null ? esc(d.execution_time_seconds) + 's' : '—'}</p>
+                    ${stages}
+                    <p><strong>Resultado:</strong> ${esc(d.summary || d.overall_state || '—')}</p>
                 `;
             } catch(e) {
                 details.innerHTML = `<span style="color:var(--danger)">Erro no SureRestore: ${e.message}</span>`;

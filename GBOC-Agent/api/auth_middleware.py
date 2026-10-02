@@ -42,8 +42,7 @@ PUBLIC_PREFIXES = [
     '/static/',
     '/api/v1/rmm/',
     '/api/rmm/',
-    '/api/v1/ai/',
-    '/api/ai/',
+    # '/api/v1/ai/' e '/api/ai/' removidos: Copilot exige sessão (expunha config/chaves de IA).
     '/api/ransomware/',
     '/api/v2/',
     '/api/v1/diagnostics/',
@@ -118,5 +117,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 return RedirectResponse(url='/login.html', status_code=302)
 
         except Exception as e:
+            # Fail-closed: erro na validação de sessão não pode liberar acesso a rotas protegidas.
             logger.error(f"Auth middleware error: {e}")
-            return await call_next(request)
+            if path.startswith('/api/'):
+                return JSONResponse(
+                    {"status": "error", "message": "Serviço de autenticação indisponível", "code": "AUTH_UNAVAILABLE"},
+                    status_code=503
+                )
+            return RedirectResponse(url='/login.html', status_code=302)

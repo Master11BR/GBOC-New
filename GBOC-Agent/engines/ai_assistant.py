@@ -1,408 +1,246 @@
 #!/usr/bin/env python3
 """
-GBOC 14.6.0 - Multi-Provider AI Assistant Engine (GBOC Copilot AI)
-Supports:
-  1. Ollama Local (Off-line / On-Premises without token limits) - Default / Fallback
-  2. DeepSeek (V3 / R1 Nuvem)
-  3. Free Cloud Providers (Groq Cloud Llama 3 70B, Google Gemini Free Tier)
-  4. Paid Subscription Providers (OpenAI GPT-4o, Anthropic Claude 3.5 Sonnet)
+GBOC 14.7.3 - Multi-Provider AI Assistant Engine (GBOC Copilot AI - Agent)
+
+Provedores: Ollama Local (padrão/fallback), DeepSeek, Groq, Google Gemini, OpenAI,
+Anthropic Claude, xAI Grok, Moonshot Kimi, Mistral e Cohere — via engines/ai_providers.py.
+
+Política Zero-Mock: o contexto enviado à IA e o relatório nativo (sem LLM) são
+construídos exclusivamente com dados reais do banco do Agente.
 """
 
-import os
-import sys
+from __future__ import annotations
+
 import json
 import logging
-import time
-import requests
+import threading
 from datetime import datetime
-from typing import Dict, Any, List, Optional
+from pathlib import Path
+from typing import Any
+
+from engines import ai_providers as aip
 
 logger = logging.getLogger(__name__)
 
-# Default configurations for AI Providers
-DEFAULT_AI_CONFIG = {
-    "provider": "ollama_local",  # ollama_local, deepseek, groq_free, gemini_free, openai, anthropic
-    "ollama_url": "http://localhost:11434",
-    "ollama_model": "llama3",
-    "deepseek_api_key": "",
-    "groq_api_key": "",
-    "groq_model": "llama-3.3-70b-versatile",
-    "gemini_api_key": "",
-    "openai_api_key": "",
-    "openai_model": "gpt-4o-mini",
-    "system_prompt": "Você é o GBOC Copilot AI, um assistente especialista em backup, recuperação de desastres, réplicas de virtualização, proteção contra ransomware e administração de sistemas GBOC Enterprise. Responda em português brasileiro com clareza técnica e objetividade."
+AGENT_ROOT = Path(__file__).resolve().parents[1]
+AI_CONFIG_FILE = AGENT_ROOT / "data" / "ai_config.json"
+_config_lock = threading.Lock()
+
+DEFAULT_AI_CONFIG: dict[str, Any] = {
+    "provider": "ollama_local",
+    "ollama_url": aip.DEFAULT_OLLAMA_HOST,
+    "ollama_host": aip.DEFAULT_OLLAMA_HOST,
+    "ollama_model": aip.DEFAULT_MODELS["ollama"],
+    "groq_model": aip.DEFAULT_MODELS["groq"],
+    "openai_model": aip.DEFAULT_MODELS["openai"],
+    "gemini_model": aip.DEFAULT_MODELS["gemini"],
+    "claude_model": aip.DEFAULT_MODELS["claude"],
+    "deepseek_model": aip.DEFAULT_MODELS["deepseek"],
+    "system_prompt": (
+        "Você é o GBOC Copilot AI, especialista em backup, recuperação de desastres, virtualização, proteção "
+        "contra ransomware e administração do GBOC Enterprise. Responda em português brasileiro com clareza "
+        "técnica. Use SOMENTE os dados do contexto fornecido; se um dado não estiver no contexto, diga que não "
+        "está disponível — nunca invente números ou status."
+    ),
 }
 
-def load_ai_config() -> Dict[str, Any]:
-    """Carrega as configurações salvas do provedor de IA."""
-    cfg_file = os.path.join(os.getcwd(), "data", "ai_config.json")
-    if os.path.exists(cfg_file):
+
+def load_ai_config() -> dict[str, Any]:
+    """Carrega a configuração do Copilot (padrões + data/ai_config.json)."""
+    merged = DEFAULT_AI_CONFIG.copy()
+    if AI_CONFIG_FILE.exists():
         try:
-            with open(cfg_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                merged = DEFAULT_AI_CONFIG.copy()
+            data = json.loads(AI_CONFIG_FILE.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
                 merged.update(data)
-                return merged
-        except Exception:
-            pass
-    return DEFAULT_AI_CONFIG.copy()
+        except (OSError, json.JSONDecodeError) as e:
+            logger.error(f"Configuração de IA ilegível em {AI_CONFIG_FILE}: {e}")
+    return merged
 
-def save_ai_config(new_config: Dict[str, Any]) -> Dict[str, Any]:
-    """Salva a configuração do provedor de IA."""
-    cfg_dir = os.path.join(os.getcwd(), "data")
-    os.makedirs(cfg_dir, exist_ok=True)
-    cfg_file = os.path.join(cfg_dir, "ai_config.json")
-    
-    current = load_ai_config()
-    current.update(new_config)
-    with open(cfg_file, "w", encoding="utf-8") as f:
-        json.dump(current, f, indent=2, ensure_ascii=False)
-    return current
 
-def _build_system_context() -> str:
-    """Coleta o contexto em tempo real do GBOC para embasamento da IA."""
+def save_ai_config(new_config: dict[str, Any]) -> dict[str, Any]:
+    """Salva a configuração (whitelist, sem sobrescrever chaves com máscaras). Retorna a versão mascarada."""
+    clean = aip.sanitize_config_update(new_config or {})
+    with _config_lock:
+        current = load_ai_config()
+        current.update(clean)
+        AI_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        tmp = AI_CONFIG_FILE.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(current, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(AI_CONFIG_FILE)
+    return aip.mask_config(current)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Contexto operacional REAL do Agente
+# ──────────────────────────────────────────────────────────────────────────────
+
+def collect_agent_operational_data(limit: int = 5) -> dict[str, Any]:
+    """Execuções reais (7 dias) e estado de proteção ransomware a partir do banco do Agente."""
+    data: dict[str, Any] = {"available": False}
+    try:
+        from shared_core import get_shared_core
+        core = get_shared_core()
+        with core.get_db_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT COUNT(*),
+                       COUNT(*) FILTER (WHERE status IN ('completed', 'success')),
+                       COUNT(*) FILTER (WHERE status = 'failed'),
+                       COUNT(*) FILTER (WHERE status = 'failed' AND started_at >= NOW() - INTERVAL '24 hours'),
+                       COUNT(*) FILTER (WHERE status = 'running')
+                FROM task_executions
+                WHERE started_at >= NOW() - INTERVAL '7 days'
+                """
+            )
+            total, success, failed, failed_24h, running = cur.fetchone()
+            cur.execute(
+                """
+                SELECT e.started_at, COALESCE(t.name, 'Task #' || e.task_id::text), LEFT(COALESCE(e.error_message, ''), 240)
+                FROM task_executions e
+                LEFT JOIN tasks t ON t.id = e.task_id
+                WHERE e.status = 'failed' AND e.started_at >= NOW() - INTERVAL '7 days'
+                ORDER BY e.started_at DESC LIMIT %s
+                """,
+                (limit,),
+            )
+            failures = [
+                {"started_at": r[0].isoformat() if hasattr(r[0], "isoformat") else r[0], "task_name": r[1], "error": r[2]}
+                for r in cur.fetchall()
+            ]
+            cur.execute("SELECT COUNT(*), COUNT(*) FILTER (WHERE enabled = true) FROM tasks")
+            tasks_total, tasks_enabled = cur.fetchone()
+            cur.close()
+        data.update({
+            "available": True,
+            "executions_7d": int(total or 0), "success_7d": int(success or 0),
+            "failed_7d": int(failed or 0), "failed_24h": int(failed_24h or 0), "running": int(running or 0),
+            "recent_failures": failures,
+            "tasks_total": int(tasks_total or 0), "tasks_enabled": int(tasks_enabled or 0),
+        })
+    except Exception as e:
+        logger.error(f"[AI] Falha ao coletar execuções do Agente: {e}")
+        data["error"] = f"Banco do Agente indisponível ({e.__class__.__name__})."
+
     try:
         from engines.ransomware_detector import get_protection_status
         status = get_protection_status()
-        canaries_ok = status.get('canaries', {}).get('status') == 'ok'
-        installed_tools = [k for k, v in status.get('integrated_tools', {}).items() if v.get('installed')]
+        canaries = status.get("canaries", {})
+        tools = status.get("integrated_tools", {})
+        data["ransomware"] = {
+            "available": True,
+            "canaries_total": canaries.get("total", 0),
+            "canaries_compromised": canaries.get("compromised", 0),
+            "last_scan_threat": None if (status.get("last_scan") or {}).get("threat_level") in (None, "never_scanned")
+                                else (status.get("last_scan") or {}).get("threat_level"),
+            "last_scan_date": (status.get("last_scan") or {}).get("date"),
+            "tools_installed": sorted(k for k, v in tools.items() if isinstance(v, dict) and v.get("installed")),
+            "tools_total": len(tools),
+        }
+    except Exception as e:
+        logger.warning(f"[AI] Status ransomware indisponível: {e}")
+        data["ransomware"] = {"available": False, "error": f"{e.__class__.__name__}"}
+    return data
 
-        ctx = f"Data Local do Agente: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-        ctx += f"Status de Ransomware: {'Protegido' if canaries_ok else 'ALERTA'}\n"
-        ctx += f"Ferramentas de Segurança Instaladas ({len(installed_tools)}/7): {', '.join(installed_tools) if installed_tools else 'Nenhuma'}\n"
-        return ctx
-    except Exception:
-        return "Contexto do sistema carregado normalmente."
 
-def _try_ollama_fallback(prompt: str, full_system: str, preferred_model: Optional[str] = None, cfg: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
-    """Tenta o fallback automático no Ollama Local descobrindo modelos instalados."""
-    if cfg is None:
-        cfg = load_ai_config()
-
-    ollama_hosts = [
-        cfg.get("ollama_url") or cfg.get("ollama_host") or "http://localhost:11434",
-        "http://127.0.0.1:11434",
-        "http://localhost:11434"
-    ]
-    cleaned_hosts = []
-    for h in ollama_hosts:
-        if h and h.rstrip('/') not in cleaned_hosts:
-            cleaned_hosts.append(h.rstrip('/'))
-
-    target_model = preferred_model or cfg.get("ollama_model") or cfg.get("model") or "gemma4:latest"
-
-    active_host = None
-    installed_models = []
-    for host in cleaned_hosts:
-        try:
-            r_tags = requests.get(f"{host}/api/tags", timeout=1.5)
-            if r_tags.status_code == 200:
-                m_list = r_tags.json().get("models", [])
-                installed_models = [m.get("name") or m.get("model") for m in m_list if m.get("name") or m.get("model")]
-                active_host = host
-                break
-        except Exception:
-            continue
-
-    if not active_host:
-        return None
-
-    model_to_use = target_model
-    if installed_models:
-        if target_model not in installed_models:
-            prefix = target_model.lower().split(':')[0]
-            match = next((m for m in installed_models if prefix == m.lower().split(':')[0]), None)
-            if not match:
-                match = next((m for m in installed_models if prefix in m.lower()), None)
-            model_to_use = match or installed_models[0]
-        else:
-            model_to_use = target_model
-
-    try:
-        res = requests.post(
-            f"{active_host}/api/generate",
-            json={
-                "model": model_to_use,
-                "prompt": f"{full_system}\n\nUsuário: {prompt}\nAssistente:",
-                "stream": False,
-                "options": {
-                    "num_predict": 256,
-                    "temperature": 0.2
-                }
-            },
-            timeout=6
+def _format_context(data: dict[str, Any]) -> str:
+    lines = [f"Data/Hora local do Agente: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"]
+    if data.get("available"):
+        lines.append(f"Tarefas cadastradas: {data['tasks_total']} (habilitadas: {data['tasks_enabled']})")
+        lines.append(
+            f"Execuções nos últimos 7 dias: {data['executions_7d']} (sucesso: {data['success_7d']}, falha: {data['failed_7d']}, "
+            f"falhas nas últimas 24h: {data['failed_24h']}, em execução agora: {data['running']})"
         )
-        if res.status_code == 200:
-            ans_text = res.json().get("response", "").strip()
-            if ans_text:
-                return {
-                    "host": active_host,
-                    "model": model_to_use,
-                    "answer": ans_text
-                }
-    except Exception:
-        pass
-
-    return None
-
-def query_ai_assistant(prompt: str, provider_override: Optional[str] = None) -> Dict[str, Any]:
-    """Envia a pergunta para o provedor de IA selecionado com Fallback e aviso explícito."""
-    cfg = load_ai_config()
-    raw_provider = (provider_override or cfg.get("provider", "ollama_local")).lower().strip()
-    sys_prompt = cfg.get("system_prompt", DEFAULT_AI_CONFIG["system_prompt"])
-    context_str = _build_system_context()
-
-    full_system = f"{sys_prompt}\n\n[CONTEXTO ATUAL DO SISTEMA GBOC]:\n{context_str}"
-    start_time = time.time()
-
-    api_key = (
-        cfg.get("api_key") or
-        cfg.get("deepseek_api_key") or
-        cfg.get("groq_api_key") or
-        cfg.get("openai_api_key") or
-        cfg.get("gemini_api_key") or
-        ""
-    ).strip()
-
-    model_name = cfg.get("model") or cfg.get("ollama_model") or cfg.get("groq_model") or cfg.get("openai_model") or "default"
-
-    if any(p in raw_provider for p in ["deepseek"]):
-        provider = "deepseek"
-        provider_label = "DeepSeek (V3 / R1 Nuvem)"
-    elif any(p in raw_provider for p in ["groq"]):
-        provider = "groq"
-        provider_label = "Groq Cloud"
-    elif any(p in raw_provider for p in ["openai", "gpt"]):
-        provider = "openai"
-        provider_label = "OpenAI API"
-    elif any(p in raw_provider for p in ["gemini", "google"]):
-        provider = "gemini"
-        provider_label = "Google Gemini"
-    elif any(p in raw_provider for p in ["ollama", "qwen", "llama", "gemma"]):
-        provider = "ollama"
-        provider_label = "Ollama Local (On-Premises)"
+        for f in data["recent_failures"]:
+            lines.append(f"  - Falha em {f['started_at']}: {f['task_name']} — {f['error'] or 'sem mensagem de erro registrada'}")
     else:
-        provider = raw_provider
-        provider_label = raw_provider.upper()
+        lines.append(f"EXECUÇÕES INDISPONÍVEIS: {data.get('error', 'motivo desconhecido')}")
 
-    config_error_detail = None
-
-    # 1. DEEPSEEK
-    if provider == "deepseek":
-        if not api_key:
-            config_error_detail = "A Chave de API do DeepSeek não foi preenchida em Configurações > Provedores de IA."
+    rw = data.get("ransomware", {})
+    if rw.get("available"):
+        if rw["canaries_total"] == 0:
+            canary_txt = "nenhum arquivo canário implantado"
         else:
-            try:
-                target_url = "https://api.deepseek.com/chat/completions"
-                headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-                actual_model = "deepseek-chat" if "deepseek" not in model_name.lower() else model_name
-                payload = {
-                    "model": actual_model,
-                    "messages": [
-                        {"role": "system", "content": full_system},
-                        {"role": "user", "content": prompt}
-                    ],
-                    "temperature": 0.3
-                }
-                res = requests.post(target_url, json=payload, headers=headers, timeout=30)
-                if res.status_code == 200:
-                    ans_text = res.json()["choices"][0]["message"]["content"]
-                    return {
-                        "status": "success",
-                        "provider": f"DeepSeek ({actual_model})",
-                        "model": actual_model,
-                        "answer": ans_text,
-                        "duration_seconds": round(time.time() - start_time, 2)
-                    }
-                else:
-                    config_error_detail = f"Falha na API DeepSeek (HTTP {res.status_code}: {res.text[:180]})."
-            except Exception as e_ds:
-                config_error_detail = f"Falha de conexão com a API DeepSeek: {str(e_ds)}"
-
-    # 2. OLLAMA LOCAL
-    elif provider == "ollama":
-        ollama_res = _try_ollama_fallback(prompt, full_system, preferred_model=model_name, cfg=cfg)
-        if ollama_res:
-            return {
-                "status": "success",
-                "provider": f"Ollama Local ({ollama_res['model']})",
-                "model": ollama_res["model"],
-                "answer": ollama_res["answer"],
-                "duration_seconds": round(time.time() - start_time, 2)
-            }
-        else:
-            config_error_detail = "O serviço Ollama Local está inacessível no Agente (tentado em http://localhost:11434)."
-
-    # 3. GROQ CLOUD
-    elif provider == "groq":
-        if not api_key:
-            config_error_detail = "A Chave de API do Groq Cloud não foi informada em Configurações > Provedores de IA."
-        else:
-            try:
-                headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-                actual_model = cfg.get("groq_model") or cfg.get("model") or "llama-3.3-70b-versatile"
-                payload = {"model": actual_model, "messages": [{"role": "system", "content": full_system}, {"role": "user", "content": prompt}]}
-                res = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers, timeout=20)
-                if res.status_code == 200:
-                    ans_text = res.json()["choices"][0]["message"]["content"]
-                    return {
-                        "status": "success",
-                        "provider": "Groq Cloud",
-                        "model": actual_model,
-                        "answer": ans_text,
-                        "duration_seconds": round(time.time() - start_time, 2)
-                    }
-                else:
-                    config_error_detail = f"Falha na API Groq Cloud (HTTP {res.status_code}: {res.text[:180]})."
-            except Exception as e_groq:
-                config_error_detail = f"Falha de conexão com Groq Cloud: {str(e_groq)}"
-
-    # 4. OPENAI
-    elif provider == "openai":
-        if not api_key:
-            config_error_detail = "A Chave de API da OpenAI não foi informada em Configurações > Provedores de IA."
-        else:
-            try:
-                headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-                actual_model = cfg.get("openai_model") or cfg.get("model") or "gpt-4o-mini"
-                payload = {"model": actual_model, "messages": [{"role": "system", "content": full_system}, {"role": "user", "content": prompt}]}
-                res = requests.post("https://api.openai.com/v1/chat/completions", json=payload, headers=headers, timeout=25)
-                if res.status_code == 200:
-                    ans_text = res.json()["choices"][0]["message"]["content"]
-                    return {
-                        "status": "success",
-                        "provider": "OpenAI API",
-                        "model": actual_model,
-                        "answer": ans_text,
-                        "duration_seconds": round(time.time() - start_time, 2)
-                    }
-                else:
-                    config_error_detail = f"Falha na API OpenAI (HTTP {res.status_code}: {res.text[:180]})."
-            except Exception as e_oai:
-                config_error_detail = f"Falha de conexão com OpenAI API: {str(e_oai)}"
-
-    # 5. GOOGLE GEMINI
-    elif provider == "gemini":
-        if not api_key:
-            config_error_detail = "A Chave de API do Google Gemini não foi informada em Configurações > Provedores de IA."
-        else:
-            try:
-                actual_model = cfg.get("model") or "gemini-1.5-flash"
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/{actual_model}:generateContent?key={api_key}"
-                payload = {"contents": [{"parts": [{"text": f"{full_system}\n\nUsuário: {prompt}"}]}]}
-                res = requests.post(url, json=payload, timeout=20)
-                if res.status_code == 200:
-                    ans_text = res.json()["candidates"][0]["content"]["parts"][0]["text"]
-                    return {
-                        "status": "success",
-                        "provider": "Google Gemini",
-                        "model": actual_model,
-                        "answer": ans_text,
-                        "duration_seconds": round(time.time() - start_time, 2)
-                    }
-                else:
-                    config_error_detail = f"Falha na API Gemini (HTTP {res.status_code}: {res.text[:180]})."
-            except Exception as e_gem:
-                config_error_detail = f"Falha de conexão com Google Gemini API: {str(e_gem)}"
-
-    # 6. ANTHROPIC CLAUDE
-    elif provider == "claude":
-        if not api_key:
-            config_error_detail = "A Chave de API do Anthropic Claude não foi informada em Configurações > Provedores de IA."
-        else:
-            try:
-                actual_model = cfg.get("model") or "claude-3-5-sonnet-20241022"
-                url = "https://api.anthropic.com/v1/messages"
-                headers = {
-                    "x-api-key": api_key,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json"
-                }
-                payload = {
-                    "model": actual_model,
-                    "max_tokens": 512,
-                    "messages": [{"role": "user", "content": f"{full_system}\n\nUsuário: {prompt}"}]
-                }
-                res = requests.post(url, json=payload, headers=headers, timeout=20)
-                if res.status_code == 200:
-                    ans_text = res.json()["content"][0]["text"]
-                    return {
-                        "status": "success",
-                        "provider": "Anthropic Claude",
-                        "model": actual_model,
-                        "answer": ans_text,
-                        "duration_seconds": round(time.time() - start_time, 2)
-                    }
-                else:
-                    config_error_detail = f"Falha na API Claude (HTTP {res.status_code}: {res.text[:180]})."
-            except Exception as e_claude:
-                config_error_detail = f"Falha de conexão com Anthropic Claude API: {str(e_claude)}"
-
-    # EXECUÇÃO DO FALLBACK AUTOMÁTICO PARA OLLAMA LOCAL QUANDO HOUVER FALHA NA IA PRINCIPAL
-    ollama_fallback = _try_ollama_fallback(prompt, full_system, cfg=cfg) if provider != "ollama" else None
-
-    err_msg = config_error_detail or f"Erro de conexão com a API do provedor {provider_label}."
-
-    if ollama_fallback:
-        answer_text = (
-            f"🚨 **ALERTA DE CONFIGURAÇÃO DA IA ({provider_label})**:\n"
-            f"• **Motivo da Falha**: {err_msg}\n"
-            f"• **Ação Recomendada**: Acesse **Configurações > Provedores de IA** para ajustar suas credenciais.\n\n"
-            f"🔄 **FALLBACK AUTOMÁTICO ATIVADO (Ollama Local - Modelo {ollama_fallback['model']})**:\n"
-            f"{ollama_fallback['answer']}"
+            canary_txt = f"{rw['canaries_total']} canários, {rw['canaries_compromised']} comprometidos"
+        lines.append(
+            f"Ransomware: {canary_txt}; último scan: {rw['last_scan_threat'] or 'nunca executado'} "
+            f"({rw['last_scan_date'] or 'sem data'}); ferramentas de segurança instaladas "
+            f"{len(rw['tools_installed'])}/{rw['tools_total']}: {', '.join(rw['tools_installed']) or 'nenhuma'}"
         )
+    else:
+        lines.append("Ransomware: status indisponível.")
+    return "\n".join(lines)
+
+
+def _build_system_context() -> str:
+    """Contexto textual real para embasar a IA (mantido por compatibilidade)."""
+    return _format_context(collect_agent_operational_data())
+
+
+def _native_report(data: dict[str, Any]) -> str:
+    """Relatório determinístico (sem LLM) com dados reais."""
+    parts = ["ℹ️ **Motor Nativo GBOC Agent (sem LLM) — dados reais do Agente**"]
+    if data.get("available"):
+        parts.append(
+            f"• Execuções 7 dias: {data['executions_7d']} — {data['success_7d']} sucesso, {data['failed_7d']} falha "
+            f"({data['failed_24h']} nas últimas 24h); {data['running']} em execução."
+        )
+        if data["executions_7d"] == 0:
+            parts.append("• Nenhuma execução registrada nos últimos 7 dias — verifique os agendamentos.")
+        if data["recent_failures"]:
+            parts.append("\n🔴 **Falhas mais recentes:**")
+            parts += [f"• {f['started_at']} — {f['task_name']}: {f['error'] or 'sem mensagem'}" for f in data["recent_failures"]]
+    else:
+        parts.append(f"• Execuções indisponíveis: {data.get('error', 'motivo desconhecido')}")
+    rw = data.get("ransomware", {})
+    if rw.get("available"):
+        parts.append(
+            f"• Ransomware: {rw['canaries_compromised']} de {rw['canaries_total']} canários comprometidos; "
+            f"último scan: {rw['last_scan_threat'] or 'nunca executado'}."
+        )
+    parts.append(
+        "\n📍 Detalhes: **Tarefas** (`/tasks.html`) → Histórico/Logs, **Falhas** (`/failed-jobs.html`) "
+        "e **Ransomware** (`/ransomware.html`)."
+    )
+    return "\n".join(parts)
+
+
+def query_ai_assistant(prompt: str, provider_override: str | None = None) -> dict[str, Any]:
+    """Consulta o provedor configurado com contexto real; fallback Ollama → relatório nativo."""
+    clean_prompt = (prompt or "").strip()
+    if not clean_prompt:
+        return {"status": "error", "message": "Prompt vazio"}
+    if len(clean_prompt) > 8000:
+        return {"status": "error", "message": "Prompt excede o limite de 8000 caracteres."}
+
+    cfg = load_ai_config()
+    data = collect_agent_operational_data()
+    system = f"{cfg.get('system_prompt') or DEFAULT_AI_CONFIG['system_prompt']}\n\n{aip.GROUNDING_RULE}\n\n[CONTEXTO REAL DO AGENTE GBOC]:\n{_format_context(data)}"
+
+    primary, fallback = aip.chat_with_fallback(cfg, system, clean_prompt, provider=provider_override)
+    if primary.ok:
         return {
-            "status": "success",
-            "provider": f"Ollama Local (Fallback - {ollama_fallback['model']})",
-            "model": ollama_fallback['model'],
-            "answer": answer_text,
-            "duration_seconds": round(time.time() - start_time, 2)
+            "status": "success", "is_llm_real": True,
+            "provider": f"{primary.provider_label} ({primary.model})", "model": primary.model,
+            "answer": primary.answer, "duration_seconds": primary.duration_seconds,
         }
 
-    # FALLBACK SECUNDÁRIO: MOTOR PREDITIVO NATIVO DO AGENTE GBOC COM TELEMETRIA REAL
-    p_lower = prompt.lower()
-    if any(w in p_lower for w in ["semana", "última semana", "ultima semana", "7 dias", "dias", "falha", "falhas", "falhos", "falhar", "erro", "erros", "executado", "não executado", "nao executado", "deu erro", "pendente", "24h", "relatório"]):
-        native_body = (
-            f"🔍 **Relatório Diagnóstico de Backups e Execuções do Agente (Últimos 7 dias / 24h)**:\n\n"
-            f"• **Análise de Histórico de Tarefas**: Consulta em tempo real realizada no agente.\n"
-            f"{context_str}\n"
-            f"• **Resultado da Busca**: 🟢 **Nenhum erro de backup foi registrado na última semana (últimos 7 dias).** Todos os agendamentos foram concluídos com 100% de integridade e sucesso.\n\n"
-            f"📍 **COMO NAVEGAR E CHEGAR À INFORMAÇÃO NO SISTEMA**:\n"
-            f"1. **Menu Tarefas**: Acesse a aba **Tarefas** (`/static/jobs.html`) para visualizar a lista de rotinas agendadas e seus horários.\n"
-            f"2. **Histórico de Execuções**: Clique no botão **Histórico / Logs** dentro de cada tarefa para filtrar logs por intervalo de datas (24h, 7 dias, 30 dias).\n"
-            f"3. **Proteção Ransomware**: Acesse o painel **Sentinel** para auditar a imunidade dos backups contra alterações."
-        )
-    elif any(w in p_lower for w in ["status", "saúde", "agente", "agentes", "geral", "infraestrutura"]):
-        native_body = (
-            f"📊 **Status Geral do Agente GBOC**:\n{context_str}\n"
-            f"• O agente e o serviço Guardian de proteção estão operando normalmente.\n\n"
-            f"📍 **COMO CHEGAR**: Acesse a página inicial ou o menu superior para conferir o status dos serviços."
-        )
-    elif any(w in p_lower for w in ["ransomware", "vírus", "proteção"]):
-        native_body = (
-            f"🛡️ **Proteção Ransomware**: O Watchdog Guardian está ativo, monitorando arquivos Canários e ferramentas de segurança.\n\n"
-            f"📍 **COMO CHEGAR**: Acesse a aba **Segurança** no menu do agente."
-        )
-    else:
-        native_body = (
-            f"ℹ️ **Assistente GBOC Agent**:\nRecebi sua pergunta: '{prompt}'.\n{context_str}\n\n"
-            f"📍 **COMO NAVEGAR NO SISTEMA**:\n"
-            f"• Para gerenciar tarefas: Acesse a aba **Tarefas**.\n"
-            f"• Para configurar provedores de IA: Acesse **Configurações > Provedores de IA**."
-        )
-
-    answer_text = (
-        f"🚨 **ALERTA DE CONFIGURAÇÃO DA IA ({provider_label})**:\n"
-        f"• **Motivo da Falha**: {err_msg}\n"
-        f"• **Ação Recomendada**: Acesse **Configurações > Provedores de IA** para preencher a Chave de API ou iniciar o serviço Ollama local.\n\n"
-        f"🛡️ **MOTOR PREDITIVO GBOC AGENT (Nativo Off-line)**:\n"
-        f"{native_body}"
+    warning = (
+        f"⚠️ **IA ({primary.provider_label}) indisponível**: {primary.error}\n"
+        "• Ajuste em **Configurações > Provedores de IA**.\n\n"
     )
-
+    if fallback and fallback.ok:
+        return {
+            "status": "success", "is_llm_real": True, "fallback": True, "primary_error": primary.error,
+            "provider": f"Ollama Local (Fallback - {fallback.model})", "model": fallback.model,
+            "answer": warning + f"🔄 **Fallback automático (Ollama Local - {fallback.model})**:\n{fallback.answer}",
+            "duration_seconds": round(primary.duration_seconds + fallback.duration_seconds, 2),
+        }
     return {
-        "status": "success",
-        "provider": "Motor Preditivo GBOC (Nativo Off-line)",
-        "model": "GBOC Diagnostic Expert",
-        "answer": answer_text,
-        "duration_seconds": round(time.time() - start_time, 2)
+        "status": "success", "is_llm_real": False, "primary_error": primary.error,
+        "fallback_error": fallback.error if fallback else None,
+        "provider": "Motor Nativo GBOC Agent (sem LLM)", "model": "gboc-native-report",
+        "answer": warning + _native_report(data),
+        "duration_seconds": round(primary.duration_seconds + (fallback.duration_seconds if fallback else 0), 2),
     }

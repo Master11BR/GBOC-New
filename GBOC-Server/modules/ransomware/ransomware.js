@@ -26,7 +26,7 @@ async function runGuardianAIDiagnostic() {
         const d = await r.json();
         if (!r.ok) throw new Error(d.detail || d.message || `HTTP ${r.status}`);
 
-        const health = d.global_health_score ?? 0;
+        const health = d.global_health_score ?? 'n/d';
         const status = d.overall_status || 'UNKNOWN';
         const nodes = d.nodes_scanned || 0;
         const text = d.ai_executive_summary || 'Diagnóstico concluído.';

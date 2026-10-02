@@ -1,416 +1,219 @@
 # ==============================================================================
-# GBOC System v14.6.0 Enterprise Edition
+# GBOC System v14.7.3 Enterprise Edition
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # Propriedade Intelectual & Direitos Autorais Registrados.
 # A cópia, distribuição ou modificação não autorizada é estritamente proibida.
 # ==============================================================================
 
 """
-GBOC Real AI Diagnostic Engine v14.6.0 Enterprise
-Integração Real com 11 Motores de IA (Local Ollama, Kimi, Grok, OpenAI, Gemini, DeepSeek, Claude, Qwen, Mistral, Llama 3.3 e Cohere).
-Análise preditiva de logs, falhas de backup, integridade de disco e auto-reparo.
+GBOC Agent AI Diagnostic Engine
+Análise de falhas de backup/sistema com o LLM configurado (Ollama, OpenAI, Groq, Gemini,
+Claude, DeepSeek, Grok, Kimi, Mistral, Cohere) e heurística determinística com telemetria
+real do host quando nenhum LLM responde.
+
+Configuração: config/global_settings.json → global_settings.ai_llm_config
+(relida a cada chamada; alterações valem sem reiniciar o Agente).
 """
 
-import os
+from __future__ import annotations
+
 import json
 import logging
-import httpx
-from typing import Dict, Any, Optional, List
+import threading
 from pathlib import Path
+from typing import Any
+
+from engines import ai_providers as aip
 
 logger = logging.getLogger("GBOC.AIDiagnosticEngine")
 
+DIAGNOSTIC_SYSTEM_PROMPT = (
+    "Você é o especialista de diagnóstico do GBOC Agent (backup corporativo). "
+    "Analise a falha informada e responda SOMENTE com um objeto JSON com as chaves: "
+    '"cause" (causa técnica concisa), "solution" (passos numerados), '
+    '"recommended_action" (uma de: "rebuild_index", "vss_shadow_copy", "prune_lock", "test_credentials", "none") '
+    'e "analysis" (resumo em Português para o operador). Não invente dados que não estejam no contexto.'
+)
+_ALLOWED_ACTIONS = {"rebuild_index", "vss_shadow_copy", "prune_lock", "test_credentials", "none"}
+
+DEFAULT_DIAG_CONFIG: dict[str, Any] = {
+    "provider": "ollama",
+    "ollama_host": aip.DEFAULT_OLLAMA_HOST,
+    "ollama_url": aip.DEFAULT_OLLAMA_HOST,
+    "model": aip.DEFAULT_MODELS["ollama"],
+    "task_history_limit": 10,
+    "auto_diagnose_errors": True,
+}
+
+
+def collect_host_telemetry() -> dict[str, Any]:
+    """Telemetria real do host do Agente (psutil)."""
+    try:
+        import platform
+        import psutil
+        root = "C:\\" if platform.system() == "Windows" else "/"
+        return {
+            "available": True,
+            "cpu_percent": psutil.cpu_percent(interval=0.2),
+            "ram_percent": psutil.virtual_memory().percent,
+            "disk_percent": psutil.disk_usage(root).percent,
+            "platform": platform.system(),
+        }
+    except Exception as e:
+        logger.error(f"Telemetria do host indisponível: {e}")
+        return {"available": False, "error": f"Telemetria indisponível: {e.__class__.__name__}"}
+
+
 class AIDiagnosticEngine:
     def __init__(self):
-        self.config_file = Path(__file__).parent.parent / "config" / "global_settings.json"
-        self._load_config()
+        self.config_file = Path(__file__).resolve().parent.parent / "config" / "global_settings.json"
+        self._lock = threading.Lock()
 
-    def _load_config(self):
-        self.config = {
-            "provider": "ollama",
-            "ollama_host": "http://localhost:11434",
-            "model": "llama3",
-            "api_key": "",
-            "task_history_limit": 10
-        }
-        
-        if self.config_file.exists():
-            try:
-                with open(self.config_file, 'r', encoding='utf-8') as f:
-                    cfg = json.load(f).get("global_settings", {}).get("ai_llm_config", {})
-                    self.config.update(cfg)
-            except Exception as e:
-                logger.warning(f"Falha ao carregar config de IA: {e}")
-
-    def save_config(self):
+    # ── Configuração ─────────────────────────────────────────────────────────
+    def _read_file(self) -> dict[str, Any]:
+        if not self.config_file.exists():
+            return {}
         try:
-            full_data = {}
-            if self.config_file.exists():
-                with open(self.config_file, 'r', encoding='utf-8') as f:
-                    full_data = json.load(f)
-            
-            if "global_settings" not in full_data:
-                full_data["global_settings"] = {}
-            full_data["global_settings"]["ai_llm_config"] = self.config
+            data = json.loads(self.config_file.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
+        except (OSError, json.JSONDecodeError) as e:
+            logger.error(f"Falha ao ler {self.config_file}: {e}")
+            return {}
 
+    @property
+    def config(self) -> dict[str, Any]:
+        cfg = DEFAULT_DIAG_CONFIG.copy()
+        cfg.update(self._read_file().get("global_settings", {}).get("ai_llm_config", {}) or {})
+        return cfg
+
+    def public_config(self) -> dict[str, Any]:
+        """Configuração com chaves mascaradas (para respostas de API)."""
+        return aip.mask_config(self.config)
+
+    def save_config(self, update: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Grava somente campos válidos; chaves mascaradas/vazias não sobrescrevem as reais."""
+        clean = aip.sanitize_config_update(update or {}, provider_hint=self.config.get("provider"))
+        with self._lock:
+            full = self._read_file()
+            gs = full.setdefault("global_settings", {})
+            current = DEFAULT_DIAG_CONFIG.copy()
+            current.update(gs.get("ai_llm_config", {}) or {})
+            current.update(clean)
+            gs["ai_llm_config"] = current
             self.config_file.parent.mkdir(parents=True, exist_ok=True)
-            with open(self.config_file, 'w', encoding='utf-8') as f:
-                json.dump(full_data, f, indent=4, ensure_ascii=False)
-        except Exception as e:
-            logger.error(f"Falha ao salvar configurações de IA: {e}")
+            tmp = self.config_file.with_suffix(".json.tmp")
+            tmp.write_text(json.dumps(full, indent=4, ensure_ascii=False), encoding="utf-8")
+            tmp.replace(self.config_file)
+        return aip.mask_config(current)
 
-    async def get_installed_ollama_models(self, ollama_host: Optional[str] = None) -> Dict[str, Any]:
-        """Busca modelos instalados e disponíveis no serviço Ollama local."""
-        target_host = ollama_host or self.config.get("ollama_host", "http://localhost:11434")
-        hosts_to_try = [target_host, "http://127.0.0.1:11434", "http://localhost:11434"]
-        cleaned_hosts = []
-        for h in hosts_to_try:
-            if h and h.rstrip('/') not in cleaned_hosts:
-                cleaned_hosts.append(h.rstrip('/'))
-
-        recommended_models = [
-            "llama3:latest",
-            "llama3.2:latest",
-            "llama3.3:70b",
-            "mistral:latest",
-            "deepseek-r1:latest",
-            "deepseek-r1:1.5b",
-            "qwen2.5:latest",
-            "gemma2:latest",
-            "codellama:latest",
-            "phi3:latest"
-        ]
-
-        for host in cleaned_hosts:
-            try:
-                async with httpx.AsyncClient(timeout=4.0) as client:
-                    resp = await client.get(f"{host}/api/tags")
-                    if resp.status_code == 200:
-                        models_data = resp.json().get("models", [])
-                        installed = [m.get("name") or m.get("model") for m in models_data if m.get("name") or m.get("model")]
-                        return {
-                            "status": "success",
-                            "connected": True,
-                            "ollama_host": host,
-                            "installed_models": installed,
-                            "recommended_models": recommended_models,
-                            "count_installed": len(installed)
-                        }
-            except Exception:
-                continue
-
+    # ── Ollama ───────────────────────────────────────────────────────────────
+    async def get_installed_ollama_models(self, ollama_host: str | None = None) -> dict[str, Any]:
+        info = await aip.alist_ollama_models(self.config, ollama_host)
         return {
-            "status": "error",
-            "connected": False,
-            "ollama_host": target_host,
-            "installed_models": [],
-            "recommended_models": recommended_models,
-            "count_installed": 0,
-            "message": f"Servidor Ollama local inacessível em {target_host} ou 127.0.0.1:11434."
+            "status": "success" if info["connected"] else "error",
+            "connected": info["connected"],
+            "ollama_host": info["host"],
+            "installed_models": info["models"],
+            "models": info["models"],
+            "recommended_models": ["llama3.2:latest", "llama3.1:8b", "qwen2.5:7b", "mistral:latest",
+                                   "deepseek-r1:8b", "gemma2:9b", "phi3:latest"],
+            "count_installed": len(info["models"]),
+            "message": "" if info["connected"] else f"Servidor Ollama inacessível: {info['error']}",
         }
 
-    async def analyze_error(self, error_context: str, system_logs: Optional[List[str]] = None) -> Dict[str, Any]:
-        """Realiza análise real de erro utilizando o LLM configurado (Ollama, Kimi, Grok, Cloud)."""
-        provider = self.config.get("provider", "ollama")
-        model = self.config.get("model", "llama3")
-        ollama_host = self.config.get("ollama_host", "http://localhost:11434")
-        api_key = self.config.get("api_key", "")
-
+    # ── Análise ──────────────────────────────────────────────────────────────
+    async def analyze_error(self, error_context: str, system_logs: list[str] | None = None,
+                            telemetry: dict[str, Any] | None = None) -> dict[str, Any]:
+        cfg = self.config
+        provider = aip.normalize_provider(cfg.get("provider"))
+        error_context = (error_context or "").strip() or "Verificação geral do Agente"
         is_test = "teste" in error_context.lower()
 
-        # Prompt estruturado
-        prompt = f"""Você é o Assistente Especialista de Inteligência Artificial do GBOC System v14.6.0 Enterprise.
-Analise a seguinte falha de backup/sistema e forneça o diagnóstico exato da causa raiz e a solução em 1 clique.
-
-ERRO REGISTRADO:
-{error_context}
-
-CONTEXTO DE LOGS RECENTES:
-{json.dumps(system_logs or [], indent=2)}
-
-Responda em formato JSON contendo obrigatoriamente:
-- "cause": Explicação técnica concisa da causa do erro.
-- "solution": Passos para solução.
-- "recommended_action": Ação automatizada sugerida ("rebuild_index", "vss_shadow_copy", "prune_lock", "test_credentials").
-- "analysis": Resumo amigável para o operador em Português.
-"""
-
-        # 1. Ollama Local ou modelos locais
-        if provider in ("ollama", "qwen", "llama3", "mistral_local", "ollama_local"):
-            ollama_info = await self.get_installed_ollama_models(ollama_host)
-            active_host = ollama_info.get("ollama_host") if ollama_info.get("connected") else ollama_host.rstrip('/')
-            installed_models = ollama_info.get("installed_models") or ollama_info.get("models", [])
-
-            # Resolver o melhor modelo disponível se o especificado não for exato
-            selected_model = model
-            if installed_models:
-                if selected_model not in installed_models:
-                    prefix = selected_model.lower().split(':')[0]
-                    match = next((m for m in installed_models if prefix == m.lower().split(':')[0]), None)
-                    if not match:
-                        match = next((m for m in installed_models if prefix in m.lower()), None)
-                    selected_model = match or installed_models[0]
-
-            if ollama_info.get("connected"):
-                try:
-                    async with httpx.AsyncClient(timeout=6.0) as client:
-                        resp = await client.post(
-                            f"{active_host}/api/generate",
-                            json={
-                                "model": selected_model,
-                                "prompt": "Responda apenas: OK - Ollama Conectado" if is_test else prompt,
-                                "stream": False,
-                                "options": {
-                                    "num_predict": 256,
-                                    "temperature": 0.2
-                                }
-                            }
-                        )
-                        if resp.status_code == 200:
-                            raw_text = resp.json().get("response", "")
-                            if is_test:
-                                return {
-                                    "is_llm_real": True,
-                                    "provider": f"Ollama Local ({active_host})",
-                                    "model": selected_model,
-                                    "analysis": f"✅ CONEXÃO COM OLLAMA OK!\n\nO serviço local Ollama respondeu com sucesso usando o modelo '{selected_model}'.\nResposta do Modelo: {raw_text.strip()}"
-                                }
-                            res = self._parse_ai_response(raw_text, error_context)
-                            res["is_llm_real"] = True
-                            res["provider"] = f"Ollama Local ({selected_model})"
-                            res["model"] = selected_model
-                            return res
-                        elif resp.status_code == 404 and is_test:
-                            return {
-                                "is_llm_real": False,
-                                "provider": f"Ollama Local ({active_host})",
-                                "model": selected_model,
-                                "analysis": f"⚠️ Ollama está ativo em {active_host}, mas o modelo '{selected_model}' não está baixado.\n\nExecute no terminal:\n`ollama pull {model}`\nou selecione um dos modelos instalados: {', '.join(installed_models) if installed_models else 'Nenhum'}"
-                            }
-                except Exception as e:
-                    logger.warning(f"Ollama local indisponível no modelo {selected_model} ({e})...")
-
-        # 2. Google Gemini
-        if provider in ("gemini", "google"):
-            if not api_key:
-                return {
-                    "is_llm_real": False,
-                    "provider": "Google Gemini (Sem Chave API)",
-                    "model": model,
-                    "analysis": "⚠️ A Chave de API do Google Gemini não foi preenchida nas configurações.\n\nPor favor, insira a sua API Key e clique em 'Salvar Configuração de IA'."
-                }
-            try:
-                gemini_model = model if "gemini" in model.lower() else "gemini-1.5-flash"
-                target_url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_model}:generateContent?key={api_key}"
-                payload = {"contents": [{"parts": [{"text": "Responda apenas: OK" if is_test else prompt}]}]}
-                async with httpx.AsyncClient(timeout=15.0) as client:
-                    resp = await client.post(target_url, json=payload)
-                    if resp.status_code == 200:
-                        content = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
-                        if is_test:
-                            return {
-                                "is_llm_real": True,
-                                "provider": "Google Gemini (API Conectada)",
-                                "model": gemini_model,
-                                "analysis": f"✅ CONEXÃO COM GOOGLE GEMINI OK!\n\nA API respondeu com sucesso usando o modelo '{gemini_model}'."
-                            }
-                        res = self._parse_ai_response(content, error_context)
-                        res["is_llm_real"] = True
-                        res["provider"] = "Google Gemini (LLM Real)"
-                        res["model"] = gemini_model
-                        return res
-            except Exception as e:
-                logger.warning(f"Falha na API Google Gemini ({e})...")
-
-        # 3. Anthropic Claude
-        if provider in ("claude", "anthropic"):
-            if not api_key:
-                return {
-                    "is_llm_real": False,
-                    "provider": "Anthropic Claude (Sem Chave API)",
-                    "model": model,
-                    "analysis": "⚠️ A Chave de API do Anthropic Claude não foi preenchida nas configurações.\n\nPor favor, insira a sua API Key e clique em 'Salvar Configuração de IA'."
-                }
-            try:
-                claude_model = model if "claude" in model.lower() else "claude-3-5-sonnet-20241022"
-                target_url = "https://api.anthropic.com/v1/messages"
-                headers = {
-                    "x-api-key": api_key,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json"
-                }
-                payload = {
-                    "model": claude_model,
-                    "max_tokens": 512,
-                    "messages": [{"role": "user", "content": "Responda apenas: OK" if is_test else prompt}]
-                }
-                async with httpx.AsyncClient(timeout=15.0) as client:
-                    resp = await client.post(target_url, json=payload, headers=headers)
-                    if resp.status_code == 200:
-                        content = resp.json()["content"][0]["text"]
-                        if is_test:
-                            return {
-                                "is_llm_real": True,
-                                "provider": "Anthropic Claude (API Conectada)",
-                                "model": claude_model,
-                                "analysis": f"✅ CONEXÃO COM ANTHROPIC CLAUDE OK!\n\nA API respondeu com sucesso usando o modelo '{claude_model}'."
-                            }
-                        res = self._parse_ai_response(content, error_context)
-                        res["is_llm_real"] = True
-                        res["provider"] = "Anthropic Claude (LLM Real)"
-                        res["model"] = claude_model
-                        return res
-            except Exception as e:
-                logger.warning(f"Falha na API Anthropic Claude ({e})...")
-
-        # 4. Provedores Cloud padrão OpenAI-compatíveis (Groq, OpenAI, DeepSeek, Kimi, Mistral)
-        endpoints = {
-            "groq": "https://api.groq.com/openai/v1/chat/completions",
-            "groq_free": "https://api.groq.com/openai/v1/chat/completions",
-            "kimi": "https://api.moonshot.cn/v1/chat/completions",
-            "grok": "https://api.x.ai/v1/chat/completions",
-            "openai": "https://api.openai.com/v1/chat/completions",
-            "deepseek": "https://api.deepseek.com/v1/chat/completions",
-            "mistral": "https://api.mistral.ai/v1/chat/completions"
-        }
-
-        if provider in endpoints:
-            if not api_key:
-                return {
-                    "is_llm_real": False,
-                    "provider": f"{provider.upper()} (Sem Chave API)",
-                    "model": model,
-                    "analysis": f"⚠️ A Chave de API (API Key) para o provedor {provider.upper()} não foi preenchida nas configurações.\n\nPor favor, insira a sua API Key e clique em 'Salvar Configuração de IA'."
-                }
-            try:
-                target_url = endpoints[provider]
-                headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-                actual_model = self.config.get("groq_model", "llama-3.3-70b-versatile") if "groq" in provider else model
-                payload = {
-                    "model": actual_model,
-                    "messages": [{"role": "user", "content": "Responda apenas: OK" if is_test else prompt}],
-                    "temperature": 0.2
-                }
-                async with httpx.AsyncClient(timeout=15.0) as client:
-                    resp = await client.post(target_url, json=payload, headers=headers)
-                    if resp.status_code == 200:
-                        content = resp.json()["choices"][0]["message"]["content"]
-                        if is_test:
-                            return {
-                                "is_llm_real": True,
-                                "provider": f"{provider.upper()} Nuvem (API Conectada)",
-                                "model": actual_model,
-                                "analysis": f"✅ CONEXÃO COM {provider.upper()} OK!\n\nA API em nuvem respondeu com sucesso usando o modelo '{actual_model}'."
-                            }
-                        res = self._parse_ai_response(content, error_context)
-                        res["is_llm_real"] = True
-                        res["provider"] = f"{provider.upper()} Nuvem (LLM Real)"
-                        res["model"] = actual_model
-                        return res
-            except Exception as e:
-                logger.warning(f"Falha na API {provider} ({e})...")
-
-        # 3. Heurística Interna (Quando o serviço Ollama local não está aberto no Windows ou não há chave de API)
         if is_test:
-            return {
-                "is_llm_real": False,
-                "provider": f"{provider.upper()} (Motor de Regras Heurísticas Interno)",
-                "model": model,
-                "analysis": f"⚠️ O serviço Ollama local não está em execução em '{ollama_host}' ou a Chave de API não foi informada.\n\n"
-                            f"📌 O GBOC ativou o Motor Heurístico Interno de Contingência para garantir que os diagnósticos de backup continuem funcionando mesmo sem internet ou sem o Ollama aberto!\n\n"
-                            f"💡 Para conectar a uma IA Real:\n"
-                            f"1. Abra o serviço Ollama na sua máquina (ex: `ollama run llama3`), OU\n"
-                            f"2. Escolha um provedor de nuvem (Kimi, Grok, OpenAI, DeepSeek) e informe a sua Chave de API."
-            }
+            result = await aip.achat(cfg, "Você é um verificador de conectividade.", "Responda apenas: OK", provider=provider)
+            if result.ok:
+                return {"is_llm_real": True, "provider": result.provider_label, "model": result.model,
+                        "analysis": f"✅ Conexão com {result.provider_label} OK (modelo '{result.model}', "
+                                    f"{result.duration_seconds}s).\nResposta do modelo: {result.answer[:200]}"}
+            return {"is_llm_real": False, "provider": result.provider_label, "model": result.model,
+                    "error": result.error, "analysis": f"❌ Falha na conexão com {result.provider_label}: {result.error}"}
 
-        res = self._rule_based_ai_analysis(error_context)
-        res["is_llm_real"] = False
-        res["provider"] = f"{provider.upper()} (Heurística Interna)"
-        res["model"] = model
+        if telemetry is None:
+            import asyncio
+            telemetry = await asyncio.to_thread(collect_host_telemetry)
+        logs = [str(x)[:500] for x in (system_logs or [])][:30]
+        prompt = (
+            f"ERRO REGISTRADO:\n{error_context[:4000]}\n\n"
+            f"LOGS RECENTES:\n{json.dumps(logs, ensure_ascii=False, indent=1)}\n\n"
+            f"TELEMETRIA REAL DO HOST:\n{json.dumps(telemetry, ensure_ascii=False)}"
+        )
+        result = await aip.achat(cfg, DIAGNOSTIC_SYSTEM_PROMPT, prompt, provider=provider)
+        if result.ok:
+            parsed = self._parse_ai_response(result.answer, error_context)
+            parsed.update({"is_llm_real": True, "provider": result.provider_label, "model": result.model})
+            return parsed
+
+        res = self._rule_based_ai_analysis(error_context, telemetry)
+        res.update({"is_llm_real": False, "provider": f"Heurística GBOC Agent (LLM indisponível: {result.provider_label})",
+                    "model": "gboc-heuristic", "llm_error": result.error})
         return res
 
-    def _rule_based_ai_analysis(self, error_text: str, telemetry: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Análise heurística de causa raiz com telemetria 100% real no GBOC Agent."""
-        err_lower = (error_text or "").lower()
-        
-        cpu = telemetry.get("cpu_percent", 0.0) if telemetry else 0.0
-        ram = telemetry.get("ram_percent", 0.0) if telemetry else 0.0
-        disk = telemetry.get("disk_percent", 0.0) if telemetry else 0.0
+    def _rule_based_ai_analysis(self, error_text: str, telemetry: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Heurística determinística: palavras-chave do erro + telemetria real do host."""
+        err = (error_text or "").lower()
+        if "lock" in err or "busy" in err:
+            return {"cause": "Trava (.lock) residual no repositório.",
+                    "solution": "1. Abrir Repositórios.\n2. Executar 'unlock'/limpeza de trava do motor (restic unlock / kopia maintenance).\n3. Reexecutar a tarefa.",
+                    "recommended_action": "prune_lock",
+                    "analysis": "⚠️ **Repositório possivelmente bloqueado** (heurística por palavra-chave)."}
+        if "permission" in err or "access denied" in err or "acesso negado" in err:
+            return {"cause": "Permissão insuficiente no caminho de origem/destino ou credencial inválida.",
+                    "solution": "1. Verificar se o serviço GBOC roda como SYSTEM/Administrador.\n2. Validar credenciais do repositório.",
+                    "recommended_action": "test_credentials",
+                    "analysis": "⚠️ **Possível falha de permissão** (heurística por palavra-chave)."}
+        if "vss" in err or "shadow" in err or "in use" in err or "being used by another process" in err:
+            return {"cause": "Arquivo em uso sem Shadow Copy (VSS) ativa.",
+                    "solution": "1. Habilitar VSS na tarefa.\n2. Verificar o serviço 'Volume Shadow Copy' (vssadmin list writers).",
+                    "recommended_action": "vss_shadow_copy",
+                    "analysis": "⚠️ **Arquivos bloqueados durante o backup** (heurística por palavra-chave)."}
 
-        if not telemetry:
-            try:
-                import psutil
-                import platform
-                cpu = psutil.cpu_percent(interval=0.05)
-                ram = psutil.virtual_memory().percent
-                disk = psutil.disk_usage("C:\\" if platform.system() == "Windows" else "/").percent
-            except Exception:
-                pass
+        tel = telemetry or collect_host_telemetry()
+        if not tel.get("available", True) or "cpu_percent" not in tel:
+            return {"cause": "Telemetria do host indisponível.",
+                    "solution": "Verifique a instalação do pacote 'psutil'.",
+                    "recommended_action": "none",
+                    "analysis": f"ℹ️ Telemetria real indisponível ({tel.get('error', 'motivo desconhecido')}). Nenhum estado foi presumido."}
 
-        if "lock" in err_lower or "busy" in err_lower:
-            return {
-                "cause": "Arquivo de trava (.lock) residual presente em repositório local.",
-                "solution": "1. Executar higienização de trava (Lock Prune).\n2. Reiniciar o serviço GBOC Agent.",
-                "recommended_action": "prune_lock",
-                "analysis": "⚠️ **REPOSITÓRIO LOCAL BLOQUEADO (TRAVA ATIVA)**\n\n📌 **Causa Raiz Técnica:** Uma execução de backup anterior foi interrompida sem liberar a trava de repositório.\n\n🛠️ **O Que Fazer Exatamente:**\n1. Clique em 'Executar Correção Automática' para remover os arquivos .lock obsoletos.\n2. Reinicie a tarefa de backup interrompida."
-            }
-        elif "permission" in err_lower or "access denied" in err_lower:
-            return {
-                "cause": "Falha de permissão de E/S no diretório de destino ou credencial inválida.",
-                "solution": "1. Verificar se a conta do GBOC Agent tem acesso de leitura/escrita ao caminho de rede/disco.\n2. Revalidar credenciais administrativas no painel.",
-                "recommended_action": "test_credentials",
-                "analysis": "⚠️ **FALHA DE PERMISSÃO NO NÓ LOCAL**\n\n📌 **Causa Raiz Técnica:** O Agente recebeu erro de 'Acesso Negado' ao ler/gravar os arquivos de origem ou destino.\n\n🛠️ **O Que Fazer Exatamente:**\n1. Verifique as permissões da pasta de origem/destino.\n2. Garanta que o serviço 'GBOC Agent' execute com uma conta com privilégios adequados."
-            }
-        elif "open file" in err_lower or "in use" in err_lower:
-            return {
-                "cause": "Arquivo em uso exclusivo por outra aplicação (ex: SQL Server / Outlook / Exchange).",
-                "solution": "1. Ativar a captura de Volume Shadow Copy (VSS) para arquivos abertos no job.\n2. Confirmar se o serviço VSS do Windows está em execução.",
-                "recommended_action": "vss_shadow_copy",
-                "analysis": "⚠️ **ARQUIVOS ABERTOS DETECTADOS**\n\n📌 **Causa Raiz Técnica:** Arquivos de sistema ou banco de dados travados por processos ativos.\n\n🛠️ **O Que Fazer Exatamente:**\n1. Habilite o suporte a VSS (Volume Shadow Copy) nas opções do job.\n2. Verifique se o serviço 'Volume Shadow Copy' no Windows Services está configurado para Manual/Automático."
-            }
-
-        issues = []
-        solutions = []
+        cpu, ram, disk = float(tel["cpu_percent"]), float(tel["ram_percent"]), float(tel["disk_percent"])
+        issues, solutions = [], []
         if disk > 85:
-            issues.append(f"Ocupação Crítica de Disco no Nó: Volume local com {disk:.1f}% de uso.")
-            solutions.append("1. Executar a rotina de expurgo de retenção local.")
-            solutions.append("2. Limpar arquivos temporários do sistema operacional.")
+            issues.append(f"Disco principal com {disk:.1f}% de uso.")
+            solutions += ["Aplicar retenção/prune nos repositórios locais.", "Limpar data/temp e logs antigos do Agente."]
         if ram > 85:
-            issues.append(f"Alta Pressão de RAM no Nó: {ram:.1f}% de consumo.")
-            solutions.append("3. Liberar memória fechando aplicações pesadas de terceiros.")
+            issues.append(f"RAM com {ram:.1f}% de uso.")
+            solutions.append("Reduzir tarefas simultâneas.")
         if cpu > 80:
-            issues.append(f"Uso Elevado de Processador: CPU em {cpu:.1f}%.")
-            solutions.append("4. Reduzir a prioridade da thread de compactação do Agente.")
-
+            issues.append(f"CPU com {cpu:.1f}% de uso.")
+            solutions.append("Reagendar tarefas concorrentes de compressão/criptografia.")
+        tel_txt = f"CPU {cpu:.1f}% • RAM {ram:.1f}% • Disco {disk:.1f}%"
         if not issues:
-            return {
-                "cause": f"Nó local GBOC Agent operando em perfeita integridade. CPU: {cpu:.1f}%, RAM: {ram:.1f}%, Disco: {disk:.1f}%.",
-                "solution": "1. Nenhuma ação corretiva emergencial é necessária no momento.\n2. O Nó está pronto para executar rotinas de backup e sincronização.",
-                "recommended_action": "auto_heal",
-                "analysis": f"✅ **DIAGNÓSTICO DO NÓ: OPERACIONAL E SAUDÁVEL**\n\n📌 **Telemetria Real do Nó:**\n• Processador (CPU): {cpu:.1f}%\n• Memória RAM: {ram:.1f}%\n• Armazenamento (Disco): {disk:.1f}%\n• Status do Agente: OK\n\n🛠️ **O Que Fazer Exatamente:**\n1. O Nó local está operando dentro da faixa de conformidade.\n2. Mantenha os serviços ativados para execução dos agendamentos automatizados."
-            }
-        else:
-            return {
-                "cause": "Alertas no Nó Local: " + " | ".join(issues),
-                "solution": "\n".join(solutions),
-                "recommended_action": "rebuild_index" if disk > 85 else "restart_agent_service",
-                "analysis": f"⚠️ **ALERTAS DETECTADOS NO NÓ LOCAL**\n\n📌 **Causa Raiz & Telemetria Real:**\n" + "\n".join([f"• {iss}" for iss in issues]) + f"\n\n🛠️ **O Que Fazer Exatamente:**\n" + "\n".join(solutions)
-            }
+            return {"cause": f"Nenhum limite de telemetria excedido ({tel_txt}).",
+                    "solution": "Sem ação corretiva indicada pelos indicadores de host. Configure um provedor de IA para análise de causa raiz.",
+                    "recommended_action": "none",
+                    "analysis": f"✅ **Telemetria real do host dentro dos limites**\n• {tel_txt}\n\nAnálise heurística (sem LLM)."}
+        numbered = "\n".join(f"{i}. {s}" for i, s in enumerate(solutions, 1))
+        return {"cause": "Alertas de telemetria: " + " | ".join(issues), "solution": numbered, "recommended_action": "none",
+                "analysis": "⚠️ **Alertas na telemetria real do host**\n" + "\n".join(f"• {i}" for i in issues)
+                            + f"\n\n🛠️ **O que fazer:**\n{numbered}"}
 
-    def _parse_ai_response(self, text: str, fallback_error: str) -> Dict[str, Any]:
-        try:
-            start = text.find("{")
-            end = text.rfind("}")
-            if start != -1 and end != -1:
-                return json.loads(text[start:end+1])
-        except Exception:
-            pass
-        
-        return {
-            "cause": "Análise processada pelo modelo de IA.",
-            "solution": "Seguir instruções recomendadas no relatório.",
-            "recommended_action": "auto_heal",
-            "analysis": text
-        }
+    def _parse_ai_response(self, text: str, fallback_error: str) -> dict[str, Any]:
+        data = aip.parse_json_object(text)
+        if data:
+            action = str(data.get("recommended_action") or "none")
+            return {"cause": str(data.get("cause") or ""), "solution": str(data.get("solution") or ""),
+                    "recommended_action": action if action in _ALLOWED_ACTIONS else "none",
+                    "analysis": str(data.get("analysis") or text)}
+        return {"cause": "", "solution": "", "recommended_action": "none", "analysis": text}
+
 
 ai_diagnostic_engine = AIDiagnosticEngine()

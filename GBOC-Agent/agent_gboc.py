@@ -690,6 +690,7 @@ API_MODULES = [
     ("api.hardware_api", "router"),  # ✅ Hardware, Disks & SMART
     ("api.ai_api", "router"),  # ✅ GBOC Copilot AI Assistant (/api/ai)
     ("api.ai_api", "router_v1"),  # ✅ GBOC Copilot AI Assistant v1 (/api/v1/ai)
+    ("api.diagnostics", "router_v1"),  # ✅ IA de diagnóstico v1 (/api/v1/diagnostics/ai-*)
 ]
 
 
@@ -914,42 +915,18 @@ async def shutdown_agent(request: Request):
 
 
 
-@app.post("/api/v1/cbt/vss-snapshot")
-async def cbt_create_snapshot(request: Request):
-    try:
-        body = await request.json()
-        drive = body.get("drive", "C:")
-        from core.cbt_vss import CBTVSSManager
-        return CBTVSSManager.create_vss_snapshot(drive)
-    except Exception as e:
-        raise HTTPException(500, detail=str(e))
-
-@app.get("/api/v1/cbt/bmr-manifest")
-async def cbt_get_bmr_manifest():
-    try:
-        from core.cbt_vss import CBTVSSManager
-        return CBTVSSManager.generate_bmr_manifest()
-    except Exception as e:
-        raise HTTPException(500, detail=str(e))
-
-@app.post("/api/v1/dr/export")
-async def dr_export_package():
-    try:
-        from core.agent_dr_sync import agent_dr_sync_manager
-        file_path = agent_dr_sync_manager.export_agent_dr_package()
-        return FileResponse(file_path, filename="agent_backup.gbocdr", media_type="application/json")
-    except Exception as e:
-        raise HTTPException(500, detail=str(e))
+# /api/v1/cbt/* e /api/v1/dr/export: implementados em modules/cbt e modules/dr.
+# (As rotas duplicadas que existiam aqui importavam módulos vazios — core/cbt_vss.py e
+#  core/agent_dr_sync.py — e, por serem registradas antes, sobrepunham as rotas reais com erro 500.)
 
 @app.post("/api/v1/dr/import-file")
 async def dr_import_from_file(request: Request):
-    try:
-        body = await request.json()
-        path = body.get("file_path", "")
-        from core.dr_restore_manager import DRRestoreManager
-        return DRRestoreManager.restore_from_file(path)
-    except Exception as e:
-        raise HTTPException(500, detail=str(e))
+    """Restauração de pacote DR a partir de arquivo ainda não implementada (core/dr_restore_manager.py está vazio)."""
+    return JSONResponse(
+        {"status": "unavailable", "error": {"code": "DR_IMPORT_NOT_IMPLEMENTED",
+         "message": "Importação de pacote DR a partir de arquivo ainda não está implementada neste Agente."}},
+        status_code=501,
+    )
 
 @app.get("/api/v1/security/defender-status")
 async def security_defender_status():
@@ -991,193 +968,7 @@ async def remote_restore_register(request: Request):
     except Exception as e:
         raise HTTPException(500, detail=str(e))
 
-@app.post("/api/v1/diagnostics/ai-analyze")
-@app.post("/api/diagnostics/ai-analyze")
-async def ai_diagnostic_analyze(request: Request):
-    """Executa a análise real via IA (Ollama ou Cloud) dos últimos logs e erros."""
-    try:
-        body = await request.json() if request.headers.get("content-type") == "application/json" else {}
-        err_msg = body.get("error_message") or body.get("prompt") or "Verificação preventiva de integridade e diagnósticos de rotina."
-        from engines.ai_diagnostic_engine import ai_diagnostic_engine
-        res = await ai_diagnostic_engine.analyze_error(err_msg)
-        return res
-    except Exception as e:
-        return {"status": "success", "analysis": f"Análise concluída: {str(e)}"}
-
-@app.api_route("/api/v1/diagnostics/ai-repair", methods=["GET", "POST"])
-@app.api_route("/api/diagnostics/ai-repair", methods=["GET", "POST"])
-async def ai_diagnostic_repair(request: Request):
-    """Executa o auto-reparo automatizado no banco de dados e rotinas de sistema."""
-    try:
-        body = {}
-        try:
-            body = await request.json() if request.headers.get("content-type") == "application/json" else {}
-        except Exception:
-            pass
-        action = body.get("action", "auto")
-        target = body.get("target", "system")
-
-        actions_taken = []
-        from shared_core import get_shared_core
-        core = get_shared_core()
-
-        # 1. Limpar / marcar como corrigidos registros de falha antigos nas execuções de tarefas
-        repaired_count = 0
-        try:
-            with core.get_db_connection() as conn:
-                cur = conn.cursor()
-                cur.execute("UPDATE task_executions SET status = 'repaired' WHERE status = 'failed'")
-                repaired_count = cur.rowcount if hasattr(cur, 'rowcount') and cur.rowcount is not None else 1
-                conn.commit()
-                actions_taken.append(f"✓ Registros de falhas auditados e atualizados para status resolvido ({repaired_count} itens) [OK]")
-        except Exception as db_err:
-            actions_taken.append("✓ Tabela de histórico de tarefas e fila de retentativas reindexadas [OK]")
-
-        # 2. Registrar evento de auditoria real do reparo
-        try:
-            with core.get_db_connection() as conn:
-                cur = conn.cursor()
-                cur.execute(
-                    "INSERT INTO system_events (event_type, source, detail, created_at) VALUES (%s, %s, %s, %s)",
-                    ('INFO', 'AI-Repair', 'Auto-reparo automatizado e otimização do banco de dados executados com sucesso.', datetime.now().isoformat())
-                )
-                conn.commit()
-                actions_taken.append("✓ Evento de auditoria gravado em system_events [OK]")
-        except Exception:
-            actions_taken.append("✓ Log de auditoria de reparo registrado [OK]")
-
-        # 3. Limpeza de arquivos temporários e travas VSS
-        actions_taken.append("✓ Varredura de arquivos temporários e liberação de travas VSS executada [OK]")
-        actions_taken.append("✓ Fila de sincronização e retentativas redefinida com sucesso [OK]")
-
-        return JSONResponse({
-            "status": "success",
-            "message": "Auto-reparo e otimização do banco de dados executados com sucesso!",
-            "action": action,
-            "target": target,
-            "actions_taken": actions_taken
-        })
-    except Exception as e:
-        return JSONResponse({"status": "success", "message": f"Auto-reparo executado: {str(e)}", "actions_taken": ["✓ Operação concluída com sucesso [OK]"]})
-
-@app.post("/api/v1/diagnostics/ai-analyze-sla")
-@app.post("/api/diagnostics/ai-analyze-sla")
-async def ai_analyze_sla():
-    """Análise preditiva de métricas de SLA via IA com dados reais do sistema."""
-    try:
-        from api.preemptive_api import get_sla_compliance
-        sla_data = await get_sla_compliance()
-        summary = sla_data.get("summary", {})
-        pct = summary.get("compliance_pct", 100)
-
-        from engines.ai_diagnostic_engine import ai_diagnostic_engine
-        ai_res = await ai_diagnostic_engine.analyze_error(f"Análise de SLA: Taxa de Compliance atual é {pct}% com {summary.get('compliant', 0)} tarefas conformes de {summary.get('total_tasks', 0)} totais.")
-
-        return {
-            "status": "success",
-            "sla_score": pct,
-            "analysis": ai_res.get("analysis", f"Métricas de SLA auditadas: Compliance atual de {pct}%."),
-            "recommendations": [
-                "Aumentar frequência de verificação preventiva para repositórios locais e em nuvem.",
-                "Manter auditoria diária de janelas de RPO/RTO."
-            ]
-        }
-    except Exception as e:
-        return {
-            "status": "success",
-            "sla_score": 100.0,
-            "analysis": f"Análise de SLA realizada: {str(e)}",
-            "recommendations": ["Acompanhar métricas de retenção VSS."]
-        }
-
-@app.post("/api/v1/diagnostics/ai-analyze-risk")
-@app.post("/api/diagnostics/ai-analyze-risk")
-async def ai_analyze_risk(request: Request):
-    """Análise de risco direcionada por item."""
-    try:
-        body = await request.json() if request.headers.get("content-type") == "application/json" else {}
-        risk_item = body.get("risk_item", "Falha de Inicialização")
-        from engines.ai_diagnostic_engine import ai_diagnostic_engine
-        res = await ai_diagnostic_engine.analyze_error(f"Erro Crítico de Risco: {risk_item}")
-        return res
-    except Exception as e:
-        return {
-            "status": "success",
-            "cause": f"Falha de permissão ou acesso no recurso para: {risk_item}",
-            "solution": "Verifique se a conta do serviço GBOC possui permissões de Administrador/SYSTEM.",
-            "recommended_action": "test_credentials",
-            "analysis": f"Análise IA para '{risk_item}': Detectada restrição de acesso ao armazenamento."
-        }
-
-@app.api_route("/api/v1/diagnostics/ollama-models", methods=["GET", "POST"])
-@app.api_route("/api/diagnostics/ollama-models", methods=["GET", "POST"])
-async def get_ollama_models(request: Request):
-    """Retorna os modelos instalados no serviço Ollama local."""
-    try:
-        host = request.query_params.get("host")
-        if not host and request.method == "POST":
-            try:
-                body = await request.json()
-                host = body.get("host")
-            except Exception:
-                pass
-        from engines.ai_diagnostic_engine import ai_diagnostic_engine
-        return await ai_diagnostic_engine.get_installed_ollama_models(host)
-    except Exception as e:
-        return {"status": "error", "connected": False, "models": [], "message": str(e)}
-
-@app.post("/api/v1/diagnostics/ollama-models/pull")
-@app.post("/api/diagnostics/ollama-models/pull")
-async def pull_ollama_model(request: Request):
-    """Dispara o download/pull de um modelo Ollama em segundo plano."""
-    try:
-        body = await request.json()
-        host = body.get("host") or "http://localhost:11434"
-        model = body.get("model")
-        if not model:
-            return {"status": "error", "message": "Nome do modelo é obrigatório."}
-        
-        # Disparar a tarefa em segundo plano para não bloquear a resposta HTTP
-        async def pull_task():
-            import httpx
-            try:
-                logger.info(f"Iniciando download do modelo '{model}' em {host}...")
-                async with httpx.AsyncClient(timeout=1800.0) as client:
-                    resp = await client.post(f"{host.rstrip('/')}/api/pull", json={"name": model, "stream": False})
-                    if resp.status_code == 200:
-                        logger.info(f"Modelo '{model}' baixado com sucesso.")
-                    else:
-                        logger.error(f"Erro ao baixar modelo '{model}': {resp.status_code} - {resp.text}")
-            except Exception as err:
-                logger.error(f"Exceção durante download do modelo '{model}': {err}")
-
-        import asyncio
-        asyncio.create_task(pull_task())
-        
-        return {"status": "downloading", "message": f"O download do modelo '{model}' foi iniciado em segundo plano."}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-
-@app.get("/api/v1/diagnostics/ai-config")
-async def get_ai_config():
-    """Retorna as configurações atuais do motor de IA/LLM."""
-    try:
-        from engines.ai_diagnostic_engine import ai_diagnostic_engine
-        return ai_diagnostic_engine.config
-    except Exception as e:
-        raise HTTPException(500, detail=str(e))
-
-@app.post("/api/v1/diagnostics/ai-config")
-async def save_ai_config(request: Request):
-    """Salva e atualiza as configurações do motor de IA/LLM."""
-    try:
-        body = await request.json()
-        from engines.ai_diagnostic_engine import ai_diagnostic_engine
-        ai_diagnostic_engine.config.update(body)
-        ai_diagnostic_engine.save_config()
-        return {"status": "success", "message": "Configurações de IA salvas", "config": ai_diagnostic_engine.config}
-    except Exception as e:
-        raise HTTPException(500, detail=str(e))
+# Rotas de IA de diagnóstico (/api/diagnostics/* e /api/v1/diagnostics/*): api/diagnostics.py
 
 # ==============================================================================
 # GBOC AGENT MODULAR ROUTERS INCLUDE (ALL AGENT MODULES)
@@ -1203,9 +994,7 @@ try:
     app.include_router(agent_logs_router)
     from modules.config.config_router import router as agent_config_router
     app.include_router(agent_config_router)
-    from api.ai_api import router as ai_copilot_router, router_v1 as ai_copilot_router_v1
-    app.include_router(ai_copilot_router)
-    app.include_router(ai_copilot_router_v1)
+    # api.ai_api (router e router_v1) já é registrado via API_MODULES — evita rotas duplicadas.
     from modules.job_alert.job_alert_router import router as job_alert_router
     app.include_router(job_alert_router)
     from modules.storage.storage_router import router as storage_router

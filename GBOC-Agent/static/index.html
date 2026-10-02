@@ -671,22 +671,24 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ module: 'Agente GBOC' })
             });
-            const res = await r.json();
+            const res = await r.json().catch(() => ({}));
+            if (!r.ok || res.success === false) throw new Error(res.detail || res.message || res.error?.message || `HTTP ${r.status}`);
             const d = res.data || res;
             const result = d.result || {};
-            
-            const healthScore = d.health_score ?? 100;
-            const statusText = d.status || (healthScore >= 80 ? 'HEALTHY' : 'WARNING');
-            const insights = d.ai_insights || result.analysis || 'Diagnóstico do Nó concluído.';
-            const cause = result.cause || '';
-            const solution = result.solution || '';
-            const recAction = result.recommended_action || 'auto_heal';
+            const _gEsc = (v) => String(v ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
+
+            const hasScore = typeof d.health_score === 'number';
+            const healthScore = hasScore ? d.health_score : null;
+            const statusText = _gEsc(d.status || 'UNAVAILABLE');
+            const insights = _gEsc(d.ai_insights || result.analysis || 'Sem análise retornada.');
+            const cause = _gEsc(result.cause || '');
+            const solution = _gEsc(result.solution || '');
 
             let html = `
                 <div style="background:var(--bg-card);padding:16px;border-radius:var(--card-radius, 10px);border:var(--card-border, 1px solid var(--border));box-shadow:var(--card-shadow);margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">
                     <div>
                         <span style="font-weight:700;font-size:1.15em">Score de Saúde do Nó: </span>
-                        <span style="font-size:1.25em;font-weight:800;color:${healthScore >= 85 ? 'var(--success, #10b981)' : healthScore >= 70 ? 'var(--warning, #f59e0b)' : 'var(--danger, #ef4444)'}">${healthScore}/100</span>
+                        <span style="font-size:1.25em;font-weight:800;color:${!hasScore ? 'var(--text-muted)' : healthScore >= 85 ? 'var(--success, #10b981)' : healthScore >= 70 ? 'var(--warning, #f59e0b)' : 'var(--danger, #ef4444)'}">${hasScore ? healthScore + '/100' : 'indisponível'}</span>
                     </div>
                     <span class="badge ${statusText === 'HEALTHY' ? 'badge-success' : 'badge-danger'}" style="padding:6px 12px;font-size:0.9em;border-radius:20px">${statusText}</span>
                 </div>
@@ -711,12 +713,12 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             html += `
                 <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
                     <button class="btn btn-secondary" onclick="runAgentAIDiagnostic()"><i class="fas fa-sync"></i> Reanalisar Agora</button>
-                    <button class="btn btn-primary" onclick="alert('Iniciando auto-recuperação do Nó...')"><i class="fas fa-magic"></i> Executar Correção Automática</button>
+                    <a class="btn btn-primary" href="/diagnostic.html"><i class="fas fa-stethoscope"></i> Abrir Diagnóstico Completo</a>
                 </div>
             `;
             container.innerHTML = html;
         } catch(e) {
-            container.innerHTML = `<p style="color:var(--danger)">Erro no diagnóstico: ${e.message}</p>`;
+            container.innerHTML = `<p style="color:var(--danger)">Erro no diagnóstico: ${String(e.message).replaceAll('<','&lt;')}</p>`;
         }
     }
 

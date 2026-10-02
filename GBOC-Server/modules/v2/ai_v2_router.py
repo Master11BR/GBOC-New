@@ -1,156 +1,156 @@
 # ==============================================================================
-# GBOC System v14.6.0 Enterprise Edition
+# GBOC System v14.7.3 Enterprise Edition
 # Module: Server AI Copilot Assistant Router (API v2 - Server)
 # ==============================================================================
 
-import time
+import asyncio
 import logging
+import time
 from typing import Optional
+
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+
+from modules.ai_assistant.ai_assistant_router import (
+    _require_admin,
+    _require_auth,
+    collect_host_telemetry,
+    compute_health_score,
+    health_status,
+    load_server_ai_config,
+    query_server_ai_assistant,
+    save_server_ai_config,
+)
+from modules.ai_assistant import ai_providers as aip
 from modules.v2.envelope import build_v2_response
 
 logger = logging.getLogger("gboc_server_v2_ai")
 router = APIRouter(prefix="/ai", tags=["Server AI Copilot v2"])
 
+# Tempo máximo para o diagnóstico por LLM antes de responder com a heurística (segundos).
+DIAGNOSE_LLM_TIMEOUT = 90.0
+
+
+def _elapsed(t0: float) -> float:
+    return round((time.perf_counter() - t0) * 1000, 2)
+
+
+def _error(t0: float, code: str, message: str, status_code: int) -> JSONResponse:
+    return JSONResponse(
+        build_v2_response(success=False, error={"code": code, "message": message}, execution_time_ms=_elapsed(t0)),
+        status_code=status_code,
+    )
+
 
 class ServerQueryRequestV2(BaseModel):
-    prompt: str = Field(..., min_length=1, description="Pergunta técnica sobre o ambiente GBOC")
-    provider: Optional[str] = Field(None, description="Override de provedor (ex: ollama_local, deepseek, groq_free)")
+    prompt: str = Field(..., min_length=1, max_length=8000, description="Pergunta técnica sobre o ambiente GBOC")
+    provider: Optional[str] = Field(None, description="Override de provedor (ex: ollama_local, deepseek, groq)")
 
 
 class ServerConfigRequestV2(BaseModel):
     provider: Optional[str] = None
+    model: Optional[str] = None
     ollama_url: Optional[str] = None
     ollama_model: Optional[str] = None
+    api_key: Optional[str] = None
     deepseek_api_key: Optional[str] = None
+    deepseek_model: Optional[str] = None
     groq_api_key: Optional[str] = None
     groq_model: Optional[str] = None
     gemini_api_key: Optional[str] = None
+    gemini_model: Optional[str] = None
     openai_api_key: Optional[str] = None
     openai_model: Optional[str] = None
+    claude_api_key: Optional[str] = None
+    claude_model: Optional[str] = None
+    grok_api_key: Optional[str] = None
+    kimi_api_key: Optional[str] = None
+    mistral_api_key: Optional[str] = None
+    cohere_api_key: Optional[str] = None
+    task_history_limit: Optional[int] = None
 
 
 @router.post("/query")
-async def server_chat_ai_v2(body: ServerQueryRequestV2):
-    """Envia pergunta para o assistente de IA generativa GBOC Server Copilot (padrão v2)."""
+async def server_chat_ai_v2(body: ServerQueryRequestV2, request: Request):
+    """Envia pergunta para o GBOC Server Copilot (padrão v2)."""
     t0 = time.perf_counter()
-    if not body.prompt or not body.prompt.strip():
+    _require_auth(request)
+    if not body.prompt.strip():
         raise HTTPException(status_code=400, detail="O prompt não pode ser vazio")
-
     try:
-        from modules.ai_assistant.ai_assistant_router import query_server_ai_assistant
-        result = query_server_ai_assistant(body.prompt, provider_override=body.provider)
-        elapsed = round((time.perf_counter() - t0) * 1000, 2)
-        return build_v2_response(data=result, execution_time_ms=elapsed)
+        result = await run_in_threadpool(query_server_ai_assistant, body.prompt, body.provider)
     except Exception as e:
-        logger.error(f"Erro na consulta AI Server v2: {e}")
-        elapsed = round((time.perf_counter() - t0) * 1000, 2)
-        return build_v2_response(
-            success=False,
-            error={"code": "AI_QUERY_FAILED", "message": str(e)},
-            execution_time_ms=elapsed
-        )
+        logger.exception(f"Erro na consulta AI Server v2: {e}")
+        return _error(t0, "AI_QUERY_FAILED", "Erro interno ao processar a consulta de IA.", 500)
+    if result.get("status") != "success":
+        return _error(t0, "AI_QUERY_INVALID", result.get("message", "Consulta inválida."), 400)
+    return build_v2_response(data=result, execution_time_ms=_elapsed(t0))
 
 
 @router.get("/config")
-async def get_server_ai_config_v2():
-    """Retorna configuração de IA do servidor central no padrão v2."""
+async def get_server_ai_config_v2(request: Request):
+    """Retorna configuração de IA do servidor central (chaves mascaradas)."""
     t0 = time.perf_counter()
-    try:
-        from modules.ai_assistant.ai_assistant_router import load_server_ai_config
-        cfg = load_server_ai_config()
-        for k in ["groq_api_key", "gemini_api_key", "openai_api_key", "deepseek_api_key"]:
-            if cfg.get(k):
-                val = cfg[k]
-                cfg[k] = val[:4] + "..." + val[-4:] if len(val) > 8 else "***"
-        elapsed = round((time.perf_counter() - t0) * 1000, 2)
-        return build_v2_response(data={"config": cfg}, execution_time_ms=elapsed)
-    except Exception as e:
-        elapsed = round((time.perf_counter() - t0) * 1000, 2)
-        return build_v2_response(
-            success=False,
-            error={"code": "AI_CONFIG_ERROR", "message": str(e)},
-            execution_time_ms=elapsed
-        )
+    _require_auth(request)
+    return build_v2_response(data={"config": aip.mask_config(load_server_ai_config())}, execution_time_ms=_elapsed(t0))
 
 
 @router.post("/config")
-async def update_server_ai_config_v2(body: ServerConfigRequestV2):
-    """Atualiza as configurações de IA do Servidor Central no padrão v2."""
+async def update_server_ai_config_v2(body: ServerConfigRequestV2, request: Request):
+    """Atualiza as configurações de IA do Servidor Central (somente administradores)."""
     t0 = time.perf_counter()
+    _require_admin(request)
     try:
-        from modules.ai_assistant.ai_assistant_router import save_server_ai_config
-        saved = save_server_ai_config(body.dict(exclude_unset=True))
-        elapsed = round((time.perf_counter() - t0) * 1000, 2)
-        return build_v2_response(
-            data={"message": "Configurações de IA salvas com sucesso", "config": saved},
-            execution_time_ms=elapsed
-        )
-    except Exception as e:
-        elapsed = round((time.perf_counter() - t0) * 1000, 2)
-        return build_v2_response(
-            success=False,
-            error={"code": "AI_CONFIG_SAVE_ERROR", "message": str(e)},
-            execution_time_ms=elapsed
-        )
+        saved = save_server_ai_config(body.model_dump(exclude_unset=True))
+    except (ValueError, TypeError) as e:
+        return _error(t0, "AI_CONFIG_INVALID", str(e), 400)
+    except OSError as e:
+        logger.error(f"Falha ao gravar configuração de IA (v2): {e}")
+        return _error(t0, "AI_CONFIG_SAVE_ERROR", "Falha ao gravar a configuração de IA no disco.", 500)
+    return build_v2_response(data={"message": "Configurações de IA salvas com sucesso", "config": saved},
+                             execution_time_ms=_elapsed(t0))
 
 
 @router.post("/diagnose")
 async def server_ai_diagnose_v2(request: Request):
-    """Diagnóstico preditivo por IA para qualquer módulo do Servidor Central (v2)."""
+    """Diagnóstico por IA do Servidor Central com telemetria real do host (v2)."""
     t0 = time.perf_counter()
+    _require_auth(request)
     try:
+        body = await request.json()
+    except ValueError:
         body = {}
-        try:
-            body = await request.json()
-        except Exception:
-            pass
+    body = body if isinstance(body, dict) else {}
+    error_context = body.get("error_context") or body.get("module") or ""
 
-        error_context = body.get("error_context") or body.get("module") or ""
+    from modules.ai_assistant.ai_diagnostic_engine import server_ai_diagnostic_engine
 
-        import psutil
-        import platform
-        cpu = psutil.cpu_percent(interval=0.05) if hasattr(psutil, 'cpu_percent') else 0.0
-        ram = psutil.virtual_memory().percent if hasattr(psutil, 'virtual_memory') else 0.0
-        disk = psutil.disk_usage("C:\\" if platform.system() == "Windows" else "/").percent if hasattr(psutil, 'disk_usage') else 0.0
-
-        telemetry = {
-            "cpu_percent": cpu,
-            "ram_percent": ram,
-            "disk_percent": disk,
-            "platform": platform.system()
-        }
-
-        import asyncio
-        ai_res = None
-        try:
-            from modules.ai_assistant.ai_diagnostic_engine import server_ai_diagnostic_engine
-            ai_res = await asyncio.wait_for(server_ai_diagnostic_engine.analyze_error(error_context, system_logs=body.get("logs")), timeout=3.5)
-        except Exception:
-            pass
-
-        if not ai_res or not ai_res.get("analysis") or "Diagnóstico geral" in str(ai_res.get("analysis")):
-            from modules.ai_assistant.ai_diagnostic_engine import server_ai_diagnostic_engine
-            ai_res = server_ai_diagnostic_engine._rule_based_ai_analysis(error_context, telemetry=telemetry)
-
-        health_score = max(40, min(100, int(100 - (cpu * 0.15 + ram * 0.25 + (disk if disk > 85 else 0) * 0.4))))
-
-        elapsed = round((time.perf_counter() - t0) * 1000, 2)
-        return build_v2_response(
-            data={
-                "status": "HEALTHY" if health_score >= 80 else "WARNING" if health_score >= 60 else "CRITICAL",
-                "health_score": health_score,
-                "ai_insights": ai_res.get("analysis", "Diagnóstico processado com sucesso."),
-                "result": ai_res,
-                "telemetry": telemetry
-            },
-            execution_time_ms=elapsed
+    telemetry = await run_in_threadpool(collect_host_telemetry)
+    try:
+        ai_res = await asyncio.wait_for(
+            server_ai_diagnostic_engine.analyze_error(error_context, system_logs=body.get("logs"), telemetry=telemetry),
+            timeout=DIAGNOSE_LLM_TIMEOUT,
         )
+    except asyncio.TimeoutError:
+        ai_res = server_ai_diagnostic_engine._rule_based_ai_analysis(error_context, telemetry=telemetry)
+        ai_res.update({
+            "is_llm_real": False, "provider": "Heurística GBOC Server", "model": "gboc-heuristic",
+            "llm_error": f"O provedor de IA não respondeu em {DIAGNOSE_LLM_TIMEOUT:.0f}s.",
+        })
     except Exception as e:
-        elapsed = round((time.perf_counter() - t0) * 1000, 2)
-        return build_v2_response(
-            success=False,
-            error={"code": "AI_DIAGNOSE_FAILED", "message": str(e)},
-            execution_time_ms=elapsed
-        )
+        logger.exception(f"Falha no diagnóstico de IA v2: {e}")
+        return _error(t0, "AI_DIAGNOSE_FAILED", "Falha interna ao executar o diagnóstico.", 500)
+
+    score = compute_health_score(telemetry)
+    return build_v2_response(
+        data={
+            "status": health_status(score),
+            "health_score": score,
+            "ai_insights": ai_res.get("analysis", ""),
+            "result": ai_res,
+            "telemetry": telemetry,
+        },
+        execution_time_ms=_elapsed(t0),
+    )

@@ -351,6 +351,9 @@ async def guardian_ai_diagnostic(include_llm: bool = True):
                     "solution": llm_res.get("solution"),
                     "recommended_action": llm_res.get("recommended_action"),
                     "analysis": llm_res.get("analysis"),
+                    "is_llm_real": bool(llm_res.get("is_llm_real")),
+                    "provider": llm_res.get("provider"),
+                    "llm_error": llm_res.get("llm_error"),
                 }
         except Exception as e:
             llm_analysis = {"error": str(e)}

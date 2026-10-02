@@ -1714,121 +1714,9 @@ async def handle_full_data_sync(agent_id: str, data: Dict) -> Dict:
         if conn:
             release_db(conn)
 
-async def handle_realtime_alert(agent_id: str, data: Dict) -> None:
-    """Persiste alerta em tempo real recebido via WebSocket"""
-    conn = None
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-        cur.execute('''
-            INSERT INTO system_events (event_type, message, agent_hostname, created_at)
-            VALUES (%s, %s, %s, LOCALTIMESTAMP)
-        ''', (
-            f"alert_{data.get('type', 'unknown')}",
-            data.get('message', 'Alert from agent'),
-            data.get('hostname', agent_id)
-        ))
-        conn.commit()
-        cur.close()
-        await notify_dashboard_update()
-    except Exception as e:
-        logger.warning(f"Erro ao salvar alerta em tempo real do agente {agent_id}: {e}")
-    finally:
-        if conn:
-            release_db(conn)
-
-
-async def get_agent_full_data(agent_id: str, since_timestamp: str = None) -> Dict:
-    """Retorna todos os dados sincronizados de um agente do banco"""
-    conn = None
-    try:
-        conn = get_db()
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-
-        cur.execute("SELECT * FROM agents WHERE agent_id = %s", (agent_id,))
-        agent = cur.fetchone()
-
-        since_filter = ""
-        since_params: list = [agent_id]
-        if since_timestamp:
-            since_filter = " AND synced_at > %s"
-            since_params.append(since_timestamp)
-
-        cur.execute(f"SELECT * FROM agent_repositories WHERE agent_id = %s{since_filter}", since_params)
-        repositories = cur.fetchall()
-
-        cur.execute(f"SELECT * FROM agent_tasks WHERE agent_id = %s{since_filter}", since_params)
-        tasks = cur.fetchall()
-
-        cur.execute(f"SELECT * FROM agent_task_executions WHERE agent_id = %s{since_filter}", since_params)
-        executions = cur.fetchall()
-
-        cur.execute(
-            "SELECT * FROM system_events WHERE agent_hostname = %s ORDER BY created_at DESC LIMIT 100",
-            (agent_id,)
-        )
-        events = cur.fetchall()
-
-        cur.close()
-        return {
-            "agent": dict(agent) if agent else {},
-            "repositories": [dict(r) for r in repositories],
-            "tasks": [dict(t) for t in tasks],
-            "executions": [dict(e) for e in executions],
-            "events": [dict(ev) for ev in events],
-        }
-    except Exception as e:
-        logger.error(f"Erro ao buscar dados completos do agente {agent_id}: {e}")
-        return {}
-    finally:
-        if conn:
-            release_db(conn)
-
-
-async def get_agent_repositories(agent_id: str, since_timestamp: str = None) -> List[Dict]:
-    """Retorna repositórios sincronizados de um agente"""
-    conn = None
-    try:
-        conn = get_db()
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-        params: list = [agent_id]
-        extra = ""
-        if since_timestamp:
-            extra = " AND synced_at > %s"
-            params.append(since_timestamp)
-        cur.execute(f"SELECT * FROM agent_repositories WHERE agent_id = %s{extra}", params)
-        rows = cur.fetchall()
-        cur.close()
-        return [dict(r) for r in rows]
-    except Exception as e:
-        logger.error(f"Erro ao buscar repositórios do agente {agent_id}: {e}")
-        return []
-    finally:
-        if conn:
-            release_db(conn)
-
-
-async def get_agent_tasks(agent_id: str, since_timestamp: str = None) -> List[Dict]:
-    """Retorna tarefas sincronizadas de um agente"""
-    conn = None
-    try:
-        conn = get_db()
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-        params: list = [agent_id]
-        extra = ""
-        if since_timestamp:
-            extra = " AND synced_at > %s"
-            params.append(since_timestamp)
-        cur.execute(f"SELECT * FROM agent_tasks WHERE agent_id = %s{extra}", params)
-        rows = cur.fetchall()
-        cur.close()
-        return [dict(r) for r in rows]
-    except Exception as e:
-        logger.error(f"Erro ao buscar tarefas do agente {agent_id}: {e}")
-        return []
-    finally:
-        if conn:
-            release_db(conn)
+# handle_realtime_alert, get_agent_full_data, get_agent_repositories e get_agent_tasks
+# estão definidos uma única vez na seção "HANDLERS PARA COMUNICAÇÃO EM TEMPO REAL" (abaixo).
+# As cópias antigas que existiam aqui eram sobrescritas pelas definições posteriores (código morto).
 
 
 async def handle_manual_sync(agent_id: str, data: Dict) -> Dict:
@@ -1890,7 +1778,7 @@ async def handle_websocket_message(agent_id: str, message: Dict, websocket: WebS
             await websocket.send_text(json.dumps({"error": "Invalid manual sync data"}))
             return
         result = await handle_manual_sync(agent_id, data)
-        await websocket.send_text(json.dumps({"status": "completed", "type": "manual_sync", "result": result}))
+        await websocket.send_text(json.dumps({"status": "completed", "type": "manual_sync", "result": result}, default=str))
 
     elif msg_type == "alert":
         # Alerta em tempo real
@@ -3252,37 +3140,30 @@ except Exception as _e: logger.warning(f"Active Directory router: {_e}")
 
 
 
-# --- USER MANAGEMENT API ---
-_server_users_store = [
-    {"id": 1, "username": "admin", "display_name": "Administrador Principal", "role": "admin", "status": "active"},
-    {"id": 2, "username": "operator", "display_name": "Operador de Backups", "role": "operator", "status": "active"},
-    {"id": 3, "username": "auditor", "display_name": "Auditor de Compliance", "role": "viewer", "status": "active"}
-]
-
 # Note: /api/v1/users routes are provided by modules.users.users_router
 
-# --- SERVER AI CONFIG API ---
-_server_ai_config_store = {
-    "provider": "ollama",
-    "ollama_host": "http://localhost:11434",
-    "model": "llama3",
-    "api_key": ""
-}
-
+# --- SERVER AI CONFIG API (compatibilidade) ---
+# Fonte única da configuração de IA: modules.ai_assistant (data/server_ai_config.json).
 @app.get("/api/v1/server/ai-config")
-async def get_server_ai_config():
-    """Retorna as configurações globais de IA/LLM do Servidor."""
-    return {"status": "success", "config": _server_ai_config_store}
+async def get_server_ai_config(request: Request):
+    """Retorna as configurações globais de IA/LLM do Servidor (chaves mascaradas)."""
+    from modules.ai_assistant.ai_assistant_router import _require_auth, load_server_ai_config
+    from modules.ai_assistant.ai_providers import mask_config
+    _require_auth(request)
+    return {"status": "success", "config": mask_config(load_server_ai_config())}
 
 @app.post("/api/v1/server/ai-config")
 async def save_server_ai_config(request: Request):
-    """Salva e atualiza as configurações globais de IA/LLM do Servidor."""
+    """Salva as configurações globais de IA/LLM do Servidor (somente administradores)."""
+    from modules.ai_assistant.ai_assistant_router import _require_admin, save_server_ai_config as _save_ai
+    _require_admin(request)
     try:
         body = await request.json()
-        _server_ai_config_store.update(body)
-        return {"status": "success", "message": "Configurações globais de IA salvas", "config": _server_ai_config_store}
-    except Exception as e:
-        raise HTTPException(500, detail=str(e))
+        if not isinstance(body, dict):
+            raise ValueError("Corpo da requisição deve ser um objeto JSON.")
+        return {"status": "success", "message": "Configurações globais de IA salvas", "config": _save_ai(body)}
+    except (ValueError, TypeError) as e:
+        raise HTTPException(400, detail=str(e))
 
 # --- LOGS API ---
 @app.get("/api/v1/logs")
@@ -3423,80 +3304,96 @@ async def index(request: Request):
 # ===========================
 
 async def handle_realtime_alert(agent_id: str, data: Dict) -> Dict:
-    """Processa alerta em tempo real"""
+    """Persiste o alerta recebido via WebSocket e o retransmite aos painéis conectados."""
     if not isinstance(data, dict):
         logger.error(f"Dados de alerta inválidos do agente {agent_id}: {data}")
         return {"status": "error", "message": "Invalid alert data format"}
-    
+
+    conn = None
     try:
         conn = get_db()
-        try:
-            cur = conn.cursor()
-            cur.execute('''
-                INSERT INTO system_events (event_type, message, agent_hostname, created_at)
-                VALUES (%s, %s, %s, LOCALTIMESTAMP)
-                ON CONFLICT DO NOTHING
-            ''', (
-                f"alert_{data.get('type', 'unknown')}",
-                data.get('message', 'Alert from agent'),
-                data.get('hostname', agent_id)
-            ))
-            conn.commit()
-
-            # Broadcast do alerta para todos os clientes conectados
-            alert_message = {
-                "type": "alert",
-                "agent_id": agent_id,
-                "data": data,
-                "timestamp": _dt.now(timezone.utc).isoformat()
-            }
-            await manager.broadcast(json.dumps(alert_message))
-
-        finally:
+        if not conn:
+            return {"status": "error", "message": "Banco de dados indisponível"}
+        cur = conn.cursor()
+        cur.execute('''
+            INSERT INTO system_events (event_type, message, agent_hostname, created_at)
+            VALUES (%s, %s, %s, LOCALTIMESTAMP)
+        ''', (
+            f"alert_{data.get('type', 'unknown')}",
+            data.get('message', 'Alert from agent'),
+            data.get('hostname', agent_id)
+        ))
+        conn.commit()
+        cur.close()
+    except Exception as e:
+        logger.error(f"Erro ao persistir alerta do agente {agent_id}: {e}")
+        return {"status": "error", "message": "Falha ao registrar o alerta"}
+    finally:
+        if conn:
             release_db(conn)
 
-        return {"status": "success"}
+    try:
+        await manager.broadcast(json.dumps({
+            "type": "alert",
+            "agent_id": agent_id,
+            "data": data,
+            "timestamp": _dt.now(timezone.utc).isoformat()
+        }, default=str))
+        await notify_dashboard_update()
     except Exception as e:
-        logger.error(f"Erro ao processar alerta do agente {agent_id}: {e}")
-        return {"status": "error", "message": str(e)}
+        logger.warning(f"Alerta do agente {agent_id} registrado, mas a retransmissão falhou: {e}")
+    return {"status": "success"}
 
 # ===========================
 # FUNÇÕES AUXILIARES PARA SINCRONIZAÇÃO
 # ===========================
 
+def _fetch_agent_rows(cur, table: str, agent_id: str, since_timestamp: Optional[str], order_by: str) -> List[Dict]:
+    """Lê linhas sincronizadas de um agente (tabela fixa do código; nunca vinda do cliente)."""
+    if since_timestamp:
+        cur.execute(f"SELECT * FROM {table} WHERE agent_id = %s AND synced_at >= %s ORDER BY {order_by}",
+                    (agent_id, since_timestamp))
+    else:
+        cur.execute(f"SELECT * FROM {table} WHERE agent_id = %s ORDER BY {order_by}", (agent_id,))
+    return [dict(r) for r in cur.fetchall()]
+
+
 async def get_agent_full_data(agent_id: str, since_timestamp: Optional[str] = None) -> Dict:
-    """Obtém todos os dados do agente a partir do banco"""
+    """Obtém todos os dados sincronizados do agente (uma única conexão do pool)."""
     conn = None
     try:
         conn = get_db()
+        if not conn:
+            return {}
         cur = conn.cursor(cursor_factory=RealDictCursor)
-
-        # Dados do agente
         cur.execute("SELECT * FROM agents WHERE agent_id = %s", (agent_id,))
         agent = cur.fetchone()
         if not agent:
+            cur.close()
             return {}
 
-        # Repositórios
-        repos = await get_agent_repositories(agent_id, since_timestamp)
+        repos = _fetch_agent_rows(cur, "agent_repositories", agent_id, since_timestamp, "name")
+        tasks = _fetch_agent_rows(cur, "agent_tasks", agent_id, since_timestamp, "task_id")
 
-        # Tarefas
-        tasks = await get_agent_tasks(agent_id, since_timestamp)
-
-        # Execuções recentes
-        cur.execute("""
-            SELECT * FROM agent_task_executions
-            WHERE agent_id = %s ORDER BY started_at DESC LIMIT 100
-        """, (agent_id,))
+        if since_timestamp:
+            cur.execute("""
+                SELECT * FROM agent_task_executions
+                WHERE agent_id = %s AND synced_at >= %s ORDER BY started_at DESC LIMIT 100
+            """, (agent_id, since_timestamp))
+        else:
+            cur.execute("""
+                SELECT * FROM agent_task_executions
+                WHERE agent_id = %s ORDER BY started_at DESC LIMIT 100
+            """, (agent_id,))
         executions = cur.fetchall()
 
-        # Eventos recentes
         cur.execute("""
             SELECT * FROM system_events
-            WHERE agent_hostname = %s OR agent_hostname = (SELECT hostname FROM agents WHERE agent_id = %s)
+            WHERE agent_hostname = %s OR agent_hostname = %s
             ORDER BY created_at DESC LIMIT 50
-        """, (agent_id, agent_id))
+        """, (agent_id, agent.get("hostname")))
         events = cur.fetchall()
+        cur.close()
 
         return {
             "agent": dict(agent),
@@ -3509,61 +3406,46 @@ async def get_agent_full_data(agent_id: str, since_timestamp: Optional[str] = No
         logger.error(f"Erro ao obter dados completos do agente {agent_id}: {e}")
         return {}
     finally:
-        if 'cur' in locals() and cur:
-            cur.close()
-        release_db(conn)
+        if conn:
+            release_db(conn)
+
 
 async def get_agent_repositories(agent_id: str, since_timestamp: Optional[str] = None) -> List[Dict]:
-    """Obtém repositórios do agente a partir do banco"""
+    """Obtém repositórios sincronizados do agente."""
     conn = None
     try:
         conn = get_db()
+        if not conn:
+            return []
         cur = conn.cursor(cursor_factory=RealDictCursor)
-        if since_timestamp:
-            cur.execute("""
-                SELECT * FROM agent_repositories
-                WHERE agent_id = %s AND synced_at >= %s
-                ORDER BY name
-            """, (agent_id, since_timestamp))
-        else:
-            cur.execute("""
-                SELECT * FROM agent_repositories
-                WHERE agent_id = %s ORDER BY name
-            """, (agent_id,))
-        return [dict(r) for r in cur.fetchall()]
+        rows = _fetch_agent_rows(cur, "agent_repositories", agent_id, since_timestamp, "name")
+        cur.close()
+        return rows
     except Exception as e:
         logger.error(f"Erro ao obter repositórios do agente {agent_id}: {e}")
         return []
     finally:
-        if 'cur' in locals() and cur:
-            cur.close()
-        release_db(conn)
+        if conn:
+            release_db(conn)
+
 
 async def get_agent_tasks(agent_id: str, since_timestamp: Optional[str] = None) -> List[Dict]:
-    """Obtém tarefas do agente a partir do banco"""
+    """Obtém tarefas sincronizadas do agente."""
     conn = None
     try:
         conn = get_db()
+        if not conn:
+            return []
         cur = conn.cursor(cursor_factory=RealDictCursor)
-        if since_timestamp:
-            cur.execute("""
-                SELECT * FROM agent_tasks
-                WHERE agent_id = %s AND synced_at >= %s
-                ORDER BY task_id
-            """, (agent_id, since_timestamp))
-        else:
-            cur.execute("""
-                SELECT * FROM agent_tasks
-                WHERE agent_id = %s ORDER BY task_id
-            """, (agent_id,))
-        return [dict(r) for r in cur.fetchall()]
+        rows = _fetch_agent_rows(cur, "agent_tasks", agent_id, since_timestamp, "task_id")
+        cur.close()
+        return rows
     except Exception as e:
         logger.error(f"Erro ao obter tarefas do agente {agent_id}: {e}")
         return []
     finally:
-        if 'cur' in locals() and cur:
-            cur.close()
-        release_db(conn)
+        if conn:
+            release_db(conn)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -4504,26 +4386,7 @@ async def receive_agent_alert(request: Request):
 
 
 
-@app.get("/api/v1/server/ai-config")
-async def get_server_ai_config():
-    """Retorna configuração de IA do servidor."""
-    return {
-        "provider": os.getenv("GBOC_AI_PROVIDER", "ollama"),
-        "ollama_host": os.getenv("GBOC_OLLAMA_HOST", "http://localhost:11434"),
-        "model": os.getenv("GBOC_AI_MODEL", "llama3"),
-        "cloud_api_key": "***" if os.getenv("GBOC_AI_KEY") else ""
-    }
-
-@app.post("/api/v1/server/ai-config")
-async def update_server_ai_config(request: Request):
-    """Atualiza configuração de IA do servidor."""
-    body = await request.json()
-    os.environ["GBOC_AI_PROVIDER"] = body.get("provider", "ollama")
-    os.environ["GBOC_OLLAMA_HOST"] = body.get("ollama_host", "http://localhost:11434")
-    os.environ["GBOC_AI_MODEL"] = body.get("model", "llama3")
-    if body.get("cloud_api_key"):
-        os.environ["GBOC_AI_KEY"] = body.get("cloud_api_key")
-    return {"status": "success", "message": "Configurações de IA salvas com sucesso!"}
+# Configuração de IA do servidor: ver /api/v1/server/ai-config (acima) e /api/v1/ai/config.
 
 try:
     from modules.ai_assistant.ai_assistant_router import router as server_ai_router

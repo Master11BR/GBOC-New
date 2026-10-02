@@ -1524,7 +1524,11 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                     if (data.provider) document.getElementById('ai-provider').value = data.provider;
                     if (data.ollama_host) document.getElementById('ai-ollama-host').value = data.ollama_host;
                     if (data.model) document.getElementById('ai-model').value = data.model;
-                    if (data.api_key) document.getElementById('ai-api-key').value = data.api_key;
+                    const keyEl = document.getElementById('ai-api-key');
+                    if (keyEl) {
+                        keyEl.value = '';   // a API devolve a chave mascarada: em branco = manter a atual
+                        keyEl.placeholder = (data.configured_keys || []).length ? 'Chave já configurada — deixe em branco para manter' : 'Cole a chave de API';
+                    }
                     if (data.task_history_limit) document.getElementById('task-history-limit').value = data.task_history_limit;
                     toggleAiFields();
                     if (data.provider === 'ollama' || !data.provider) {
@@ -1541,9 +1545,10 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 provider: document.getElementById('ai-provider').value,
                 ollama_host: document.getElementById('ai-ollama-host').value,
                 model: document.getElementById('ai-model').value,
-                api_key: document.getElementById('ai-api-key').value,
                 task_history_limit: parseInt(document.getElementById('task-history-limit').value, 10) || 10
             };
+            const apiKey = document.getElementById('ai-api-key').value.trim();
+            if (apiKey) payload.api_key = apiKey;   // o backend grava no campo do provedor selecionado
             try {
                 const res = await fetch(window.GBOC_API_BASE + '/api/v1/diagnostics/ai-config', {
                     method: 'POST',
@@ -1577,8 +1582,10 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                     body: JSON.stringify({ context: 'teste_conexao', prompt: prompt })
                 });
                 const data = await res.json();
-                if (res.ok && data.analysis) {
-                    alert('✅ IA Respondeu com sucesso!\n\nProvedor: ' + (data.provider || provider) + '\nModelo: ' + (data.model || 'Padrão') + '\n\nResposta:\n' + data.analysis);
+                if (res.ok && data.is_llm_real) {
+                    alert('✅ IA respondeu com sucesso!\n\nProvedor: ' + (data.provider || provider) + '\nModelo: ' + (data.model || 'Padrão') + '\n\nResposta:\n' + data.analysis);
+                } else if (res.ok) {
+                    alert('⚠️ O provedor de IA não respondeu.\n\n' + (data.error || data.analysis || 'Sem detalhes.'));
                 } else {
                     alert('⚠️ Falha ao testar IA: ' + (data.detail || data.error || 'Sem resposta do modelo.'));
                 }

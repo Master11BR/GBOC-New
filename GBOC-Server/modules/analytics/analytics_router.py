@@ -1,26 +1,13 @@
-# GBOC System v14.6.0 Enterprise Edition
+# GBOC System v14.7.3 Enterprise Edition
 # Module: Analytics Router
+#
+# GET /api/v1/analytics/comprehensive é implementado em server_gboc.py com dados reais do
+# PostgreSQL (agents, agent_task_executions). A versão anterior deste módulo retornava valores
+# fixos (12 agentes, 100% de sucesso) — removida por violar a Política Zero-Mock (AI_RULES.md §11).
+# Este roteador permanece registrado para futuras rotas de analytics modularizadas.
 
 import logging
 from fastapi import APIRouter
-from fastapi.responses import JSONResponse
 
 logger = logging.getLogger("gboc_analytics_module")
 router = APIRouter(prefix="/api/v1/analytics", tags=["Analytics"])
-
-@router.get("/comprehensive")
-async def get_comprehensive_analytics():
-    """Retorna o score de saúde do sistema e estatísticas de analytics."""
-    return JSONResponse({
-        "status": "success",
-        "health_score": 100,
-        "health_label": "Saudável",
-        "health_summary": "Todos os agentes online, 0 alertas de ransomware e backups 100% integrais.",
-        "preemptive_alerts": [],
-        "kpis": {
-            "total_agents": 12,
-            "agents_online": 12,
-            "success_rate_24h": 100.0,
-            "total_protected_gb": 4580.5
-        }
-    })

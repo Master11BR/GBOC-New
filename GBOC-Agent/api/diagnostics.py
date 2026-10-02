@@ -224,78 +224,268 @@ async def run_specific_diagnostic(diagnostic_type: str) -> Dict[str, Any]:
         logger.error(f"Error running diagnostic {diagnostic_type}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/ai-repair")
-async def router_ai_repair():
-    """Auto-reparo e integridade de repositórios via IA"""
-    from shared_core import get_shared_core
-    core = get_shared_core()
-    repaired_count = 0
-    actions = []
+# ==============================================================================
+# IA de diagnóstico (rotas únicas, expostas em /api/diagnostics e /api/v1/diagnostics)
+# ==============================================================================
+
+router_v1 = APIRouter(prefix="/api/v1/diagnostics", tags=["diagnostics v1 (IA)"])
+
+
+async def _json_body(request: Request) -> Dict[str, Any]:
+    """Lê o corpo JSON (aceita 'application/json; charset=utf-8'); corpo vazio/ inválido -> {}."""
+    if not (request.headers.get("content-type") or "").lower().startswith("application/json"):
+        return {}
     try:
+        body = await request.json()
+        return body if isinstance(body, dict) else {}
+    except ValueError:
+        return {}
+
+
+def _ai_auth(request: Request, admin: bool = False):
+    from api.ai_api import require_ai_user
+    return require_ai_user(request, admin=admin)
+
+
+def _repair_clean_temp(max_age_hours: int = 24) -> Dict[str, Any]:
+    """Remove arquivos temporários do Agente mais antigos que max_age_hours (data/temp)."""
+    from pathlib import Path
+    temp_dir = Path(__file__).resolve().parents[1] / "data" / "temp"
+    if not temp_dir.exists():
+        return {"action": "Limpeza de data/temp", "ok": True, "detail": "Diretório inexistente — nada a limpar."}
+    cutoff = time.time() - max_age_hours * 3600
+    removed, freed, errors = 0, 0, 0
+    for f in temp_dir.rglob("*"):
+        try:
+            if f.is_file() and f.stat().st_mtime < cutoff:
+                size = f.stat().st_size
+                f.unlink()
+                removed += 1
+                freed += size
+        except OSError:
+            errors += 1
+    return {"action": "Limpeza de data/temp", "ok": errors == 0,
+            "detail": f"{removed} arquivo(s) removido(s), {freed / 1048576:.1f} MB liberados" + (f", {errors} erro(s)" if errors else "")}
+
+
+def _repair_db_maintenance() -> Dict[str, Any]:
+    """Atualiza estatísticas do PostgreSQL nas tabelas operacionais (ANALYZE)."""
+    try:
+        core = get_shared_core()
         with core.get_db_connection() as conn:
             cur = conn.cursor()
-            cur.execute("UPDATE task_executions SET status = 'repaired' WHERE status = 'failed'")
-            repaired_count = cur.rowcount if hasattr(cur, 'rowcount') and cur.rowcount is not None else 1
+            for table in ("tasks", "task_executions", "repositories", "system_logs"):
+                cur.execute(f"ANALYZE {table}")
             conn.commit()
-            actions.append(f"✓ Registros de falhas auditados e corrigidos no banco ({repaired_count} itens) [OK]")
-    except Exception:
-        actions.append("✓ Histórico de tarefas e fila de retentativas reindexadas [OK]")
+            cur.close()
+        return {"action": "Manutenção do banco (ANALYZE)", "ok": True, "detail": "Estatísticas atualizadas em 4 tabelas."}
+    except Exception as e:
+        return {"action": "Manutenção do banco (ANALYZE)", "ok": False, "detail": f"{e.__class__.__name__}: {e}"}
 
-    actions.append("✓ Varredura de arquivos temporários e liberação de travas VSS executada [OK]")
-    actions.append("✓ Fila de sincronização e retentativas redefinida com sucesso [OK]")
 
+def _repair_report_stale_runs(hours: int = 48) -> Dict[str, Any]:
+    """Conta (sem alterar) execuções presas em 'running' há mais de N horas, para revisão manual."""
+    try:
+        core = get_shared_core()
+        with core.get_db_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT COUNT(*) FROM task_executions WHERE status = 'running' AND started_at < NOW() - make_interval(hours => %s)",
+                (hours,),
+            )
+            stale = cur.fetchone()[0]
+            cur.close()
+        detail = (f"{stale} execução(ões) em 'running' há mais de {hours}h — verifique se o processo ainda existe."
+                  if stale else f"Nenhuma execução presa há mais de {hours}h.")
+        return {"action": "Verificação de execuções presas", "ok": stale == 0, "detail": detail}
+    except Exception as e:
+        return {"action": "Verificação de execuções presas", "ok": False, "detail": f"{e.__class__.__name__}: {e}"}
+
+
+def _repair_audit(results: List[Dict[str, Any]], user: Dict[str, Any]) -> None:
+    try:
+        import json as _json
+        core = get_shared_core()
+        with core.get_db_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "INSERT INTO system_logs (timestamp, level, source, message, details) VALUES (%s, %s, %s, %s, %s)",
+                (datetime.now().isoformat(), "INFO", "AI-Repair",
+                 f"Manutenção automatizada executada por {user.get('username', '?')}",
+                 _json.dumps(results, ensure_ascii=False)),
+            )
+            conn.commit()
+            cur.close()
+    except Exception as e:
+        logger.error(f"Falha ao auditar AI-Repair em system_logs: {e}")
+
+
+@router.api_route("/ai-repair", methods=["POST"])
+@router_v1.api_route("/ai-repair", methods=["POST"])
+async def router_ai_repair(request: Request):
+    """
+    Manutenção automatizada REAL e verificável. O histórico de falhas NÃO é alterado
+    (antes os registros 'failed' eram reescritos como 'repaired', mascarando falhas reais).
+    """
+    user = _ai_auth(request)
+    body = await _json_body(request)
+    results = [
+        await asyncio.to_thread(_repair_clean_temp),
+        await asyncio.to_thread(_repair_db_maintenance),
+        await asyncio.to_thread(_repair_report_stale_runs),
+    ]
+    await asyncio.to_thread(_repair_audit, results, user)
+    all_ok = all(r["ok"] for r in results)
     return {
-        "status": "success",
-        "message": "Auto-reparo e otimização de rotina executados no banco de dados!",
-        "actions_taken": actions
+        "status": "success" if all_ok else "partial",
+        "message": "Manutenção concluída." if all_ok else "Manutenção concluída com pendências — veja os detalhes.",
+        "action": body.get("action", "auto"),
+        "target": body.get("target", "system"),
+        "results": results,
+        "actions_taken": [f"{'✓' if r['ok'] else '✗'} {r['action']}: {r['detail']}" for r in results],
     }
 
+
 @router.post("/ai-analyze")
-async def router_ai_analyze(request: Request = None):
-    """Análise de IA de diagnóstico preditivo"""
-    err_msg = "Verificação preventiva de integridade e diagnósticos de rotina."
-    if request:
-        try:
-            body = await request.json() if request.headers.get("content-type") == "application/json" else {}
-            err_msg = body.get("error_message") or body.get("prompt") or err_msg
-        except Exception:
-            pass
+@router_v1.post("/ai-analyze")
+async def router_ai_analyze(request: Request):
+    """Análise de IA de uma falha/alerta (LLM configurado ou heurística com telemetria real)."""
+    _ai_auth(request)
+    body = await _json_body(request)
+    err_msg = body.get("error_message") or body.get("prompt") or "Verificação preventiva de integridade e diagnósticos de rotina."
     from engines.ai_diagnostic_engine import ai_diagnostic_engine
-    return await ai_diagnostic_engine.analyze_error(err_msg)
+    try:
+        return await ai_diagnostic_engine.analyze_error(str(err_msg))
+    except Exception as e:
+        logger.exception(f"Falha na análise de IA: {e}")
+        raise HTTPException(status_code=500, detail="Falha interna ao executar a análise de IA.")
+
 
 @router.post("/ai-analyze-risk")
-async def router_ai_analyze_risk(request: Request = None):
-    """Análise de risco de IA por item"""
-    risk_item = "Falha Crítica de Inicialização / Repositório"
-    if request:
-        try:
-            body = await request.json() if request.headers.get("content-type") == "application/json" else {}
-            risk_item = body.get("risk_item") or risk_item
-        except Exception:
-            pass
+@router_v1.post("/ai-analyze-risk")
+async def router_ai_analyze_risk(request: Request):
+    """Análise de risco de IA por item."""
+    _ai_auth(request)
+    body = await _json_body(request)
+    risk_item = body.get("risk_item") or "Falha Crítica de Inicialização / Repositório"
     from engines.ai_diagnostic_engine import ai_diagnostic_engine
-    return await ai_diagnostic_engine.analyze_error(f"Erro Crítico de Risco: {risk_item}")
+    try:
+        return await ai_diagnostic_engine.analyze_error(f"Erro Crítico de Risco: {risk_item}")
+    except Exception as e:
+        logger.exception(f"Falha na análise de risco: {e}")
+        raise HTTPException(status_code=500, detail="Falha interna ao executar a análise de risco.")
+
 
 @router.post("/ai-analyze-sla")
-async def router_ai_analyze_sla():
-    """Análise de SLA via IA com dados reais de tarefas"""
-    from api.preemptive_api import get_sla_compliance
-    sla_data = await get_sla_compliance()
-    summary = sla_data.get("summary", {})
-    pct = summary.get("compliance_pct", 100)
+@router_v1.post("/ai-analyze-sla")
+async def router_ai_analyze_sla(request: Request):
+    """Análise de SLA via IA com dados reais de tarefas (sem valores presumidos)."""
+    _ai_auth(request)
+    try:
+        from api.preemptive_api import get_sla_compliance
+        sla_data = await get_sla_compliance()
+    except Exception as e:
+        logger.error(f"Dados de SLA indisponíveis: {e}")
+        raise HTTPException(status_code=503, detail="Dados de SLA indisponíveis no momento.")
+    summary = sla_data.get("summary", {}) if isinstance(sla_data, dict) else {}
+    pct = summary.get("compliance_pct")
+    if pct is None:
+        raise HTTPException(status_code=503, detail="Dados de SLA indisponíveis (sem resumo de compliance).")
+    if not summary.get("total_tasks"):
+        return {
+            "status": "no_data",
+            "sla_score": None,
+            "summary": summary,
+            "analysis": "Nenhuma tarefa cadastrada: não há base para calcular SLA/RPO.",
+            "recommendations": ["Cadastre e agende tarefas de backup para que o SLA possa ser medido."],
+            "is_llm_real": False,
+            "provider": None,
+        }
 
     from engines.ai_diagnostic_engine import ai_diagnostic_engine
-    ai_res = await ai_diagnostic_engine.analyze_error(f"Análise de SLA: Taxa de Compliance atual é {pct}% em {summary.get('total_tasks', 0)} tarefas cadastradas.")
-
+    ai_res = await ai_diagnostic_engine.analyze_error(
+        f"Análise de SLA: compliance atual de {pct}% com {summary.get('compliant', 0)} tarefas conformes "
+        f"de {summary.get('total_tasks', 0)} cadastradas."
+    )
+    recs = [s.strip(" -•") for s in str(ai_res.get("solution") or "").splitlines() if s.strip()]
     return {
         "status": "success",
         "sla_score": pct,
-        "analysis": ai_res.get("analysis", f"SLA com compliance de {pct}%."),
-        "recommendations": [
-            "Manter verificação preventiva de integridade quinzenal.",
-            "Monitorar tempo de resposta e retenção de snapshots VSS."
-        ]
+        "summary": summary,
+        "analysis": ai_res.get("analysis", ""),
+        "recommendations": recs,
+        "is_llm_real": bool(ai_res.get("is_llm_real")),
+        "provider": ai_res.get("provider"),
     }
+
+
+@router.api_route("/ollama-models", methods=["GET", "POST"])
+@router_v1.api_route("/ollama-models", methods=["GET", "POST"])
+async def get_ollama_models(request: Request):
+    """Modelos instalados no Ollama (consulta real a /api/tags)."""
+    _ai_auth(request)
+    host = request.query_params.get("host")
+    if not host and request.method == "POST":
+        host = (await _json_body(request)).get("host")
+    from engines import ai_providers as aip
+    if host:
+        try:
+            host = aip.validate_http_url(host)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+    from engines.ai_diagnostic_engine import ai_diagnostic_engine
+    return await ai_diagnostic_engine.get_installed_ollama_models(host)
+
+
+@router.post("/ollama-models/pull")
+@router_v1.post("/ollama-models/pull")
+async def pull_ollama_model(request: Request):
+    """Dispara o download (pull) real de um modelo Ollama em segundo plano (somente administradores)."""
+    _ai_auth(request, admin=True)
+    body = await _json_body(request)
+    model = str(body.get("model") or "").strip()
+    if not model or len(model) > 200 or any(c.isspace() for c in model):
+        raise HTTPException(status_code=400, detail="Nome do modelo inválido.")
+    from engines import ai_providers as aip
+    from engines.ai_diagnostic_engine import ai_diagnostic_engine
+    try:
+        host = aip.validate_http_url(body.get("host") or ai_diagnostic_engine.config.get("ollama_host") or aip.DEFAULT_OLLAMA_HOST)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    async def pull_task():
+        logger.info(f"Iniciando download do modelo '{model}' em {host}...")
+        ok, msg = await asyncio.to_thread(aip.pull_ollama_model, host, model)
+        (logger.info if ok else logger.error)(msg)
+
+    asyncio.create_task(pull_task())
+    return {"status": "downloading", "message": f"O download do modelo '{model}' foi iniciado em segundo plano."}
+
+
+@router.get("/ai-config")
+@router_v1.get("/ai-config")
+async def get_ai_config(request: Request):
+    """Configuração do motor de IA de diagnóstico (chaves mascaradas)."""
+    _ai_auth(request)
+    from engines.ai_diagnostic_engine import ai_diagnostic_engine
+    return ai_diagnostic_engine.public_config()
+
+
+@router.post("/ai-config")
+@router_v1.post("/ai-config")
+async def save_ai_config(request: Request):
+    """Salva a configuração do motor de IA de diagnóstico (somente administradores)."""
+    _ai_auth(request, admin=True)
+    body = await _json_body(request)
+    from engines.ai_diagnostic_engine import ai_diagnostic_engine
+    try:
+        saved = ai_diagnostic_engine.save_config(body)
+    except (ValueError, TypeError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except OSError as e:
+        logger.error(f"Falha ao gravar configuração de IA: {e}")
+        raise HTTPException(status_code=500, detail="Falha ao gravar a configuração de IA no disco.")
+    return {"status": "success", "message": "Configurações de IA salvas", "config": saved}
 
 # Funções auxiliares
 async def _get_system_metrics() -> Dict[str, Any]:

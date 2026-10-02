@@ -1,400 +1,194 @@
 # ==============================================================================
-# GBOC System v14.6.0 Enterprise Edition
+# GBOC System v14.7.3 Enterprise Edition
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # Propriedade Intelectual & Direitos Autorais Registrados.
 # ==============================================================================
 
 """
-GBOC Server Real AI Diagnostic Engine v14.6.0 Enterprise
-Integração de Inteligência Preditiva no Servidor Central para Diagnósticos de Agentes, Backups, SLA e Segurança.
-Suporta: Ollama Local, Grok 70B, Google Gemini, OpenAI GPT-4o, DeepSeek, Kimi, Mistral e Motor Heurístico Server.
+GBOC Server AI Diagnostic Engine
+Diagnóstico de falhas (agentes, backups, SLA, segurança) usando o LLM configurado
+(Ollama, OpenAI, Groq, Gemini, Claude, DeepSeek, Grok, Kimi, Mistral, Cohere) e, na
+ausência de LLM, uma heurística determinística baseada em telemetria real do host.
+
+A configuração é relida a cada chamada (mesmo arquivo do Copilot:
+data/server_ai_config.json), de modo que alterações salvas na interface
+valem imediatamente, sem reiniciar o serviço.
 """
 
-import os
+from __future__ import annotations
+
 import json
 import logging
-import httpx
-from typing import Dict, Any, Optional, List
-from pathlib import Path
+from typing import Any
+
+from modules.ai_assistant import ai_providers as aip
 
 logger = logging.getLogger("GBOC.ServerAIDiagnosticEngine")
 
+DIAGNOSTIC_SYSTEM_PROMPT = (
+    "Você é o especialista de diagnóstico do GBOC Server Central (backup corporativo). "
+    "Analise a falha informada e responda SOMENTE com um objeto JSON com as chaves: "
+    '"cause" (causa técnica concisa), "solution" (passos numerados), '
+    '"recommended_action" (uma de: "rebuild_index", "vss_shadow_copy", "prune_lock", '
+    '"test_credentials", "restart_agent_service", "none") e "analysis" (resumo em Português '
+    "para o operador). Não invente dados que não estejam no contexto."
+)
+
+_ALLOWED_ACTIONS = {"rebuild_index", "vss_shadow_copy", "prune_lock", "test_credentials", "restart_agent_service", "none"}
+
+
 class ServerAIDiagnosticEngine:
-    def __init__(self):
-        self.config_file = Path(__file__).parent.parent.parent / "data" / "server_ai_config.json"
-        self._load_config()
+    """Motor de diagnóstico por IA do Servidor Central."""
 
-    def _load_config(self):
-        self.config = {
-            "provider": "ollama",
-            "ollama_host": "http://localhost:11434",
-            "model": "llama3",
-            "api_key": "",
-            "task_history_limit": 10
-        }
-        
-        if self.config_file.exists():
-            try:
-                with open(self.config_file, 'r', encoding='utf-8') as f:
-                    cfg = json.load(f)
-                    self.config.update(cfg)
-            except Exception as e:
-                logger.warning(f"Falha ao carregar config de IA do servidor: {e}")
+    @property
+    def config(self) -> dict[str, Any]:
+        from modules.ai_assistant.ai_assistant_router import load_server_ai_config
+        return load_server_ai_config()
 
-    def save_config(self):
-        try:
-            self.config_file.parent.mkdir(parents=True, exist_ok=True)
-            with open(self.config_file, 'w', encoding='utf-8') as f:
-                json.dump(self.config, f, indent=2, ensure_ascii=False)
-        except Exception as e:
-            logger.error(f"Falha ao salvar configurações de IA do servidor: {e}")
+    def save_config(self, update: dict[str, Any] | None = None) -> dict[str, Any]:
+        from modules.ai_assistant.ai_assistant_router import save_server_ai_config
+        return save_server_ai_config(update or {})
 
-    async def get_installed_ollama_models(self, ollama_host: Optional[str] = None) -> Dict[str, Any]:
-        """Busca modelos instalados e disponíveis no serviço Ollama local no servidor."""
-        target_host = ollama_host or self.config.get("ollama_host", "http://localhost:11434")
-        hosts_to_try = [target_host, "http://127.0.0.1:11434", "http://localhost:11434"]
-        cleaned_hosts = []
-        for h in hosts_to_try:
-            if h and h.rstrip('/') not in cleaned_hosts:
-                cleaned_hosts.append(h.rstrip('/'))
-
-        recommended_models = [
-            "llama3:latest",
-            "llama3.2:latest",
-            "llama3.3:70b",
-            "mistral:latest",
-            "deepseek-r1:latest",
-            "deepseek-r1:1.5b",
-            "qwen2.5:latest",
-            "gemma2:latest",
-            "codellama:latest",
-            "phi3:latest"
-        ]
-
-        for host in cleaned_hosts:
-            try:
-                async with httpx.AsyncClient(timeout=4.0) as client:
-                    resp = await client.get(f"{host}/api/tags")
-                    if resp.status_code == 200:
-                        models_data = resp.json().get("models", [])
-                        installed = [m.get("name") or m.get("model") for m in models_data if m.get("name") or m.get("model")]
-                        return {
-                            "status": "success",
-                            "connected": True,
-                            "ollama_host": host,
-                            "installed_models": installed,
-                            "recommended_models": recommended_models,
-                            "count_installed": len(installed)
-                        }
-            except Exception:
-                continue
-
+    async def get_installed_ollama_models(self, ollama_host: str | None = None) -> dict[str, Any]:
+        """Consulta real dos modelos instalados no Ollama."""
+        info = await aip.alist_ollama_models(self.config, ollama_host)
         return {
-            "status": "error",
-            "connected": False,
-            "ollama_host": target_host,
-            "installed_models": [],
-            "recommended_models": recommended_models,
-            "count_installed": 0,
-            "message": f"Servidor Ollama local inacessível em {target_host} ou 127.0.0.1:11434."
+            "status": "success" if info["connected"] else "error",
+            "connected": info["connected"],
+            "ollama_host": info["host"],
+            "installed_models": info["models"],
+            "models": info["models"],
+            "count_installed": len(info["models"]),
+            "message": "" if info["connected"] else f"Servidor Ollama inacessível: {info['error']}",
         }
 
-    async def analyze_error(self, error_context: str, system_logs: Optional[List[str]] = None) -> Dict[str, Any]:
-        """Realiza análise de erro no Servidor Central utilizando o LLM configurado ou motor heurístico."""
-        provider = self.config.get("provider", "ollama")
-        model = self.config.get("model", "llama3")
-        ollama_host = self.config.get("ollama_host", "http://localhost:11434")
-        api_key = self.config.get("api_key") or self.config.get("groq_api_key") or self.config.get("openai_api_key") or ""
-
+    async def analyze_error(self, error_context: str, system_logs: list[str] | None = None,
+                            telemetry: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Analisa uma falha com o LLM configurado; sem LLM, usa heurística com telemetria real."""
+        cfg = self.config
+        provider = aip.normalize_provider(cfg.get("provider"))
+        error_context = (error_context or "").strip() or "Diagnóstico geral do Servidor Central"
         is_test = "teste" in error_context.lower()
 
-        # Prompt estruturado para o Servidor Central
-        prompt = f"""Você é o Assistente Especialista de Inteligência Artificial do GBOC Server Central v14.6.0 Enterprise.
-Analise a seguinte falha de backup/sistema/agente e forneça o diagnóstico exato da causa raiz e a solução em 1 clique.
-
-ERRO REGISTRADO NO SERVIDOR CENTRAL:
-{error_context}
-
-CONTEXTO DE LOGS RECENTES:
-{json.dumps(system_logs or [], indent=2)}
-
-Responda em formato JSON contendo obrigatoriamente:
-- "cause": Explicação técnica concisa da causa do erro.
-- "solution": Passos para solução.
-- "recommended_action": Ação automatizada sugerida ("rebuild_index", "vss_shadow_copy", "prune_lock", "test_credentials", "restart_agent_service").
-- "analysis": Resumo amigável para o operador do GBOC Server em Português.
-"""
-
-        # 1. Ollama Local ou modelos locais
-        if provider in ("ollama", "qwen", "llama3", "mistral_local", "ollama_local"):
-            ollama_info = await self.get_installed_ollama_models(ollama_host)
-            active_host = ollama_info.get("ollama_host") if ollama_info.get("connected") else ollama_host.rstrip('/')
-            installed_models = ollama_info.get("installed_models") or ollama_info.get("models", [])
-
-            selected_model = model
-            if installed_models:
-                if selected_model not in installed_models:
-                    prefix = selected_model.lower().split(':')[0]
-                    match = next((m for m in installed_models if prefix == m.lower().split(':')[0]), None)
-                    if not match:
-                        match = next((m for m in installed_models if prefix in m.lower()), None)
-                    selected_model = match or installed_models[0]
-
-            if ollama_info.get("connected"):
-                try:
-                    async with httpx.AsyncClient(timeout=6.0) as client:
-                        resp = await client.post(
-                            f"{active_host}/api/generate",
-                            json={
-                                "model": selected_model,
-                                "prompt": "Responda apenas: OK - GBOC Server Ollama Conectado" if is_test else prompt,
-                                "stream": False,
-                                "options": {
-                                    "num_predict": 256,
-                                    "temperature": 0.2
-                                }
-                            }
-                        )
-                        if resp.status_code == 200:
-                            raw_text = resp.json().get("response", "")
-                            if is_test:
-                                return {
-                                    "is_llm_real": True,
-                                    "provider": f"Ollama Local ({active_host})",
-                                    "model": selected_model,
-                                    "analysis": f"✅ CONEXÃO COM OLLAMA OK NO SERVIDOR!\n\nO serviço local Ollama respondeu com sucesso usando o modelo '{selected_model}'.\nResposta do Modelo: {raw_text.strip()}"
-                                }
-                            res = self._parse_ai_response(raw_text, error_context)
-                            res["is_llm_real"] = True
-                            res["provider"] = f"Ollama Local ({selected_model})"
-                            res["model"] = selected_model
-                            return res
-                except Exception as e:
-                    logger.warning(f"Ollama local no servidor indisponível no modelo {selected_model} ({e})...")
-
-        # 2. Google Gemini
-        if provider in ("gemini", "google"):
-            gemini_key = api_key or self.config.get("gemini_api_key", "")
-            if not gemini_key:
-                return {
-                    "is_llm_real": False,
-                    "provider": "Google Gemini (Sem Chave API)",
-                    "model": model,
-                    "analysis": "⚠️ A Chave de API do Google Gemini não foi configurada no Servidor.\n\nPor favor, insira a sua API Key em Configurações > IA do Servidor."
-                }
-            try:
-                gemini_model = model if "gemini" in model.lower() else "gemini-1.5-flash"
-                target_url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_model}:generateContent?key={gemini_key}"
-                payload = {"contents": [{"parts": [{"text": "Responda apenas: OK" if is_test else prompt}]}]}
-                async with httpx.AsyncClient(timeout=15.0) as client:
-                    resp = await client.post(target_url, json=payload)
-                    if resp.status_code == 200:
-                        content = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
-                        if is_test:
-                            return {
-                                "is_llm_real": True,
-                                "provider": "Google Gemini (API Conectada)",
-                                "model": gemini_model,
-                                "analysis": f"✅ CONEXÃO COM GOOGLE GEMINI OK NO SERVIDOR!\n\nA API respondeu com sucesso usando o modelo '{gemini_model}'."
-                            }
-                        res = self._parse_ai_response(content, error_context)
-                        res["is_llm_real"] = True
-                        res["provider"] = "Google Gemini (LLM Real)"
-                        res["model"] = gemini_model
-                        return res
-            except Exception as e:
-                logger.warning(f"Falha na API Google Gemini no servidor ({e})...")
-
-        # 3. Anthropic Claude
-        if provider in ("claude", "anthropic"):
-            if not api_key:
-                return {
-                    "is_llm_real": False,
-                    "provider": "Anthropic Claude (Sem Chave API)",
-                    "model": model,
-                    "analysis": "⚠️ A Chave de API da Anthropic Claude não foi configurada no Servidor.\n\nPor favor, insira a sua API Key em Configurações > IA do Servidor."
-                }
-            try:
-                claude_model = model if "claude" in model.lower() else "claude-3-5-sonnet-20241022"
-                target_url = "https://api.anthropic.com/v1/messages"
-                headers = {
-                    "x-api-key": api_key,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json"
-                }
-                payload = {
-                    "model": claude_model,
-                    "max_tokens": 512,
-                    "messages": [{"role": "user", "content": "Responda apenas: OK" if is_test else prompt}]
-                }
-                async with httpx.AsyncClient(timeout=15.0) as client:
-                    resp = await client.post(target_url, json=payload, headers=headers)
-                    if resp.status_code == 200:
-                        content = resp.json()["content"][0]["text"]
-                        if is_test:
-                            return {
-                                "is_llm_real": True,
-                                "provider": "Anthropic Claude (API Conectada)",
-                                "model": claude_model,
-                                "analysis": f"✅ CONEXÃO COM ANTHROPIC CLAUDE OK NO SERVIDOR!\n\nA API respondeu com sucesso usando o modelo '{claude_model}'."
-                            }
-                        res = self._parse_ai_response(content, error_context)
-                        res["is_llm_real"] = True
-                        res["provider"] = "Anthropic Claude (LLM Real)"
-                        res["model"] = claude_model
-                        return res
-            except Exception as e:
-                logger.warning(f"Falha na API Anthropic Claude no servidor ({e})...")
-
-        # 4. Provedores Cloud padrão OpenAI-compatíveis (Groq, OpenAI, DeepSeek, Kimi)
-        endpoints = {
-            "groq": "https://api.groq.com/openai/v1/chat/completions",
-            "groq_free": "https://api.groq.com/openai/v1/chat/completions",
-            "kimi": "https://api.moonshot.cn/v1/chat/completions",
-            "grok": "https://api.x.ai/v1/chat/completions",
-            "openai": "https://api.openai.com/v1/chat/completions",
-            "deepseek": "https://api.deepseek.com/v1/chat/completions",
-            "mistral": "https://api.mistral.ai/v1/chat/completions"
-        }
-
-        if provider in endpoints:
-            if not api_key:
-                return {
-                    "is_llm_real": False,
-                    "provider": f"{provider.upper()} (Sem Chave API)",
-                    "model": model,
-                    "analysis": f"⚠️ A Chave de API para o provedor {provider.upper()} não foi configurada no Servidor.\n\nPor favor, insira a sua API Key em Configurações > IA do Servidor."
-                }
-            try:
-                target_url = endpoints[provider]
-                headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-                actual_model = self.config.get("groq_model", "llama-3.3-70b-versatile") if "groq" in provider else model
-                payload = {
-                    "model": actual_model,
-                    "messages": [{"role": "user", "content": "Responda apenas: OK" if is_test else prompt}],
-                    "temperature": 0.2
-                }
-                async with httpx.AsyncClient(timeout=15.0) as client:
-                    resp = await client.post(target_url, json=payload, headers=headers)
-                    if resp.status_code == 200:
-                        content = resp.json()["choices"][0]["message"]["content"]
-                        if is_test:
-                            return {
-                                "is_llm_real": True,
-                                "provider": f"{provider.upper()} Nuvem (API Conectada)",
-                                "model": actual_model,
-                                "analysis": f"✅ CONEXÃO COM {provider.upper()} OK NO SERVIDOR!\n\nA API em nuvem respondeu com sucesso."
-                            }
-                        res = self._parse_ai_response(content, error_context)
-                        res["is_llm_real"] = True
-                        res["provider"] = f"{provider.upper()} Nuvem (LLM Real)"
-                        res["model"] = actual_model
-                        return res
-            except Exception as e:
-                logger.warning(f"Falha na API {provider} no servidor ({e})...")
-
-        # 3. Heurística Interna do Servidor Central
         if is_test:
+            result = await aip.achat(cfg, "Você é um verificador de conectividade.", "Responda apenas: OK", provider=provider)
+            if result.ok:
+                return {
+                    "is_llm_real": True, "provider": result.provider_label, "model": result.model,
+                    "analysis": f"✅ Conexão com {result.provider_label} OK (modelo '{result.model}', "
+                                f"{result.duration_seconds}s).\nResposta do modelo: {result.answer[:200]}",
+                }
             return {
-                "is_llm_real": False,
-                "provider": f"{provider.upper()} (Motor Preditivo GBOC Server)",
-                "model": model,
-                "analysis": f"⚠️ O serviço Ollama local não está ativo em '{ollama_host}' ou a Chave de API não foi informada.\n\n"
-                            f"📌 O GBOC Server ativou o Motor Preditivo Interno de Contingência para diagnósticos de conectividade e réplicas.\n\n"
-                            f"💡 Para conectar a uma IA Real:\n"
-                            f"1. Abra o serviço Ollama na máquina do servidor (ex: `ollama run llama3`), OU\n"
-                            f"2. Escolha um provedor de nuvem (Groq, Gemini, OpenAI) e informe a sua Chave de API."
+                "is_llm_real": False, "provider": result.provider_label, "model": result.model,
+                "error": result.error,
+                "analysis": f"❌ Falha na conexão com {result.provider_label}: {result.error}",
             }
 
-        res = self._rule_based_ai_analysis(error_context)
-        res["is_llm_real"] = False
-        res["provider"] = f"{provider.upper()} (Heurística Server)"
-        res["model"] = model
+        logs = [str(x)[:500] for x in (system_logs or [])][:30]
+        prompt = (
+            f"ERRO REGISTRADO NO SERVIDOR CENTRAL:\n{error_context[:4000]}\n\n"
+            f"LOGS RECENTES:\n{json.dumps(logs, ensure_ascii=False, indent=1)}\n\n"
+            f"TELEMETRIA REAL DO HOST:\n{json.dumps(telemetry or {}, ensure_ascii=False)}"
+        )
+        result = await aip.achat(cfg, DIAGNOSTIC_SYSTEM_PROMPT, prompt, provider=provider)
+        if result.ok:
+            parsed = self._parse_ai_response(result.answer, error_context)
+            parsed.update({"is_llm_real": True, "provider": result.provider_label, "model": result.model})
+            return parsed
+
+        res = self._rule_based_ai_analysis(error_context, telemetry)
+        res.update({
+            "is_llm_real": False,
+            "provider": f"Heurística GBOC Server (LLM indisponível: {result.provider_label})",
+            "model": "gboc-heuristic",
+            "llm_error": result.error,
+        })
         return res
 
-    def _rule_based_ai_analysis(self, error_text: str, telemetry: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Análise heurística de causa raiz com telemetria 100% real no Servidor Central."""
+    def _rule_based_ai_analysis(self, error_text: str, telemetry: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Análise heurística determinística (palavras-chave + telemetria real do host)."""
         err_lower = (error_text or "").lower()
-        
-        cpu = telemetry.get("cpu_percent", 0.0) if telemetry else 0.0
-        ram = telemetry.get("ram_percent", 0.0) if telemetry else 0.0
-        disk = telemetry.get("disk_percent", 0.0) if telemetry else 0.0
-
-        if not telemetry:
-            try:
-                import psutil
-                import platform
-                cpu = psutil.cpu_percent(interval=0.05)
-                ram = psutil.virtual_memory().percent
-                disk = psutil.disk_usage("C:\\" if platform.system() == "Windows" else "/").percent
-            except Exception:
-                pass
 
         if "offline" in err_lower or "disconnect" in err_lower or "timeout" in err_lower:
             return {
-                "cause": "Heartbeat de comunicação do agente expirado ou porta TCP 9200/443 inacessível.",
-                "solution": "1. Verificar se o serviço GBOC Agent está ativo no host remoto.\n2. Confirmar regra de firewall permitindo porta 9200.\n3. Testar a resolução DNS/IP do host de destino.",
+                "cause": "Heartbeat do agente expirado ou porta TCP 9200/443 inacessível.",
+                "solution": "1. Verificar se o serviço GBOC Agent está ativo no host remoto.\n2. Confirmar regra de firewall para a porta 9200.\n3. Testar a resolução DNS/IP do host.",
                 "recommended_action": "restart_agent_service",
-                "analysis": "⚠️ **FALHA DE COMUNICAÇÃO DE AGENTE DETECTADA**\n\n📌 **Causa Raiz Técnica:** O Agente remoto parou de emitir pulso de vida (heartbeat) ao Servidor Central.\n\n🛠️ **O Que Fazer Exatamente:**\n1. Verifique a conectividade de rede e teste a resposta da porta 9200.\n2. Acesse a máquina remota e reinicie o serviço 'GBOC Agent'.\n3. Re-homologue a chave de pareamento na aba 'Gerenciamento de Agentes'."
+                "analysis": "⚠️ **Possível falha de comunicação com agente** (heurística por palavra-chave).\n"
+                            "Verifique conectividade, firewall e o serviço 'GBOC Agent' no host remoto.",
             }
-        elif "lock" in err_lower or "busy" in err_lower:
+        if "lock" in err_lower or "busy" in err_lower:
             return {
-                "cause": "Arquivo de trava (.lock) residual presente em repositório de armazenamento.",
-                "solution": "1. Acessar o Gerenciador de Repositórios.\n2. Executar a limpeza de trava (Lock Prune).\n3. Reiniciar a rotina de sincronização de repositório.",
+                "cause": "Trava (.lock) residual no repositório de armazenamento.",
+                "solution": "1. Abrir o Gerenciador de Repositórios.\n2. Executar a limpeza de trava (Lock Prune).\n3. Reexecutar o job.",
                 "recommended_action": "prune_lock",
-                "analysis": "⚠️ **REPOSITÓRIO BLOQUEADO (TRAVA ATIVA)**\n\n📌 **Causa Raiz Técnica:** Uma execução de backup anterior foi interrompida sem liberar a trava de repositório.\n\n🛠️ **O Que Fazer Exatamente:**\n1. Clique no botão 'Executar Correção Automática' abaixo para remover os arquivos .lock obsoletos.\n2. Aguarde a confirmação de higienização do repositório."
+                "analysis": "⚠️ **Repositório possivelmente bloqueado** (heurística por palavra-chave).\n"
+                            "Uma execução anterior pode ter sido interrompida sem liberar a trava.",
             }
-        elif "permission" in err_lower or "access denied" in err_lower:
+        if "permission" in err_lower or "access denied" in err_lower or "acesso negado" in err_lower:
             return {
-                "cause": "Permissões NTFS/S3 insuficientes ou credencial de serviço revogada.",
-                "solution": "1. Validar as credenciais administrativas do storage.\n2. Verificar se o usuário de execução possui permissão de leitura/escrita.",
+                "cause": "Permissões NTFS/S3 insuficientes ou credencial revogada.",
+                "solution": "1. Validar as credenciais do storage.\n2. Verificar permissão de leitura/escrita do usuário de serviço.",
                 "recommended_action": "test_credentials",
-                "analysis": "⚠️ **FALHA DE PERMISSÃO DE ACESSO AO REPOSITÓRIO**\n\n📌 **Causa Raiz Técnica:** O Servidor Central recebeu um erro 'Acesso Negado' ao ler/gravar no destino.\n\n🛠️ **O Que Fazer Exatamente:**\n1. Acesse 'Configurações de Storage & Credenciais'.\n2. Reinforme a senha do usuário administrativo ou secret key S3.\n3. Clique em 'Testar Credencial'."
+                "analysis": "⚠️ **Possível falha de permissão no destino** (heurística por palavra-chave).\n"
+                            "Revalide as credenciais em 'Configurações de Storage & Credenciais'.",
             }
 
-        issues = []
-        solutions = []
-        if disk > 85:
-            issues.append(f"Ocupação Crítica do Disco Principal: {disk:.1f}% em uso.")
-            solutions.append("1. Executar a rotina de expurgo de backups antigos nas Políticas de Retenção GFS.")
-            solutions.append("2. Limpar arquivos de logs temporários no diretório GBOC Server.")
-        if ram > 85:
-            issues.append(f"Alta Pressão de Memória RAM: Consumo de {ram:.1f}%.")
-            solutions.append("3. Ajustar a quantidade de workers simultâneos nas configurações globais.")
-            solutions.append("4. Reiniciar serviços secundários para liberar cache de memória.")
-        if cpu > 80:
-            issues.append(f"Uso Elevado de Processador: CPU operando em {cpu:.1f}%.")
-            solutions.append("5. Verificar se há rotinas simultâneas de desduplicação/criptografia.")
+        tel = telemetry
+        if tel is None:
+            from modules.ai_assistant.ai_assistant_router import collect_host_telemetry
+            tel = collect_host_telemetry()
+        if not tel.get("available", True) or "cpu_percent" not in tel:
+            return {
+                "cause": "Telemetria do host indisponível.",
+                "solution": "Verifique se o pacote 'psutil' está instalado e se o serviço possui permissão para ler métricas.",
+                "recommended_action": "none",
+                "analysis": f"ℹ️ Não foi possível coletar telemetria real do host ({tel.get('error', 'motivo desconhecido')}). "
+                            "Nenhum estado de saúde foi presumido.",
+            }
 
+        cpu, ram, disk = float(tel["cpu_percent"]), float(tel["ram_percent"]), float(tel["disk_percent"])
+        issues: list[str] = []
+        solutions: list[str] = []
+        if disk > 85:
+            issues.append(f"Ocupação crítica do disco principal: {disk:.1f}%.")
+            solutions += ["Executar o expurgo de backups antigos (retenção GFS).", "Limpar logs temporários do GBOC Server."]
+        if ram > 85:
+            issues.append(f"Alta pressão de memória RAM: {ram:.1f}%.")
+            solutions += ["Reduzir workers simultâneos nas configurações globais.", "Reiniciar serviços secundários para liberar memória."]
+        if cpu > 80:
+            issues.append(f"Uso elevado de CPU: {cpu:.1f}%.")
+            solutions.append("Verificar rotinas simultâneas de deduplicação/criptografia.")
+
+        telemetry_txt = f"CPU {cpu:.1f}% • RAM {ram:.1f}% • Disco {disk:.1f}%"
         if not issues:
             return {
-                "cause": f"Servidor Central operando em estado de alta integridade. CPU: {cpu:.1f}%, RAM: {ram:.1f}%, Disco: {disk:.1f}%. Sem falhas críticas registradas.",
-                "solution": "1. Nenhuma intervenção corretiva manual é exigida.\n2. Recomenda-se manter as rotinas preventivas de monitoramento ativas.",
-                "recommended_action": "auto_heal",
-                "analysis": f"✅ **DIAGNÓSTICO GERAL: SERVIDORE OPERANDO EM TOTAL SAÚDE**\n\n📌 **Telemetria Real do Host:**\n• Processador (CPU): {cpu:.1f}%\n• Memória RAM: {ram:.1f}%\n• Volume de Armazenamento: {disk:.1f}%\n• Conectividade & APIs v2: OK\n\n🛠️ **O Que Fazer Exatamente:**\n1. O Servidor Central está operando dentro dos parâmetros de desempenho desejados.\n2. Para análises preditivas ainda mais detalhadas por LLM, certifique-se de configurar uma chave de API na aba 'Assistente de IA'."
+                "cause": f"Nenhum limite de telemetria excedido ({telemetry_txt}).",
+                "solution": "Nenhuma ação corretiva exigida pelos indicadores de host. Para análise de causa raiz, configure um provedor de IA.",
+                "recommended_action": "none",
+                "analysis": f"✅ **Telemetria real do host dentro dos limites**\n• {telemetry_txt}\n\n"
+                            "Observação: esta é uma análise heurística (sem LLM) e cobre apenas CPU, RAM e disco.",
             }
-        else:
-            return {
-                "cause": "Alertas de Telemetria Detectados: " + " | ".join(issues),
-                "solution": "\n".join(solutions),
-                "recommended_action": "rebuild_index" if disk > 85 else "restart_agent_service",
-                "analysis": f"⚠️ **ALERTAS DETECTADOS NO AUTO-DIAGNÓSTICO**\n\n📌 **Causa Raiz & Telemetria Real:**\n" + "\n".join([f"• {iss}" for iss in issues]) + f"\n\n🛠️ **O Que Fazer Exatamente:**\n" + "\n".join(solutions)
-            }
-
-    def _parse_ai_response(self, text: str, fallback_error: str) -> Dict[str, Any]:
-        try:
-            start = text.find("{")
-            end = text.rfind("}")
-            if start != -1 and end != -1:
-                return json.loads(text[start:end+1])
-        except Exception:
-            pass
-        
+        numbered = "\n".join(f"{i}. {s}" for i, s in enumerate(solutions, 1))
         return {
-            "cause": "Análise processada pelo modelo de IA do Servidor.",
-            "solution": "Seguir instruções recomendadas no relatório.",
-            "recommended_action": "auto_heal",
-            "analysis": text
+            "cause": "Alertas de telemetria: " + " | ".join(issues),
+            "solution": numbered,
+            "recommended_action": "none",
+            "analysis": "⚠️ **Alertas detectados na telemetria real do host**\n"
+                        + "\n".join(f"• {i}" for i in issues) + f"\n\n🛠️ **O que fazer:**\n{numbered}",
         }
+
+    def _parse_ai_response(self, text: str, fallback_error: str) -> dict[str, Any]:
+        data = aip.parse_json_object(text)
+        if data:
+            action = str(data.get("recommended_action") or "none")
+            return {
+                "cause": str(data.get("cause") or ""),
+                "solution": str(data.get("solution") or ""),
+                "recommended_action": action if action in _ALLOWED_ACTIONS else "none",
+                "analysis": str(data.get("analysis") or text),
+            }
+        return {"cause": "", "solution": "", "recommended_action": "none", "analysis": text}
+
 
 server_ai_diagnostic_engine = ServerAIDiagnosticEngine()
