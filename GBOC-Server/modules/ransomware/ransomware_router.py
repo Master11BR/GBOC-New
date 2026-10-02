@@ -137,7 +137,7 @@ def _get_online_agents() -> List[Dict[str, Any]]:
         cur = conn.cursor()
         cur.execute(
             """
-            SELECT agent_id, hostname, COALESCE(ip_address, '127.0.0.1') AS ip_address,
+            SELECT agent_id, hostname, ip_address,
                    COALESCE(status, 'unknown') AS status
             FROM agents
             ORDER BY hostname
@@ -147,7 +147,7 @@ def _get_online_agents() -> List[Dict[str, Any]]:
             rows.append({
                 "agent_id": r[0],
                 "hostname": r[1] or r[0],
-                "ip": r[2] or "127.0.0.1",
+                "ip": r[2],
                 "port": 9200,
                 "status": r[3] or "unknown",
             })
@@ -168,7 +168,7 @@ def _get_agent_connection_info(agent_id: str) -> Dict[str, Any]:
     if _is_local_agent(agent_id):
         return {"is_local": True, "ip": "127.0.0.1", "port": 9200, "hostname": socket.gethostname(), "status": "online"}
 
-    data = {"is_local": False, "ip": "127.0.0.1", "port": 9200, "hostname": agent_id, "status": "unknown"}
+    data = {"is_local": False, "ip": None, "port": 9200, "hostname": agent_id, "status": "unknown"}
     conn = None
     cur = None
     try:
@@ -206,6 +206,13 @@ def _get_agent_connection_info(agent_id: str) -> Dict[str, Any]:
 async def _fetch_agent_endpoint(agent_id: str, endpoint_path: str, method: str = "GET", json_body: Optional[Dict[str, Any]] = None, timeout: float = 10.0) -> Dict[str, Any]:
     conn = _get_agent_connection_info(agent_id)
     endpoint = endpoint_path if endpoint_path.startswith("/") else f"/{endpoint_path}"
+    if not conn.get("ip"):
+        return {"ok": False, "error": "Agente não encontrado ou sem IP registrado (aguarde o heartbeat)", "agent": conn}
+    try:
+        from modules.agents.agent_pairing import agent_headers
+        _hdrs = agent_headers()
+    except Exception:
+        _hdrs = {}
 
     urls = [
         f"https://{conn.get('ip')}:{conn.get('port')}{endpoint}",
@@ -216,7 +223,7 @@ async def _fetch_agent_endpoint(agent_id: str, endpoint_path: str, method: str =
     for url in urls:
         try:
             async with httpx.AsyncClient(timeout=timeout, verify=False) as client:
-                resp = await client.request(method.upper(), url, json=json_body)
+                resp = await client.request(method.upper(), url, json=json_body, headers=_hdrs)
                 if resp.status_code >= 400:
                     last_error = f"HTTP {resp.status_code}"
                     continue
@@ -579,6 +586,7 @@ async def get_ransomware_overview():
     total_canaries = 0
     total_compromised = 0
     guardian_running = 0
+    scans_7d = None  # None = banco indisponível (UI mostra "—")
     agents = []
 
     conn = None
@@ -634,6 +642,19 @@ async def get_ransomware_overview():
                     "guardian_running": g_running,
                     "last_scan": srow[1].isoformat() if srow and srow[1] else None,
                 })
+        # Varreduras reais sincronizadas pelos agentes (eventos scan_*) nos últimos 7 dias
+        if conn:
+            cur3 = conn.cursor()
+            cur3.execute(
+                """
+                SELECT COUNT(DISTINCT (agent_id, COALESCE(message, ''), COALESCE(event_time, created_at)))
+                FROM ransomware_central_events
+                WHERE event_type LIKE 'scan\\_%%'
+                  AND COALESCE(event_time, created_at) >= LOCALTIMESTAMP - INTERVAL '7 days'
+                """
+            )
+            scans_7d = int((cur3.fetchone() or [0])[0] or 0)
+            cur3.close()
     except Exception as e:
         logger.warning(f"Erro ao obter overview ransomware: {e}")
     finally:
@@ -661,7 +682,7 @@ async def get_ransomware_overview():
         "total_agents": total_agents,
         "total_canaries": total_canaries,
         "total_compromised": total_compromised,
-        "scans_7d": 0,
+        "scans_7d": scans_7d,
         "status_label": label,
         "agents": agents,
     })

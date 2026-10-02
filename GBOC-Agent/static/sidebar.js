@@ -266,14 +266,11 @@ class UnifiedSidebar {
             });
         }
 
-        // fallback defensivo: marca dashboard se nada casar
-        if (!activeFound) {
-            const home = document.querySelector(`${SIDEBAR_CONFIG.SELECTORS.NAV_LINK}[href="/"]`) ||
-                         document.querySelector(`${SIDEBAR_CONFIG.SELECTORS.NAV_LINK}[href="/index.html"]`);
-            if (home) {
-                home.classList.add('active', 'in-focus');
-                activeEl = home;
-            }
+        // Página sem item próprio no menu: o GBOCNav resolve pelo item "pai"
+        // (ex.: database-backup -> Cargas Protegidas) em vez de marcar o Dashboard.
+        if (!activeFound && window.GBOCNav && typeof window.GBOCNav.resolveForPage === 'function') {
+            window.GBOCNav.resolveForPage();
+            return;
         }
 
         if (activeEl) {
@@ -693,13 +690,10 @@ window.initNavGroups = function() {
             if (arrow) arrow.style.transform = 'rotate(180deg)';
             if (header) header.classList.add('has-active-child');
             localStorage.setItem('gboc-nav-' + grpId, 'open');
-        } else if (savedState === 'open' || savedState === null) {
-            items.classList.add('open');
-            if (arrow) arrow.style.transform = 'rotate(180deg)';
-        } else if (savedState === 'closed') {
+        } else {
+            // Submenus retráteis: apenas o grupo do item ativo inicia aberto (GBOCNav)
             items.classList.remove('open');
             if (arrow) arrow.style.transform = '';
-            if (header) header.classList.remove('has-active-child');
         }
     });
 };

@@ -258,16 +258,9 @@ Zero-Overflow & Smart Sidebar Presence Detection.
     }
 
     function _setupToggleButtons() {
-        const toggleBtn = document.getElementById('gboc-vheader-toggle');
-        if (toggleBtn && !toggleBtn.dataset.boundClick) {
-            toggleBtn.dataset.boundClick = 'true';
-            toggleBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                document.body.classList.toggle('sidebar-collapsed');
-                const isCollapsed = document.body.classList.contains('sidebar-collapsed');
-                localStorage.setItem(LS_COLLAPSED, isCollapsed ? 'true' : 'false');
-            });
-        }
+        // O botão ☰ é tratado pelo GBOCNav (fim deste arquivo), que decide entre
+        // recolher a sidebar (desktop), abri-la (celular) ou abrir a navegação horizontal.
+        // Antes havia dois handlers (onclick inline + listener) e o clique se anulava.
     }
 
     async function _updateDynamicVersion() {
@@ -730,4 +723,334 @@ Zero-Overflow & Smart Sidebar Presence Detection.
     window.gbocShutdownSystem = window.gbocConfirmShutdown;
 
     console.log('[GBOCLayout] ✅ Motor de Layout Ativo (Zero-Overflow) — Layout:', _currentLayout, '| Tema:', _currentColorTheme, '| Style:', _currentUiStyle);
+})();
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+   GBOCNav — Controlador único de navegação (Server + Agent, vertical e horizontal)
+   • Submenus retráteis (acordeão): abrir um grupo fecha os demais, exceto o grupo
+     do item ativo, que permanece aberto e visível até a próxima navegação.
+   • Item ativo sincronizado entre menu lateral e topbar (inclusive switchTab do Server).
+   • Botão ☰: recolhe a sidebar (desktop), abre a sidebar (celular) ou abre a
+     navegação horizontal (celular).
+   • Tooltips automáticos para itens truncados / sidebar recolhida.
+   ════════════════════════════════════════════════════════════════════════════ */
+(function () {
+    'use strict';
+    if (window.GBOCNav) return;
+
+    const LS_COLLAPSED = 'gboc-sidebar-collapsed';
+    const isMobile = () => window.matchMedia('(max-width: 768px)').matches;
+    const isHorizontal = () => document.body.classList.contains('layout-horizontal');
+
+    const groupOf = (el) => (el ? el.closest('.nav-group') : null);
+    const itemsOf = (g) => (g ? g.querySelector('.nav-group-items') : null);
+    const headerOf = (g) => (g ? g.querySelector('.nav-group-header') : null);
+    const activeLink = () => document.querySelector('.sidebar .nav-link.active, .sidebar .nav-link.in-focus');
+
+    function navKey(el) {
+        if (!el) return null;
+        const oc = el.getAttribute('onclick') || '';
+        const m = oc.match(/switchTab\(\s*['"]([^'"]+)['"]/);
+        if (m) return 'tab:' + m[1];
+        let href = (el.getAttribute('href') || '').trim();
+        if (!href || href.startsWith('javascript') || href === '#') return null;
+        try { const u = new URL(href, window.location.origin); href = u.pathname + u.search; } catch (e) { /* mantém */ }
+        href = href.toLowerCase();
+        if (href === '/') href = '/index.html';
+        return 'href:' + href;
+    }
+
+    function currentHrefKeys() {
+        let p = window.location.pathname.toLowerCase();
+        if (p === '/') p = '/index.html';
+        return ['href:' + p + window.location.search.toLowerCase(), 'href:' + p];
+    }
+
+    function setOpen(g, open) {
+        const items = itemsOf(g), hdr = headerOf(g);
+        if (!items) return;
+        items.classList.toggle('open', open);
+        if (hdr) {
+            hdr.classList.toggle('open', open);
+            hdr.setAttribute('aria-expanded', open ? 'true' : 'false');
+        }
+        const arr = g.querySelector('.nav-group-arrow');
+        if (arr) arr.style.transform = '';
+    }
+
+    function syncActiveHeaders() {
+        document.querySelectorAll('.sidebar .nav-group-header.has-active-child')
+            .forEach(h => h.classList.remove('has-active-child'));
+        const g = groupOf(activeLink());
+        if (g && headerOf(g)) headerOf(g).classList.add('has-active-child');
+        return g;
+    }
+
+    function revealActive() {
+        const a = activeLink();
+        const nav = a && a.closest('.nav');
+        if (!a || !nav) return;
+        const ar = a.getBoundingClientRect(), nr = nav.getBoundingClientRect();
+        if (ar.top < nr.top + 8 || ar.bottom > nr.bottom - 8) {
+            nav.scrollTop += (ar.top - nr.top) - nr.height / 3;
+        }
+    }
+
+    function addTitles(root) {
+        (root || document).querySelectorAll('.sidebar .nav-link, .sidebar .nav-group-header, .tb-nav-link, .tb-dropdown-item')
+            .forEach(el => {
+                if (!el.getAttribute('title')) {
+                    const t = (el.textContent || '').replace(/\s+/g, ' ').trim();
+                    if (t) el.setAttribute('title', t);
+                }
+            });
+    }
+
+    function markTopbar(key) {
+        document.querySelectorAll('.tb-dropdown-item.active, .tb-nav-link.active')
+            .forEach(x => x.classList.remove('active'));
+        if (!key) return;
+        document.querySelectorAll('.tb-dropdown-item').forEach(it => {
+            if (navKey(it) === key) {
+                it.classList.add('active');
+                const top = it.closest('.tb-dropdown');
+                const btn = top && top.querySelector('.tb-nav-link');
+                if (btn) btn.classList.add('active');
+            }
+        });
+    }
+
+    function setActive(link, opts) {
+        if (!link) return;
+        document.querySelectorAll('.sidebar .nav-link.active, .sidebar .nav-link.in-focus')
+            .forEach(l => l.classList.remove('active', 'in-focus'));
+        link.classList.add('active', 'in-focus');
+        const g = groupOf(link);
+        if (g) {
+            // Acordeão: ao navegar, fica aberto apenas o grupo do novo item ativo
+            document.querySelectorAll('.sidebar .nav-group').forEach(o => { if (o !== g) setOpen(o, false); });
+            setOpen(g, true);
+        }
+        syncActiveHeaders();
+        if (!opts || opts.topbar !== false) markTopbar(navKey(link));
+        try { sessionStorage.setItem('gboc_active_nav_key', navKey(link) || ''); } catch (e) { /* storage indisponível */ }
+        revealActive();
+    }
+
+    function syncFromKey(key) {
+        if (!key) return;
+        let found = null;
+        document.querySelectorAll('.sidebar .nav-link').forEach(l => { if (!found && navKey(l) === key) found = l; });
+        if (found) setActive(found, { topbar: false });
+        markTopbar(key);
+    }
+
+    function isNavigational(link) {
+        return !!navKey(link);
+    }
+
+    // Páginas do Agente sem item próprio no menu -> item "pai" que deve ficar ativo
+    const PARENT_PAGES = {
+        '/database-backup.html': '/protected-workloads.html',
+        '/active-directory.html': '/protected-workloads.html',
+        '/tape-backup.html': '/protected-workloads.html',
+        '/enterprise-features.html': '/protected-workloads.html',
+        '/integrity.html': '/restore.html',
+        '/import.html': '/repositories.html',
+        '/duplicati-native.html': '/engines.html',
+        '/hermes-agent.html': '/engines.html',
+        '/power-tools.html': '/diagnostic.html',
+        '/schema-check.html': '/diagnostic.html',
+        '/auth-diagnostic.html': '/diagnostic.html',
+        '/config-manager.html': '/settings.html'
+    };
+
+    function findLinkForPage(sb) {
+        const links = Array.from((sb || document).querySelectorAll('.nav-link'));
+        const keys = currentHrefKeys();
+        let match = links.find(l => keys.includes(navKey(l)));
+        if (!match) {   // mesma página com outra query (?tab=...)
+            match = links.find(l => (navKey(l) || '').split('?')[0] === keys[1]);
+        }
+        if (!match) {
+            const parent = PARENT_PAGES[keys[1].slice(5)];
+            if (parent) match = links.find(l => (navKey(l) || '').split('?')[0] === 'href:' + parent);
+        }
+        if (!match) {   // SPA (Server): última aba escolhida nesta sessão
+            let saved = '';
+            try { saved = sessionStorage.getItem('gboc_active_nav_key') || ''; } catch (e) { saved = ''; }
+            if (saved) match = links.find(l => navKey(l) === saved);
+        }
+        return match || null;
+    }
+
+    function resolveForPage() {
+        const sb = document.querySelector('.sidebar');
+        const m = sb && findLinkForPage(sb);
+        if (m) setActive(m);
+    }
+
+    // Estado inicial: só o grupo do item ativo aberto (uma vez por sidebar inserida)
+    function normalizeSidebar() {
+        const sb = document.querySelector('.sidebar');
+        if (!sb) return;
+        addTitles(sb);
+        if (sb.__gbocNavReady) return;
+        sb.__gbocNavReady = true;
+
+        if (!activeLink()) {
+            const match = findLinkForPage(sb);
+            if (match) match.classList.add('active', 'in-focus');
+        }
+        const ag = syncActiveHeaders();
+        const groups = sb.querySelectorAll('.nav-group');
+        groups.forEach(g => setOpen(g, ag ? g === ag : g === groups[0]));
+        const a = activeLink();
+        markTopbar(a ? navKey(a) : null);
+        requestAnimationFrame(revealActive);
+    }
+
+    function normalizeTopbar() {
+        const tb = document.getElementById('gboc-topbar');
+        if (!tb) return;
+        addTitles(tb);
+        // Remove o onclick inline legado do ☰ (causava duplo toggle)
+        const tog = document.getElementById('gboc-vheader-toggle');
+        if (tog && tog.hasAttribute('onclick')) tog.removeAttribute('onclick');
+        if (tb.__gbocNavReady) return;
+        tb.__gbocNavReady = true;
+        if (!document.querySelector('.sidebar .nav-link.active')) {
+            const keys = currentHrefKeys();
+            let key = null;
+            const parent = PARENT_PAGES[keys[1].slice(5)];
+            if (parent) keys.push('href:' + parent);
+            tb.querySelectorAll('.tb-dropdown-item').forEach(it => { const k = navKey(it); if (!key && keys.includes(k)) key = k; });
+            if (!key) tb.querySelectorAll('.tb-dropdown-item').forEach(it => { const k = navKey(it) || ''; if (!key && k.split('?')[0] === keys[1]) key = k; });
+            if (key) markTopbar(key);
+        }
+    }
+
+    function toggleMenu() {
+        const b = document.body;
+        if (isMobile()) {
+            if (isHorizontal()) b.classList.toggle('tb-nav-open');
+            else b.classList.toggle('sidebar-open');
+            return;
+        }
+        b.classList.toggle('sidebar-collapsed');
+        try { localStorage.setItem(LS_COLLAPSED, b.classList.contains('sidebar-collapsed') ? 'true' : 'false'); } catch (e) { /* ignore */ }
+    }
+
+    function closeDropdowns(except) {
+        document.querySelectorAll('.tb-dropdown.active').forEach(d => { if (d !== except) d.classList.remove('active'); });
+    }
+
+    // Captura: roda antes dos onclick inline legados (toggleNavGroup duplicados por página)
+    document.addEventListener('click', function (e) {
+        const tog = e.target.closest('#gboc-vheader-toggle');
+        if (tog) {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleMenu();
+            return;
+        }
+
+        const hdr = e.target.closest('.sidebar .nav-group-header');
+        if (hdr) {
+            e.preventDefault();
+            e.stopPropagation();
+            const g = groupOf(hdr);
+            const items = itemsOf(g);
+            const willOpen = !(items && items.classList.contains('open'));
+            if (willOpen) {
+                const ag = groupOf(activeLink());
+                document.querySelectorAll('.sidebar .nav-group').forEach(o => { if (o !== g && o !== ag) setOpen(o, false); });
+                if (document.body.classList.contains('sidebar-collapsed') && !isMobile()) {
+                    document.body.classList.remove('sidebar-collapsed');
+                    try { localStorage.setItem(LS_COLLAPSED, 'false'); } catch (err) { /* ignore */ }
+                }
+            }
+            setOpen(g, willOpen);
+            return;
+        }
+
+        const link = e.target.closest('.sidebar .nav-link');
+        if (link) {
+            if (isNavigational(link)) setActive(link);
+            if (isMobile()) document.body.classList.remove('sidebar-open');
+            return;
+        }
+
+        const item = e.target.closest('.tb-dropdown-item');
+        if (item) {
+            const key = navKey(item);
+            if (key) { markTopbar(key); syncFromKey(key); }
+            const dd = item.closest('.tb-dropdown');
+            closeDropdowns(null);
+            if (dd) {
+                dd.classList.add('tb-suppress');
+                dd.addEventListener('mouseleave', () => dd.classList.remove('tb-suppress'), { once: true });
+            }
+            document.body.classList.remove('tb-nav-open');
+        }
+    }, true);
+
+    // Fecha menus com ESC e ao trocar para desktop
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeDropdowns(null);
+            document.body.classList.remove('tb-nav-open', 'sidebar-open');
+        }
+    });
+    window.addEventListener('resize', () => {
+        if (!isMobile()) document.body.classList.remove('tb-nav-open', 'sidebar-open');
+    });
+
+    // Server: switchTab() também é chamado por código (restauração da aba salva)
+    function hookSwitchTab() {
+        const st = window.switchTab;
+        if (typeof st !== 'function' || st.__gbocNavHooked) return;
+        const wrapped = function (id) {
+            const r = st.apply(this, arguments);
+            try { syncFromKey('tab:' + id); } catch (e) { /* não bloqueia a navegação */ }
+            return r;
+        };
+        wrapped.__gbocNavHooked = true;
+        window.switchTab = wrapped;
+    }
+
+    let pending = false;
+    function refresh() {
+        if (pending) return;
+        pending = true;
+        requestAnimationFrame(() => {
+            pending = false;
+            normalizeSidebar();
+            normalizeTopbar();
+            hookSwitchTab();
+        });
+    }
+
+    function boot() {
+        refresh();
+        if (window.MutationObserver) {
+            new MutationObserver((muts) => {
+                for (const m of muts) {
+                    for (const n of m.addedNodes) {
+                        if (n.nodeType === 1 && (n.matches?.('.sidebar, #gboc-topbar') || n.querySelector?.('.sidebar, #gboc-topbar'))) {
+                            refresh();
+                            return;
+                        }
+                    }
+                }
+            }).observe(document.body, { childList: true, subtree: true });
+        }
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+    else boot();
+    window.addEventListener('load', () => { hookSwitchTab(); refresh(); });
+
+    window.GBOCNav = { setActive, syncFromKey, toggleMenu, refresh, markTopbar, resolveForPage };
 })();

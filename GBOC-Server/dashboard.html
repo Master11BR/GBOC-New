@@ -10,6 +10,28 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 <head>
     <script>
         window.GBOC_API_BASE = (window.location.protocol === 'https:' || window.location.port === '8080' ? 'https:' : window.location.protocol) + '//' + window.location.hostname + ':' + (window.location.port === '8080' ? '8000' : (window.location.port || '8000'));
+        // Sessão expirada: qualquer /api/ protegida respondendo AUTH_REQUIRED leva ao login.
+        (function () {
+            const _fetch = window.fetch;
+            let redirecting = false;
+            window.fetch = async function (...args) {
+                const resp = await _fetch.apply(this, args);
+                if (resp.status === 401 && !redirecting) {
+                    try {
+                        const url = String((args[0] && args[0].url) || args[0] || '');
+                        if (url.includes('/api/') && !url.includes('/auth/')) {
+                            resp.clone().json().then(d => {
+                                if (d && (d.code === 'AUTH_REQUIRED' || d.code === 'AUTH_SETUP_REQUIRED') && !redirecting) {
+                                    redirecting = true;
+                                    window.location.href = '/login.html';
+                                }
+                            }).catch(() => {});
+                        }
+                    } catch (e) { /* mantém a resposta original */ }
+                }
+                return resp;
+            };
+        })();
     </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -163,59 +185,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         .trend-badge.degrading{background:rgba(245,101,101,.15);color:var(--danger)}
         .trend-badge.stable{background:rgba(66,153,225,.15);color:var(--primary)}
 
-        /* Sidebar Unified Rules */
-        .sidebar {
-            width: 240px;
-            height: 100vh;
-            position: fixed;
-            top: 0;
-            left: 0;
-            background: var(--sidebar-bg);
-            border-right: 1px solid var(--border-color, var(--border));
-            display: flex;
-            flex-direction: column;
-            z-index: 1000;
-            overflow: hidden;
-        }
-        .sidebar-header {
-            flex-shrink: 0;
-            padding: 16px 20px;
-            border-bottom: 1px solid var(--border-color, var(--border));
-        }
-        .sidebar-theme-wrap {
-            flex-shrink: 0;
-            padding: 10px 12px 6px 12px;
-        }
-        .sidebar .nav {
-            flex: 1;
-            overflow-y: auto;
-            padding: 10px 12px;
-        }
-        .sidebar-footer-fixed {
-            flex-shrink: 0;
-            padding: 12px 14px;
-            background: var(--sidebar-bg);
-            border-top: 1px solid var(--border-color, var(--border));
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            margin-top: auto;
-        }
-        .nav-group { margin:2px 0; }
-        .nav-group-header {
-            width:100%; background:transparent; border:none; color:var(--text-primary, var(--text)); cursor:pointer;
-            display:flex; align-items:center; justify-content:space-between;
-            padding:8px 10px; border-radius:8px; font-size:0.82em; font-weight:600;
-            transition:background 0.2s;
-            text-align:left;
-        }
-        .nav-group-header:hover { background:var(--input-bg, var(--bg-input)); }
-        .nav-group-arrow { font-size:0.7em; transition:transform 0.25s; color:var(--text-muted); }
-        .nav-group-items {
-            overflow:hidden; max-height:0; transition:max-height 0.3s ease;
-        }
-        .nav-group-items.open { max-height:600px; }
-        .nav-link.nav-sub { padding-left:28px; font-size:0.82em; }
+        /* Menu lateral/topbar: regras únicas em /static/gboc-layout.css (seção 9 — UI Contract) */
     </style>
 </head>
 <body>
@@ -352,7 +322,7 @@ function gbocToggleSidebarCollapse(){
         <div class="header">
             <h1 class="page-title"><i class="fas fa-chart-line"></i> GBOC Analytics <span style="font-size:0.5em;opacity:0.7" id="versionBadge">v14.6.0</span></h1>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                <button class="btn btn-warning" style="background:#f0a940;color:#000" onclick="openAIDiagnosticModal()"><i class="fas fa-brain"></i> IA Diagnóstico</button>
+                <button class="btn btn-warning" onclick="openAIDiagnosticModal()"><i class="fas fa-brain"></i> IA Diagnóstico</button>
                 <button class="btn btn-success" onclick="pushSync()"><i class="fas fa-upload"></i> Push Sync</button>
                 <button class="btn btn-primary" onclick="loadAll()"><i class="fas fa-sync-alt"></i> Atualizar</button>
             </div>
@@ -929,8 +899,24 @@ function gbocToggleSidebarCollapse(){
                     <input type="file" id="import-file" accept=".json" style="display:none" onchange="importSettings(this)">
                     <button class="btn btn-sm" onclick="runCleanup()" title="Limpeza"><i class="fas fa-broom"></i> Manutenção</button>
                     <button class="btn btn-sm" style="color:var(--danger)" onclick="resetAllSettings()" title="Reset"><i class="fas fa-undo"></i> Reset</button>
-                    <button class="btn btn-sm" style="color:#ef4444;border-color:rgba(239,68,68,0.4);background:rgba(239,68,68,0.08);font-weight:600" onclick="typeof gbocConfirmShutdown==='function'?gbocConfirmShutdown('server'):alert('Desligar')" title="Desligar Servidor Central"><i class="fas fa-power-off"></i> Desligar Servidor</button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="typeof gbocConfirmShutdown==='function'?gbocConfirmShutdown('server'):alert('Desligar')" title="Desligar Servidor Central"><i class="fas fa-power-off"></i> Desligar Servidor</button>
                 </div>
+            </div>
+
+            <!-- Pareamento de Agentes (chave Server <-> Agente) -->
+            <div class="panel" id="pairing-panel" style="padding:16px;margin-bottom:20px">
+                <h3 style="font-size:.95em;margin-bottom:8px"><i class="fas fa-key" style="color:var(--warning)"></i> Pareamento de Agentes</h3>
+                <p style="font-size:.85em;color:var(--text-muted);margin:0 0 12px">
+                    Cole esta chave no Agente em <strong>Configurações &gt; Servidor Central &gt; Chave de Pareamento</strong>.
+                    Ela autentica heartbeat, sincronização e os comandos RMM entre Server e Agente (inclusive em máquinas diferentes).
+                </p>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                    <input type="password" id="pairing-key" class="form-control" readonly value="" placeholder="Somente administradores" style="flex:1;min-width:260px;font-family:var(--font-mono, monospace)">
+                    <button class="btn btn-sm" onclick="gbocTogglePairingKey()" title="Mostrar/ocultar"><i class="fas fa-eye"></i> Mostrar</button>
+                    <button class="btn btn-sm" onclick="gbocCopyPairingKey()" title="Copiar"><i class="fas fa-copy"></i> Copiar</button>
+                    <button class="btn btn-sm" style="color:var(--danger)" onclick="gbocRotatePairingKey()" title="Gerar nova chave"><i class="fas fa-rotate"></i> Gerar nova</button>
+                </div>
+                <div id="pairing-status" style="font-size:.8em;color:var(--text-muted);margin-top:8px"></div>
             </div>
 
             <!-- Server Info Cards -->
@@ -982,7 +968,7 @@ function gbocToggleSidebarCollapse(){
                     <div style="text-align:center;color:var(--text-muted);padding:30px">Carregando configurações...</div>
                 </div>
                 <div style="margin-top:20px;display:flex;gap:10px">
-                    <button class="btn btn-sm" style="background:var(--primary);color:#fff" onclick="saveCurrentTab()"><i class="fas fa-save"></i> Salvar Alterações</button>
+                    <button class="btn btn-sm btn-primary" onclick="saveCurrentTab()"><i class="fas fa-save"></i> Salvar Alterações</button>
                     <button class="btn btn-sm" onclick="loadConfig()"><i class="fas fa-undo"></i> Descartar</button>
                     <span id="save-status" style="font-size:.82em;color:var(--success);align-self:center"></span>
                 </div>
@@ -1973,18 +1959,22 @@ function gbocToggleSidebarCollapse(){
         function connectWS(){
             if(_wsReconnectTimer){ clearTimeout(_wsReconnectTimer); _wsReconnectTimer=null; }
             try{
+                // Indicador de conexão: usa o LED do topbar (#wsDot/#wsLabel) ou o legado (#conn-dot)
+                window._gbocSetConn = window._gbocSetConn || function(online){
+                    const dot=document.getElementById('wsDot')||document.getElementById('conn-dot');
+                    const txt=document.getElementById('wsLabel')||document.getElementById('conn-text');
+                    if(dot) dot.style.background = online ? 'var(--success)' : 'var(--danger)';
+                    if(txt){ txt.textContent = online ? 'Online' : 'Desconectado'; txt.style.color = online ? 'var(--success)' : 'var(--danger)'; }
+                };
                 const proto=location.protocol==='https:'?'wss':'ws';
                 ws=new WebSocket(`${proto}://${window.location.host}/ws/dashboard`);
                 ws.onopen=()=>{
                     _wsBackoff=2000;
-                    document.getElementById('conn-dot').className='status-dot status-online';
-                    document.getElementById('conn-text').textContent='Servidor Online';
+                    _gbocSetConn(true);
                 };
                 ws.onmessage=(e)=>{try{const d=JSON.parse(e.data);if(d.type==='update')loadAll();}catch(ex){}};
                 ws.onclose=(ev)=>{
-                    document.getElementById('conn-dot').className='status-dot';
-                    document.getElementById('conn-dot').style.background='var(--danger)';
-                    document.getElementById('conn-text').textContent='Desconectado';
+                    _gbocSetConn(false);
                     // Reconectar com backoff exponencial (máx 30s)
                     _wsBackoff=Math.min(_wsBackoff*1.5,30000);
                     _wsReconnectTimer=setTimeout(()=>{
@@ -2441,6 +2431,7 @@ function gbocToggleSidebarCollapse(){
         }
 
         async function loadConfig(){
+            if (typeof gbocLoadPairingKey === 'function') gbocLoadPairingKey();
             // 1. Server info cards
             try{
                 const r=await fetch(`${API}/server/info`);const d=await r.json();
@@ -3323,7 +3314,7 @@ function gbocToggleSidebarCollapse(){
                 document.getElementById('rw-protected').textContent=d.protected_agents||0;
                 document.getElementById('rw-canaries').textContent=d.total_canaries||0;
                 document.getElementById('rw-compromised').textContent=d.total_compromised||0;
-                document.getElementById('rw-scans').textContent=d.scans_7d||0;
+                document.getElementById('rw-scans').textContent=(d.scans_7d===null||d.scans_7d===undefined)?'—':d.scans_7d;
 
                 // Load local AV protection
                 try {
@@ -4471,6 +4462,7 @@ function gbocToggleSidebarCollapse(){
 
     </script>
     <!-- GBOC Modular JavaScript Modules -->
+    <script src="/modules/agents/agents.js"></script>
     <script src="/modules/rmm/rmm.js"></script>
     <script src="/modules/reports/reports.js"></script>
     <script src="/modules/multitenant/multitenant.js"></script>

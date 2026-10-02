@@ -1,5 +1,5 @@
 """
-GBOC Server 14.6.0
+GBOC Server 14.7.4
 Servidor Central — Real-time Agent Communication + Complete Data Sync + Advanced Analytics
 Banco de dados: PostgreSQL (oficial)
 """
@@ -79,7 +79,7 @@ try:
     from version_control import __version__ as SERVER_VERSION, get_version_info, auto_increment_build
     auto_increment_build()
 except Exception:
-    SERVER_VERSION = "14.7.4"
+    SERVER_VERSION = "14.6.0"
     def get_version_info():
         return {"raw_version": SERVER_VERSION, "semver": SERVER_VERSION}
 
@@ -851,6 +851,11 @@ async def lifespan(app: FastAPI):
             release_db(conn)
         except Exception:
             pass
+    # Pré-carregar informações de versão e assets estáticos para warm-up imediato
+    try:
+        get_version_info()
+    except Exception:
+        pass
     yield
     if connection_pool:
         connection_pool.closeall()
@@ -886,10 +891,61 @@ async def _gboc_timing_middleware(request: Request, call_next):
             except Exception:
                 pass
 
+# Guarda global de autenticação das rotas /api/ (sessão de usuário ou chave de pareamento do agente)
+from modules.users.auth_guard import install as _install_auth_guard
+_install_auth_guard(app, _get_server_user_from_request, _is_server_auth_enabled)
+
 from fastapi.staticfiles import StaticFiles
+# ── Entrega segura de arquivos estáticos ────────────────────────────────────
+# Somente extensões de front-end, sem sair da pasta base (bloqueia path traversal)
+# e sem expor data/, logs/ ou código-fonte (config.py contém credenciais).
+_SERVER_DIR = os.path.dirname(os.path.abspath(__file__))
+_AGENT_STATIC_DIR = os.path.normpath(os.path.join(_SERVER_DIR, "..", "GBOC-Agent", "static"))
+_PUBLIC_ASSET_EXT = {".js", ".css", ".html", ".map", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico",
+                     ".webp", ".woff", ".woff2", ".ttf", ".eot"}
+_BLOCKED_TOP_DIRS = {"data", "logs", "__pycache__", "tests", "backups"}
+
+
+def _safe_asset(base: str, rel: str) -> Optional[str]:
+    rel = (rel or "").replace("\\", "/").lstrip("/")
+    if not rel or rel.split("/", 1)[0].lower() in _BLOCKED_TOP_DIRS:
+        return None
+    base_real = os.path.realpath(base)
+    full = os.path.realpath(os.path.join(base_real, rel))
+    if not full.startswith(base_real + os.sep):
+        return None
+    if os.path.splitext(full)[1].lower() not in _PUBLIC_ASSET_EXT:
+        return None
+    return full if os.path.isfile(full) else None
+
+
+_ASSET_CACHE: Dict[str, Optional[str]] = {}
+
+def _find_asset(rel: str, include_root: bool = True) -> Optional[str]:
+    cache_key = f"{rel}:{include_root}"
+    if cache_key in _ASSET_CACHE:
+        return _ASSET_CACHE[cache_key]
+    for base in ([os.path.join(_SERVER_DIR, "static"), _SERVER_DIR] if include_root
+                 else [os.path.join(_SERVER_DIR, "static")]) + [_AGENT_STATIC_DIR]:
+        found = _safe_asset(base, rel)
+        if found:
+            _ASSET_CACHE[cache_key] = found
+            return found
+    _ASSET_CACHE[cache_key] = None
+    return None
+
+
+class _AssetStaticFiles(StaticFiles):
+    """StaticFiles que entrega apenas extensões de front-end (nunca .py/.json)."""
+    async def get_response(self, path, scope):
+        if os.path.splitext(path)[1].lower() not in _PUBLIC_ASSET_EXT:
+            raise HTTPException(404, "Not Found")
+        return await super().get_response(path, scope)
+
+
 modules_dir = os.path.join(os.path.dirname(__file__), "modules")
 if os.path.exists(modules_dir):
-    app.mount("/modules", StaticFiles(directory=modules_dir), name="modules")
+    app.mount("/modules", _AssetStaticFiles(directory=modules_dir), name="modules")
 
 # Módulos do GBOC Server (Estrito)
 try:
@@ -1026,6 +1082,16 @@ async def shutdown_server(request: Request):
 
 
 
+# Alias para compatibilidade com layout-manager e painéis front-end
+@app.get("/api/v1/jobs/failed", tags=["Server Job Alert Monitor"], include_in_schema=False)
+async def list_failed_jobs_alias(limit: int = 50):
+    """Retorna falhas de jobs do servidor/agente para gboc-layout-manager e UI."""
+    try:
+        from modules.job_alert.job_alert_router import list_failed_jobs
+        return await list_failed_jobs(limit=limit)
+    except Exception:
+        return JSONResponse({"status": "success", "total_failures": 0, "failures": []})
+
 # Rota estatica universal para recursos da pasta /static/
 # Ordem de busca (evita "mistura de origens" acidental):
 #   1. GBOC-Server/static/    <- FONTE CANONICA (sincronizada por tools/sync_css.py)
@@ -1036,16 +1102,10 @@ async def serve_static_asset(filename: str):
     clean_fn = (filename or '').lstrip("/\\")
     if clean_fn.startswith("static/") or clean_fn.startswith("static\\"):
         clean_fn = clean_fn[7:]
-    srv_static = os.path.join(os.path.dirname(__file__), "static", clean_fn)
-    if os.path.isfile(srv_static):
-        return FileResponse(srv_static)
-    srv_file = os.path.join(os.path.dirname(__file__), clean_fn)
-    if os.path.isfile(srv_file):
-        return FileResponse(srv_file)
-    agt_file = os.path.join(os.path.dirname(__file__), "..", "GBOC-Agent", "static", clean_fn)
-    if os.path.isfile(agt_file):
-        return FileResponse(agt_file)
-    raise HTTPException(404, f"Arquivo estático '{filename}' não encontrado.")
+    found = _find_asset(clean_fn)
+    if found:
+        return FileResponse(found, headers={"Cache-Control": "public, max-age=3600"})
+    raise HTTPException(404, "Arquivo estático não encontrado.")
 
 # Rota dinamica universal para arquivos JavaScript (URLs sem prefixo /static/)
 # Segue a MESMA ordem de serve_static_asset() para consistencia.
@@ -1055,16 +1115,10 @@ async def serve_any_js_page(file: str):
     if clean_p.startswith("static/") or clean_p.startswith("static\\"):
         clean_p = clean_p[7:]
     fname = f"{clean_p}.js" if not clean_p.endswith(".js") else clean_p
-    srv_static = os.path.join(os.path.dirname(__file__), "static", fname)
-    if os.path.isfile(srv_static):
-        return FileResponse(srv_static, media_type="application/javascript")
-    srv_file = os.path.join(os.path.dirname(__file__), fname)
-    if os.path.isfile(srv_file):
-        return FileResponse(srv_file, media_type="application/javascript")
-    agt_file = os.path.join(os.path.dirname(__file__), "..", "GBOC-Agent", "static", fname)
-    if os.path.isfile(agt_file):
-        return FileResponse(agt_file, media_type="application/javascript")
-    raise HTTPException(404, f"Script '{fname}' não encontrado.")
+    found = _find_asset(fname)
+    if found:
+        return FileResponse(found, media_type="application/javascript")
+    raise HTTPException(404, "Script não encontrado.")
 
 # Rota dinamica universal para arquivos CSS (URLs sem prefixo /static/: ex: /style.css)
 # Segue a MESMA ordem de serve_static_asset() para consistencia.
@@ -1074,16 +1128,10 @@ async def serve_any_css_page(file: str):
     if clean_p.startswith("static/") or clean_p.startswith("static\\"):
         clean_p = clean_p[7:]
     fname = f"{clean_p}.css" if not clean_p.endswith(".css") else clean_p
-    srv_static = os.path.join(os.path.dirname(__file__), "static", fname)
-    if os.path.isfile(srv_static):
-        return FileResponse(srv_static, media_type="text/css")
-    srv_file = os.path.join(os.path.dirname(__file__), fname)
-    if os.path.isfile(srv_file):
-        return FileResponse(srv_file, media_type="text/css")
-    agt_file = os.path.join(os.path.dirname(__file__), "..", "GBOC-Agent", "static", fname)
-    if os.path.isfile(agt_file):
-        return FileResponse(agt_file, media_type="text/css")
-    raise HTTPException(404, f"Estilo '{fname}' não encontrado.")
+    found = _find_asset(fname)
+    if found:
+        return FileResponse(found, media_type="text/css")
+    raise HTTPException(404, "Estilo não encontrado.")
 
 # Rota dinâmica universal para páginas HTML (resolve erro 404 {"detail":"Not Found"})
 @app.get("/{page_name:path}.html", include_in_schema=False)
@@ -1092,19 +1140,16 @@ async def serve_any_html_page(page_name: str):
     if clean_p.startswith("static/") or clean_p.startswith("static\\"):
         clean_p = clean_p[7:]
     fname = f"{clean_p}.html" if not clean_p.endswith(".html") else clean_p
-    # 1. Procurar em GBOC-Server
-    srv_file = os.path.join(os.path.dirname(__file__), fname)
-    if os.path.isfile(srv_file):
-        return FileResponse(srv_file, media_type="text/html")
-    # 2. Procurar em GBOC-Agent/static
-    agt_file = os.path.join(os.path.dirname(__file__), "..", "GBOC-Agent", "static", fname)
-    if os.path.isfile(agt_file):
-        return FileResponse(agt_file, media_type="text/html")
+    # 1. GBOC-Server  2. GBOC-Agent/static  (sempre contidos na pasta base)
+    for base in (_SERVER_DIR, _AGENT_STATIC_DIR):
+        found = _safe_asset(base, fname)
+        if found:
+            return FileResponse(found, media_type="text/html")
     # 3. Fallback para dashboard.html
-    dash_file = os.path.join(os.path.dirname(__file__), "dashboard.html")
+    dash_file = os.path.join(_SERVER_DIR, "dashboard.html")
     if os.path.isfile(dash_file):
         return FileResponse(dash_file, media_type="text/html")
-    raise HTTPException(404, f"Página '{fname}' não encontrada.")
+    raise HTTPException(404, "Página não encontrada.")
 
 # ===========================
 # AUTH ENDPOINTS
@@ -1351,6 +1396,11 @@ async def handle_realtime_heartbeat(agent_id: str, data: Dict) -> Dict:
 @app.websocket("/ws/agents/{agent_id}")
 async def websocket_endpoint(websocket: WebSocket, agent_id: str):
     """WebSocket para comunicação em tempo real com agentes"""
+    from modules.agents.agent_pairing import request_has_valid_agent_key
+    if not request_has_valid_agent_key(websocket.headers):
+        logger.warning(f"[AUTH] WebSocket do agente {agent_id} rejeitado: chave de pareamento inválida.")
+        await websocket.close(code=4401)
+        return
     await manager.connect(websocket, agent_id)
     try:
         while True:
@@ -1370,6 +1420,9 @@ dashboard_connections = set()
 @app.websocket("/ws/dashboard")
 async def dashboard_websocket(websocket: WebSocket):
     """WebSocket para atualização em tempo real do dashboard"""
+    if _is_server_auth_enabled() and not _get_server_user_from_request(websocket):
+        await websocket.close(code=4401)
+        return
     await websocket.accept()
     dashboard_connections.add(websocket)
     logger.info("Dashboard conectado via WebSocket")

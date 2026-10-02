@@ -15,7 +15,8 @@ import os
 import json
 import subprocess
 import datetime
-from typing import Dict, Any
+import time
+from typing import Dict, Any, Optional
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 VERSION_FILE = os.path.join(BASE_DIR, "data", "version_info.json")
@@ -26,8 +27,21 @@ MINOR = 7
 PATCH = 4
 PRERELEASE = "full-stable"
 
-def _get_git_info() -> Dict[str, str]:
-    """Obtém informações em tempo real do repositório Git."""
+_GIT_INFO_CACHE: Optional[Dict[str, Any]] = None
+_GIT_INFO_CACHE_TIME: float = 0.0
+_GIT_INFO_TTL: float = 60.0  # 60s cache elimina overhead de 300ms de subprocessos git
+
+_BUILD_META_CACHE: Optional[Dict[str, Any]] = None
+_BUILD_META_CACHE_TIME: float = 0.0
+_BUILD_META_TTL: float = 30.0
+
+def _get_git_info() -> Dict[str, Any]:
+    """Obtém informações em tempo real do repositório Git com cache TTL."""
+    global _GIT_INFO_CACHE, _GIT_INFO_CACHE_TIME
+    now = time.time()
+    if _GIT_INFO_CACHE is not None and (now - _GIT_INFO_CACHE_TIME) < _GIT_INFO_TTL:
+        return _GIT_INFO_CACHE
+
     info = {
         "commit": "a8f2e91",
         "commit_count": "1",
@@ -37,33 +51,41 @@ def _get_git_info() -> Dict[str, str]:
     try:
         # Commit curto
         res = subprocess.run(["git", "rev-parse", "--short", "HEAD"],
-                             cwd=BASE_DIR, capture_output=True, text=True, timeout=3)
+                             cwd=BASE_DIR, capture_output=True, text=True, timeout=2)
         if res.returncode == 0 and res.stdout.strip():
             info["commit"] = res.stdout.strip()
         
         # Contagem de commits (revisão)
         res_count = subprocess.run(["git", "rev-list", "--count", "HEAD"],
-                                   cwd=BASE_DIR, capture_output=True, text=True, timeout=3)
+                                   cwd=BASE_DIR, capture_output=True, text=True, timeout=2)
         if res_count.returncode == 0 and res_count.stdout.strip():
             info["commit_count"] = res_count.stdout.strip()
             
         # Branch
         res_branch = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"],
-                                    cwd=BASE_DIR, capture_output=True, text=True, timeout=3)
+                                    cwd=BASE_DIR, capture_output=True, text=True, timeout=2)
         if res_branch.returncode == 0 and res_branch.stdout.strip():
             info["branch"] = res_branch.stdout.strip()
 
         # Status modificado / dirty
         res_status = subprocess.run(["git", "status", "--porcelain"],
-                                    cwd=BASE_DIR, capture_output=True, text=True, timeout=3)
+                                    cwd=BASE_DIR, capture_output=True, text=True, timeout=2)
         if res_status.returncode == 0 and res_status.stdout.strip():
             info["is_dirty"] = True
     except Exception:
         pass
+
+    _GIT_INFO_CACHE = info
+    _GIT_INFO_CACHE_TIME = now
     return info
 
 def _load_or_create_build_meta() -> Dict[str, Any]:
-    """Carrega ou cria o estado persistente do build counter."""
+    """Carrega ou cria o estado persistente do build counter com cache TTL."""
+    global _BUILD_META_CACHE, _BUILD_META_CACHE_TIME
+    now = time.time()
+    if _BUILD_META_CACHE is not None and (now - _BUILD_META_CACHE_TIME) < _BUILD_META_TTL:
+        return _BUILD_META_CACHE
+
     os.makedirs(os.path.dirname(VERSION_FILE), exist_ok=True)
     today_str = datetime.date.today().strftime("%Y-%m-%d")
     
@@ -82,10 +104,13 @@ def _load_or_create_build_meta() -> Dict[str, Any]:
         except Exception:
             pass
             
+    _BUILD_META_CACHE = data
+    _BUILD_META_CACHE_TIME = now
     return data
 
 def auto_increment_build() -> int:
     """Incrementa o build counter persistente a cada nova alteração / inicialização."""
+    global _BUILD_META_CACHE, _BUILD_META_CACHE_TIME
     meta = _load_or_create_build_meta()
     meta["build_number"] = int(meta.get("build_number", 0)) + 1
     meta["last_build_date"] = datetime.date.today().strftime("%Y-%m-%d")
@@ -95,6 +120,8 @@ def auto_increment_build() -> int:
             json.dump(meta, f, indent=2)
     except Exception:
         pass
+    _BUILD_META_CACHE = meta
+    _BUILD_META_CACHE_TIME = time.time()
     return meta["build_number"]
 
 def bump_version(part: str = "patch") -> str:

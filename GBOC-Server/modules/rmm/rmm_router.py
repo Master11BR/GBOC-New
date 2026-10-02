@@ -38,6 +38,49 @@ except Exception:
 logger = logging.getLogger("gboc_rmm_server_module")
 router = APIRouter(prefix="/api/v1/rmm", tags=["Server RMM & Terminal"])
 
+# Perfis com permissão RMM_EXEC (ver modules/users/users_router.py)
+_RMM_EXEC_ROLES = ("admin", "superadmin", "administrator", "operator")
+# Cabeçalhos do navegador que nunca devem ser repassados ao Agente (sessão do Server)
+_STRIP_PROXY_HEADERS = {"host", "content-length", "cookie", "authorization", "x-gboc-agent-key"}
+
+
+def _agent_headers() -> Dict[str, str]:
+    """Chave de pareamento enviada em toda chamada Server -> Agente."""
+    try:
+        from modules.agents.agent_pairing import agent_headers
+        return agent_headers()
+    except Exception:
+        return {}
+
+
+def _require_rmm_exec(request: Request) -> Optional[JSONResponse]:
+    user = getattr(request.state, "user", None) or {}
+    if (user.get("role") or "").lower() not in _RMM_EXEC_ROLES:
+        return JSONResponse({"status": "error", "code": "FORBIDDEN",
+                             "message": "Seu perfil não tem permissão para executar ações RMM (requer admin ou operator)."},
+                            status_code=403)
+    return None
+
+
+def _agent_unreachable(agent_id: str, conn_info: Dict[str, Any], what: str, extra: Optional[Dict] = None,
+                       status_code: int = 503) -> JSONResponse:
+    if not conn_info.get("ip"):
+        msg = f"Agente '{agent_id}' não encontrado ou sem endereço IP registrado (aguarde o heartbeat)."
+        status_code = 404
+    else:
+        msg = f"Agente '{agent_id}' ({conn_info['ip']}:{conn_info.get('port', 9200)}) está OFFLINE ou inacessível. {what}"
+    payload = {"status": "error", "agent_id": agent_id, "message": msg}
+    payload.update(extra or {})
+    return JSONResponse(payload, status_code=status_code)
+
+
+def _agent_urls(conn_info: Dict[str, Any], path: str) -> List[str]:
+    ip = conn_info.get("ip")
+    if not ip:
+        return []
+    port = conn_info.get("port") or 9200
+    return [f"http://{ip}:{port}/{path.lstrip('/')}", f"https://{ip}:{port}/{path.lstrip('/')}"]
+
 
 def _is_local_agent(agent_id: Optional[str]) -> bool:
     if not agent_id:
@@ -51,7 +94,7 @@ def _get_agent_connection_info(agent_id: str) -> Dict[str, Any]:
     if _is_local_agent(agent_id):
         return {"is_local": True}
 
-    ip = "127.0.0.1"
+    ip = None  # sem fallback para 127.0.0.1: Server e Agente podem estar em máquinas diferentes
     port = 9200
     is_ws_connected = False
     status = "unknown"
@@ -81,11 +124,9 @@ def _get_agent_connection_info(agent_id: str) -> Dict[str, Any]:
             if row:
                 if isinstance(row, (tuple, list)):
                     ip = row[0] or ip
-                    port = 9200
                     status = row[1] if len(row) > 1 and row[1] else status
                 else:
                     ip = row.get("ip_address") or ip
-                    port = 9200
                     status = row.get("status") or status
         except Exception as e:
             logger.warning(f"[SERVER RMM] Erro ao consultar DB para agente '{agent_id}': {e}")
@@ -154,6 +195,9 @@ def _run_local_server_command(cmd: str, shell: str = "powershell", cwd: str = No
 @router.post("/terminal/exec")
 async def rmm_execute_command(request: Request):
     """Encaminha comandos para execucao no Agente remoto ou executa localmente no Servidor."""
+    denied = _require_rmm_exec(request)
+    if denied:
+        return denied
     try:
         body = await request.json()
         agent_id = body.get("agent_id") or body.get("agent")
@@ -173,19 +217,19 @@ async def rmm_execute_command(request: Request):
 
         # 2. Se for agente remoto
         conn_info = _get_agent_connection_info(agent_id)
-        agent_ip = conn_info.get("ip", "127.0.0.1")
+        agent_ip = conn_info.get("ip")
         agent_port = conn_info.get("port", 9200)
+        if not agent_ip:
+            return _agent_unreachable(agent_id, conn_info, "")
 
-        urls_to_try = [
-            f"http://{agent_ip}:{agent_port}/api/v1/rmm/execute",
-            f"https://{agent_ip}:{agent_port}/api/v1/rmm/execute",
-            f"http://127.0.0.1:{agent_port}/api/v1/rmm/execute"
-        ]
-
-        for target_url in urls_to_try:
+        for target_url in _agent_urls(conn_info, "api/v1/rmm/execute"):
             try:
                 async with httpx.AsyncClient(timeout=float(timeout + 5), verify=False) as client:
-                    resp = await client.post(target_url, json=body)
+                    resp = await client.post(target_url, json=body, headers=_agent_headers())
+                    if resp.status_code == 401:
+                        return JSONResponse({"status": "error", "agent_id": agent_id, "code": "AGENT_KEY_REJECTED",
+                                             "message": "O Agente recusou a chave de pareamento. Configure a chave do Server no Agente."},
+                                            status_code=502)
                     if resp.status_code == 200:
                         res_data = resp.json()
                         res_data["execution_type"] = f"remote_agent_{agent_id}"
@@ -217,21 +261,15 @@ async def rmm_get_processes(agent_id: Optional[str] = None):
     """Retorna lista de processos ativos (do Agente remoto ou do Servidor local)."""
     if not _is_local_agent(agent_id):
         conn_info = _get_agent_connection_info(agent_id)
-        agent_ip = conn_info.get("ip", "127.0.0.1")
-        agent_port = conn_info.get("port", 9200)
-        urls_to_try = [
-            f"http://{agent_ip}:{agent_port}/api/v1/rmm/processes",
-            f"https://{agent_ip}:{agent_port}/api/v1/rmm/processes"
-        ]
-        for url in urls_to_try:
+        for url in _agent_urls(conn_info, "api/v1/rmm/processes"):
             try:
                 async with httpx.AsyncClient(timeout=6.0, verify=False) as client:
-                    resp = await client.get(url)
+                    resp = await client.get(url, headers=_agent_headers())
                     if resp.status_code == 200:
                         return JSONResponse(resp.json())
             except Exception:
                 pass
-        return JSONResponse({"status": "error", "message": f"Agente '{agent_id}' esta OFFLINE. Impossivel listar processos.", "processes": []}, status_code=503)
+        return _agent_unreachable(agent_id, conn_info, "Impossível listar processos.", {"processes": []})
 
     # Processos locais do Servidor Central
     procs = []
@@ -255,6 +293,9 @@ async def rmm_get_processes(agent_id: Optional[str] = None):
 @router.post("/process/kill")
 async def rmm_kill_process(request: Request):
     """Encerra um processo pelo PID."""
+    denied = _require_rmm_exec(request)
+    if denied:
+        return denied
     try:
         body = await request.json()
         agent_id = body.get("agent_id")
@@ -262,21 +303,15 @@ async def rmm_kill_process(request: Request):
 
         if not _is_local_agent(agent_id):
             conn_info = _get_agent_connection_info(agent_id)
-            agent_ip = conn_info.get("ip", "127.0.0.1")
-            agent_port = conn_info.get("port", 9200)
-            urls_to_try = [
-                f"http://{agent_ip}:{agent_port}/api/v1/rmm/process/kill",
-                f"https://{agent_ip}:{agent_port}/api/v1/rmm/process/kill"
-            ]
-            for url in urls_to_try:
+            for url in _agent_urls(conn_info, "api/v1/rmm/process/kill"):
                 try:
                     async with httpx.AsyncClient(timeout=6.0, verify=False) as client:
-                        resp = await client.post(url, json=body)
+                        resp = await client.post(url, json=body, headers=_agent_headers())
                         if resp.status_code == 200:
                             return JSONResponse(resp.json())
                 except Exception:
                     pass
-            return JSONResponse({"status": "error", "message": f"Agente '{agent_id}' esta OFFLINE. Nao foi possivel encerrar o processo PID {pid}."}, status_code=503)
+            return _agent_unreachable(agent_id, conn_info, f"Não foi possível encerrar o processo PID {pid}.")
 
         # Local Kill no Servidor
         if PSUTIL_AVAILABLE and pid > 0:
@@ -301,21 +336,15 @@ async def rmm_get_services(agent_id: Optional[str] = None):
     """Retorna lista de servicos."""
     if not _is_local_agent(agent_id):
         conn_info = _get_agent_connection_info(agent_id)
-        agent_ip = conn_info.get("ip", "127.0.0.1")
-        agent_port = conn_info.get("port", 9200)
-        urls_to_try = [
-            f"http://{agent_ip}:{agent_port}/api/v1/rmm/services",
-            f"https://{agent_ip}:{agent_port}/api/v1/rmm/services"
-        ]
-        for url in urls_to_try:
+        for url in _agent_urls(conn_info, "api/v1/rmm/services"):
             try:
                 async with httpx.AsyncClient(timeout=6.0, verify=False) as client:
-                    resp = await client.get(url)
+                    resp = await client.get(url, headers=_agent_headers())
                     if resp.status_code == 200:
                         return JSONResponse(resp.json())
             except Exception:
                 pass
-        return JSONResponse({"status": "error", "message": f"Agente '{agent_id}' esta OFFLINE. Impossivel listar servicos.", "services": []}, status_code=503)
+        return _agent_unreachable(agent_id, conn_info, "Impossível listar serviços.", {"services": []})
 
     services = []
     if os.name == 'nt' and PSUTIL_AVAILABLE:
@@ -342,43 +371,41 @@ async def rmm_get_mirror(agent_id: Optional[str] = None):
     """Retorna o Espelho Remoto Completo do Agente ou Servidor."""
     if not _is_local_agent(agent_id):
         conn_info = _get_agent_connection_info(agent_id)
-        agent_ip = conn_info.get("ip", "127.0.0.1")
-        agent_port = conn_info.get("port", 9200)
-        urls_to_try = [
-            f"http://{agent_ip}:{agent_port}/api/v1/rmm/mirror",
-            f"https://{agent_ip}:{agent_port}/api/v1/rmm/mirror"
-        ]
-        for url in urls_to_try:
+        for url in _agent_urls(conn_info, "api/v1/rmm/mirror"):
             try:
                 async with httpx.AsyncClient(timeout=6.0, verify=False) as client:
-                    resp = await client.get(url)
+                    resp = await client.get(url, headers=_agent_headers())
                     if resp.status_code == 200:
                         return JSONResponse(resp.json())
             except Exception as proxy_err:
                 logger.warning(f"[SERVER RMM] Espelho do agente {agent_id} inacessivel ({url}): {proxy_err}")
-        return JSONResponse({"status": "error", "message": f"Agente '{agent_id}' esta OFFLINE."}, status_code=503)
+        return _agent_unreachable(agent_id, conn_info, "")
 
     # Mirror Snapshot do Servidor Central
     hostname = socket.gethostname()
     os_info = f"{platform.system()} {platform.release()} ({platform.architecture()[0]})"
-    cpu = psutil.cpu_percent(interval=0.2) if PSUTIL_AVAILABLE else 5.0
+    cpu = psutil.cpu_percent(interval=0.2) if PSUTIL_AVAILABLE else None
     mem = psutil.virtual_memory() if PSUTIL_AVAILABLE else None
+    try:
+        host_ip = socket.gethostbyname(hostname)
+    except Exception:
+        host_ip = None
 
     return JSONResponse({
         "status": "success",
         "mirror": {
             "agent_id": agent_id or "servidor-central",
             "hostname": hostname,
-            "ip_address": socket.gethostbyname(hostname),
+            "ip_address": host_ip,
             "version": f"GBOC Server {SERVER_VERSION} Enterprise",
             "system_telemetry": {
                 "hostname": hostname,
                 "os_info": os_info,
                 "cpu_percent": cpu,
                 "memory": {
-                    "total_gb": round(mem.total / (1024**3), 2) if mem else 8.0,
-                    "used_gb": round(mem.used / (1024**3), 2) if mem else 3.2,
-                    "percent": mem.percent if mem else 40.0
+                    "total_gb": round(mem.total / (1024**3), 2) if mem else None,
+                    "used_gb": round(mem.used / (1024**3), 2) if mem else None,
+                    "percent": mem.percent if mem else None
                 }
             },
             "mirror_timestamp": datetime.now().isoformat()
@@ -392,33 +419,35 @@ async def rmm_get_mirror(agent_id: Optional[str] = None):
 async def rmm_proxy_agent(agent_id: str, subpath: str, request: Request):
     """Proxy HTTP/REST para redirecionar chamadas RMM diretamente ao Agente."""
     body = await request.body()
-    
+    if request.method != "GET":
+        denied = _require_rmm_exec(request)
+        if denied:
+            return denied
+
     if not _is_local_agent(agent_id):
         conn_info = _get_agent_connection_info(agent_id)
-        agent_ip = conn_info.get("ip", "127.0.0.1")
-        agent_port = conn_info.get("port", 9200)
         clean_subpath = subpath if subpath.startswith("api/") else f"api/v1/{subpath.lstrip('/')}"
-        
-        urls_to_try = [
-            f"http://{agent_ip}:{agent_port}/{clean_subpath}",
-            f"https://{agent_ip}:{agent_port}/{clean_subpath}"
-        ]
+        fwd_headers = {k: v for k, v in request.headers.items() if k.lower() not in _STRIP_PROXY_HEADERS}
+        fwd_headers.update(_agent_headers())
 
-        for target_url in urls_to_try:
+        for target_url in _agent_urls(conn_info, clean_subpath):
             try:
                 async with httpx.AsyncClient(timeout=15.0, verify=False) as client:
                     resp = await client.request(
                         method=request.method,
                         url=target_url,
-                        headers={k: v for k, v in request.headers.items() if k.lower() not in ("host", "content-length")},
+                        params=dict(request.query_params),
+                        headers=fwd_headers,
                         content=body
                     )
-                    if resp.status_code < 400:
-                        return Response(content=resp.content, status_code=resp.status_code, headers=dict(resp.headers))
+                    if resp.status_code < 500:
+                        hop = {"content-length", "content-encoding", "transfer-encoding", "connection", "set-cookie"}
+                        return Response(content=resp.content, status_code=resp.status_code,
+                                        headers={k: v for k, v in resp.headers.items() if k.lower() not in hop})
             except Exception as e:
                 logger.warning(f"[SERVER RMM] Falha proxy para agente {agent_id} ({target_url}): {e}")
 
-        return JSONResponse({"status": "error", "message": f"Agente '{agent_id}' esta OFFLINE ou inacessivel."}, status_code=502)
+        return _agent_unreachable(agent_id, conn_info, "", status_code=502)
 
     # Execucao local no Servidor Central
     if "command" in subpath or "execute" in subpath:
@@ -437,6 +466,7 @@ async def rmm_proxy_agent(agent_id: str, subpath: str, request: Request):
         return await rmm_get_processes(agent_id="servidor-central")
 
     elif "isolation" in subpath:
-        return JSONResponse({"status": "success", "message": f"Isolamento de Rede solicitado para {agent_id}."})
+        return JSONResponse({"status": "unavailable", "message": "Isolamento de rede não é executado no host do Servidor Central; selecione um agente."},
+                            status_code=501)
 
     return JSONResponse({"status": "error", "message": f"Agente '{agent_id}' offline ou inacessivel."}, status_code=502)

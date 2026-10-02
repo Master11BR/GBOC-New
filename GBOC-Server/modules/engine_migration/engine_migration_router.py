@@ -38,39 +38,40 @@ async def server_discover_migration_engines(agent_id: str = "local"):
                                     discovered_tasks.append({
                                         "id": t.get("id"),
                                         "name": t.get("name", "Tarefa de Backup"),
-                                        "source_paths": t.get("source_paths") or t.get("paths") or ["C:\\Data"],
+                                        "source_paths": t.get("source_paths") or t.get("paths") or [],
                                         "current_engine": eng,
-                                        "schedule": t.get("schedule", "0 2 * * *"),
+                                        "schedule": t.get("schedule"),
                                         "can_migrate": eng != "gboc_native_v4"
                                     })
                     except Exception:
                         pass
 
+                # Zero-Mock: somente o que foi realmente encontrado no host do Server.
                 return JSONResponse({
                     "status": "success",
                     "agent_id": "local",
                     "summary": {
                         "total_tasks_found": len(discovered_tasks),
-                        "total_repositories_found": 2,
-                        "total_credentials_found": 1
+                        "total_repositories_found": 0,
+                        "total_credentials_found": 0
                     },
                     "tasks": discovered_tasks,
-                    "repositories": [
-                        {"id": "repo_s3_legacy", "name": "Repositório S3 Legacy (Restic)", "engine_type": "Restic CLI", "target_path": "s3.amazonaws.com/backup-bucket"},
-                        {"id": "repo_local_legacy", "name": "Repositório Local D:\\Backups", "engine_type": "Duplicati Engine", "target_path": "D:\\Backups"}
-                    ],
-                    "credentials": [
-                        {"target": "AWS S3 Master Key", "engine": "Restic S3", "key_alias": "AWS_ACCESS_KEY_ID"}
-                    ]
+                    "repositories": [],
+                    "credentials": []
                 })
             else:
-                # Consulta remota no agente MSP via HTTP Proxy
-                agent_url = f"http://{agent_id}:9200/api/v1/migrator/discover"
-                res = requests.get(agent_url, timeout=10)
+                # Consulta remota no agente (IP real do heartbeat + chave de pareamento)
+                from modules.agents.agent_pairing import resolve_agent_address, agent_headers
+                addr = resolve_agent_address(agent_id)
+                if not addr:
+                    raise HTTPException(status_code=404, detail=f"Agente '{agent_id}' não encontrado ou sem IP registrado")
+                agent_url = f"http://{addr['ip']}:{addr['port']}/api/v1/migrator/discover"
+                res = requests.get(agent_url, timeout=10, headers=agent_headers())
                 if res.status_code == 200:
                     return JSONResponse(res.json())
-                else:
-                    raise HTTPException(status_code=res.status_code, detail=f"Falha ao consultar agente {agent_id}")
+                raise HTTPException(status_code=502, detail=f"Agente {agent_id} respondeu HTTP {res.status_code}")
+        except HTTPException:
+            raise
         except Exception as e:
             telemetry.capture_exception(e, {"module": "engine_migration", "action": "discover"})
             logger.error(f"❌ Erro na descoberta de migração: {e}", exc_info=True)

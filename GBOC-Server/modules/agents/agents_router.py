@@ -96,3 +96,53 @@ async def get_agents_list(request: Request):
         return JSONResponse({"status": "success", "agents": []})
     finally:
         if conn: release_db(conn)
+
+
+# ── Chave de Pareamento Server <-> Agente ─────────────────────────────────────
+_ADMIN_ROLES = ("admin", "superadmin", "administrator")
+
+
+def _require_admin(request: Request) -> Dict[str, Any]:
+    u = _get_current_user_from_req(request)
+    if not u:
+        raise HTTPException(401, "Autenticação necessária")
+    if (u.get("role") or "").lower() not in _ADMIN_ROLES:
+        raise HTTPException(403, "Apenas administradores podem gerenciar a chave de pareamento")
+    return u
+
+
+@router.get("/pairing/check")
+async def pairing_check(request: Request):
+    """Usado pelo Agente para validar URL + chave (o guarda global já validou a chave)."""
+    from modules.agents.agent_pairing import request_has_valid_agent_key
+    return {"status": "success", "paired": request_has_valid_agent_key(request.headers)}
+
+
+@router.get("/pairing")
+async def pairing_get(request: Request):
+    """Exibe a chave de pareamento para configurar novos agentes (somente admin)."""
+    _require_admin(request)
+    from modules.agents.agent_pairing import get_pairing_key, AGENT_KEY_HEADER
+    import os as _os
+    key = get_pairing_key()
+    if not key:
+        raise HTTPException(503, "Banco de dados indisponível para ler a chave de pareamento")
+    return {
+        "status": "success",
+        "pairing_key": key,
+        "header": AGENT_KEY_HEADER,
+        "managed_by_env": bool((_os.getenv("GBOC_AGENT_PAIRING_KEY") or "").strip()),
+    }
+
+
+@router.post("/pairing/rotate")
+async def pairing_rotate(request: Request):
+    """Gera nova chave de pareamento. Agentes com a chave antiga deixam de sincronizar."""
+    u = _require_admin(request)
+    from modules.agents.agent_pairing import rotate_pairing_key
+    try:
+        key = rotate_pairing_key()
+    except RuntimeError as exc:
+        raise HTTPException(409, str(exc))
+    logger.warning(f"[PAIRING] Chave rotacionada por {u.get('username')}")
+    return {"status": "success", "pairing_key": key}
