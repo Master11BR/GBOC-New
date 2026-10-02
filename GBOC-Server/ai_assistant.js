@@ -1,4 +1,4 @@
-/* GBOC 14.7.3 Enterprise Edition — GBOC Copilot AI (widget flutuante compartilhado Server/Agent)
+/* GBOC 14.7.4 Enterprise Edition — GBOC Copilot AI (widget flutuante compartilhado Server/Agent)
  * Arquivo idêntico em GBOC-Server/ai_assistant.js e GBOC-Agent/static/ai_assistant.js.
  * - Autenticação: envia o token da sessão (Bearer) — Server: gboc_server_token / Agent: gboc_token.
  * - Segurança: todo conteúdo dinâmico é inserido via textContent / HTML escapado (sem XSS).

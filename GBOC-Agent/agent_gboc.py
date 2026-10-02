@@ -67,7 +67,7 @@ try:
     from version_control import __version__ as AGENT_VERSION, get_version_info, auto_increment_build
     auto_increment_build()
 except Exception:
-    AGENT_VERSION = "14.6.0"
+    AGENT_VERSION = "14.7.4"
     def get_version_info():
         return {"raw_version": AGENT_VERSION, "semver": AGENT_VERSION}
 

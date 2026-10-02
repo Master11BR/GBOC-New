@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v14.7.3 Enterprise Edition
+# GBOC System v14.7.4 Enterprise Edition
 # Module: Server AI Copilot Assistant Router (API v2 - Server)
 # ==============================================================================
 

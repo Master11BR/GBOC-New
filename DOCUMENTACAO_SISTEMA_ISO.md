@@ -1,17 +1,17 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.7.3 Enterprise Edition. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.7.4 Enterprise Edition. Todos os direitos reservados. -->
 
-# 🏆 GBOC System v14.7.3 Full Stable Enterprise — Relatório de Auditoria e Documentação Técnica no Padrão ISO (ISO/IEC 25010, ISO/IEC 12207, ISO 22301 & ISO 27001)
+# 🏆 GBOC System v14.7.4 Full Stable Enterprise — Relatório de Auditoria e Documentação Técnica no Padrão ISO (ISO/IEC 25010, ISO/IEC 12207, ISO 22301 & ISO 27001)
 
 **Documento Oficial de Engenharia de Software e Garantia de Qualidade**  
 **Organização**: GBOC Enterprise Operations Center  
-**Versão do Sistema**: 14.7.3 Full Stable Enterprise Edition  
+**Versão do Sistema**: 14.7.4 Full Stable Enterprise Edition  
 **Padrões de Referência**: ISO/IEC 25010:2011 (System and Software Quality Models), ISO/IEC 12207:2017 (Software Life Cycle Processes), ISO 22301 (Business Continuity Management) e ISO/IEC 27001 (Information Security Management).
 
 ---
 
 ## 📌 Sumário Executivo
 
-Este documento apresenta a especificação técnica formal e a avaliação de conformidade do **GBOC System (v14.7.3 Enterprise)** em relação aos padrões internacionais de qualidade de software, engenharia de processos, continuidade de negócios (DR) e segurança da informação, assegurando aderência estrita às diretrizes de governança (`.agents/AGENTS.md` e `ARCHITECTURE_POLICIES.md`).
+Este documento apresenta a especificação técnica formal e a avaliação de conformidade do **GBOC System (v14.7.4 Enterprise)** em relação aos padrões internacionais de qualidade de software, engenharia de processos, continuidade de negócios (DR) e segurança da informação, assegurando aderência estrita às diretrizes de governança (`.agents/AGENTS.md` e `ARCHITECTURE_POLICIES.md`).
 
 ---
 
@@ -129,5 +129,24 @@ A norma **ISO/IEC 25010** especifica 8 características de qualidade de software
 - **ISO/IEC 25010 — Confiabilidade & Precisão Preditiva (Zero-Mock Strict)**:
   - Integração de telemetria em tempo real no coletor operacional `_build_server_system_context() -> Tuple[str, int]`.
   - Garantia de fidedignidade analítica: reporte semafórico `🔴` para incidentes comprovados e `🟢` estritamente sob conformidade auditada no período.
+
+### 2.5. Auditoria Integral das Funções de IA, Zero-Mock Strict & Camada Unificada Multi-Provedores (Release 14.7.4)
+- **ISO/IEC 25010 — Adequação Funcional e Integridade de Dados (Zero-Mock Strict Policy §11)**:
+  - Eliminação de dados sintéticos e frases de conformidade fabricadas: Copilot Server lê o estado operacional real via PostgreSQL (`agents`, `agent_task_executions`); Copilot Agent consome telemetria real do banco local SQLite e Ransomware Guardian.
+  - O endpoint `/diagnose` coleta telemetria real via `psutil` (CPU, RAM, Disco) em vez de percentuais estáticos.
+  - Endpoints de correção autônoma (`/auto_fix` e `/api/v2/system/auto-heal`) retornam código HTTP 501 com guia de remediação manual auditável, eliminando falsos positivos de "sucesso".
+  - O utilitário `ai-repair` do Agente executa ações reais de manutenção (limpeza de diretório temporário, `VACUUM`/`ANALYZE`, expurgo de processos órfãos) e reporta status atômico por etapa, sem adulterar o histórico de tarefas falhadas.
+  - Reescrita do módulo analítico preditivo REP-F6 (*AI Predictive Suite*) através de `ai_predictive.py` compartilhado, empregando regressão linear com cálculo de R², detecção de anomalias por Z-Score e monitoramento de canários reais.
+- **ISO/IEC 27001 & OWASP API Security — Blindagem de Autenticação e Sanitização**:
+  - Fechamento de superfícies não autenticadas no Agente (`/api/ai/*` e `/api/v1/ai/*`); o endpoint de leitura de configuração de IA exige sessão e máscara chaves secretas contra vazamento em texto puro.
+  - Middleware de autenticação do Agente configurado com política *fail-closed*.
+  - Sanitização obrigatória de entradas em `innerHTML` no widget Copilot contra ataques de Cross-Site Scripting (XSS).
+  - Validação estrita de esquemas URI em endpoints de LLM local (somente `http`/`https` permitidos).
+- **ISO/IEC 12207 — Arquitetura de Provedores Modernos & Paridade Simétrica**:
+  - Implementação da camada única `ai_providers.py` idêntica no Server e no Agent, abrangendo 10 provedores com isolamento de credenciais e parâmetros atuais de mercado: Ollama (`/api/chat`), OpenAI (`gpt-4o`), Groq (`openai/gpt-oss-120b`), Google Gemini (`gemini-flash-latest`), Anthropic Claude (`claude-sonnet-5-5`), DeepSeek (`deepseek-flash`), xAI Grok (`grok-4.7`), Moonshot Kimi (`kimi-k2.6`), Mistral e Cohere v2.
+  - Ajuste de timeouts para 180s (inferência local Ollama) e 60s (provedores cloud).
+  - Cobertura de testes unitários automatizados (`tests/test_ai_providers.py`) com 28 casos de teste validados com sucesso.
+- **ISO/IEC 12207 — Empacotamento de Distribuição e Integridade do Instalador**:
+  - Sincronização e verificação de integridade dos componentes de release (`make_distribution.py`, `Setup.bat`, `Setup.ps1`, `package_manifest.json`) para a versão oficial 14.7.4.
 
 

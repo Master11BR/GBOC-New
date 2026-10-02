@@ -1,8 +1,8 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.7.3 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.7.4 Enterprise. Todos os direitos reservados. -->
 
-# 📘 GBOC System v14.7.3 — Guia Master de Configurações, Parâmetros e Controle de IA
+# 📘 GBOC System v14.7.4 — Guia Master de Configurações, Parâmetros e Controle de IA
 
-[![GBOC Version](https://img.shields.io/badge/GBOC%20Version-14.7.3-blue.svg)](file:///d:/GBOC-New/GBOC-New/README.md)
+[![GBOC Version](https://img.shields.io/badge/GBOC%20Version-14.7.4-blue.svg)](file:///d:/GBOC-New/GBOC-New/README.md)
 [![UI Model](https://img.shields.io/badge/UI__MODEL-modern%20(Official)-indigo.svg)]()
 [![Status](https://img.shields.io/badge/status-active-brightgreen.svg)]()
 
@@ -65,11 +65,18 @@ RATE_LIMIT_WINDOW=60
 DEAD_LETTER_QUEUE_ENABLED=true
 DLQ_FILE="data/dead_letter_queue.jsonl"
 
-# Engine de IA (Local & Nuvem)
-AI_PROVIDER="auto"                                   # Opções: 'auto', 'local', 'openai', 'anthropic', 'gemini', 'deepseek'
-LOCAL_LLM_URL="http://localhost:11434/api/generate" # Ollama / LocalAI
+# Engine de IA (Local & Nuvem — Camada Unificada ai_providers.py)
+AI_PROVIDER="auto"                                   # Opções: 'auto', 'ollama', 'openai', 'groq', 'gemini', 'claude', 'deepseek', 'grok', 'kimi', 'mistral', 'cohere'
+OLLAMA_URL="http://localhost:11434"                 # Endpoint raiz Ollama (/api/chat)
 OPENAI_API_KEY=""                                    # Opcional (sk-...)
+GROQ_API_KEY=""                                      # Opcional (gsk_...)
+GEMINI_API_KEY=""                                    # Opcional (AIzaSy...)
 ANTHROPIC_API_KEY=""                                 # Opcional (sk-ant-...)
+DEEPSEEK_API_KEY=""                                  # Opcional (sk-...)
+GROK_API_KEY=""                                      # Opcional (xai-...)
+KIMI_API_KEY=""                                      # Opcional (sk-...)
+MISTRAL_API_KEY=""                                   # Opcional
+COHERE_API_KEY=""                                    # Opcional
 AI_DIAGNOSTIC_FREQ=30                                # Minutos
 AI_AUTO_REMEDIATION=true
 AI_THREAT_SENSITIVITY="HIGH"
@@ -105,14 +112,22 @@ AGENT_AI_AUTO_HEALING=true
 
 ## 3. 🤖 Configuração da Engine de Inteligência Artificial (Local & Nuvem)
 
-A Engine de IA do GBOC (`ai_diagnostic.py`) oferece análise preditiva de integridade, diagnósticos de causa raiz e sugestões executivas.
+A Engine de IA do GBOC opera sob a camada unificada e simétrica `ai_providers.py` compartilhada entre Server e Agent, suportando 10 provedores com isolamento estrito de chaves/modelos, timeouts realistas e política Zero-Mock estrita:
 
 | Parâmetro | Valor Padrão | Descrição / Opções |
 | :--- | :--- | :--- |
-| `AI_PROVIDER` | `auto` | `local` (apenas LLM local), `openai` (nuvem OpenAI), `anthropic` (nuvem Anthropic), `auto` (prioriza nuvem, fallback local/heurístico). |
-| `LOCAL_LLM_URL` | `http://localhost:11434/api/generate` | Endpoint REST para LLMs locais executando via Ollama ou LocalAI. |
-| `OPENAI_API_KEY` | `""` | Chave de API para integração com GPT-4o / GPT-4o-mini. |
-| `AI_AUTO_REMEDIATION` | `true` | Habilita autorrecuperação autônoma orientada por IA para serviços e tarefas estagnadas. |
+| `AI_PROVIDER` | `auto` | `auto` (prioriza provedor em nuvem configurado com chave válida; fallback para Ollama Local), `ollama` (on-premises), `openai`, `groq`, `gemini`, `claude`, `deepseek`, `grok`, `kimi`, `mistral`, `cohere`. |
+| `OLLAMA_URL` | `http://localhost:11434` | Endpoint base do Ollama (utiliza API nativa `/api/chat` com streaming estruturado). Timeout de 180s para inferências locais. |
+| `OPENAI_API_KEY` | `""` | Chave de API para OpenAI (`gpt-4o`, `gpt-4o-mini`). |
+| `GROQ_API_KEY` | `""` | Chave de API para Groq Cloud (`openai/gpt-oss-120b`). |
+| `GEMINI_API_KEY` | `""` | Chave Google Gemini (`gemini-flash-latest`, header `x-goog-api-key`). |
+| `ANTHROPIC_API_KEY` | `""` | Chave Anthropic Claude (`claude-sonnet-5-5`). |
+| `DEEPSEEK_API_KEY` | `""` | Chave DeepSeek (`deepseek-flash`, endpoint oficial compatível). |
+| `GROK_API_KEY` | `""` | Chave xAI Grok (`grok-4.7`). |
+| `KIMI_API_KEY` | `""` | Chave Moonshot Kimi (`kimi-k2.6`). |
+| `MISTRAL_API_KEY` | `""` | Chave Mistral AI (`mistral-large-latest`). |
+| `COHERE_API_KEY` | `""` | Chave Cohere API v2 (`command-a-plus-05-2026`). |
+| `AI_AUTO_REMEDIATION` | `true` | Habilita rotinas de manutenção autônoma reais (limpeza, reparo de catálogos SQLite) retornando 501 com guia manual se a ação exigir intervenção humana. |
 | `AI_THREAT_SENSITIVITY` | `HIGH` | Sensibilidade de análise do Ransomware Shield (`LOW`, `MEDIUM`, `HIGH`, `MAX`). |
 
 ---
@@ -199,4 +214,4 @@ cd d:\GBOC-New\GBOC-New\GBOC-Server
 
 ---
 
-**GBOC System v14.7.3** — Guia Oficial de Parâmetros e Configuração.
+**GBOC System v14.7.4** — Guia Oficial de Parâmetros e Configuração.

@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v14.6.0 Enterprise Edition
+# GBOC System v14.7.4 Enterprise Edition
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # Propriedade Intelectual & Direitos Autorais Registrados.
 # ==============================================================================
@@ -49,7 +49,7 @@ def create_unified_requirements(server_req_path: Path, agent_req_path: Path, out
                         
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as f:
-        f.write("# GBOC System v14.6.0 - Dependencias Consolidadas (Server + Agent)\n")
+        f.write("# GBOC System v14.7.4 - Dependencias Consolidadas (Server + Agent)\n")
         for dep in sorted(dependencies):
             f.write(f"{dep}\n")
     print(f"  [OK] Dependencias consolidadas criadas em: {output_path}")
@@ -79,9 +79,9 @@ def get_current_version(source_root: Path) -> str:
             return f"v{version_control.__version__} Full Stable Enterprise"
         except Exception:
             pass
-    return "v14.7.3 Full Stable Enterprise"
+    return "v14.7.4 Full Stable Enterprise"
 
-def generate_manifest(output_dir: Path, version: str = "v14.7.3 Full Stable Enterprise"):
+def generate_manifest(output_dir: Path, version: str = "v14.7.4 Full Stable Enterprise"):
     """Gera um arquivo de manifesto com metadados do pacote gerado."""
     manifest = {
         "system": "GBOC System",

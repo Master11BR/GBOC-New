@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v14.7.3 Enterprise Edition
+# GBOC System v14.7.4 Enterprise Edition
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================
 """
@@ -175,7 +175,8 @@ def build_predictive_suite(executions: list[dict[str, Any]], disks: list[dict[st
     operational = [m for m in models if m["status"] != "UNAVAILABLE"]
 
     score: int | None = None
-    if operational:
+    # O score só é calculado quando há dados de execução/capacidade (o modelo de ransomware sozinho não basta)
+    if any(m["status"] != "UNAVAILABLE" for m in (cap, ano, win)):
         score = 100
         if ano.get("anomalies"):
             score -= min(30, 10 * ano["anomalies"])

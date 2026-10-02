@@ -1,4 +1,4 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.7.3 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.7.4 Enterprise. Todos os direitos reservados. -->
 
 # GBOC — Changelog de Atualizações
 
@@ -6,7 +6,7 @@
 
 ---
 
-## 14.7.4 — 2026-10-01 (Auditoria das Funções de IA: Zero-Mock, Segurança e Provedores Atuais) — pendente de build
+## 14.7.4 — 2026-10-01 (Auditoria das Funções de IA: Zero-Mock, Segurança, Provedores Atuais e Empacotamento de Distribuição)
 
 ### 🤖 Camada única de provedores de IA (Server + Agent)
 - Novo `ai_providers.py` idêntico em `GBOC-Server/modules/ai_assistant/` e `GBOC-Agent/engines/`: Ollama (`/api/chat`), OpenAI, Groq, Gemini (header `x-goog-api-key` + `systemInstruction`), Claude (campo `system`), DeepSeek, Grok, Kimi, Mistral e Cohere v2.
@@ -38,6 +38,14 @@
 - Rotas de IA de diagnóstico do Agent movidas de `agent_gboc.py` para `api/diagnostics.py` (entrypoint mais enxuto).
 - Removidas rotas de `agent_gboc.py` que importavam módulos vazios (`core/cbt_vss.py`, `core/agent_dr_sync.py`) e **sobrepunham** as rotas reais de `modules/cbt` e `modules/dr` (botão "Exportar Runbook" de DR sempre falhava).
 - Novos testes: `tests/test_ai_providers.py` (28 testes).
+
+### 📦 Empacotamento, Instalador e Documentação (v14.7.4)
+- Instalador unificado (`Setup.bat` e `Setup.ps1` em `tools/installer_assets/`) atualizado para GBOC System v14.7.4 Enterprise.
+- Sincronização e geração de requisitos unificados em `tools/make_distribution.py` com manifesto oficial `package_manifest.json` (v14.7.4).
+- Execução e validação do script `build_installer_package.ps1` gerando o pacote consolidado em `GBOC-Distribution`.
+- Atualização dos guias normativos e técnicos: `DOCUMENTACAO_SISTEMA_ISO.md` (Seção 2.5), `SYSTEM_CONFIG_GUIDE.md`, `README.md`, `INSTALADORES_README.md`, `PROJECT_CONTEXT.md` e `arch_contract.json`.
+- Atualização dos módulos centrais de controle de versão (`version_control.py`, `version.py`, `server_gboc.py`, `agent_gboc.py`) e incremento de build.
+- Suíte de testes automatizados com validação estrita de paridade Server/Agent (`tests/test_ai_providers.py` — 28/28 passed).
 
 ## 14.7.3 — 2026-09-28 (AI Copilot Router Modernization, Security Auth Enforcement & Predictive Fallback Precision)
 

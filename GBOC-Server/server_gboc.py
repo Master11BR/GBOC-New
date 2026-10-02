@@ -79,7 +79,7 @@ try:
     from version_control import __version__ as SERVER_VERSION, get_version_info, auto_increment_build
     auto_increment_build()
 except Exception:
-    SERVER_VERSION = "14.6.0"
+    SERVER_VERSION = "14.7.4"
     def get_version_info():
         return {"raw_version": SERVER_VERSION, "semver": SERVER_VERSION}
 
