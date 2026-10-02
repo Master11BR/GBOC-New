@@ -1,21 +1,21 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.7.3 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.7.4 Enterprise. Todos os direitos reservados. -->
 
-# 🚀 GBOC - Gestão & Backup Operations Center (v14.7.3 Enterprise Edition)
+# 🚀 GBOC - Gestão & Backup Operations Center (v14.7.4 Enterprise Edition)
 
-[![GBOC System Version](https://img.shields.io/badge/version-14.7.3--Enterprise-blue.svg)](https://github.com/Master11BR/GBOC-New)
+[![GBOC System Version](https://img.shields.io/badge/version-14.7.4--Enterprise-blue.svg)](https://github.com/Master11BR/GBOC-New)
 [![Python Version](https://img.shields.io/badge/python-3.11%2B%20%7C%203.14-green.svg)](https://www.python.org/)
 [![PostgreSQL](https://img.shields.io/badge/postgresql-16-blue.svg)](https://www.postgresql.org/)
 [![UI Model](https://img.shields.io/badge/UI__MODEL-modern%20(Official)-indigo.svg)]()
 [![Status](https://img.shields.io/badge/status-production--ready-brightgreen.svg)]()
 
-> **GBOC (Gestão & Backup Operations Center v14.7.3 Enterprise Edition)** é a mais avançada plataforma corporativa de orquestração de backup, Disaster Recovery (DR) 100% verificável ponta a ponta, RMM, telemetria real (Zero-Mock Strict), modelo visual universal **Modern UI (UnoCSS)**, **Padrão Oficial de Relatórios v3.0 & Flagships** e resposta cibernética a incidentes.
+> **GBOC (Gestão & Backup Operations Center v14.7.4 Enterprise Edition)** é a mais avançada plataforma corporativa de orquestração de backup, Disaster Recovery (DR) 100% verificável ponta a ponta, RMM, telemetria real (Zero-Mock Strict), modelo visual universal **Modern UI (UnoCSS)**, **Padrão Oficial de Relatórios v3.0 & Flagships** e resposta cibernética a incidentes.
 
 ---
 
 ## 📌 Sumário
 1. [Visão Geral e Arquitetura Operacional](#-visão-geral-e-arquitetura-operacional)
 2. [Estrutura Canônica de Navegação (7 Domínios de Negócio)](#-estrutura-canônica-de-navegação)
-3. [Recursos de Destaque (v14.7.3 Enterprise)](#-recursos-de-destaque-v1473-enterprise)
+3. [Recursos de Destaque (v14.7.4 Enterprise)](#-recursos-de-destaque-v1474-enterprise)
 4. [Padrão Oficial de Relatórios v3.0 & Flagships](#-padrão-oficial-de-relatórios-v30--flagships)
 5. [Disaster Recovery & SureRestore Sandbox Zero-Mock](#-disaster-recovery--surerestore-sandbox-zero-mock)
 6. [Cyber Security Sentinel (ClamAV, YARA, Maltrail, Wazuh, Defender)](#-cyber-security-sentinel)
@@ -26,7 +26,7 @@
 
 ## 🏗️ Visão Geral e Arquitetura Operacional
 
-O GBOC v14.7.3 opera sob o ciclo de vida completo e verificável de proteção contínua:
+O GBOC v14.7.4 opera sob o ciclo de vida completo e verificável de proteção contínua:
 
 ```text
 Política → Backup consistente → Armazenamento → Integridade →
@@ -110,7 +110,24 @@ Configuração
 
 ---
 
-## ⚡ Recursos de Destaque (v14.7.3 Full Stable Enterprise)
+## ⚡ Recursos de Destaque (v14.7.4 Full Stable Enterprise)
+
+- **Camada Unificada de Provedores de IA (`ai_providers.py`)**:
+  - Código 100% idêntico e simétrico em `GBOC-Server/modules/ai_assistant/` e `GBOC-Agent/engines/`.
+  - Suporte completo a 10 provedores modernos: Ollama Local (`/api/chat`), OpenAI (`gpt-4o`), Groq (`openai/gpt-oss-120b`), Google Gemini (`gemini-flash-latest`), Anthropic Claude (`claude-sonnet-5-5`), DeepSeek (`deepseek-flash`), xAI Grok (`grok-4.7`), Moonshot Kimi (`kimi-k2.6`), Mistral e Cohere v2.
+  - Isolamento estrito de chaves de API e modelos por provedor, eliminando cruzamento indevido de tokens.
+  - Timeouts calibrados para inferências realistas (180s para Ollama local; 60s para nuvem) com regra fixa de ancoragem contextual no prompt de sistema.
+- **Auditoria Rigorosa Zero-Mock (AI_RULES §11)**:
+  - Eliminação definitiva de fallbacks sintéticos e frases fabricadas de integridade ("Nenhum erro registrado", "100% OK").
+  - Consulta direta a dados reais: PostgreSQL 16 (`agents`, `agent_task_executions`) no Server e banco local SQLite + status real do Ransomware Guardian no Agente.
+  - Endpoint `/diagnose` alimentado por telemetria real via `psutil` (CPU, RAM, Discos reais do host).
+  - Rotas de autorrecuperação autônoma (`/auto_fix` e `/api/v2/system/auto-heal`) com retorno formal HTTP 501 e procedimentos manuais auditáveis.
+  - Reescrita completa do REP-F6 (*AI Predictive Suite*) com regressão linear real com R², z-score de anomalias e canários reais (`ai_predictive.py`).
+- **Blindagem de Segurança & OWASP API Compliance**:
+  - Todos os endpoints de IA protegidos por autenticação de sessão, eliminando superfícies anônimas.
+  - Mascaramento e proteção de chaves de API contra exibição ou sobrescrita em texto puro.
+  - Sanitização completa contra XSS no chat Copilot e validação restrita de URIs (apenas HTTP/HTTPS).
+  - Middleware de autenticação do Agente configurado com política defensiva *fail-closed*.
 
 - **Padrão Oficial de Relatórios v3.0 (Zero-Mock Normative)**:
   - Eliminação de dados sintéticos e resolução dos 10 bugs de telemetria em `reports_api.py`.
@@ -163,7 +180,13 @@ A partir da versão **14.7.0**, o sistema adota o padrão normativo v3.0 onde os
 
 ---
 
-## 📜 Histórico de Mudanças (Changelog v14.7.3 Enterprise)
+## 📜 Histórico de Mudanças (Changelog v14.7.4 Enterprise)
+
+- **Release 14.7.4 — Auditoria das Funções de IA, Zero-Mock Strict, Camada Multi-Provedores & Empacotamento de Distribuição**:
+  - **Camada Unificada de Provedores de IA**: Módulo `ai_providers.py` idêntico e compartilhado entre Server e Agent suportando 10 provedores de ponta com isolamento estrito de parâmetros e chaves.
+  - **Blindagem Zero-Mock Estrita**: Telemetria real em `/diagnose` via `psutil`, consulta ao PostgreSQL e SQLite nos Copilots, eliminação de frases fabricadas e reescrita do REP-F6 AI Predictive Suite com regressão linear real.
+  - **Segurança de Endpoints e OWASP**: Autenticação obrigatória em rotas de IA, sanitização XSS, mascaramento de credenciais e middleware *fail-closed*.
+  - **Empacotamento e Instalador 14.7.4**: Atualização de `Setup.bat`, `Setup.ps1`, `make_distribution.py`, `package_manifest.json` e documentação formal ISO/IEC.
 
 - **Release 14.7.3 — AI Copilot Router Modernization, Security Auth Enforcement & Predictive Fallback Precision**:
   - **Função Standalone Multi-Provedor (`query_server_ai_assistant`)**: Desacoplamento da inferência de IA (DeepSeek, Ollama, Groq, OpenAI, Gemini, Claude) em função reutilizável retornando `dict`, restabelecendo a operação da rota oficial `/api/v2/ai/query` (eliminação definitiva do erro `ImportError`).
