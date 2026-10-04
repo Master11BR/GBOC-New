@@ -2385,55 +2385,88 @@ function gbocToggleSidebarCollapse(){
             renderServerLogs(true);
         }
 
-        async function loadLogs(){
+        async function _fetchJsonSafe(url){
+            // Nunca "engole" erro: devolve {ok, status, data, error}
             try{
-                const agent = document.getElementById('log-agent')?.value || '';
-                const search = document.getElementById('log-search')?.value || '';
-                _serverLogSearchTerm = search;
-                let url = `${API}/logs?limit=300`;
+                const r = await fetch(url);
+                const text = await r.text();
+                let data = {};
+                try { data = text ? JSON.parse(text) : {}; } catch(e) { data = { error: text.slice(0, 300) }; }
+                return { ok: r.ok && data.status !== 'error', status: r.status, data,
+                         error: data.error || data.detail || data.message || (r.ok ? '' : `HTTP ${r.status}`) };
+            }catch(e){ return { ok:false, status:0, data:{}, error:e.message }; }
+        }
+
+        // Selo de versão real (antes fixo no HTML)
+        fetch('/api/v1/version').then(r => r.ok ? r.json() : null).then(v => {
+            const b = document.getElementById('versionBadge');
+            if (b && v && v.version) b.textContent = 'v' + v.version;
+        }).catch(() => {});
+
+        async function loadLogs(){
+            const agent = document.getElementById('log-agent')?.value || '';
+            const search = document.getElementById('log-search')?.value || '';
+            const empty = document.getElementById('server-toast-empty');
+            _serverLogSearchTerm = search;
+            const buildUrls = (hours) => {
+                let url = `${API}/logs?limit=300&hours=${hours}`;
                 if(agent) url += `&agent_id=${encodeURIComponent(agent)}`;
                 if(_serverActiveLogFilter && _serverActiveLogFilter !== 'all') url += `&type=${_serverActiveLogFilter}`;
                 if(search) url += `&search=${encodeURIComponent(search)}`;
+                return [url, `${API}/logs/stats?hours=${hours}` + (agent ? `&agent_id=${encodeURIComponent(agent)}` : '')];
+            };
+            let windowLabel = '7 dias';
+            let [url, statsUrl] = buildUrls(168);
+            let [logsRes, statsRes] = await Promise.all([_fetchJsonSafe(url), _fetchJsonSafe(statsUrl)]);
+            // Sem logs nos últimos 7 dias (ex.: relógio/fuso diferente entre agente e servidor): mostra todo o histórico
+            if (statsRes.ok && Number(statsRes.data.total || 0) === 0) {
+                [url, statsUrl] = buildUrls(0);
+                [logsRes, statsRes] = await Promise.all([_fetchJsonSafe(url), _fetchJsonSafe(statsUrl)]);
+                windowLabel = 'todo o período';
+            }
 
-                const [logsRes, statsRes] = await Promise.allSettled([
-                    fetch(url).then(r=>r.json()),
-                    fetch(`${API}/logs/stats`).then(r=>r.json())
-                ]);
-
-                if(statsRes.status === 'fulfilled'){
-                    const s = statsRes.value;
-                    const statsEl = document.getElementById('log-stats');
-                    if (statsEl) {
-                        statsEl.innerHTML = `
-                            <span><i class="fas fa-list"></i> Total: <strong>${(s.total||0).toLocaleString()}</strong></span>
-                            <span style="color:var(--danger)"><i class="fas fa-times-circle"></i> Erros: <strong>${(s.errors||0).toLocaleString()}</strong></span>
-                            <span style="color:var(--warning)"><i class="fas fa-exclamation-triangle"></i> Avisos: <strong>${(s.warnings||0).toLocaleString()}</strong></span>
-                            <span style="color:var(--success)"><i class="fas fa-info-circle"></i> Info: <strong>${(s.info||0).toLocaleString()}</strong></span>
-                        `;
-                    }
+            const statsEl = document.getElementById('log-stats');
+            if (statsEl) {
+                if (statsRes.ok) {
+                    const s = statsRes.data;
+                    const n = v => Number(v || 0).toLocaleString('pt-BR');
+                    statsEl.innerHTML = `
+                        <span><i class="fas fa-list"></i> Total (${windowLabel}): <strong>${n(s.total)}</strong></span>
+                        <span style="color:var(--danger)"><i class="fas fa-times-circle"></i> Erros: <strong>${n(s.errors)}</strong></span>
+                        <span style="color:var(--warning)"><i class="fas fa-exclamation-triangle"></i> Avisos: <strong>${n(s.warnings)}</strong></span>
+                        <span style="color:var(--success)"><i class="fas fa-check-circle"></i> Sucesso: <strong>${n(s.success)}</strong></span>
+                        <span style="color:var(--info)"><i class="fas fa-info-circle"></i> Info: <strong>${n(s.info)}</strong></span>`;
+                } else {
+                    statsEl.innerHTML = `<span style="color:var(--danger)"><i class="fas fa-triangle-exclamation"></i> Estatísticas indisponíveis: ${escapeHtml(statsRes.error)}</span>`;
                 }
+            }
 
-                if(logsRes.status === 'fulfilled'){
-                    const data = logsRes.value;
-                    const rawLogs = data.logs || [];
-                    _serverAllLogs = rawLogs.map((l, idx) => {
-                        const calculatedType = mapLogToType(l.level, l.message);
-                        const type = (_serverActiveLogFilter && _serverActiveLogFilter !== 'all') ? _serverActiveLogFilter : calculatedType;
-                        return {
-                            id: l.id || `${Date.now()}_${idx}`,
-                            type: type,
-                            icon: getLogIcon(type),
-                            title: (l.level || type).toUpperCase(),
-                            agent: l.agent_name || l.agent_id || 'Servidor',
-                            source: l.source || 'core',
-                            message: l.message || '',
-                            timestamp: l.timestamp ? fmtDateTime(l.timestamp) : ''
-                        };
-                    });
-
-                    renderServerLogs(true);
+            if (!logsRes.ok) {
+                _serverAllLogs = [];
+                renderServerLogs(false);
+                if (empty) {
+                    empty.innerHTML = `<i class="fas fa-triangle-exclamation" style="color:var(--danger)"></i> Não foi possível carregar os logs: ${escapeHtml(logsRes.error)}`;
+                    empty.classList.add('show');
                 }
-            }catch(e){console.error('loadLogs:',e)}
+                return;
+            }
+            if (empty) empty.textContent = 'Nenhum log encontrado para o filtro selecionado.';
+            const rawLogs = logsRes.data.logs || [];
+            _serverAllLogs = rawLogs.map((l, idx) => {
+                const calculatedType = mapLogToType(l.level, l.message);
+                const type = (_serverActiveLogFilter && _serverActiveLogFilter !== 'all') ? _serverActiveLogFilter : calculatedType;
+                return {
+                    id: l.id || `${Date.now()}_${idx}`,
+                    type: type,
+                    icon: getLogIcon(type),
+                    title: (l.level || type).toUpperCase(),
+                    agent: l.agent_name || l.agent_id || 'Servidor',
+                    source: l.source || 'core',
+                    message: l.message || '',
+                    timestamp: l.timestamp ? fmtDateTime(l.timestamp) : ''
+                };
+            });
+            renderServerLogs(true);
         }
 
         async function loadConfig(){

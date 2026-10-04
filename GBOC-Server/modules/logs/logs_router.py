@@ -1,78 +1,197 @@
-# GBOC System v14.7.3 Enterprise Edition
-# Module: Server Audit Logs Router
-# Modular Architecture: modules/logs/logs_router.py
+# GBOC System — Module: Server Logs Router (logs sincronizados pelos agentes)
+#
+# Fonte única de /api/v1/logs e /api/v1/logs/stats (as rotas antigas em server_gboc.py
+# delegam para cá).
+#
+# Robustez:
+#   * Bases PostgreSQL criadas no Windows com ENCODING SQL_ASCII/WIN1252 podem conter
+#     bytes que não são UTF-8 (ex.: "Não" gravado em cp1252). Com client_encoding UTF8
+#     o PostgreSQL recusa o SELECT ("invalid byte sequence") e a lista ficava VAZIA enquanto
+#     as contagens (que não leem texto) funcionavam. Agora há um modo seguro que lê os
+#     textos como bytes e decodifica UTF-8 → cp1252.
+#   * Erros nunca são escondidos: a resposta traz "error" para a interface exibir.
+#   * Consultas síncronas rodam fora do event loop.
 
+import asyncio
 import logging
-from typing import Optional
-from fastapi import APIRouter, Query, Request
+from typing import Any, Dict, List, Optional, Tuple
+
+from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
 try:
     from database import db_manager
-    def get_db(): return db_manager.get_connection()
-    def release_db(conn): db_manager.release_connection(conn)
-except Exception:
-    def get_db(): return None
-    def release_db(conn): pass
 
-try:
-    from psycopg2.extras import RealDictCursor
-except Exception:
-    RealDictCursor = None
+    def get_db():
+        return db_manager.get_connection()
+
+    def release_db(conn):
+        db_manager.release_connection(conn)
+except Exception:  # pragma: no cover
+    def get_db():
+        return None
+
+    def release_db(conn):
+        pass
 
 logger = logging.getLogger("gboc_logs_module")
 router = APIRouter(prefix="/api/v1/logs", tags=["Logs & Auditoria"])
 
+_COLUMNS = ("id", "agent_id", "level", "source", "message", "details", "timestamp", "agent_name")
+_MAX_DETAILS = 4000
+_ENCODING_ERRORS = ("invalid byte sequence", "character with byte sequence", "codec can't decode",
+                    "CharacterNotInRepertoire", "UntranslatableCharacter")
 
-@router.get("/stats")
-async def get_logs_stats():
-    """Estatísticas reais dos logs sincronizados dos agentes e servidor."""
-    conn = None
-    cur = None
+
+def _decode(value: Any) -> Any:
+    if isinstance(value, (bytes, bytearray, memoryview)):
+        raw = bytes(value)
+        try:
+            return raw.decode("utf-8")
+        except UnicodeDecodeError:
+            return raw.decode("cp1252", errors="replace")
+    return value
+
+
+# Níveis + marcadores na mensagem (agentes antigos gravam tudo como INFO com "[ERROR]", "falha"...).
+# Mesmo critério de mapLogToType() no dashboard, para filtro, contagem e cor baterem.
+_MSG_MARKERS = {
+    "error": ["[error]", "[critical]", "falha", "error:"],
+    "warning": ["[warning]", "[warn]", "alerta", "threshold=", "[perf-slow]"],
+    "success": ["[success]", "[ok]", "sucesso", "concluíd", "concluido"],
+}
+_LEVEL_PATTERNS = {
+    "error": ["err%%", "crit%%", "fatal%%"],
+    "warning": ["warn%%"],
+    "success": ["succ%%"],
+}
+
+
+def _group_sql(group: str) -> str:
+    parts = [f"COALESCE(al.level,'') ILIKE '{p}'" for p in _LEVEL_PATTERNS[group]]
+    if group == "success":
+        parts.append("UPPER(COALESCE(al.level,'')) = 'OK'")
+    parts += [f"COALESCE(al.message,'') ILIKE '%%{m}%%'" for m in _MSG_MARKERS[group]]
+    return "(" + " OR ".join(parts) + ")"
+
+
+def _type_condition(t: str) -> Optional[str]:
+    t = (t or "").strip().lower()
+    if t == "error":
+        return _group_sql("error")
+    # Prioridade igual à do dashboard: erro > aviso > sucesso > info
+    if t == "warning":
+        return f"({_group_sql('warning')} AND NOT {_group_sql('error')})"
+    if t == "success":
+        return f"({_group_sql('success')} AND NOT {_group_sql('error')} AND NOT {_group_sql('warning')})"
+    if t == "info":
+        return f"(NOT {_group_sql('error')} AND NOT {_group_sql('warning')} AND NOT {_group_sql('success')})"
+    return None
+
+
+def _build_where(level, search, source, agent_id, log_type, hours) -> Tuple[str, List[Any]]:
+    conditions: List[str] = []
+    params: List[Any] = []
+    if hours:
+        conditions.append("al.timestamp >= LOCALTIMESTAMP - make_interval(hours := %s)")
+        params.append(int(hours))
+    if level:
+        conditions.append("UPPER(al.level) = UPPER(%s)")
+        params.append(level)
+    tc = _type_condition(log_type)
+    if tc:
+        conditions.append(tc)
+    if agent_id:
+        conditions.append("al.agent_id = %s")
+        params.append(agent_id)
+    if source:
+        conditions.append("al.source ILIKE %s")
+        params.append(f"%{source}%")
+    if search:
+        conditions.append("(al.message ILIKE %s OR al.details ILIKE %s OR al.source ILIKE %s)")
+        params.extend([f"%{search}%"] * 3)
+    return ("WHERE " + " AND ".join(conditions)) if conditions else "", params
+
+
+def _query_logs(where: str, params: List[Any], limit: int) -> List[Dict[str, Any]]:
+    import psycopg2.extensions as ext
+
+    sql = f"""
+        SELECT al.id, al.agent_id, al.level, al.source, al.message,
+               LEFT(al.details, {_MAX_DETAILS}) AS details, al.timestamp,
+               COALESCE(a.hostname, al.agent_id, 'Servidor') AS agent_name
+        FROM agent_logs al
+        LEFT JOIN agents a ON a.agent_id = al.agent_id
+        {where}
+        ORDER BY al.timestamp DESC NULLS LAST, al.id DESC
+        LIMIT %s
+    """
+    conn = get_db()
+    if conn is None:
+        raise RuntimeError("Banco de dados não disponível")
     try:
-        conn = get_db()
-        if not conn:
-            return JSONResponse(
-                status_code=503,
-                content={"status": "error", "message": "Banco de dados não disponível"}
-            )
-
-        cur = conn.cursor(cursor_factory=RealDictCursor) if RealDictCursor else conn.cursor()
-        cur.execute("""
-            SELECT
-                COUNT(*) as total,
-                COUNT(*) FILTER (WHERE UPPER(level) IN ('ERROR', 'CRITICAL', 'FATAL') OR message ILIKE '%[error]%' OR message ILIKE '%falha%') as errors,
-                COUNT(*) FILTER (WHERE UPPER(level) = 'WARNING' OR message ILIKE '%[warn%' OR message ILIKE '%alerta%') as warnings,
-                COUNT(*) FILTER (WHERE UPPER(level) IN ('SUCCESS', 'OK') OR message ILIKE '%sucess%' OR message ILIKE '%conclui%') as success,
-                COUNT(*) FILTER (WHERE UPPER(level) = 'INFO' AND NOT (
-                    message ILIKE '%[error]%' OR message ILIKE '%falha%' OR
-                    message ILIKE '%[warn%' OR message ILIKE '%alerta%' OR
-                    message ILIKE '%sucess%' OR message ILIKE '%conclui%'
-                )) as info,
-                COUNT(DISTINCT agent_id) as agents_with_logs,
-                MIN(timestamp) as oldest,
-                MAX(timestamp) as newest
-            FROM agent_logs
-            WHERE timestamp >= (LOCALTIMESTAMP - INTERVAL '30 days')
-        """)
-        stats = cur.fetchone()
-        res = dict(stats) if hasattr(stats, 'keys') else {}
-        for k in ['oldest', 'newest']:
-            if res.get(k) and hasattr(res[k], 'isoformat'):
-                res[k] = res[k].isoformat()
-            elif res.get(k):
-                res[k] = str(res[k])
-
-        return {"status": "success", **res}
-    except Exception as e:
-        logger.error(f"[LOGS MODULE] Erro ao obter estatísticas: {e}", exc_info=True)
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        cur = conn.cursor()
+        try:
+            cur.execute(sql, params + [limit])
+            rows = cur.fetchall()
+            safe_mode = False
+        except Exception as exc:
+            if not any(k in str(exc) or k in type(exc).__name__ for k in _ENCODING_ERRORS):
+                raise
+            # Modo seguro: textos lidos como bytes e decodificados aqui
+            logger.warning(f"[LOGS] Texto fora de UTF-8 na base ({exc}); usando leitura tolerante.")
+            conn.rollback()
+            conn.set_client_encoding("SQL_ASCII")
+            cur = conn.cursor()
+            ext.register_type(ext.BYTES, cur)
+            cur.execute(sql, params + [limit])
+            rows = cur.fetchall()
+            safe_mode = True
+        cur.close()
+        out = []
+        for r in rows:
+            item = {k: _decode(v) for k, v in zip(_COLUMNS, r)}
+            ts = item.get("timestamp")
+            item["timestamp"] = ts.isoformat() if hasattr(ts, "isoformat") else (str(ts) if ts else None)
+            out.append(item)
+        if safe_mode:
+            conn.rollback()
+            conn.set_client_encoding("UTF8")
+        return out
+    except Exception:
+        try:
+            conn.rollback()
+            conn.set_client_encoding("UTF8")
+        except Exception:
+            pass
+        raise
     finally:
-        if cur:
-            try: cur.close()
-            except Exception: pass
-        if conn:
-            release_db(conn)
+        release_db(conn)
+
+
+def _query_stats(agent_id: Optional[str], hours: int) -> Dict[str, Any]:
+    conn = get_db()
+    if conn is None:
+        raise RuntimeError("Banco de dados não disponível")
+    try:
+        cur = conn.cursor()
+        where, params = _build_where(None, None, None, agent_id, None, hours)
+        cur.execute(f"""
+            SELECT COUNT(*),
+                   COUNT(*) FILTER (WHERE {_type_condition('error')}),
+                   COUNT(*) FILTER (WHERE {_type_condition('warning')}),
+                   COUNT(*) FILTER (WHERE {_type_condition('success')}),
+                   COUNT(*) FILTER (WHERE {_type_condition('info')}),
+                   COUNT(DISTINCT al.agent_id), MIN(al.timestamp), MAX(al.timestamp)
+            FROM agent_logs al {where}
+        """, params)
+        r = cur.fetchone()
+        cur.close()
+        iso = lambda v: v.isoformat() if hasattr(v, "isoformat") else v
+        return {"total": r[0], "errors": r[1], "warnings": r[2], "success": r[3], "info": r[4],
+                "agents_with_logs": r[5], "oldest": iso(r[6]), "newest": iso(r[7]), "hours": hours}
+    finally:
+        release_db(conn)
 
 
 @router.get("")
@@ -81,146 +200,43 @@ async def get_logs_list(
     search: Optional[str] = Query(None),
     source: Optional[str] = Query(None),
     agent_id: Optional[str] = Query(None),
-    type: Optional[str] = Query(None, description="all | success | info | warning | error"),
-    hours: Optional[int] = Query(None, ge=1, le=8760),
-    limit: int = Query(300, ge=1, le=1000)
+    type: Optional[str] = Query(None, description="success | info | warning | error (agrupa variações de nível)"),
+    hours: int = Query(168, ge=0, le=24 * 365, description="Janela em horas (0 = sem limite)"),
+    limit: int = Query(100, ge=1, le=1000),
 ):
-    """Retorna os logs reais dos agentes e servidor com suporte completo a filtros."""
-    conn = None
-    cur = None
+    """Logs reais sincronizados pelos agentes, do mais recente para o mais antigo."""
+    where, params = _build_where(level, search, source, agent_id, type, hours)
     try:
-        conn = get_db()
-        if not conn:
-            return JSONResponse(
-                status_code=503,
-                content={"status": "error", "message": "Banco de dados não disponível", "logs": []}
-            )
-
-        cur = conn.cursor(cursor_factory=RealDictCursor) if RealDictCursor else conn.cursor()
-
-        conditions = []
-        params = []
-
-        if hours:
-            conditions.append(f"al.timestamp >= (LOCALTIMESTAMP - INTERVAL '{int(hours)} hours')")
-
-        if level:
-            conditions.append("UPPER(al.level) = UPPER(%s)")
-            params.append(level)
-
-        t = (type or "").strip().lower()
-        if t == "error":
-            conditions.append("(al.level ILIKE 'err%%' OR al.level ILIKE 'crit%%' OR al.level ILIKE 'fatal%%' OR al.message ILIKE '%%[error]%%' OR al.message ILIKE '%%[critical]%%' OR al.message ILIKE '%%falha%%' OR al.message ILIKE '%%error:%%')")
-        elif t == "warning":
-            conditions.append("(al.level ILIKE 'warn%%' OR al.message ILIKE '%%[warning]%%' OR al.message ILIKE '%%[warn]%%' OR al.message ILIKE '%%alerta%%' OR al.message ILIKE '%%threshold=%%')")
-        elif t == "success":
-            conditions.append("(al.level ILIKE 'succ%%' OR UPPER(al.level) = 'OK' OR al.message ILIKE '%%[success]%%' OR al.message ILIKE '%%[ok]%%' OR al.message ILIKE '%%sucesso%%' OR al.message ILIKE '%%concluíd%%' OR al.message ILIKE '%%concluido%%')")
-        elif t == "info":
-            conditions.append("(NOT (al.level ILIKE 'err%%' OR al.level ILIKE 'crit%%' OR al.level ILIKE 'fatal%%' OR al.level ILIKE 'warn%%' OR al.level ILIKE 'succ%%' OR UPPER(al.level) = 'OK' OR al.message ILIKE '%%[error]%%' OR al.message ILIKE '%%falha%%' OR al.message ILIKE '%%[warning]%%' OR al.message ILIKE '%%[warn]%%' OR al.message ILIKE '%%alerta%%' OR al.message ILIKE '%%[success]%%' OR al.message ILIKE '%%sucesso%%' OR al.message ILIKE '%%concluíd%%' OR al.message ILIKE '%%concluido%%'))")
-
-        if agent_id:
-            conditions.append("al.agent_id = %s")
-            params.append(agent_id)
-
-        if source:
-            conditions.append("al.source ILIKE %s")
-            params.append(f"%{source}%")
-
-        if search:
-            conditions.append("(al.message ILIKE %s OR al.details ILIKE %s)")
-            params.extend([f"%{search}%", f"%{search}%"])
-
-        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
-
-        query = f"""
-            SELECT al.id, al.agent_id, al.level, al.source, al.message, al.details,
-                   al.timestamp, COALESCE(a.hostname, al.agent_id, 'Servidor') as agent_name
-            FROM agent_logs al
-            LEFT JOIN agents a ON al.agent_id = a.agent_id
-            {where_clause}
-            ORDER BY al.timestamp DESC
-            LIMIT %s
-        """
-        cur.execute(query, params + [limit])
-        rows = cur.fetchall()
-
-        logs = []
-        for r in rows:
-            row_dict = dict(r) if hasattr(r, 'keys') else {
-                "id": r[0], "agent_id": r[1], "level": r[2], "source": r[3],
-                "message": r[4], "details": r[5], "timestamp": r[6], "agent_name": r[7]
-            }
-            if row_dict.get("timestamp") and hasattr(row_dict["timestamp"], "isoformat"):
-                row_dict["timestamp"] = row_dict["timestamp"].isoformat()
-            elif row_dict.get("timestamp"):
-                row_dict["timestamp"] = str(row_dict["timestamp"])
-            logs.append(row_dict)
-
-        return JSONResponse({
-            "status": "success",
-            "logs": logs,
-            "count": len(logs),
-            "total": len(logs)
-        })
+        logs = await asyncio.to_thread(_query_logs, where, params, limit)
+        return JSONResponse({"status": "success", "logs": logs, "count": len(logs), "showing": len(logs), "total": len(logs),
+                             "filters": {"level": level, "type": type, "agent_id": agent_id, "hours": hours,
+                                         "search": search}})
     except Exception as e:
-        logger.error(f"[LOGS MODULE] Erro ao buscar logs: {e}", exc_info=True)
-        return JSONResponse(
-            status_code=500,
-            content={"status": "error", "message": f"Erro ao consultar logs: {str(e)}", "logs": []}
-        )
-    finally:
-        if cur:
-            try: cur.close()
-            except Exception: pass
-        if conn:
-            release_db(conn)
+        logger.error(f"[LOGS] Erro ao consultar logs: {e}", exc_info=True)
+        return JSONResponse(status_code=500, content={"status": "error", "logs": [], "count": 0,
+                                                      "error": f"Erro ao consultar logs: {e}",
+                                                      "message": f"Erro ao consultar logs: {e}"})
+
+
+@router.get("/stats")
+async def get_logs_stats(agent_id: Optional[str] = Query(None), hours: int = Query(168, ge=0, le=24 * 365)):
+    """Contagens por nível na mesma janela de tempo da lista (padrão: 7 dias)."""
+    try:
+        stats = await asyncio.to_thread(_query_stats, agent_id, hours)
+        return {"status": "success", **stats}
+    except Exception as e:
+        logger.error(f"[LOGS] Erro nas estatísticas: {e}")
+        return JSONResponse(status_code=500, content={"status": "error", "error": str(e), "message": str(e)})
 
 
 @router.get("/agents/{agent_id}")
-async def get_agent_logs_by_id(
-    agent_id: str,
-    level: Optional[str] = Query(None),
-    limit: int = Query(50, ge=1, le=500),
-    hours: int = Query(168, ge=1, le=8760)
-):
-    """Consulta logs específicos de um determinado agente."""
-    conn = None
-    cur = None
+async def get_agent_logs_by_id(agent_id: str, level: Optional[str] = Query(None),
+                               limit: int = Query(50, ge=1, le=500), hours: int = Query(168, ge=0, le=24 * 365)):
+    """Logs de um agente específico (mesma leitura tolerante da lista principal)."""
+    where, params = _build_where(level, None, None, agent_id, None, hours)
     try:
-        conn = get_db()
-        if not conn:
-            return JSONResponse(status_code=503, content={"status": "error", "message": "Banco de dados não disponível", "logs": []})
-
-        cur = conn.cursor(cursor_factory=RealDictCursor) if RealDictCursor else conn.cursor()
-        conditions = ["agent_id = %s", f"timestamp >= (LOCALTIMESTAMP - INTERVAL '{int(hours)} hours')"]
-        params = [agent_id]
-        if level:
-            conditions.append("UPPER(level) = UPPER(%s)")
-            params.append(level)
-
-        where = " AND ".join(conditions)
-        cur.execute(f"""
-            SELECT id, level, source, message, details, timestamp
-            FROM agent_logs WHERE {where}
-            ORDER BY timestamp DESC LIMIT %s
-        """, params + [limit])
-        logs = cur.fetchall()
-        serialized = []
-        for log in logs:
-            ld = dict(log) if hasattr(log, 'keys') else {}
-            if ld.get('timestamp') and hasattr(ld['timestamp'], 'isoformat'):
-                ld['timestamp'] = ld['timestamp'].isoformat()
-            elif ld.get('timestamp'):
-                ld['timestamp'] = str(ld['timestamp'])
-            serialized.append(ld)
-
-        return {"status": "success", "logs": serialized, "total": len(serialized), "agent_id": agent_id}
+        logs = await asyncio.to_thread(_query_logs, where, params, limit)
+        return {"status": "success", "logs": logs, "total": len(logs), "agent_id": agent_id}
     except Exception as e:
-        logger.error(f"[LOGS MODULE] Erro ao consultar logs do agente {agent_id}: {e}", exc_info=True)
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e), "logs": []})
-    finally:
-        if cur:
-            try: cur.close()
-            except Exception: pass
-        if conn:
-            release_db(conn)
+        logger.error(f"[LOGS] Erro ao consultar logs do agente {agent_id}: {e}", exc_info=True)
+        return JSONResponse(status_code=500, content={"status": "error", "logs": [], "error": str(e), "message": str(e)})

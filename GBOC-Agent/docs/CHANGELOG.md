@@ -6,6 +6,21 @@
 
 ---
 
+## 14.7.7 — 2026-10-04 (Logs robustos, Copilot guia de uso e login limpo) — pendente de build
+
+### 🐞 Correções
+- **Central de Logs do Server mais robusta:** leitura tolerante a textos fora de UTF-8 (bases SQL_ASCII/WIN1252 do Windows: UTF-8 → cp1252), consultas fora do event loop e, em qualquer falha (ex.: página corrompida como a reparada na 14.7.6), a tela mostra a mensagem real em vez de lista vazia.
+- Filtros, contagens e cores usam o **mesmo critério** (nível + marcadores na mensagem como `[ERROR]`, `falha`, `[PERF-SLOW]`, `sucesso`), com prioridade erro > aviso > sucesso > info — os números das estatísticas batem com a lista filtrada. Rota `/api/v1/logs/agents/{agent_id}` mantida.
+- Lista e estatísticas usam a mesma janela (7 dias); se não houver nada nesse período (ex.: relógio/fuso diferente), a tela mostra todo o histórico automaticamente.
+- **Menu e barra superior apareciam na tela de login:** o gerenciador de layout não injeta mais menu, topbar, botão de layout, Copilot nem HUD em páginas de autenticação; páginas internas (Server e Agente) sem sessão redirecionam para `/login.html` no próprio servidor.
+- Selo de versão do Dashboard do Server mostrava v14.6.0 fixo; agora lê `/api/v1/version`.
+
+### 🤖 Copilot — guia de uso do sistema
+- Novo guia oficial (`gboc_help_kb.py`, idêntico no Server e no Agente) com 18 funções: onde fica cada uma no menu e o passo a passo (restaurar arquivos, tarefas, repositórios, DR, ransomware, alertas, logs, relatórios, pareamento, RMM, usuários, IA, migração de motores, virtualização, armazenamento, diagnóstico e temas).
+- Perguntas como “onde fica restaurar arquivos e como usar?” são respondidas com links clicáveis que abrem a tela/aba certa. Com LLM configurado, o guia entra no contexto (o modelo é instruído a não inventar menus); sem LLM, a resposta vem direto do guia.
+- Novo atalho “📍 Onde fica…”; o Copilot agora formata títulos, *itálico* e links internos (somente destinos locais).
+- Testes: `tests/test_help_kb.py`.
+
 ## 14.7.6 — 2026-10-03 (Auditoria de Banco de Dados, Resiliência de Logs & Aceleração Sub-milissegundo)
 
 ### 🚀 Resiliência de Banco de Dados e Logs Globais
