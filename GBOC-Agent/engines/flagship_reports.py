@@ -740,7 +740,7 @@ def render_flagship_html(payload: Dict[str, Any], is_print: bool = False) -> str
     <link rel="stylesheet" href="/static/style.css">
     <link rel="stylesheet" href="/static/gboc-themes.css">
     <link rel="stylesheet" href="/static/gboc-layout.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
     <style>
         :root {{
             --bg-page: #f8fafc;

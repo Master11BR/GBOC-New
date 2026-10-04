@@ -102,6 +102,7 @@ def setup_logger(name: str) -> logging.Logger:
             LOG_FILE,
             maxBytes=LOG_MAX_SIZE_MB * 1024 * 1024,
             backupCount=LOG_BACKUP_COUNT,
+            encoding="utf-8",
         )
         file_handler.setLevel(LOG_LEVEL)
         file_handler.setFormatter(formatter)

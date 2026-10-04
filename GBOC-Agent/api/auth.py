@@ -515,6 +515,12 @@ async def login(req: LoginRequest, request: Request):
             conn.commit()
 
         audit_login(username=db_username, success=True, ip=client_ip)
+        # Login bem-sucedido não conta para o limite (só tentativas com falha bloqueiam o IP)
+        try:
+            if _login_attempts.get(client_ip):
+                _login_attempts[client_ip].pop()
+        except Exception:
+            pass
         resp = JSONResponse({
             "status": "success",
             "token": token,

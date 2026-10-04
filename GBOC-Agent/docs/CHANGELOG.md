@@ -6,6 +6,43 @@
 
 ---
 
+## 14.8.0 — 2026-10-04 (Relatórios reais, Painel de Decisão e Gerenciamento Remoto) — pendente de build
+
+### 📊 Relatórios reais (substituem o catálogo de 50)
+- Os 50 relatórios antigos geravam o mesmo conteúdo com números fixos (ex.: “85 MB/s”, “3 Organizações”). Foram substituídos por **20 relatórios calculados sobre dados reais**, com um motor único (`report_core.py`, idêntico no Server e no Agente):
+  - Operação: Resumo executivo operacional, Histórico de execuções, Falhas e causa raiz (com MTTR e ação recomendada por categoria de erro), Eventos e logs.
+  - SLA: Conformidade de RPO (alvo por tarefa conforme a agenda), Scorecard de SLA por agente/cliente.
+  - Risco: Cobertura e lacunas (inclui volumes sem backup), Prontidão para DR (nota 0–100).
+  - Capacidade: Capacidade e previsão de esgotamento (regressão linear), Retenção.
+  - Performance: Throughput, Recursos dos agentes, Janela de backup/concorrência (mapa de calor).
+  - Inventário da frota, Restaurações e testes de recuperação, Segurança/ransomware, Auditoria de acessos, Anomalias.
+  - Comercial: Consumo por cliente/faturamento (Server) e Custo de nuvem.
+- Saídas: HTML pronto para impressão/PDF (gráficos SVG embutidos, funciona offline), CSV (`;`) e JSON, com hash de integridade.
+- **Central de Relatórios** no Dashboard do Server: filtros de período, agente e cliente; pré-visualização; imprimir/CSV/HTML/JSON.
+- **Envio agendado por e-mail** (diário/semanal/mensal) com HTML e CSV anexos, usando o SMTP de Notificações.
+- Novos parâmetros em Configurações > Relatórios: empresa, alvo de RPO, meta de sucesso, preço por agente/TB e moeda.
+- Consolidado do Server reescrito (período e filtro de agente reais).
+
+### 📈 Painel de Decisão (Visão Geral do Server)
+- KPIs (RPO cumprido, sucesso 24h, agentes online, falhas pendentes, armazenamento e crescimento, repositórios em risco), execuções por dia, taxa de sucesso × meta, idade do último backup por agente, agentes com mais falhas, armazenamento com projeção de 30 dias e **lista de ações priorizadas** que abre o relatório correspondente. Rota `GET /api/v1/analytics/decision`.
+
+### 🛰️ Gerenciamento Remoto do Agente pelo Server
+- Novo menu **Gerenciamento Remoto**: tarefas (executar, ativar/desativar, histórico), execuções em andamento (parar), repositórios (testar acesso), logs, alertas (reconhecer/resolver), intervalos de heartbeat/sincronização e terminal.
+- Canal pelo **WebSocket aberto pelo agente** (funciona atrás de NAT/firewall); sem WebSocket, HTTP direto com a chave de pareamento. Ações de escrita exigem perfil admin/operator e ficam na auditoria; desligamento remoto bloqueado.
+- RMM e Migração de Motores passam a usar o mesmo canal.
+
+### 🔗 Integração Agente ↔ Server
+- **Segurança:** a sincronização completa enviava senhas de repositório ao Server; agora os dados são saneados.
+- Novo inventário sincronizado (`POST /api/v1/sync/inventory`): execuções de 30 dias, histórico de tamanho dos repositórios, restaurações, verificações, falhas, volumes e replicação — antes as execuções só chegavam pelo WebSocket.
+- Repositórios com status `ready` passam a ser medidos e sincronizados.
+- Endereço do agente gravado como `ip:9200` gerava URLs `http://ip:9200:9200` (RMM/migração).
+
+### 🧰 Outras correções
+- Bibliotecas locais: Font Awesome, Chart.js e o CSS do login agora são servidos de `/static/vendor` (sem depender de CDN/internet).
+- Login do Agente: logins bem-sucedidos não contam mais para o bloqueio por tentativas.
+- `reports.js` sobrescrevia o carregador do Consolidado do Dashboard (KPIs nunca carregavam).
+- Testes: `tests/test_report_core.py`.
+
 ## 14.7.7 — 2026-10-04 (Logs robustos, Copilot guia de uso e login limpo) — pendente de build
 
 ### 🐞 Correções
@@ -20,6 +57,18 @@
 - Perguntas como “onde fica restaurar arquivos e como usar?” são respondidas com links clicáveis que abrem a tela/aba certa. Com LLM configurado, o guia entra no contexto (o modelo é instruído a não inventar menus); sem LLM, a resposta vem direto do guia.
 - Novo atalho “📍 Onde fica…”; o Copilot agora formata títulos, *itálico* e links internos (somente destinos locais).
 - Testes: `tests/test_help_kb.py`.
+
+### 🔎 Revisão geral (varredura de todas as telas e de 288 rotas GET)
+- **Agente respondia HTTP 429 ao navegar:** o limite era 200 chamadas/min por IP (cada tela faz 10–30, mais o polling; vários usuários atrás do mesmo NAT somavam). Agora vale por sessão (1200/min; 300/min sem sessão), ajustável por `GBOC_API_RATE_LIMIT`/`GBOC_API_RATE_LIMIT_ANON`; chamadas do Server com chave de pareamento válida não entram no limite.
+- **Erros de rota apareciam como “Serviço de autenticação indisponível” (503) ou 401:** o middleware de autenticação do Agente envolvia a execução da rota no mesmo `try`. A autenticação agora é decidida antes, com a consulta de sessão fora do event loop.
+- **Regra 3-2-1 (Replicação) quebrada:** consultava a coluna inexistente `repo_type` em `repositories`.
+- **Assistente de primeira configuração (onboarding) do Agente:** 4 chamadas apontavam para rotas inexistentes (verificação do banco, motores, salvar Servidor Central e criar repositório). Agora usa as rotas reais, pede a chave de pareamento e a senha de criptografia do repositório e oferece o Motor Nativo GBOC.
+- **Validador de motores:** `shutil` usado antes da importação local fazia o Duplicati nunca ser encontrado pelo PATH.
+- **Duplicati nativo:** removida a primeira definição duplicada de `create_backup` (código morto, a segunda é a usada).
+- **Envio de logs Agente → Server incremental:** antes eram sempre os 500 mais recentes das últimas 24h a cada ciclo (reenvio constante e perda quando havia mais de 500 entre ciclos). Agora envia só o que é novo desde o último envio (até 2000 por ciclo).
+- **Retenção automática no Server:** a limpeza por idade (Configurações > Retenção: logs 30 dias, métricas 90, eventos 60 por padrão) só rodava pelo botão de Manutenção. Agora roda 1x por dia em segundo plano, em lotes curtos (sem travar a tabela); desative com `GBOC_AUTO_RETENTION=0`. O botão de Manutenção roda fora do event loop.
+- **Atualizações não apareciam no navegador:** JS/CSS/HTML eram servidos com cache de 1 h e `?v=14.6.0` fixo; agora sempre revalidados (ETag → 304).
+- Log do Server (`logs/gboc_server.log`) gravado em UTF-8 (acentos apareciam como “conex�es”).
 
 ## 14.7.6 — 2026-10-03 (Auditoria de Banco de Dados, Resiliência de Logs & Aceleração Sub-milissegundo)
 

@@ -148,7 +148,6 @@ class EngineValidator:
                     return executable
             else:
                 # Para outros motores, usar shutil.which
-                import shutil
                 executable = shutil.which(config['commands'][0])
                 if executable:
                     return executable

@@ -13,7 +13,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GBOC Agent 14.6.0 - Central de Relatórios UniFi</title>
     
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
     <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.6.0">
     <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=14.6.0">
     <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=14.6.0">
@@ -395,7 +395,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             <header class="header">
                 <div>
                     <h1 class="page-title"><i class="fas fa-file-contract" style="color:var(--primary)"></i> Central de Relatórios Executivos & Inteligência v2.0</h1>
-                    <div class="page-subtitle">Arquitetura consolidada: 7 Relatórios Flagship de mercado alimentados por 50 módulos internos com 100% de dados reais.</div>
+                    <div class="page-subtitle">Arquitetura consolidada: Relatórios executivos e 20 relatórios operacionais calculados com os dados reais deste agente.</div>
                 </div>
                 <div class="header-actions">
                     <button class="btn btn-secondary" onclick="loadAllReports()"><i class="fas fa-sync-alt"></i> Atualizar</button>
@@ -410,7 +410,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                         <i class="fas fa-star"></i> 7 Relatórios Flagship v2.0 (Executivos)
                     </button>
                     <button id="btnTabDataModules" class="btn btn-secondary" onclick="switchReportsMode('modules')" style="display:flex;align-items:center;gap:8px">
-                        <i class="fas fa-layer-group"></i> Módulos de Dados Internos (50 Relatórios Base)
+                        <i class="fas fa-layer-group"></i> Relatórios Operacionais
                     </button>
                 </div>
 
@@ -526,20 +526,35 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                             <div class="cat-select-wrapper">
                                 <i class="fas fa-filter filter-icon"></i>
                                 <select id="reportCategorySelect" onchange="setCategoryFilter(this.value)">
-                                    <option value="ALL">📁 Todas as Categorias (50 relatórios)</option>
-                                    <option value="Executive">👔 Executivos</option>
-                                    <option value="Performance">⚡ Performance</option>
-                                    <option value="Storage">💾 Storage</option>
-                                    <option value="Security">🛡️ Segurança</option>
-                                    <option value="AI Predictive">🤖 IA Preditiva</option>
-                                    <option value="AI Executive">🧠 IA Executiva</option>
+                                    <option value="ALL">📁 Todas as categorias</option>
+                                    <option value="Operação">⚙️ Operação</option>
+                                    <option value="SLA">⏱️ SLA</option>
+                                    <option value="Risco">⚠️ Risco</option>
+                                    <option value="Capacidade">💾 Capacidade</option>
+                                    <option value="Desempenho">⚡ Desempenho</option>
+                                    <option value="Recuperação">🛟 Recuperação</option>
+                                    <option value="Segurança">🛡️ Segurança</option>
+                                    <option value="Comercial">💰 Comercial</option>
+                                    <option value="Inventário">🖥️ Inventário</option>
+                                </select>
+                                <i class="fas fa-chevron-down select-chevron"></i>
+                            </div>
+
+                            <div class="cat-select-wrapper">
+                                <i class="fas fa-calendar filter-icon"></i>
+                                <select id="reportDays" onchange="if (selectedReportId) runCurrentSelectedReport()">
+                                    <option value="7">Últimos 7 dias</option>
+                                    <option value="30" selected>Últimos 30 dias</option>
+                                    <option value="90">Últimos 90 dias</option>
+                                    <option value="180">Últimos 180 dias</option>
+                                    <option value="365">Últimos 12 meses</option>
                                 </select>
                                 <i class="fas fa-chevron-down select-chevron"></i>
                             </div>
 
                             <div class="reports-list" id="reportsList">
                                 <p style="color:var(--text-muted);text-align:center;padding:20px"><i
-                                        class="fas fa-spinner fa-spin"></i> Carregando 50 relatórios...</p>
+                                        class="fas fa-spinner fa-spin"></i> Carregando relatórios...</p>
                             </div>
                         </div>
 
@@ -565,7 +580,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                             <div class="viewer-body" id="viewerBody">
                                 <div class="viewer-empty" id="viewerEmpty">
                                     <i class="fas fa-file-contract"></i>
-                                    <h3>Selecione um dos 50 relatórios ao lado</h3>
+                                    <h3>Selecione um relatório ao lado</h3>
                                     <p style="max-width:400px;font-size:0.88em;line-height:1.5">Escolha qualquer um dos 30
                                         relatórios de mercado ou 20 relatórios exclusivos orientados por Inteligência
                                         Artificial.</p>
@@ -811,236 +826,20 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             `;
         }
 
-        async function runCurrentSelectedReport() {
+        // Relatórios reais (motor engines/report_core.py): exibidos já formatados, com gráficos.
+        function runCurrentSelectedReport() {
             if (!selectedReportId) return;
             const body = document.getElementById('viewerBody');
-            const btnRun = document.getElementById('btnRunCurrent');
-            if (!body) return;
-
-            showReportLoading();
-            if (btnRun) {
-                btnRun.disabled = true;
-                btnRun.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gerando...';
-            }
-
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-            try {
-                let r = null;
-                try {
-                    r = await fetch('/api/reports/generate', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ report_id: selectedReportId }),
-                        signal: controller.signal
-                    });
-                } catch (err1) {
-                    if (err1.name === 'AbortError') throw err1;
-                }
-
-                if (!r || !r.ok) {
-                    r = await fetch((window.GBOC_API_BASE || '') + '/api/v1/reports/generate', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ report_id: selectedReportId }),
-                        signal: controller.signal
-                    });
-                }
-                clearTimeout(timeoutId);
-                const data = await r.json();
-
-                if (!data || data.status === 'error' || (!data.title && !data.code)) {
-                    throw new Error((data && (data.message || data.detail || data.reason)) || 'Erro ao comunicar com a engine do agente.');
-                }
-
-                const btnPrint = document.getElementById('btnPrint');
-                const btnCsv = document.getElementById('btnCsv');
-                const btnJson = document.getElementById('btnJson');
-                if (btnPrint) btnPrint.disabled = false;
-                if (btnCsv) btnCsv.disabled = false;
-                if (btnJson) btnJson.disabled = false;
-
-                if (data.status === 'unavailable') {
-                    body.innerHTML = `
-                        <div style="background:rgba(245,158,11,0.08);border:1.5px solid rgba(245,158,11,0.3);border-radius:8px;padding:20px;margin-bottom:20px">
-                            <h3 style="color:var(--warning);margin:0 0 8px"><i class="fas fa-triangle-exclamation"></i> Recurso Requer Integração Externa</h3>
-                            <p style="margin:0 0 12px;font-size:0.92em;color:var(--text)">${data.reason || 'Este relatório requer integração com componente externo.'}</p>
-                            <div style="font-size:0.86em;color:var(--text-muted)">Consulte as configurações do agente ou conecte ao GBOC Server Central para habilitar este monitoramento.</div>
-                        </div>
-                    `;
-                    return;
-                }
-
-                // Score banner
-                let scoreHtml = '';
-                if (data.score) {
-                    const sc = data.score;
-                    const scColor = sc.status === 'OK' ? '#10b981' : (sc.status === 'AT_RISK' ? '#f59e0b' : '#ef4444');
-                    let breakdownHtml = '';
-                    if (sc.breakdown) {
-                        breakdownHtml = `
-                            <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;font-size:0.75em;color:var(--text-muted)">
-                                ${Object.entries(sc.breakdown).map(([k, v]) => `
-                                    <span style="background:var(--bg-card);padding:2px 8px;border-radius:4px;border:1px solid var(--border)">
-                                        ${k.replace('_', ' ')}: <strong>${v.value}%</strong> (peso ${v.weight}%)
-                                    </span>
-                                `).join('')}
-                            </div>
-                        `;
-                    }
-                    scoreHtml = `
-                        <div style="background:var(--bg-input);border:1.5px solid var(--border);border-left:5px solid ${scColor};border-radius:8px;padding:12px 18px;margin-bottom:16px;">
-                            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
-                                <div style="display:flex;align-items:center;gap:16px;">
-                                    <div style="font-size:2em;font-weight:800;color:${scColor};">${sc.value}<span style="font-size:0.5em;color:var(--text-muted)">/100</span></div>
-                                    <div>
-                                        <div style="font-weight:700;font-size:0.95em;color:var(--text);">Protection & Operations Score</div>
-                                        <div style="font-size:0.78em;color:var(--text-muted);">Tendência: <strong>${sc.trend || '0'}pp</strong> vs período anterior • Status: <span class="badge" style="background:${scColor};color:#fff;font-size:0.8em;padding:2px 6px;border-radius:4px;">${sc.status}</span></div>
-                                    </div>
-                                </div>
-                                <div style="font-size:0.75em;color:var(--text-muted);text-align:right;">
-                                    <div>GBOC Engine v4.0</div>
-                                    <code>${data.schema_version || '4.0.0'}</code>
-                                </div>
-                            </div>
-                            ${breakdownHtml}
-                        </div>
-                    `;
-                }
-
-                // Delta list
-                let deltaHtml = '';
-                if (data.delta && data.delta.length > 0) {
-                    const bullets = data.delta.map(d => {
-                        const ic = d.icon === 'up' ? '<i class="fas fa-arrow-up" style="color:#10b981"></i>' : (d.icon === 'down' ? '<i class="fas fa-arrow-down" style="color:#ef4444"></i>' : '<i class="fas fa-minus" style="color:#0284c7"></i>');
-                        return `<li style="display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:0.85em;color:var(--text);">${ic} <span>${d.text}</span></li>`;
-                    }).join('');
-                    deltaHtml = `
-                        <div style="background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:18px;">
-                            <div style="font-size:0.75em;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px;"><i class="fas fa-chart-line"></i> O que mudou vs período anterior:</div>
-                            <ul style="list-style:none;margin:0;padding:0;">${bullets}</ul>
-                        </div>
-                    `;
-                }
-
-                const metricsHtml = (data.metrics || []).map(m => {
-                    const st = String(m.status || 'ok').toLowerCase();
-                    return `
-                    <div class="unifi-metric-card">
-                        <div class="lbl">${m.label}</div>
-                        <div class="val">${m.value}</div>
-                        ${m.target ? `<div class="target">Meta: ${m.target}</div>` : ''}
-                        <div class="status-dot ${st}"></div>
-                    </div>
-                    `;
-                }).join('');
-
-                let tableHtml = '';
-                if (data.table_headers && data.table_headers.length > 0) {
-                    const headers = data.table_headers.map(h => `<th>${h}</th>`).join('');
-                    const rows = (data.table_rows || []).map(row => {
-                        const cells = row.map(cell => {
-                            const cStr = String(cell).toUpperCase();
-                            if (cStr === 'CONFORME' || cStr === 'OK') {
-                                return `<td><span class="badge-ok">CONFORME</span></td>`;
-                            } else if (cStr === 'EM RISCO' || cStr === 'AT_RISK' || cStr === 'ATENÇÃO') {
-                                return `<td><span class="badge-warn">EM RISCO</span></td>`;
-                            } else if (cStr === 'NÃO CONFORME' || cStr === 'CRITICAL' || cStr === 'FALHA') {
-                                return `<td><span class="badge-fail">NÃO CONFORME</span></td>`;
-                            }
-                            return `<td>${cell}</td>`;
-                        }).join('');
-                        return `<tr>${cells}</tr>`;
-                    }).join('');
-
-                    tableHtml = `
-                        <h4 style="margin:20px 0 10px;font-size:0.95em"><i class="fas fa-table" style="color:var(--primary)"></i> Detalhamento dos Dados Auditados:</h4>
-                        <div style="overflow-x:auto">
-                            <table class="data-table" style="width:100%;border-collapse:collapse;font-size:0.88em">
-                                <thead><tr>${headers}</tr></thead>
-                                <tbody>${rows || '<tr><td colspan="100%" style="text-align:center">Nenhum registro encontrado.</td></tr>'}</tbody>
-                            </table>
-                        </div>
-                    `;
-                }
-
-                let actionsHtml = '';
-                if (data.recommended_actions && data.recommended_actions.length > 0) {
-                    const acts = data.recommended_actions.map(act => {
-                        const p = String(act.priority || 'MEDIUM').toUpperCase();
-                        return `
-                            <div class="action-item action-${p.toLowerCase()}" style="margin-bottom:8px;padding:8px 12px;border-radius:6px;border-left:3px solid ${p === 'HIGH' ? 'var(--danger)' : (p === 'MEDIUM' ? 'var(--warning)' : 'var(--success)')};background:var(--bg-input)">
-                                <div style="display:flex;align-items:center;gap:8px">
-                                    <span class="action-badge" style="font-size:0.7em;padding:2px 6px;border-radius:4px;font-weight:700;background:${p === 'HIGH' ? 'var(--danger)' : (p === 'MEDIUM' ? 'var(--warning)' : 'var(--success)')};color:#fff">${p}</span>
-                                    <strong style="font-size:0.88em">${act.action}</strong>
-                                </div>
-                                ${act.detail ? `<div style="font-size:0.8em;color:var(--text-muted);margin-top:4px">${act.detail}</div>` : ''}
-                            </div>
-                        `;
-                    }).join('');
-                    actionsHtml = `
-                        <h4 style="margin:20px 0 10px;font-size:0.95em"><i class="fas fa-bolt" style="color:var(--warning)"></i> Ações Recomendadas:</h4>
-                        <div class="actions-list">${acts}</div>
-                    `;
-                }
-
-                body.innerHTML = `
-                <div style="border-bottom:1.5px solid var(--border);padding-bottom:14px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">
-                    <div>
-                        <h2 style="color:var(--primary);margin:0 0 4px;font-size:1.35em">${data.title}</h2>
-                        <div style="font-size:0.82em;color:var(--text-muted)">Código: <code>${data.code || 'REP'}</code> | Categoria: <strong>${data.category || 'Geral'}</strong></div>
-                    </div>
-                    <div style="text-align:right;font-size:0.8em;color:var(--text-muted)">
-                        <div>Data: <strong>${new Date(data.generated_at || Date.now()).toLocaleString()}</strong></div>
-                        <div>Plataforma: <strong>GBOC Agent v14.6.0 Enterprise</strong></div>
-                        ${data.integrity_hash ? `<div>Hash: <code style="font-size:0.85em">${data.integrity_hash.slice(0, 19)}...</code></div>` : ''}
-                    </div>
-                </div>
-
-                ${scoreHtml}
-                ${deltaHtml}
-
-                <h4 style="margin-bottom:10px;font-size:0.95em"><i class="fas fa-chart-bar" style="color:var(--primary)"></i> Métricas do Diagnóstico:</h4>
-                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(170px, 1fr));gap:10px;margin-bottom:20px">
-                    ${metricsHtml}
-                </div>
-
-                <h4 style="margin-bottom:10px;font-size:0.95em"><i class="fas fa-robot" style="color:var(--warning)"></i> Parecer Executivo & Recomendação IA:</h4>
-                <div style="background:var(--bg-input);padding:14px;border-radius:8px;border-left:4px solid var(--warning);font-size:0.9em;line-height:1.6">
-                    ${data.ai_executive_recommendation || data.content || 'Rotina operacional analisada sem inconformidades de integridade.'}
-                </div>
-
-                ${tableHtml}
-                ${actionsHtml}
-            `;
-            } catch (e) {
-                clearTimeout(timeoutId);
-                if (body) {
-                    const isAbort = e.name === 'AbortError';
-                    const msg = isAbort 
-                        ? 'Tempo limite de geração excedido (30s). A engine do agente pode estar ocupada ou processando grande volume de telemetria.'
-                        : `Erro ao gerar relatório: ${e.message}`;
-                    body.innerHTML = `
-                        <div style="background:rgba(239,68,68,0.08);border:1.5px solid rgba(239,68,68,0.25);border-radius:8px;padding:24px;text-align:center;margin:20px">
-                            <h4 style="color:var(--danger);margin:0 0 8px;font-size:1.1em"><i class="fas fa-circle-exclamation"></i> Falha na Extração dos Dados</h4>
-                            <p style="color:var(--text);font-size:0.92em;margin:0 0 16px;max-width:550px;margin-left:auto;margin-right:auto">${msg}</p>
-                            <button class="btn btn-primary" onclick="runCurrentSelectedReport()" style="padding:8px 20px;font-size:0.9em"><i class="fas fa-rotate"></i> Tentar Novamente</button>
-                        </div>
-                    `;
-                }
-            } finally {
-                clearTimeout(timeoutId);
-                if (btnRun) {
-                    btnRun.disabled = false;
-                    btnRun.innerHTML = '<i class="fas fa-play"></i> Gerar Agora';
-                }
-            }
+            const days = document.getElementById('reportDays')?.value || 30;
+            ['btnPrint', 'btnCsv', 'btnJson'].forEach(id => { const b = document.getElementById(id); if (b) b.disabled = false; });
+            body.innerHTML = `<iframe id="agentReportFrame" title="Relatório" src="/api/reports/v2/${selectedReportId}?format=embed&days=${days}"
+                style="width:100%;height:78vh;border:1px solid var(--border);border-radius:10px;background:#fff"></iframe>`;
         }
 
         function exportAgentReport(format) {
             if (!selectedReportId) return;
-            const url = `/api/reports/export/${selectedReportId}?format=${format}${format === 'html' ? '&print=1' : ''}`;
+            const days = document.getElementById('reportDays')?.value || 30;
+            const url = `/api/reports/v2/${selectedReportId}?format=${format}&days=${days}`;
             window.open(url, '_blank');
         }
     </script>

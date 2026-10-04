@@ -179,7 +179,9 @@ def resolve_agent_address(agent_id: str) -> Optional[Dict[str, object]]:
         cur.close()
         if not row or not row[0]:
             return None
-        return {"ip": row[0], "port": 9200, "hostname": row[1]}
+        from modules.agents.remote_mgmt import split_host_port
+        host, port = split_host_port(row[0])
+        return {"ip": host, "port": port, "hostname": row[1]}
     except Exception as exc:
         logger.warning(f"[PAIRING] Falha ao resolver endereço do agente '{agent_id}': {exc}")
         return None

@@ -13,7 +13,7 @@ import platform
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, Request, Response, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 import httpx
 
 try:
@@ -134,6 +134,12 @@ def _get_agent_connection_info(agent_id: str) -> Dict[str, Any]:
             if 'cur' in locals() and cur: cur.close()
             if conn and release_db: release_db(conn)
 
+    # O agente informa "ip:porta" (ex.: 10.0.0.5:9200); antes a URL virava http://10.0.0.5:9200:9200
+    try:
+        from modules.agents.remote_mgmt import split_host_port
+        ip, port = split_host_port(ip, int(port or 9200))
+    except Exception:
+        pass
     return {
         "is_local": False,
         "ip": ip,
@@ -429,6 +435,20 @@ async def rmm_proxy_agent(agent_id: str, subpath: str, request: Request):
         clean_subpath = subpath if subpath.startswith("api/") else f"api/v1/{subpath.lstrip('/')}"
         fwd_headers = {k: v for k, v in request.headers.items() if k.lower() not in _STRIP_PROXY_HEADERS}
         fwd_headers.update(_agent_headers())
+
+        # Agente conectado por WebSocket: usa o canal do próprio agente (funciona atrás de NAT/firewall)
+        if conn_info.get("is_ws_connected"):
+            try:
+                from modules.agents.remote_mgmt import agent_call
+                body_json = json.loads(body.decode("utf-8")) if body else None
+                res = await agent_call(agent_id, request.method, clean_subpath, query=dict(request.query_params), body=body_json)
+                if res["status_code"] < 500 or res.get("channel"):
+                    b = res["body"]
+                    if isinstance(b, (dict, list)):
+                        return JSONResponse(b, status_code=res["status_code"])
+                    return Response(content=str(b or ""), status_code=res["status_code"], media_type=res.get("content_type") or "text/plain")
+            except Exception as e:
+                logger.warning(f"[SERVER RMM] Canal WebSocket falhou para {agent_id}: {e}")
 
         for target_url in _agent_urls(conn_info, clean_subpath):
             try:

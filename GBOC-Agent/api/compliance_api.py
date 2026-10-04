@@ -140,7 +140,7 @@ def _evaluate_rules():
             })
 
             # Rule 4: Active repository exists
-            cursor.execute("SELECT COUNT(*) FROM repositories WHERE status = 'active'")
+            cursor.execute("SELECT COUNT(*) FROM repositories WHERE status IN ('active', 'ready')")
             active_repos = cursor.fetchone()[0]
 
             # Verificar se existem repositórios cadastrados (mesmo inativos)

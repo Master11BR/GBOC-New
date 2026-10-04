@@ -111,7 +111,7 @@ def collect_repository_sizes() -> List[Dict[str, Any]]:
     try:
         with core.get_db_connection() as conn:
             cur = conn.cursor()
-            cur.execute("SELECT id, name, engine, path, status, type FROM repositories WHERE status = 'active'")
+            cur.execute("SELECT id, name, engine, path, status, type FROM repositories WHERE status IN ('active', 'ready')")
             cols = [d[0] for d in cur.description] if cur.description else []
             db_repos = [dict(zip(cols, row)) for row in cur.fetchall()]
 

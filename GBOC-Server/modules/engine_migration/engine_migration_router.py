@@ -46,6 +46,24 @@ def _agent_call(method: str, agent_id: str, path: str, body: Dict[str, Any] = No
     raise HTTPException(status_code=503, detail=f"Agente '{agent_id}' inacessível: {last}")
 
 
+async def _agent_call_async(method: str, agent_id: str, path: str, body: Dict[str, Any] = None, timeout: float = 60.0):
+    """Mesma semântica de _agent_call, usando o canal do Gerenciamento Remoto (WebSocket do agente
+    quando conectado — funciona atrás de NAT — ou HTTP direto)."""
+    from modules.agents.remote_mgmt import agent_call
+    res = await agent_call(agent_id, method, path, body=body, timeout=timeout)
+    code, data = res["status_code"], res["body"]
+    if not isinstance(data, dict):
+        data = {"detail": str(data)[:300]}
+    if code == 401:
+        raise HTTPException(status_code=502, detail="O Agente recusou a chave de pareamento. Configure a chave do Server no Agente.")
+    if code == 404:
+        raise HTTPException(status_code=502, detail="Agente sem suporte à migração de motores — atualize o GBOC Agent.")
+    if code >= 400:
+        raise HTTPException(status_code=502 if code != 503 else 503,
+                            detail=data.get("detail") or data.get("message") or f"Agente respondeu HTTP {code}")
+    return data
+
+
 @router.get("/agents")
 async def migration_agents():
     """Agentes disponíveis para migração (a migração sempre ocorre no Agente dono das tarefas)."""
@@ -69,7 +87,7 @@ async def server_discover_migration_engines(agent_id: str = ""):
     with telemetry.record_span("migration_discover", {"agent_id": agent_id}):
         if not agent_id or agent_id == "local":
             raise HTTPException(status_code=400, detail="Selecione um agente: as tarefas de backup ficam no Agente, não no Servidor Central.")
-        data = await asyncio.to_thread(_agent_call, "GET", agent_id, "/api/v1/migrator/discover")
+        data = await _agent_call_async("GET", agent_id, "/api/v1/migrator/discover")
         data["agent_id"] = agent_id
         return JSONResponse(data)
 
@@ -92,6 +110,6 @@ async def server_execute_migration(request: Request):
             "selected_repo_ids": body.get("selected_repo_ids") or [],
             "target_params": params,
         }
-        data = await asyncio.to_thread(_agent_call, "POST", agent_id, "/api/v1/migrator/execute", payload, 120.0)
+        data = await _agent_call_async("POST", agent_id, "/api/v1/migrator/execute", payload, 120.0)
         logger.info(f"Migração de motores no agente {agent_id}: {data.get('message')}")
         return JSONResponse(data)
