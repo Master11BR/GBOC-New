@@ -17,6 +17,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 
 from modules.ai_assistant import ai_providers as aip
+from modules.ai_assistant import gboc_help_kb as kb
 
 try:
     from database import db_manager
@@ -301,6 +302,16 @@ def _native_report(prompt: str, data: dict[str, Any]) -> str:
 # Consulta principal (usada pelas APIs v1 e v2)
 # ──────────────────────────────────────────────────────────────────────────────
 
+
+def _kb_or_native(prompt: str, topics, native, product: str) -> str:
+    """Sem LLM: perguntas de uso ("onde fica", "como usar") são respondidas pelo guia oficial."""
+    if topics and kb.is_howto_question(prompt):
+        return kb.answer_from_kb(prompt, product) or native()
+    if kb.is_howto_question(prompt) and not topics:
+        return ("📘 **Guia de uso do GBOC** — não encontrei essa função específica. Funções disponíveis:\n"
+                + kb.menu_map(product) + "\n\n" + native())
+    return native()
+
 def query_server_ai_assistant(prompt: str, provider_override: str | None = None) -> dict[str, Any]:
     """
     Consulta o provedor de IA configurado com contexto operacional real.
@@ -317,6 +328,11 @@ def query_server_ai_assistant(prompt: str, provider_override: str | None = None)
     data = _collect_server_operational_data()
     context_info = _format_context(data)
     system = f"{cfg.get('system_prompt') or DEFAULT_SERVER_AI_CONFIG['system_prompt']}\n\n{aip.GROUNDING_RULE}\n\n[CONTEXTO OPERACIONAL REAL DO SERVIDOR CENTRAL GBOC]:\n{context_info}"
+    kb_topics = kb.find_topics(clean_prompt, "server", limit=3)
+    kb_ctx = kb.format_for_prompt(kb_topics, "server")
+    if kb_ctx:
+        system += "\n\n" + kb_ctx + "\n\n[MAPA DE FUNÇÕES]:\n" + kb.menu_map("server")
+
 
     primary, fallback = aip.chat_with_fallback(cfg, system, clean_prompt, provider=provider_override)
 
@@ -343,7 +359,7 @@ def query_server_ai_assistant(prompt: str, provider_override: str | None = None)
         "status": "success", "is_llm_real": False, "primary_error": primary.error,
         "fallback_error": fallback.error if fallback else None,
         "provider": "Motor Nativo GBOC Server (sem LLM)", "model": "gboc-native-report",
-        "answer": warning + _native_report(clean_prompt, data),
+        "answer": warning + _kb_or_native(clean_prompt, kb_topics, lambda: _native_report(clean_prompt, data), "server"),
         "duration_seconds": round(primary.duration_seconds + (fallback.duration_seconds if fallback else 0), 2),
     }
 

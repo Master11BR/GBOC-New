@@ -155,8 +155,22 @@ Zero-Overflow & Smart Sidebar Presence Detection.
         if (g3) g3.style.backgroundColor = 'var(--ambient-glow-1)';
     }
 
+    // ── Telas públicas (login / primeiro acesso): sem menu, topbar ou painel ──
+    // Antes o menu lateral e a topbar apareciam na tela de login (vinham do cache
+    // de sessão), expondo a navegação a quem ainda não autenticou.
+    function _isAuthPage() {
+        const p = (window.location.pathname || '').toLowerCase();
+        return /\/(login|setup|first-access|primeiro-acesso)(\.html)?$/.test(p) ||
+               (document.body && document.body.hasAttribute('data-no-layout'));
+    }
+
     // ── Apply layout mode to <body> ───────────────────────────────────────────
     function _applyLayout(mode) {
+        if (_isAuthPage()) {
+            document.querySelectorAll('#gboc-topbar, aside.sidebar, #gboc-layout-fab, #gboc-layout-panel').forEach(el => el.remove());
+            document.body.classList.remove('layout-vertical', 'layout-horizontal', 'has-sidebar');
+            return;
+        }
         document.body.classList.remove('layout-vertical', 'layout-horizontal');
         document.body.classList.add('layout-' + mode);
         _currentLayout = mode;
@@ -214,6 +228,7 @@ Zero-Overflow & Smart Sidebar Presence Detection.
 
     // ── Fetch & inject topbar & hero backdrop ─────────────────────────────────
     async function _injectTopbar() {
+        if (_isAuthPage()) return;
         if (_isInjectingTopbar) return;
         _isInjectingTopbar = true;
         try {
@@ -356,6 +371,7 @@ Zero-Overflow & Smart Sidebar Presence Detection.
 
     // ── Inject AI Assistant script if missing ────────────────────────────────
     function _ensureAiAssistantLoaded() {
+        if (_isAuthPage()) return;
         if (!window.GBOC_AI_Assistant && !document.getElementById('gboc-ai-script')) {
             const script = document.createElement('script');
             script.id = 'gboc-ai-script';
@@ -365,6 +381,7 @@ Zero-Overflow & Smart Sidebar Presence Detection.
     }
 
     function _ensureHardwareHudLoaded() {
+        if (_isAuthPage()) return;
         if (!window.toggleHardwareHUD && !document.getElementById('gboc-hw-script')) {
             const script = document.createElement('script');
             script.id = 'gboc-hw-script';
@@ -448,6 +465,7 @@ Zero-Overflow & Smart Sidebar Presence Detection.
 
     // ── Create floating panel ─────────────────────────────────────────────────
     function _createPanel() {
+        if (_isAuthPage()) return;
         if (document.getElementById('gboc-layout-panel')) return;
 
         const themesHtml = THEMES.map(t => `
@@ -517,6 +535,7 @@ Zero-Overflow & Smart Sidebar Presence Detection.
     }
 
     function _createFAB() {
+        if (_isAuthPage()) return;
         if (document.getElementById('gboc-layout-fab')) return;
         const fab = document.createElement('button');
         fab.id = 'gboc-layout-fab';

@@ -86,7 +86,12 @@
 
     /** Markdown mínimo e seguro: escapa tudo e só então aplica **negrito**, `código` e quebras de linha. */
     const formatAiResponse = (text) => escapeHtml(text)
+        .replace(/^#{1,4} (.+)$/gm, '<strong class="ai-h">$1</strong>')
+        // Links internos do guia: [texto](/pagina.html) ou [texto](gboc:tab:id) — só destinos locais
+        .replace(/\[([^\]]+)\]\((\/[A-Za-z0-9_\-\/\.\?=&;]*|gboc:tab:[a-z0-9\-]+)\)/g,
+            '<a href="#" class="ai-link" data-href="$2">$1</a>')
         .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/(^|[^*\w])\*([^*\n]+?)\*(?![*\w])/g, '$1<em>$2</em>')
         .replace(/`([^`]+?)`/g, '<code>$1</code>')
         .replace(/\n/g, '<br>');
 
@@ -105,6 +110,8 @@
             .ai-head-sub { font-size: 0.75em; opacity: 0.88; }
             .ai-icon-btn { background: rgb(255 255 255 / 0.15); border: none; color: #fff; inline-size: 30px; block-size: 30px; border-radius: 8px; cursor: pointer; }
             .ai-icon-btn:focus-visible, .ai-preset-btn:focus-visible, .ai-send-btn:focus-visible { outline: 2px solid var(--primary, #4fa3e8); outline-offset: 2px; }
+            .ai-link { color: var(--primary, #3b82f6); text-decoration: underline; cursor: pointer; }
+            .ai-h { display: block; margin-block: 6px 2px; font-size: 1.02em; }
             .ai-presets { display: flex; gap: 6px; padding: 8px 12px; background: var(--bg-input, #111928); border-block-end: 1px solid var(--border, #2a3f5f); overflow-x: auto; scrollbar-width: none; }
             .ai-preset-btn { background: var(--bg-card, #182035); border: 1px solid var(--border, #2a3f5f); color: var(--text-muted, #7ea8cc); padding: 4px 10px; border-radius: 12px; font-size: 0.76em; cursor: pointer; white-space: nowrap; }
             .ai-preset-btn:hover { color: var(--primary, #4fa3e8); border-color: var(--primary, #4fa3e8); }
@@ -134,13 +141,34 @@
         document.head.append(style);
     }
 
+    /** Abre um destino do guia: aba do dashboard (gboc:tab:id) ou página local. */
+    function openInternalLink(href) {
+        if (href.startsWith('gboc:tab:')) {
+            const id = href.slice(9);
+            const btn = document.querySelector(`[onclick*="switchTab('${id}'"]`);
+            if (typeof window.switchTab === 'function' && (document.getElementById('tab-' + id) || document.getElementById(id))) {
+                window.switchTab(id, btn);
+                return;
+            }
+            window.location.href = '/dashboard.html#' + encodeURIComponent(id);
+            return;
+        }
+        if (href.startsWith('/')) window.location.href = href;
+    }
+
     function addMessage(kind, text, meta) {
         const box = document.getElementById('ai-chat-messages');
         if (!box) return null;
         const msg = el('div', { class: `ai-msg ai-msg-${kind}` });
         if (meta) msg.append(el('div', { class: `ai-msg-meta${meta.noLlm ? ' ai-no-llm' : ''}`, text: meta.label }));
         const body = el('div');
-        if (kind === 'bot') body.innerHTML = formatAiResponse(text);
+        if (kind === 'bot') {
+            body.innerHTML = formatAiResponse(text);
+            body.querySelectorAll('a.ai-link').forEach((a) => a.addEventListener('click', (ev) => {
+                ev.preventDefault();
+                openInternalLink(a.dataset.href.replaceAll('&amp;', '&'));
+            }));
+        }
         else body.textContent = text;
         msg.append(body);
         box.append(msg);
@@ -165,6 +193,7 @@
             el('nav', { class: 'ai-presets', 'aria-label': 'Perguntas rápidas' }, [
                 ['📊 Status Geral', 'Qual o status geral do sistema e agentes?'],
                 ['🚨 Jobs Falhos', 'Quais jobs falharam nas últimas 24h e por quê?'],
+                ['📍 Onde fica…', 'Onde fica a restauração de arquivos e como usar?'],
                 ['📼 Dica Backup', 'Como configurar backup de repositório LTO/Tape?'],
             ].map(([label, prompt]) => el('button', { type: 'button', class: 'ai-preset-btn', text: label,
                 onclick: () => window.GBOC_AI_Assistant.sendPreset(prompt) }))),
@@ -194,7 +223,7 @@
 
         const container = el('div', { id: 'gboc-ai-chatbot-container' }, [drawer, modal]);
         document.body.append(container);
-        addMessage('bot', '👋 Olá! Eu sou o **GBOC AI Copilot**. Pergunte sobre backups, restaurações, agentes ou segurança — respondo com os dados reais do sistema.');
+        addMessage('bot', '👋 Olá! Eu sou o **GBOC AI Copilot**. Pergunte sobre backups, restaurações, agentes ou segurança — respondo com os dados reais do sistema. Também explico **onde fica** cada função e **como usar** (ex.: “onde fica restaurar arquivos?”).');
     }
 
     function injectAiChatbotWidget() {

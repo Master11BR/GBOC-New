@@ -1139,11 +1139,17 @@ async def serve_any_css_page(file: str):
 
 # Rota dinâmica universal para páginas HTML (resolve erro 404 {"detail":"Not Found"})
 @app.get("/{page_name:path}.html", include_in_schema=False)
-async def serve_any_html_page(page_name: str):
+async def serve_any_html_page(page_name: str, request: Request):
     clean_p = (page_name or '').lstrip("/\\")
     if clean_p.startswith("static/") or clean_p.startswith("static\\"):
         clean_p = clean_p[7:]
     fname = f"{clean_p}.html" if not clean_p.endswith(".html") else clean_p
+    # Páginas do painel só com sessão válida (antes /dashboard.html e qualquer *.html
+    # abriam o painel — com o menu — sem login). Fragmentos _sidebar/_topbar seguem livres
+    # porque não contêm dados e são usados pela própria tela de login/layout.
+    if not os.path.basename(fname).startswith("_") and os.path.basename(fname).lower() != "login.html":
+        if not await asyncio.to_thread(_get_server_user_from_request, request):
+            return RedirectResponse(url="/login.html", status_code=302)
     # 1. GBOC-Server  2. GBOC-Agent/static  (sempre contidos na pasta base)
     for base in (_SERVER_DIR, _AGENT_STATIC_DIR):
         found = _safe_asset(base, fname)
