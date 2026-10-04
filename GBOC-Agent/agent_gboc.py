@@ -428,6 +428,16 @@ app.add_middleware(
 _SLOW_THRESHOLD_MS = float(os.getenv("GBOC_SLOW_MS", "250"))
 
 @app.middleware("http")
+async def _gboc_asset_revalidate(request: Request, call_next):
+    """JS/CSS/HTML sempre revalidados (ETag → 304): os HTML usam ?v= fixo e, sem isso,
+    o navegador seguia com scripts antigos depois de uma atualização do GBOC."""
+    r = await call_next(request)
+    p = request.url.path.lower()
+    if p.endswith((".js", ".css", ".html")) or p in ("/", ""):
+        r.headers["Cache-Control"] = "no-cache"
+    return r
+
+@app.middleware("http")
 async def _gboc_timing_middleware(request: Request, call_next):
     """Medidor de performance das rotas HTTP.
 

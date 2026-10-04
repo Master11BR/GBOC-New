@@ -156,18 +156,53 @@ TOPICS: List[Dict] = [
     },
     {
         "id": "reports",
-        "title": "Relatórios executivos e técnicos",
-        "keywords": ["relatorio", "relatorios", "report", "pdf", "csv", "exportar", "sla", "compliance report",
-                     "finops", "custo", "flagship"],
+        "title": "Relatórios (operação, SLA, risco, capacidade, segurança e comercial)",
+        "keywords": ["relatorio", "relatorios", "report", "pdf", "csv", "exportar", "sla", "rpo", "compliance report",
+                     "finops", "custo", "flagship", "faturamento", "cliente", "agendar relatorio", "enviar relatorio", "email",
+                     "relatorio por email", "envio de relatorio", "relatorios agendados"],
         "agent": {"menu": "Operações > Relatórios", "url": "/reports.html"},
         "server": {"menu": "Operações > Central de Relatórios", "tab": "reports"},
         "steps": [
-            "Abra **Operações > Relatórios** (Agente) ou **Central de Relatórios** (Server).",
-            "Escolha um relatório Flagship (proteção, operacional, armazenamento, segurança, conformidade, IA preditiva, FinOps, DR) "
-            "ou um dos relatórios de dados.",
-            "Clique em **Gerar Agora** e exporte em *Imprimir / PDF*, *CSV* ou *JSON*.",
+            "Abra **Central de Relatórios** (Server) ou **Operações > Relatórios** (Agente).",
+            "Escolha o período, o agente e, no Server, o cliente; filtre por categoria (Operação, SLA, Risco, Capacidade, "
+            "Desempenho, Recuperação, Segurança, Comercial) ou use os relatórios Executivos.",
+            "Clique em **Visualizar**: o relatório abre com indicadores, constatações, recomendações, gráficos e detalhamento.",
+            "Exporte em **Imprimir / PDF**, **CSV**, **HTML** ou **JSON**.",
+            "Para receber por e-mail, clique em **Agendar envio** (diário, semanal ou mensal) — usa o SMTP de Configurações > Notificações.",
         ],
-        "tips": ["Custo por TB e câmbio usados no FinOps ficam em Configurações > Relatórios."],
+        "tips": ["RPO alvo, meta de sucesso, nome da empresa e preços por agente/TB (faturamento MSP) ficam em "
+                 "Configurações > Relatórios. Todos os números vêm dos dados sincronizados pelos agentes."],
+    },
+    {
+        "id": "remote_management",
+        "title": "Gerenciamento remoto de agentes",
+        "keywords": ["gerenciamento remoto", "gerenciar agente", "remoto", "executar tarefa remota", "executar backup agora",
+                     "parar backup", "habilitar tarefa", "logs do agente", "sincronizar agente", "intervalo de sincronizacao",
+                     "remotamente", "gerencio", "backup remoto", "controlar agente", "administrar agente"],
+        "agent": None,
+        "server": {"menu": "Visão Geral > Gerenciamento Remoto", "tab": "remote"},
+        "steps": [
+            "No Server, abra **Visão Geral > Gerenciamento Remoto** e escolha o agente.",
+            "Veja conexão, versão, recursos e execuções das últimas 24 h; use **Sincronizar agora** para atualizar os dados no Server.",
+            "Na aba **Tarefas**: executar agora, habilitar/desabilitar e ver o histórico; **Em execução**: acompanhar e parar.",
+            "Use também as abas **Repositórios** (testar acesso), **Logs**, **Alertas** (reconhecer/resolver) e **Sincronização** (intervalos).",
+        ],
+        "tips": ["Funciona pelo WebSocket aberto pelo próprio agente — inclusive atrás de NAT/firewall. Ações exigem perfil "
+                 "admin ou operator e ficam registradas na auditoria."],
+    },
+    {
+        "id": "decision_panel",
+        "title": "Painel de decisão (gráficos do Dashboard Central)",
+        "keywords": ["painel de decisao", "graficos", "dashboard", "tendencia", "previsao de armazenamento", "acoes prioritarias"],
+        "agent": None,
+        "server": {"menu": "Visão Geral > Dashboard Central", "tab": "overview"},
+        "steps": [
+            "Abra **Dashboard Central**: o Painel de Decisão mostra proteção dentro do RPO, sucesso em 24 h, agentes online, "
+            "falhas pendentes e armazenamento.",
+            "Escolha o período (7, 14, 30 ou 90 dias) e passe o mouse nos gráficos para ver os valores.",
+            "Em **Ações prioritárias**, clique no código do relatório para abrir o detalhamento correspondente.",
+        ],
+        "tips": [],
     },
     {
         "id": "agents_pairing",

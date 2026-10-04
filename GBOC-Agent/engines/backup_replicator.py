@@ -370,7 +370,7 @@ def get_321_status() -> Dict[str, Any]:
     """Check 3-2-1 rule compliance for all tasks."""
     ensure_tables()
     tasks = _query("SELECT id, name, repository_id FROM tasks WHERE enabled = true")
-    repos = _query("SELECT id, name, engine, repo_type FROM repositories")
+    repos = _query("SELECT id, name, engine, type AS repo_type FROM repositories")
     policies = _query("SELECT source_repo_id, target_repo_id FROM replication_policies WHERE enabled = true")
 
     repo_map = {r['id']: r for r in repos}

@@ -105,6 +105,33 @@ class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[str, WebSocket] = {}
         self.agent_data: Dict[str, Dict] = {}
+        # Requisições Server -> Agente pelo WebSocket aguardando resposta (request_id -> (agent_id, future))
+        self.pending: Dict[str, Any] = {}
+
+    async def request(self, agent_id: str, payload: Dict, timeout: float = 30.0) -> Dict:
+        """Envia um comando ao agente pelo WebSocket e aguarda a resposta (funciona atrás de NAT/firewall,
+        pois a conexão é aberta pelo próprio agente)."""
+        import uuid as _uuid
+        ws = self.active_connections.get(agent_id)
+        if ws is None:
+            raise ConnectionError("Agente não está conectado via WebSocket")
+        rid = _uuid.uuid4().hex
+        fut = asyncio.get_running_loop().create_future()
+        self.pending[rid] = (agent_id, fut)
+        try:
+            await ws.send_text(json.dumps({**payload, "request_id": rid}, default=str))
+            return await asyncio.wait_for(fut, timeout)
+        finally:
+            self.pending.pop(rid, None)
+
+    def resolve(self, request_id: str, data: Dict) -> bool:
+        item = self.pending.get(request_id)
+        if not item:
+            return False
+        fut = item[1]
+        if not fut.done():
+            fut.set_result(data)
+        return True
 
     async def connect(self, websocket: WebSocket, agent_id: str):
         await websocket.accept()
@@ -115,6 +142,9 @@ class ConnectionManager:
         if agent_id in self.active_connections:
             del self.active_connections[agent_id]
             logger.info(f"🔌 Agente {agent_id} desconectado")
+        for rid, (aid, fut) in list(self.pending.items()):
+            if aid == agent_id and not fut.done():
+                fut.set_exception(ConnectionError("WebSocket do agente desconectou"))
 
     async def send_personal_message(self, message: str, agent_id: str):
         if agent_id in self.active_connections:
@@ -484,6 +514,20 @@ def init_database():
                     VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING
                 """, (cat, key, val, typ, desc))
 
+        # Parâmetros dos relatórios (inseridos também em bases já existentes)
+        for cat, key, val, typ, desc in [
+            ('reports', 'company_name', '', 'text', 'Nome da empresa/MSP exibido nos relatórios'),
+            ('reports', 'rpo_target_hours', '24', 'number', 'RPO alvo (horas) para conformidade de SLA'),
+            ('reports', 'success_rate_goal', '95', 'number', 'Meta de taxa de sucesso dos backups (%)'),
+            ('reports', 'price_per_agent', '0', 'number', 'Preço por agente no período (faturamento MSP; 0 = não calcular)'),
+            ('reports', 'price_per_tb', '0', 'number', 'Preço por TB armazenado (faturamento MSP; 0 = não calcular)'),
+            ('reports', 'currency', 'BRL', 'text', 'Moeda do faturamento'),
+        ]:
+            cur.execute("""
+                INSERT INTO server_settings (category, key, value, type, description)
+                VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING
+            """, (cat, key, val, typ, desc))
+
         # ── Hermes Agent Stats (fila offline, mesh, bandwidth por agente) ──────
         cur.execute('''
             CREATE TABLE IF NOT EXISTS hermes_agent_stats (
@@ -732,6 +776,7 @@ class AgentFullData(BaseModel):
     task_executions: List[Dict] = []
     system_events: List[Dict] = []
     alerts: List[Dict] = []
+    inventory: Optional[Dict[str, Any]] = None
     timestamp: str
     tenant_id: Optional[str] = None
 
@@ -845,6 +890,11 @@ class ServerSetupRequest(BaseModel):
 async def lifespan(app: FastAPI):
     if init_connection_pool():
         init_database()
+        try:
+            from modules.agents.inventory_sync import ensure_schema as _ensure_inventory_schema
+            _ensure_inventory_schema()
+        except Exception as _inv_e:
+            logger.warning(f"Schema de inventário não aplicado: {_inv_e}")
         # Limpar todos os tokens ao reiniciar — garante que o browser pede login novamente
         try:
             conn = get_db()
@@ -860,6 +910,13 @@ async def lifespan(app: FastAPI):
         get_version_info()
     except Exception:
         pass
+    try:
+        from modules.reports.report_schedules import start_scheduler as _start_report_scheduler
+        _start_report_scheduler()
+    except Exception as _rs_e:
+        logger.warning(f"Agendador de relatórios não iniciado: {_rs_e}")
+    if os.getenv("GBOC_AUTO_RETENTION", "1") != "0":
+        threading.Thread(target=_retention_scheduler_loop, name="gboc-retention", daemon=True).start()
     yield
     if connection_pool:
         connection_pool.closeall()
@@ -868,6 +925,16 @@ app = FastAPI(title="GBOC Server", version=SERVER_VERSION, lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 _SLOW_THRESHOLD_MS = float(os.getenv("GBOC_SLOW_MS", "250"))
+
+@app.middleware("http")
+async def _gboc_asset_revalidate(request: Request, call_next):
+    """JS/CSS/HTML sempre revalidados (ETag → 304): os HTML usam ?v= fixo e, sem isso,
+    o navegador seguia com scripts antigos depois de uma atualização do GBOC."""
+    r = await call_next(request)
+    p = request.url.path.lower()
+    if p.endswith((".js", ".css", ".html")) or p in ("/", ""):
+        r.headers["Cache-Control"] = "no-cache"
+    return r
 
 @app.middleware("http")
 async def _gboc_timing_middleware(request: Request, call_next):
@@ -1108,7 +1175,7 @@ async def serve_static_asset(filename: str):
         clean_fn = clean_fn[7:]
     found = _find_asset(clean_fn)
     if found:
-        return FileResponse(found, headers={"Cache-Control": "public, max-age=3600"})
+        return FileResponse(found, headers={"Cache-Control": "no-cache"})
     raise HTTPException(404, "Arquivo estático não encontrado.")
 
 # Rota dinamica universal para arquivos JavaScript (URLs sem prefixo /static/)
@@ -1422,12 +1489,22 @@ async def websocket_endpoint(websocket: WebSocket, agent_id: str):
             data = await websocket.receive_text()
             try:
                 message = json.loads(data)
-                await handle_websocket_message(agent_id, message, websocket)
+                # Respostas a comandos do Server (gerenciamento remoto) são entregues imediatamente
+                if isinstance(message, dict) and message.get("request_id") and manager.resolve(message["request_id"], message):
+                    continue
+                if isinstance(message, dict) and message.get("type") == "full_sync":
+                    # Sincronização completa pode ser grande: processa em paralelo sem travar a leitura
+                    asyncio.create_task(handle_websocket_message(agent_id, message, websocket))
+                else:
+                    await handle_websocket_message(agent_id, message, websocket)
             except json.JSONDecodeError:
                 await websocket.send_text(json.dumps({"error": "Invalid JSON"}))
     except WebSocketDisconnect:
         manager.disconnect(agent_id)
         logger.info(f"WebSocket desconectado para agente {agent_id}")
+    except Exception as ws_err:
+        manager.disconnect(agent_id)
+        logger.warning(f"WebSocket do agente {agent_id} encerrado: {ws_err}")
 
 # WebSocket para dashboard
 dashboard_connections = set()
@@ -1725,8 +1802,8 @@ async def handle_full_data_sync(agent_id: str, data: Dict) -> Dict:
         ensure_agent_exists(conn, agent_id, data)
         conn.commit()
 
-        # Atualizar dados em memória
-        manager.update_agent_data(agent_id, data)
+        # Atualizar dados em memória (sem o inventário, que pode ter milhares de execuções)
+        manager.update_agent_data(agent_id, {k: v for k, v in data.items() if k != "inventory"})
 
         # Cada etapa é isolada para não abortar a transação inteira
         try:
@@ -1769,6 +1846,13 @@ async def handle_full_data_sync(agent_id: str, data: Dict) -> Dict:
                 conn.commit()
             except Exception:
                 conn.rollback()
+
+        if isinstance(data.get("inventory"), dict):
+            try:
+                from modules.agents.inventory_sync import _store_sync
+                await asyncio.to_thread(_store_sync, agent_id, data["inventory"])   # fora do event loop
+            except Exception as inv_err:
+                logger.warning(f"Inventário do agente {agent_id} não gravado: {inv_err}")
 
         logger.info(f"✅ Sincronização completa recebida do agente {agent_id}")
         return {"status": "success", "message": "Full sync completed"}
@@ -3155,6 +3239,26 @@ try:
 except Exception as _e: logger.warning(f"Agents router: {_e}")
 
 try:
+    from modules.reports.decision_api import router as server_decision_router
+    app.include_router(server_decision_router)
+except Exception as _e: logger.warning(f"Decision router: {_e}")
+
+try:
+    from modules.reports.report_schedules import router as server_report_schedules_router
+    app.include_router(server_report_schedules_router)
+except Exception as _e: logger.warning(f"Report schedules router: {_e}")
+
+try:
+    from modules.agents.remote_mgmt import router as server_remote_router
+    app.include_router(server_remote_router)
+except Exception as _e: logger.warning(f"Remote management router: {_e}")
+
+try:
+    from modules.agents.inventory_sync import router as server_inventory_router
+    app.include_router(server_inventory_router)
+except Exception as _e: logger.warning(f"Inventory router: {_e}")
+
+try:
     from modules.surerestore.surerestore_router import router as server_surerestore_router
     app.include_router(server_surerestore_router)
 except Exception as _e: logger.warning(f"SureRestore router: {_e}")
@@ -4199,56 +4303,111 @@ async def get_server_info():
         release_db(conn)
 
 
-@app.post("/api/v1/server/maintenance/cleanup")
-async def server_maintenance_cleanup(request: Request):
-    """Clean old data based on retention settings."""
-    conn = None
+def _retention_days() -> Dict[str, int]:
+    conn = get_db()
     try:
-        data = await request.json() if request.headers.get('content-type') == 'application/json' else {}
-        conn = get_db(); cur = conn.cursor()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("SELECT key, value FROM server_settings WHERE category = 'retention'")
+        out = {}
+        for r in cur.fetchall():
+            try:
+                out[r['key']] = int(r['value'])
+            except (TypeError, ValueError):
+                pass
+        cur.close()
+        return out
+    finally:
+        release_db(conn)
 
-        cur2 = conn.cursor(cursor_factory=RealDictCursor)
-        cur2.execute("SELECT key, value FROM server_settings WHERE category = 'retention'")
-        retention = {r['key']: int(r['value']) for r in cur2.fetchall()}
-        cur2.close()
 
-        metrics_days = retention.get('metrics_retention_days', 90)
-        logs_days = retention.get('logs_retention_days', 30)
-        events_days = retention.get('events_retention_days', 60)
+def _delete_in_batches(table: str, ts_col: str, days: int, batch: int = 50000) -> int:
+    """Apaga em lotes curtos (commit a cada lote) para não travar a tabela por minutos."""
+    total = 0
+    while True:
+        conn = get_db()
+        try:
+            cur = conn.cursor()
+            cur.execute(f"""
+                DELETE FROM {table} WHERE ctid IN (
+                    SELECT ctid FROM {table}
+                    WHERE {ts_col} < (LOCALTIMESTAMP - make_interval(days := %s)) LIMIT %s)
+            """, (days, batch))
+            n = cur.rowcount
+            conn.commit()
+            cur.close()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            release_db(conn)
+        total += max(n, 0)
+        if n < batch:
+            return total
 
-        deleted = {}
-        cur.execute("DELETE FROM agent_metrics WHERE timestamp < (LOCALTIMESTAMP - make_interval(days := %s))", (metrics_days,))
-        deleted['agent_metrics'] = cur.rowcount
-        cur.execute("DELETE FROM agent_logs WHERE timestamp < (LOCALTIMESTAMP - make_interval(days := %s))", (logs_days,))
-        deleted['agent_logs'] = cur.rowcount
-        # Remove cópias geradas pelo reenvio de 24h das versões anteriores (mantém a mais antiga)
-        cur.execute("""
-            DELETE FROM agent_logs a USING agent_logs b
-            WHERE a.id > b.id
-              AND a.agent_id IS NOT DISTINCT FROM b.agent_id
-              AND a.timestamp IS NOT DISTINCT FROM b.timestamp
-              AND a.message IS NOT DISTINCT FROM b.message
-        """)
-        deleted['agent_logs_duplicates'] = cur.rowcount
-        cur.execute("DELETE FROM system_events WHERE created_at < (LOCALTIMESTAMP - make_interval(days := %s))", (events_days,))
-        deleted['system_events'] = cur.rowcount
+
+def _run_retention_cleanup(remove_duplicates: bool = True) -> Dict[str, Any]:
+    retention = _retention_days()
+    metrics_days = retention.get('metrics_retention_days', 90)
+    logs_days = retention.get('logs_retention_days', 30)
+    events_days = retention.get('events_retention_days', 60)
+
+    deleted = {
+        'agent_metrics': _delete_in_batches('agent_metrics', 'timestamp', metrics_days),
+        'agent_logs': _delete_in_batches('agent_logs', 'timestamp', logs_days),
+        'system_events': _delete_in_batches('system_events', 'created_at', events_days),
+    }
+    conn = get_db()
+    try:
+        cur = conn.cursor()
+        if remove_duplicates:
+            # Remove cópias geradas pelo reenvio de 24h das versões anteriores (mantém a mais antiga)
+            cur.execute("""
+                DELETE FROM agent_logs a USING agent_logs b
+                WHERE a.id > b.id
+                  AND a.agent_id IS NOT DISTINCT FROM b.agent_id
+                  AND a.timestamp IS NOT DISTINCT FROM b.timestamp
+                  AND a.message IS NOT DISTINCT FROM b.message
+            """)
+            deleted['agent_logs_duplicates'] = cur.rowcount
         cur.execute("DELETE FROM server_auth_tokens WHERE expires_at < LOCALTIMESTAMP")
         deleted['expired_tokens'] = cur.rowcount
-
         conn.commit()
-        total = sum(deleted.values())
-        return {
-            "status": "success",
-            "deleted": deleted,
-            "total_deleted": total,
-            "retention_config": {"metrics_days": metrics_days, "logs_days": logs_days, "events_days": events_days}
-        }
-    except Exception as e:
-        if conn: conn.rollback()
-        raise HTTPException(500, str(e))
+        cur.close()
+    except Exception:
+        conn.rollback()
+        raise
     finally:
-        if 'cur' in locals() and cur: cur.close()
         release_db(conn)
+    return {
+        "status": "success",
+        "deleted": deleted,
+        "total_deleted": sum(deleted.values()),
+        "retention_config": {"metrics_days": metrics_days, "logs_days": logs_days, "events_days": events_days}
+    }
+
+
+def _retention_scheduler_loop():
+    """Aplica a retenção (Configurações > Retenção) automaticamente 1x por dia.
+    Antes a limpeza só rodava pelo botão de Manutenção e agent_logs crescia sem limite."""
+    import time as _t
+    _t.sleep(300)  # deixa o servidor terminar de subir
+    while True:
+        try:
+            res = _run_retention_cleanup(remove_duplicates=False)
+            if res.get("total_deleted"):
+                logger.info(f"[RETENÇÃO] Limpeza automática: {res['deleted']}")
+        except Exception as e:
+            logger.warning(f"[RETENÇÃO] Limpeza automática falhou: {e}")
+        _t.sleep(24 * 3600)
+
+
+@app.post("/api/v1/server/maintenance/cleanup")
+async def server_maintenance_cleanup(request: Request):
+    """Clean old data based on retention settings (fora do event loop)."""
+    try:
+        return await asyncio.to_thread(_run_retention_cleanup, True)
+    except Exception as e:
+        raise HTTPException(500, str(e))
 
 
 @app.post("/api/v1/server/test-notification")

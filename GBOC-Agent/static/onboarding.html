@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GBOC Agent 14.6.0 - Assistente de Configuração</title>
     
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
     <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.6.0">
     <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=14.6.0">
     <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=14.6.0">
@@ -101,8 +101,8 @@
                 <input type="text" id="ob-server-url" placeholder="http://192.168.1.100:9300" value="">
             </div>
             <div class="form-group">
-                <label>Chave de API do Agente (se configurada)</label>
-                <input type="password" id="ob-server-apikey" placeholder="Deixe em branco se não configurado">
+                <label>Chave de pareamento (exibida no Server em Configurações Gerais &gt; Pareamento de Agentes)</label>
+                <input type="password" id="ob-server-apikey" placeholder="gboc_pk_..." autocomplete="off">
             </div>
             <div id="ob-server-test-result" style="display:none;padding:10px;border-radius:8px;margin-top:10px;font-size:0.85em"></div>
             <button class="btn btn-secondary" onclick="testServerConnection()" style="margin-top:8px">
@@ -135,10 +135,15 @@
             <div class="form-group">
                 <label>Motor de Backup</label>
                 <select id="ob-repo-engine">
+                    <option value="gboc_native">Motor Nativo GBOC (não exige instalação)</option>
                     <option value="restic">Restic (recomendado — rápido, incremental, deduplicação)</option>
                     <option value="kopia">Kopia (excelente para nuvem e objetos S3)</option>
                     <option value="duplicati">Duplicati (compatível com múltiplos destinos)</option>
                 </select>
+            </div>
+            <div class="form-group">
+                <label>Senha de criptografia do repositório (mín. 8 caracteres)</label>
+                <input type="password" id="ob-repo-pwd" autocomplete="new-password" placeholder="Guarde esta senha: sem ela não é possível restaurar">
             </div>
             <div id="ob-repo-result" style="display:none;padding:10px;border-radius:8px;margin-top:10px;font-size:0.85em"></div>
         </div>
@@ -229,8 +234,13 @@ async function runSystemCheck() {
     // Check connectivity to agent itself
     const checks = [
         { label: 'Servidor do Agente GBOC', url: '/api/v1/system/health', critical: true },
-        { label: 'Banco de Dados PostgreSQL', url: '/api/v1/diagnostic/db', critical: true },
-        { label: 'Restic (motor de backup)', url: '/api/v1/repositories/engines', critical: false },
+        { label: 'Banco de Dados PostgreSQL', url: '/api/system/health/schema', critical: true,
+          eval: d => [d.status === 'success' && d.schema_ok !== false,
+                      d.schema_ok === false ? 'Estrutura incompleta: ' + (d.missing_tables || []).join(', ') : 'Conectado (' + (d.database || 'postgresql') + ')'] },
+        { label: 'Motores de backup', url: '/api/engines/validate', critical: false,
+          eval: d => { const ok = (d.engines || []).filter(e => e.available || e.healthy);
+                       return [ok.length > 0, ok.length ? 'Disponíveis: ' + ok.map(e => e.display_name || e.name).join(', ')
+                                                        : 'Nenhum motor externo instalado — o Motor Nativo GBOC pode ser usado.']; } },
     ];
 
     let allOk = true;
@@ -240,8 +250,11 @@ async function runSystemCheck() {
         try {
             const r = await fetch(chk.url);
             const d = await r.json();
-            ok = r.ok && (d.status === 'success' || d.healthy === true || d.ok === true || Array.isArray(d.engines));
-            msg = d.message || (ok ? 'OK' : 'Verificar configuração');
+            if (r.ok && chk.eval) { [ok, msg] = chk.eval(d); }
+            else {
+                ok = r.ok && (d.status === 'success' || d.status === 'healthy' || d.healthy === true || d.ok === true);
+                msg = d.message || (ok ? 'OK' : 'Verificar configuração');
+            }
         } catch(e) {
             msg = 'Sem resposta: ' + e.message;
         }
@@ -274,13 +287,23 @@ async function testServerConnection() {
     }
 }
 
-function saveServerAndNext() {
+async function saveServerAndNext() {
     const url = document.getElementById('ob-server-url').value.trim();
-    if (url) {
-        // Save to server config API
-        fetch(window.GBOC_API_BASE + '/api/v1/config/server-url', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({server_url: url}) }).catch(()=>{});
+    const key = document.getElementById('ob-server-apikey').value.trim();
+    const res = document.getElementById('ob-server-test-result');
+    if (!url) { goObStep(3); return; }
+    try {
+        const r = await fetch((window.GBOC_API_BASE || '') + '/api/server/configure', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ server_url: url, api_key: key })
+        });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok || d.status === 'error' || d.success === false) throw new Error(d.message || d.detail || ('HTTP ' + r.status));
+        goObStep(3);
+    } catch (e) {
+        res.style.display = 'block'; res.style.background = 'rgba(245,101,101,0.1)'; res.style.color = '#f56565';
+        res.textContent = 'Não foi possível salvar a configuração do servidor: ' + e.message;
     }
-    goObStep(3);
 }
 
 async function createFirstRepo() {
@@ -289,20 +312,26 @@ async function createFirstRepo() {
     const engine = document.getElementById('ob-repo-engine').value;
     const res = document.getElementById('ob-repo-result');
 
+    const pwd = document.getElementById('ob-repo-pwd')?.value || '';
     if (!name || !path) {
         res.style.display='block'; res.style.background='rgba(245,101,101,0.1)'; res.style.color='#f56565';
         res.textContent='Preencha o nome e o caminho do repositório.'; return;
     }
+    if (pwd.length < 8) {
+        res.style.display='block'; res.style.background='rgba(245,101,101,0.1)'; res.style.color='#f56565';
+        res.textContent='Informe uma senha de criptografia com pelo menos 8 caracteres.'; return;
+    }
 
     try {
-        const r = await fetch(window.GBOC_API_BASE + '/api/v1/repositories', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, path, engine, status:'active'})});
-        const d = await r.json();
-        if (r.ok) {
+        const r = await fetch((window.GBOC_API_BASE || '') + '/api/repositories/', {method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ name, path, engine, type: 'local', motor_password: pwd })});
+        const d = await r.json().catch(() => ({}));
+        if (r.ok && d.success !== false && d.status !== 'error') {
             res.style.display='block'; res.style.background='rgba(72,187,120,0.1)'; res.style.color='#48bb78';
             res.innerHTML=`<i class="fas fa-check-circle"></i> Repositório criado com sucesso!`;
             setTimeout(() => goObStep(4), 1200);
         } else {
-            throw new Error(d.detail || 'Erro ao criar repositório');
+            throw new Error((typeof d.detail === 'string' ? d.detail : '') || d.message || 'Erro ao criar repositório');
         }
     } catch(e) {
         res.style.display='block'; res.style.background='rgba(245,101,101,0.1)'; res.style.color='#f56565';

@@ -491,7 +491,7 @@ class CentralServerClient:
             with self.shared_core.get_db_connection() as conn:
                 with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                     # Contar repositórios
-                    cursor.execute("SELECT COUNT(*) as total FROM repositories WHERE status='active'")
+                    cursor.execute("SELECT COUNT(*) as total FROM repositories WHERE status IN ('active', 'ready')")
                     repo_count = cursor.fetchone()['total']
                     
                     # Contar tarefas
@@ -658,6 +658,14 @@ class CentralServerClient:
         
         if cmd_type == "request_sync" or cmd_type == "request_full_sync":
             await self._send_full_sync()
+
+        elif cmd_type == "api_request":
+            # Gerenciamento remoto pelo Server: executa a chamada na API local do próprio Agente
+            # (mesmas regras/validações da interface) e devolve a resposta pelo WebSocket.
+            reply = await asyncio.to_thread(self._local_api_call, command.get("data") or {})
+            reply.update({"type": "api_response", "request_id": command.get("request_id"), "agent_id": self.agent_id})
+            if self.websocket and self.websocket_connected:
+                await self.websocket.send(json.dumps(reply, default=str))
             
         elif cmd_type == "request_manual_sync":
             sync_data = command.get("data", {})
@@ -707,6 +715,38 @@ class CentralServerClient:
             except Exception as m_err:
                 logger.error(f"Erro ao enviar espelho remoto: {m_err}")
     
+    def _local_api_call(self, req: Dict) -> Dict:
+        """Chama a API local (http://127.0.0.1:AGENT_PORT) com a chave de pareamento."""
+        method = str(req.get("method") or "GET").upper()
+        path = "/" + str(req.get("path") or "").lstrip("/")
+        if not path.startswith("/api/") or ".." in path or method not in ("GET", "POST", "PUT", "DELETE", "PATCH"):
+            return {"status_code": 400, "body": {"status": "error", "message": "Caminho/método não permitido"}}
+        if path.rstrip("/") in ("/api/system/shutdown", "/api/v1/system/shutdown"):
+            return {"status_code": 403, "body": {"status": "error", "message": "Desligamento remoto não é permitido por este canal"}}
+        port = int(os.getenv("AGENT_PORT", "9200"))
+        headers = outbound_headers(self.agent_id, self.api_key or "")
+        headers["Content-Type"] = "application/json"
+        last_err = None
+        for scheme in ("http", "https"):
+            try:
+                r = requests.request(method, f"{scheme}://127.0.0.1:{port}{path}", params=req.get("query") or None,
+                                     data=json.dumps(req["body"]) if req.get("body") is not None else None,
+                                     headers=headers, timeout=float(req.get("timeout") or 60), verify=False)
+                ctype = r.headers.get("content-type", "")
+                try:
+                    body = r.json() if "json" in ctype else r.text[:500000]
+                except ValueError:
+                    body = r.text[:500000]
+                return {"status_code": r.status_code, "content_type": ctype, "body": body}
+            except requests.exceptions.SSLError as e:
+                last_err = e
+            except requests.exceptions.ConnectionError as e:
+                last_err = e
+                continue
+            except Exception as e:
+                return {"status_code": 502, "body": {"status": "error", "message": f"Falha na API local do agente: {e}"}}
+        return {"status_code": 502, "body": {"status": "error", "message": f"API local do agente indisponível: {last_err}"}}
+
     async def _send_manual_sync(self, sync_request: Dict):
         """Envia sincronização manual via WebSocket"""
         try:
@@ -730,15 +770,23 @@ class CentralServerClient:
             with self.shared_core.get_db_connection() as conn:
                 cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) if PSYCOPG2_AVAILABLE else conn.cursor()
 
-                # Repositórios
+                # Repositórios / tarefas SEM senhas, chaves e scripts (antes iam todas as colunas,
+                # inclusive motor_password/cloud_password, e ficavam expostas no Server)
+                from core.central_inventory import sanitize_rows, build_inventory
                 cursor.execute("SELECT * FROM repositories")
                 rows = cursor.fetchall()
-                repos = [self._serialize_for_json(dict(row) if PSYCOPG2_AVAILABLE else dict(zip([d[0] for d in cursor.description], row))) for row in rows]
+                repos = sanitize_rows([self._serialize_for_json(dict(row) if PSYCOPG2_AVAILABLE else dict(zip([d[0] for d in cursor.description], row))) for row in rows])
 
                 # Tarefas
                 cursor.execute("SELECT * FROM tasks")
                 rows = cursor.fetchall()
-                tasks = [self._serialize_for_json(dict(row) if PSYCOPG2_AVAILABLE else dict(zip([d[0] for d in cursor.description], row))) for row in rows]
+                tasks = sanitize_rows([self._serialize_for_json(dict(row) if PSYCOPG2_AVAILABLE else dict(zip([d[0] for d in cursor.description], row))) for row in rows])
+
+                try:
+                    inventory = build_inventory(conn)
+                except Exception as inv_err:
+                    logger.warning(f"Inventário indisponível na sincronização completa: {inv_err}")
+                    inventory = None
 
                 # Execuções de tarefas (fallback se tabela não existir)
                 try:
@@ -776,6 +824,7 @@ class CentralServerClient:
                 "task_executions": executions,
                 "system_events": events,
                 "alerts": alerts,
+                "inventory": inventory,
                 "timestamp": datetime.now().isoformat()
             }
 
@@ -956,7 +1005,7 @@ class CentralServerClient:
                     cur = conn.cursor()
 
                     # Contar repositórios ativos
-                    cur.execute("SELECT COUNT(*) FROM repositories WHERE status='active'")
+                    cur.execute("SELECT COUNT(*) FROM repositories WHERE status IN ('active', 'ready')")
                     system_info["component_count"] = cur.fetchone()[0]
 
                     # Contar tarefas
@@ -1045,6 +1094,14 @@ class CentralServerClient:
                 logger.warning(f"Erro na sincronização de tarefas: {e}")
                 results["tasks"] = {"error": str(e)}
 
+            # Inventário completo (tarefas, execuções, tamanhos, restaurações, verificações) — HTTP,
+            # funciona mesmo quando o WebSocket está bloqueado por firewall/proxy
+            try:
+                results["inventory"] = self._sync_inventory()
+            except Exception as e:
+                logger.warning(f"Erro na sincronização do inventário: {e}")
+                results["inventory"] = {"error": str(e)}
+
             # Sincronizar estatísticas de backup
             try:
                 stats_result = self._sync_backup_statistics()
@@ -1062,12 +1119,34 @@ class CentralServerClient:
                 results["logs"] = {"error": str(e)}
 
             logger.info("✅ Sincronização concluída")
+            self._last_sync_at = datetime.now().isoformat()
             return results
 
         except Exception as e:
             logger.error(f"Erro na sincronização: {e}")
             return {"success": False, "error": str(e)}
     
+    def _sync_inventory(self) -> Dict[str, Any]:
+        """Envia o inventário completo e sanitizado ao Server (POST /api/v1/sync/inventory)."""
+        from core.central_inventory import build_inventory
+        from shared_core import get_shared_core
+        core = get_shared_core()
+        with core.get_db_connection() as conn:
+            inventory = build_inventory(conn)
+        response = self._session.post(
+            f"{self.server_url}/api/v1/sync/inventory",
+            json={"agent_id": self.agent_id, "inventory": inventory},
+            headers={"Content-Type": "application/json"},
+            timeout=120
+        )
+        if response.status_code == 200:
+            return {"status": "success", "tasks": len(inventory["tasks"]),
+                    "executions": len(inventory["task_executions"]), "repositories": len(inventory["repositories"])}
+        if response.status_code == 404:
+            return {"status": "skipped", "message": "Server sem suporte a inventário (atualize o GBOC Server)"}
+        logger.warning(f"Erro HTTP no inventário: {response.status_code}")
+        return {"status": "error", "error": f"HTTP {response.status_code}"}
+
     def _sync_repositories(self) -> Dict[str, Any]:
         """Sincroniza repositórios com servidor"""
         try:
@@ -1078,7 +1157,7 @@ class CentralServerClient:
 
                 cur.execute("""
                     SELECT id, name, engine, type, status, created_at, updated_at
-                    FROM repositories WHERE status='active'
+                    FROM repositories WHERE status IN ('active', 'ready')
                 """)
                 repositories = []
 
@@ -1206,8 +1285,13 @@ class CentralServerClient:
     def _sync_logs(self) -> Dict[str, Any]:
         """Sincroniza logs do sistema com servidor"""
         try:
-            # Enviar logs das últimas 24 horas
-            day_ago = (datetime.now() - timedelta(days=1)).isoformat()
+            # Envio incremental: só o que é novo desde o último envio bem-sucedido (marca d'água).
+            # Antes eram sempre os 500 mais recentes das últimas 24h — reenviava tudo a cada ciclo
+            # e, com mais de 500 logs entre ciclos, os mais antigos nunca chegavam ao Server.
+            # Na primeira execução (ou após reiniciar) começa pelas últimas 24h; o Server ignora repetidos.
+            # (a coluna timestamp é TEXT ISO em algumas bases e TIMESTAMP em outras: o parâmetro vai
+            #  sempre como texto ISO, que funciona nos dois casos)
+            since = getattr(self, "_log_sync_watermark", None) or (datetime.now() - timedelta(days=1)).isoformat()
 
             from shared_core import get_shared_core
             core = get_shared_core()
@@ -1217,13 +1301,15 @@ class CentralServerClient:
                 cur.execute("""
                     SELECT timestamp, level, source, message, details
                     FROM system_logs
-                    WHERE timestamp > %s
-                    ORDER BY timestamp DESC
-                    LIMIT 500
-                """, (day_ago,))
+                    WHERE timestamp >= %s
+                    ORDER BY timestamp ASC
+                    LIMIT 2000
+                """, (since,))
 
                 logs = []
-                for row in cur.fetchall():
+                rows = cur.fetchall()
+                newest = rows[-1][0] if rows else None
+                for row in rows:
                     log_info = {
                         "agent_id": self.agent_id,
                         "timestamp": row[0].isoformat() if hasattr(row[0], 'isoformat') else str(row[0]),
@@ -1246,6 +1332,8 @@ class CentralServerClient:
                 )
 
                 if response.status_code == 200:
+                    if newest is not None:
+                        self._log_sync_watermark = newest.isoformat() if hasattr(newest, "isoformat") else str(newest)
                     return {"synced": len(logs), "status": "success"}
                 else:
                     logger.warning(f"Erro HTTP na sincronização de logs: {response.status_code}")
@@ -1423,7 +1511,10 @@ class CentralServerClient:
             "heartbeat_active": self.heartbeat_thread.is_alive() if self.heartbeat_thread else False,
             "websocket_connected": self.websocket_connected,
             "websocket_active": self.websocket_thread.is_alive() if self.websocket_thread else False,
-            "last_websocket_message": self.last_websocket_message
+            "last_websocket_message": self.last_websocket_message,
+            "last_sync_at": getattr(self, "_last_sync_at", None),
+            "heartbeat_interval_minutes": config_manager.get_heartbeat_interval(),
+            "sync_interval_minutes": config_manager.get_sync_interval(),
         }
 
     async def send_realtime_alert(self, alert_type: str, message: str, details: Optional[Dict] = None):

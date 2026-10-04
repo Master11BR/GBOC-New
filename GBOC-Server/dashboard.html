@@ -38,7 +38,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     <title>GBOC Server Dashboard</title>
     
     
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
     <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.6.0">
     <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=14.6.0">
     <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=14.6.0">
@@ -51,7 +51,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     <script src="/static/gboc-layout-manager.js?v=14.6.0"></script>
     <script src="/static/gboc-modal.js?v=14.6.0"></script>
 <link rel="stylesheet" href="/static/gboc-hardware-hud.css?v=14.6.0">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="/static/vendor/chart.umd.min.js"></script>
     <script src="/modules/storage/storage.js?v=14.6.0"></script>
     <script src="/modules/job_alert/job_alert.js?v=14.6.0"></script>
     <script src="/static/ai_assistant.js?v=14.6.0"></script>
@@ -201,7 +201,8 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                     <div class="nav-link nav-sub active" onclick="switchTab('overview',this)"><i class="fas fa-home"></i> <span>Dashboard Central</span></div>
                     <div class="nav-link nav-sub" onclick="switchTab('agents',this)"><i class="fas fa-server"></i> <span>Agentes & MSP</span></div>
                     <div class="nav-link nav-sub" onclick="switchTab('multitenant',this)"><i class="fas fa-building"></i> <span>Multi-Tenant MSP</span></div>
-                    <div class="nav-link nav-sub" onclick="switchTab('rmm',this)"><i class="fas fa-terminal"></i> <span>RMM & Terminal</span></div>
+                    <div class="nav-link nav-sub" onclick="switchTab('remote',this)"><i class="fas fa-satellite-dish"></i> <span>Gerenciamento Remoto</span></div>
+                <div class="nav-link nav-sub" onclick="switchTab('rmm',this)"><i class="fas fa-terminal"></i> <span>RMM & Terminal</span></div>
                 </div>
             </div>
 
@@ -353,6 +354,9 @@ function gbocToggleSidebarCollapse(){
                 </div>
             </div>
 
+            <!-- Painel de Decisão (gráficos de apoio à decisão; modules/reports/decision_panel.js) -->
+            <div id="decision-panel" style="margin-bottom:18px"></div>
+
             <div class="chart-panel">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
                     <h3 style="margin:0"><i class="fas fa-activity" style="color:var(--primary);margin-right:8px"></i> Trafego & Performance</h3>
@@ -402,6 +406,9 @@ function gbocToggleSidebarCollapse(){
         </div>
 
         <!-- TAB: RMM & TERMINAL -->
+        <!-- TAB: GERENCIAMENTO REMOTO (modules/agents/remote_mgmt.js) -->
+        <div id="tab-remote" class="tab-section"><div id="remote-mgmt"></div></div>
+
         <div id="tab-rmm" class="tab-section">
             <div class="panel">
                 <h3><i class="fas fa-terminal" style="color:var(--primary);margin-right:8px"></i> RMM - Terminal Remoto & Gerenciador de Sistema</h3>
@@ -873,20 +880,8 @@ function gbocToggleSidebarCollapse(){
                 </div>
             </div>
 
-            <!-- CATÁLOGO DOS 50 RELATÓRIOS INTEGRADO -->
-            <div class="panel" style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:20px">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
-                    <h3 style="margin:0;font-size:1.1em;color:var(--primary)"><i class="fas fa-file-contract"></i> Catálogo dos 50 Relatórios Enterprise & IA</h3>
-                    <div style="display:flex;gap:8px">
-                        <input type="text" id="tabReportSearch" placeholder="Buscar relatório por ID/nome..." onkeyup="filterTabReports()" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:0.88em;width:240px">
-                        <button class="btn btn-primary" onclick="loadTabReportsCatalog()"><i class="fas fa-sync-alt"></i> Carregar</button>
-                    </div>
-                </div>
-                <div id="tab-reports-grid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(260px, 1fr));gap:12px;max-height:450px;overflow-y:auto;padding-right:6px">
-                    <p style="color:var(--text-muted)">Clique em "Carregar" ou navegue pelo catálogo...</p>
-                </div>
-                <div id="tab-report-output" style="margin-top:16px;display:none;background:var(--bg-dark);padding:16px;border-radius:8px;border:1px solid var(--border)"></div>
-            </div>
+            <!-- CENTRAL DE RELATÓRIOS (relatórios reais + executivos) -->
+            <div class="panel" id="report-center" style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:20px"></div>
         </div>
 
         <!-- TAB: CONFIG -->
@@ -959,6 +954,7 @@ function gbocToggleSidebarCollapse(){
                 <button class="btn btn-sm" onclick="switchSettingsTab('database',this)"><i class="fas fa-database"></i> Database</button>
                 <button class="btn btn-sm" onclick="switchSettingsTab('retention',this)"><i class="fas fa-clock"></i> Retenção</button>
                 <button class="btn btn-sm" onclick="switchSettingsTab('notifications',this)"><i class="fas fa-bell"></i> Notificações</button>
+                <button class="btn btn-sm" onclick="switchSettingsTab('reports',this)"><i class="fas fa-chart-pie"></i> Relatórios</button>
                 <button class="btn btn-sm" onclick="switchSettingsTab('ui',this)"><i class="fas fa-palette"></i> Interface</button>
             </div>
 
@@ -1948,7 +1944,8 @@ function gbocToggleSidebarCollapse(){
             if(targetId==='alerts') loadServerAlerts();
             if(targetId==='replication') loadServerReplication();
             if(targetId==='users') loadServerUsers();
-            if(targetId==='reports') { loadReportsTab(); loadTabReportsCatalog(); }
+            if(targetId==='reports') { loadReportsTab(); if (window.GBOCReportCenter) GBOCReportCenter.init(); }
+            if(targetId==='remote' && window.GBOCRemote) { GBOCRemote.init(); }
             if(targetId==='job-alert') loadServerJobAlertData();
             if(targetId==='storage') loadServerStorageData();
             if(targetId==='workloads') loadServerWorkloads();
@@ -3148,6 +3145,9 @@ function gbocToggleSidebarCollapse(){
                                 <i class="fas fa-plug"></i> Desconectar
                             </button>
                             ` : ''}
+                            <button class="btn" style="background:rgba(66,153,225,.12);color:var(--primary);border:1px solid var(--primary)" onclick="switchTab('remote'); setTimeout(()=>window.GBOCRemote && GBOCRemote.init('${a.agent_id}'), 50)">
+                                <i class="fas fa-sliders"></i> Gerenciar remotamente
+                            </button>
                             <button class="btn btn-primary" onclick="document.getElementById('agent-detail-panel').style.display='none'">
                                 <i class="fas fa-times"></i> Fechar
                             </button>
@@ -3768,7 +3768,8 @@ function gbocToggleSidebarCollapse(){
         async function loadReportsTab(){
             const days = document.getElementById('rpt-days').value || 30;
             try{
-                const r = await fetch(`${API}/reports/consolidated?days=${days}`);
+                const rcAgent = document.getElementById('rc-agent')?.value || '';
+                const r = await fetch(`${API}/reports/consolidated?days=${days}${rcAgent ? '&agent_id=' + encodeURIComponent(rcAgent) : ''}`);
                 if(!r.ok) throw new Error(`HTTP ${r.status}`);
                 const d = await r.json();
                 const g = d.global || {};
@@ -4087,6 +4088,7 @@ function gbocToggleSidebarCollapse(){
 
         let currentTabReports = [];
         async function loadTabReportsCatalog() {
+            if (window.GBOCReportCenter) { GBOCReportCenter.init(); return; }
             const container = document.getElementById('tab-reports-grid');
             if(!container) return;
             container.innerHTML = '<p style="color:var(--text-muted)"><i class="fas fa-spinner fa-spin"></i> Carregando catálogo dos 50 relatórios...</p>';
@@ -4504,6 +4506,9 @@ function gbocToggleSidebarCollapse(){
     <script src="/modules/agents/agents.js"></script>
     <script src="/modules/rmm/rmm.js"></script>
     <script src="/modules/reports/reports.js"></script>
+    <script src="/modules/reports/report_center.js"></script>
+    <script src="/modules/reports/decision_panel.js"></script>
+    <script src="/modules/agents/remote_mgmt.js"></script>
     <script src="/modules/multitenant/multitenant.js"></script>
     <script src="/modules/users/users.js"></script>
     <script src="/modules/engine_migration/engine_migration.js"></script>
