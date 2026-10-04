@@ -995,6 +995,13 @@ async def remote_restore_register(request: Request):
 # GBOC AGENT MODULAR ROUTERS INCLUDE (ALL AGENT MODULES)
 # ==============================================================================
 try:
+    # Migração de motores (chamada pelo Server com a chave de pareamento)
+    from api.api_migrator import router as agent_migrator_router
+    app.include_router(agent_migrator_router)
+except Exception as _mig_err:
+    logger.warning(f"Router de migração de motores indisponível: {_mig_err}")
+
+try:
     from modules.rmm.rmm_router import router as agent_rmm_router
     app.include_router(agent_rmm_router)
     from modules.cbt.cbt_router import router as agent_cbt_router

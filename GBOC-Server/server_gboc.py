@@ -1,5 +1,5 @@
 """
-GBOC Server 14.7.4
+GBOC Server 14.7.6
 Servidor Central — Real-time Agent Communication + Complete Data Sync + Advanced Analytics
 Banco de dados: PostgreSQL (oficial)
 """
@@ -275,6 +275,10 @@ def init_database():
                 synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+
+        # Índice para consultas/deduplicação de logs por agente e horário
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_agent_logs_agent_ts ON agent_logs (agent_id, timestamp)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_agent_logs_ts ON agent_logs (timestamp DESC)")
 
         cur.execute('''
             CREATE TABLE IF NOT EXISTS system_events (
@@ -1324,6 +1328,11 @@ async def server_auth_logout(request: Request, response: Response):
             cur = conn.cursor()
             cur.execute("DELETE FROM server_auth_tokens WHERE token = %s", (token,))
             conn.commit()
+            try:
+                from modules.users.auth_guard import invalidate_session_cache
+                invalidate_session_cache(token)
+            except Exception:
+                pass
             cur.close()
         except Exception:
             pass
@@ -2080,25 +2089,43 @@ async def sync_tasks(data: TaskSyncData):
 
 @app.post("/api/v1/sync/logs")
 async def sync_logs(data: LogSyncData):
-    conn = None
-    try:
-        conn = get_db(); cur = conn.cursor()
-        for log in data.logs:
-            cur.execute('''
+    """Recebe logs do agente. O agente reenvia as últimas 24h a cada ciclo, então cada
+    linha só é gravada se ainda não existir (mesmo agente + horário + mensagem).
+    Inserção em lote fora do event loop (antes: 1 INSERT por linha, ~700 ms bloqueando)."""
+    def _insert() -> Dict[str, int]:
+        from psycopg2.extras import execute_values
+        conn = None
+        try:
+            conn = get_db(); cur = conn.cursor()
+            rows = [(data.agent_id, l.get('level'), l.get('source'), l.get('message'),
+                     l.get('details'), l.get('timestamp')) for l in (data.logs or [])]
+            if not rows:
+                return {"received": 0, "inserted": 0}
+            execute_values(cur, """
                 INSERT INTO agent_logs (agent_id, level, source, message, details, timestamp)
-                VALUES (%s, %s, %s, %s, %s, %s)
-            ''', (
-                data.agent_id, log.get('level'), log.get('source'), log.get('message'),
-                log.get('details'), log.get('timestamp')
-            ))
-        conn.commit()
-        return {"status": "success", "synced_logs": len(data.logs)}
+                SELECT v.agent_id, v.level, v.source, v.message, v.details, v.ts::timestamp
+                FROM (VALUES %s) AS v(agent_id, level, source, message, details, ts)
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM agent_logs l
+                    WHERE l.agent_id = v.agent_id
+                      AND l.timestamp IS NOT DISTINCT FROM v.ts::timestamp
+                      AND l.message IS NOT DISTINCT FROM v.message
+                )
+            """, rows, page_size=500)
+            inserted = cur.rowcount
+            conn.commit()
+            cur.close()
+            return {"received": len(rows), "inserted": max(inserted, 0)}
+        except Exception:
+            if conn: conn.rollback()
+            raise
+        finally:
+            release_db(conn)
+    try:
+        res = await asyncio.to_thread(_insert)
+        return {"status": "success", "synced_logs": res["received"], "inserted": res["inserted"]}
     except Exception as e:
-        if conn: conn.rollback()
         raise HTTPException(500, str(e))
-    finally:
-        if 'cur' in locals() and cur: cur.close()
-        release_db(conn)
 
 @app.post("/api/v1/sync/push")
 async def push_sync_agents():
@@ -3218,130 +3245,15 @@ async def save_server_ai_config(request: Request):
     except (ValueError, TypeError) as e:
         raise HTTPException(400, detail=str(e))
 
-# --- LOGS API ---
-@app.get("/api/v1/logs")
-async def get_server_logs(
-    level: Optional[str] = None,
-    agent_id: Optional[str] = None,
-    source: Optional[str] = None,
-    search: Optional[str] = None,
-    limit: int = 50,
-    hours: int = 168
-):
-    """Consulta logs sincronizados dos agentes"""
-    conn = None
-    try:
-        conn = get_db(); cur = conn.cursor(cursor_factory=RealDictCursor)
-        conditions = ["timestamp >= (LOCALTIMESTAMP - INTERVAL '%s hours')" % hours]
-        params = []
-
-        if level:
-            conditions.append("UPPER(level) = UPPER(%s)")
-            params.append(level)
-        if agent_id:
-            conditions.append("agent_id = %s")
-            params.append(agent_id)
-        if source:
-            conditions.append("source ILIKE %s")
-            params.append(f"%{source}%")
-        if search:
-            conditions.append("(message ILIKE %s OR details ILIKE %s)")
-            params.extend([f"%{search}%", f"%{search}%"])
-
-        where = " AND ".join(conditions)
-        cur.execute(f"""
-            SELECT al.id, al.agent_id, al.level, al.source, al.message, al.details,
-                   al.timestamp, a.hostname as agent_name
-            FROM agent_logs al
-            LEFT JOIN agents a ON al.agent_id = a.agent_id
-            WHERE {where}
-            ORDER BY al.timestamp DESC
-            LIMIT %s
-        """, params + [limit])
-        logs = cur.fetchall()
-
-        # Serializar timestamps
-        for log in logs:
-            for k in ['timestamp', 'synced_at']:
-                if k in log and log[k] and hasattr(log[k], 'isoformat'):
-                    log[k] = log[k].isoformat()
-
-        # Contagem total
-        cur.execute(f"SELECT COUNT(*) as total FROM agent_logs WHERE {where}", params)
-        total = cur.fetchone()['total']
-
-        return {
-            "status": "success",
-            "logs": logs,
-            "total": total,
-            "showing": len(logs),
-            "filters": {"level": level, "agent_id": agent_id, "source": source, "hours": hours, "search": search}
-        }
-    except Exception as e:
-        logger.error(f"Erro ao consultar logs: {e}")
-        return {"status": "error", "message": str(e), "logs": [], "total": 0, "showing": 0}
-    finally:
-        if 'cur' in locals() and cur: cur.close()
-        release_db(conn)
-
-@app.get("/api/v1/logs/stats")
-async def get_server_log_stats():
-    """Estatísticas dos logs sincronizados"""
-    conn = None
-    try:
-        conn = get_db(); cur = conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute("""
-            SELECT
-                COUNT(*) as total,
-                COUNT(*) FILTER (WHERE UPPER(level) = 'ERROR') as errors,
-                COUNT(*) FILTER (WHERE UPPER(level) = 'WARNING') as warnings,
-                COUNT(*) FILTER (WHERE UPPER(level) = 'INFO') as info,
-                COUNT(DISTINCT agent_id) as agents_with_logs,
-                MIN(timestamp) as oldest,
-                MAX(timestamp) as newest
-            FROM agent_logs
-            WHERE timestamp >= (LOCALTIMESTAMP - INTERVAL '7 days')
-        """)
-        stats = cur.fetchone()
-        for k in ['oldest', 'newest']:
-            if stats.get(k) and hasattr(stats[k], 'isoformat'):
-                stats[k] = stats[k].isoformat()
-        return {"status": "success", **dict(stats)}
-    except Exception as e:
-        logger.error(f"Erro ao consultar stats de logs: {e}")
-        return {"status": "error", "message": str(e)}
-    finally:
-        if 'cur' in locals() and cur: cur.close()
-        release_db(conn)
+# --- LOGS API (Modularizado em modules/logs/logs_router.py) ---
+# Rotas /api/v1/logs, /api/v1/logs/stats e /api/v1/logs/agents/{agent_id}
+# são gerenciadas exclusivamente por modules.logs.logs_router.
 
 @app.get("/api/v1/agents/{agent_id}/logs")
-async def get_agent_logs(agent_id: str, level: Optional[str] = None, limit: int = 50, hours: int = 168):
-    """Logs de um agente específico"""
-    conn = None
-    try:
-        conn = get_db(); cur = conn.cursor(cursor_factory=RealDictCursor)
-        conditions = ["agent_id = %s", "timestamp >= (LOCALTIMESTAMP - INTERVAL '%s hours')" % hours]
-        params = [agent_id]
-        if level:
-            conditions.append("UPPER(level) = UPPER(%s)")
-            params.append(level)
-        where = " AND ".join(conditions)
-        cur.execute(f"""
-            SELECT id, level, source, message, details, timestamp
-            FROM agent_logs WHERE {where}
-            ORDER BY timestamp DESC LIMIT %s
-        """, params + [limit])
-        logs = cur.fetchall()
-        for log in logs:
-            if log.get('timestamp') and hasattr(log['timestamp'], 'isoformat'):
-                log['timestamp'] = log['timestamp'].isoformat()
-        return {"status": "success", "logs": logs, "total": len(logs), "agent_id": agent_id}
-    except Exception as e:
-        logger.error(f"Erro ao consultar logs do agente {agent_id}: {e}")
-        return {"status": "error", "message": str(e), "logs": []}
-    finally:
-        if 'cur' in locals() and cur: cur.close()
-        release_db(conn)
+async def get_agent_logs_compat(agent_id: str, level: Optional[str] = None, limit: int = 50, hours: int = 168):
+    """Compatibilidade reversa: delega para o módulo oficial de logs."""
+    from modules.logs.logs_router import get_agent_logs_by_id
+    return await get_agent_logs_by_id(agent_id=agent_id, level=level, limit=limit, hours=hours)
 
 @app.get("/")
 async def index(request: Request):
@@ -3862,6 +3774,11 @@ async def change_own_password(req: _ChangePwReq, request: Request):
             (me["user_id"], me["username"], request.client.host if request.client else "unknown")
         )
         conn.commit()
+        try:
+            from modules.users.auth_guard import invalidate_session_cache
+            invalidate_session_cache()
+        except Exception:
+            pass
         return {"status": "success", "message": "Senha alterada com sucesso"}
     except HTTPException:
         raise
@@ -4298,6 +4215,15 @@ async def server_maintenance_cleanup(request: Request):
         deleted['agent_metrics'] = cur.rowcount
         cur.execute("DELETE FROM agent_logs WHERE timestamp < (LOCALTIMESTAMP - make_interval(days := %s))", (logs_days,))
         deleted['agent_logs'] = cur.rowcount
+        # Remove cópias geradas pelo reenvio de 24h das versões anteriores (mantém a mais antiga)
+        cur.execute("""
+            DELETE FROM agent_logs a USING agent_logs b
+            WHERE a.id > b.id
+              AND a.agent_id IS NOT DISTINCT FROM b.agent_id
+              AND a.timestamp IS NOT DISTINCT FROM b.timestamp
+              AND a.message IS NOT DISTINCT FROM b.message
+        """)
+        deleted['agent_logs_duplicates'] = cur.rowcount
         cur.execute("DELETE FROM system_events WHERE created_at < (LOCALTIMESTAMP - make_interval(days := %s))", (events_days,))
         deleted['system_events'] = cur.rowcount
         cur.execute("DELETE FROM server_auth_tokens WHERE expires_at < LOCALTIMESTAMP")

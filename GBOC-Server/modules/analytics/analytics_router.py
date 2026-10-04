@@ -1,4 +1,4 @@
-# GBOC System v14.7.4 Enterprise Edition
+# GBOC System v14.7.6 Enterprise Edition
 # Module: Analytics Router
 #
 # GET /api/v1/analytics/comprehensive é implementado em server_gboc.py com dados reais do

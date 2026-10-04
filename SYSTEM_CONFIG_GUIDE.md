@@ -1,8 +1,8 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.7.4 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.7.6 Enterprise. Todos os direitos reservados. -->
 
-# 📘 GBOC System v14.7.4 — Guia Master de Configurações, Parâmetros e Controle de IA
+# 📘 GBOC System v14.7.6 — Guia Master de Configurações, Parâmetros e Controle de IA
 
-[![GBOC Version](https://img.shields.io/badge/GBOC%20Version-14.7.4-blue.svg)](file:///d:/GBOC-New/GBOC-New/README.md)
+[![GBOC Version](https://img.shields.io/badge/GBOC%20Version-14.7.6-blue.svg)](file:///d:/GBOC-New/GBOC-New/README.md)
 [![UI Model](https://img.shields.io/badge/UI__MODEL-modern%20(Official)-indigo.svg)]()
 [![Status](https://img.shields.io/badge/status-active-brightgreen.svg)]()
 
@@ -214,4 +214,4 @@ cd d:\GBOC-New\GBOC-New\GBOC-Server
 
 ---
 
-**GBOC System v14.7.4** — Guia Oficial de Parâmetros e Configuração.
+**GBOC System v14.7.6** — Guia Oficial de Parâmetros e Configuração.

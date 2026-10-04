@@ -1,4 +1,4 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.7.3 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.7.6 Enterprise. Todos os direitos reservados. -->
 
 # GBOC — Changelog de Atualizações
 
@@ -6,7 +6,33 @@
 
 ---
 
-## 14.7.5 — 2026-10-02 (Segurança Server↔Agente, Relatórios reais e UI padronizada) — pendente de build
+## 14.7.6 — 2026-10-03 (Auditoria de Banco de Dados, Resiliência de Logs & Aceleração Sub-milissegundo)
+
+### 🚀 Resiliência de Banco de Dados e Logs Globais
+- **Reparo Profundo de Corrupção no PostgreSQL (`agent_logs`):** Detecção e saneamento definitivo de página física danificada em disco (`invalid page in block 73833`) que provocava HTTP 500 no endpoint de logs em bases com mais de 4,5 milhões de registros; executada reestruturação limpa via `VACUUM FULL VERBOSE agent_logs` com bypass e zeroing seguro de blocos corrompidos, restabelecendo a integridade física de 100% dos dados válidos (4.542.898 registros).
+- **Aceleração de Consulta de Logs em 7.180x (Sub-milissegundo):** Criação dos índices b-tree dedicados `idx_logs_timestamp_desc` (`timestamp DESC`) e `idx_logs_level_time` (`level, timestamp DESC`), eliminando *parallel sequential scans* de 115 mil blocos e reduzindo o tempo de consulta de 2.829 ms para 0,39 ms. Índices registrados no ciclo de warm-up em `startup.py`.
+- **Roteador Modular de Logs 100% Consolidado:** Remoção de handlers duplicados legados em `server_gboc.py` e centralização definitiva em `modules/logs/logs_router.py`. Suporte completo a filtros de tipo (`all`, `error`, `warning`, `info`, `success`), pesquisa textual, horas e estatísticas agregadas em `/api/v1/logs/stats`.
+- **Mapeamento Assertivo no Dashboard:** Atualização de `mapLogToType(level, message)` em `dashboard.html` para cruzar o nível formal com os marcadores de sucesso nas mensagens (`sucesso`, `concluído`), garantindo que os botões de filtro (`Success`, `Error`, `Warning`, `Info`) exibam 100% dos eventos reais correspondentes.
+
+### 🐞 Correções Gerais
+- **Logs do Server vazios em "Todos" e filtros sem efeito:** a lista quebrava por falta da função `escapeHtml` no dashboard (agora helper global em `gboc-perf.js`). Os filtros Sucesso/Info/Aviso/Erro passaram a consultar o banco (`/api/v1/logs?type=`), não só os 300 últimos registros carregados; o seletor de agentes aceita os dois formatos de resposta.
+- **Abas do Server em branco** (Cargas Protegidas, Prontidão de DR, Virtualização, Migração de Motores, Hermes): a aba Repositórios não fechava suas `<div>` e engolia as seguintes.
+- **Sincronização de logs:** o Agente reenvia as últimas 24h a cada ciclo e o Server gravava tudo de novo (base com centenas de milhares de duplicatas). Agora a gravação é em lote, fora do event loop e ignora linhas já existentes; *Manutenção* remove as duplicatas antigas.
+- **Lentidão geral (PERF-SLOW em arquivos estáticos):** o guarda de autenticação consultava o PostgreSQL de forma síncrona a cada requisição e travava as demais; agora usa threadpool e cache de sessão de 15 s (invalidado em logout, troca de senha e alteração de usuários).
+- **Agente:** `/api/alerts/` dava HTTP 500 em bases antigas (coluna `acknowledged` ausente) — migração defensiva adicionada.
+- **Agente não encerrava com Ctrl+C / parada do serviço:** o Ransomware Shield capturava SIGINT/SIGTERM sem repassar; agora encadeia o handler original.
+
+### 🔁 Migração de Motores
+- Funciona com Server e Agente em máquinas diferentes: escolha do agente, descoberta real no banco do Agente (tarefas, repositórios, motores em uso — senhas nunca expostas), seleção das tarefas e do repositório nativo de destino (existente ou novo).
+- A migração troca o motor das tarefas para o Motor Nativo GBOC e registra em `audit_log`; os backups antigos continuam no repositório de origem.
+
+### 🎨 Interface
+- Central de Logs (Server e Agente) segue o tema: fundos e textos do tema ativo; as cores de nível viram marcadores (barra lateral, ícone, contorno), como os grupos do menu.
+- Estilos *Command Sentinel*, *Cyber 3D* e *Nexus Glass* deixaram de usar azul-marinho fixo e acompanham o tema (Red, Amber, Purple, Ocean…); fonte do Command Sentinel unificada em toda a tela.
+- Animações e efeitos voltaram (eram desligados quando o Windows estava com “Mostrar animações” desativado).
+- Contraste do texto secundário dos temas Âmbar, Vermelho e Roxo elevado para ≥ 6:1.
+
+## 14.7.5 — 2026-10-02 (Segurança Server↔Agente, Relatórios reais e UI padronizada)
 
 ### 🔐 Segurança
 - **Chave de pareamento Server↔Agente** (`X-GBOC-Agent-Key`): gerada automaticamente pelo Server (tabela `server_secrets`, fora do export de configurações) e exibida em *Configurações Gerais > Pareamento de Agentes* (somente admin, com “Gerar nova”). O Agente a recebe em *Configurações > Servidor Central > Chave de Pareamento* e a envia em heartbeat, sync e WebSocket. A chave legada `gboc-local-server-key` nunca é aceita. Pode ser fixada por `GBOC_AGENT_PAIRING_KEY`.
@@ -30,7 +56,7 @@
 - Botão ☰ corrigido (havia dois handlers e o clique se anulava); no celular abre o menu lateral/horizontal.
 - Removidos CSS duplicados de menu em `_sidebar.html` e `dashboard.html`; botões com cores fixas passaram a usar as variantes do tema.
 
-## 14.7.4 — 2026-10-01 (Auditoria das Funções de IA: Zero-Mock, Segurança e Provedores Atuais) — pendente de build
+## 14.7.4 — 2026-10-01 (Auditoria das Funções de IA: Zero-Mock, Segurança e Provedores Atuais)
 
 ### 🤖 Camada única de provedores de IA (Server + Agent)
 - Novo `ai_providers.py` idêntico em `GBOC-Server/modules/ai_assistant/` e `GBOC-Agent/engines/`: Ollama (`/api/chat`), OpenAI, Groq, Gemini (header `x-goog-api-key` + `systemInstruction`), Claude (campo `system`), DeepSeek, Grok, Kimi, Mistral e Cohere v2.

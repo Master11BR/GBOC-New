@@ -1771,10 +1771,146 @@ body.sidebar-collapsed .sidebar .nav-link > span { display: none !important; }
     }
 }
 
-/* ── 9.12 Acessibilidade e movimento reduzido ─────────────────────────────── */
-@media (prefers-reduced-motion: reduce) {
-    body[class*="layout-"] *, body[class*="layout-"] *::before, body[class*="layout-"] *::after {
-        animation-duration: .01ms !important;
-        transition-duration: .01ms !important;
+/* ── 9.12 Movimento ─────────────────────────────────────────────────────────
+   Animações e efeitos ficam sempre ativos (servidores Windows/RDP costumam ter
+   "Mostrar animações" desligado, o que antes zerava todos os efeitos do sistema). */
+
+/* ── 9.13 Estilos de UI acompanham o TEMA de cor ──────────────────────────────
+   Antes Command Sentinel / Cyber 3D / Nexus Glass tinham fundos azul-marinho fixos
+   (#0f172a, #020617, rgba(30,41,59)) e ignoravam os temas Red/Amber/Purple/Ocean. */
+html[data-ui-style="command-sentinel"] {
+    --font-sans: 'JetBrains Mono', 'Cascadia Code', Consolas, 'Courier New', monospace;
+    --card-bg: var(--bg-card);
+    --input-bg: var(--bg-input);
+    --input-border: 1px solid var(--border-color);
+}
+html[data-ui-style="cyber-3d"] { --card-bg: var(--bg-card); }
+html[data-ui-style="nexus-glass"] { --card-bg: var(--bg-card); }
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+    html[data-ui-style="command-sentinel"] { --card-bg: color-mix(in srgb, var(--bg-card) 94%, var(--primary-color)); }
+    html[data-ui-style="cyber-3d"] {
+        --card-bg: linear-gradient(135deg, color-mix(in srgb, var(--bg-card) 88%, var(--primary-color)) 0%, var(--bg-card) 100%);
+    }
+    html[data-ui-style="nexus-glass"] { --card-bg: color-mix(in srgb, var(--bg-card) 72%, transparent); }
+}
+html[data-ui-style="command-sentinel"] body .sidebar .nav-link {
+    background: var(--bg-input) !important;
+    border: 1px solid var(--border-color) !important;
+}
+html[data-ui-style="command-sentinel"] body .sidebar .nav-link:hover { border-color: var(--group-accent) !important; }
+html[data-ui-style="command-sentinel"] body .sidebar :is(.nav-link.active, .nav-link.in-focus) {
+    background: var(--bg-main) !important;
+    border-color: var(--group-accent) !important;
+    box-shadow: 0 0 12px var(--group-glow) !important;
+}
+html:is([data-ui-style="cyber-3d"], [data-ui-style="nexus-glass"]) body .sidebar .nav-link {
+    background: var(--bg-input) !important;
+    border: 1px solid var(--border-color) !important;
+}
+html:is([data-ui-style="cyber-3d"], [data-ui-style="nexus-glass"]) body .sidebar :is(.nav-link.active, .nav-link.in-focus) {
+    background: var(--bg-card) !important;
+    border-color: var(--group-accent) !important;
+    box-shadow: 0 0 16px var(--group-glow) !important;
+}
+
+/* ── 9.14 Central de Logs / Notificações (Server + Agent) ────────────────────
+   Superfícies seguem o tema; as cores de nível (sucesso/info/aviso/erro) viram
+   MARCADORES — barra lateral, ícone e contorno — como os grupos do menu. */
+body[class*="layout-"] :is(.log-toast-panel, .toast-panel) {
+    background: var(--card-bg, var(--bg-card)) !important;
+    border: var(--card-border, 1px solid var(--border-color)) !important;
+    border-radius: var(--card-radius, 12px) !important;
+    box-shadow: var(--card-shadow, none) !important;
+}
+body[class*="layout-"] :is(.filter, .toast-filter) {
+    --mk: var(--primary-color);
+    min-height: var(--control-h-sm);
+    padding: 0 14px;
+    gap: 7px;
+    font-size: var(--fs-sm);
+    font-weight: 700;
+    color: var(--text-primary) !important;
+    background: var(--bg-input) !important;
+    border: 1px solid var(--border-color);
+    border-radius: var(--btn-radius, 8px);
+    box-shadow: inset 3px 0 0 var(--mk);
+}
+body[class*="layout-"] :is(.filter, .toast-filter)[data-filter="success"] { --mk: var(--success-color); }
+body[class*="layout-"] :is(.filter, .toast-filter)[data-filter="info"]    { --mk: var(--info-color); }
+body[class*="layout-"] :is(.filter, .toast-filter)[data-filter="warning"] { --mk: var(--warning-color); }
+body[class*="layout-"] :is(.filter, .toast-filter)[data-filter="error"]   { --mk: var(--danger-color); }
+body[class*="layout-"] :is(.filter, .toast-filter) i { color: var(--mk); }
+body[class*="layout-"] :is(.filter, .toast-filter):hover {
+    border-color: var(--mk);
+    transform: translateY(-1px);
+    filter: none;
+}
+body[class*="layout-"] :is(.filter, .toast-filter).active {
+    border-color: var(--mk);
+    background: var(--bg-card) !important;
+    box-shadow: inset 3px 0 0 var(--mk), 0 0 0 1px var(--mk), 0 0 14px var(--primary-glow, transparent);
+}
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+    body[class*="layout-"] :is(.filter, .toast-filter).active {
+        background: color-mix(in srgb, var(--mk) 16%, var(--bg-input)) !important;
+        box-shadow: inset 3px 0 0 var(--mk), 0 0 0 1px var(--mk), 0 0 14px color-mix(in srgb, var(--mk) 35%, transparent);
     }
 }
+body[class*="layout-"] :is(.toolbar, .toast-toolbar) { color: var(--text-muted); font-size: var(--fs-xs); }
+body[class*="layout-"] :is(.toolbar, .toast-toolbar) button { color: var(--text-muted); font-size: var(--fs-xs); }
+body[class*="layout-"] :is(.toolbar, .toast-toolbar) button:hover { color: var(--primary-color); }
+
+body[class*="layout-"] .toast {
+    --mk: var(--info-color);
+    color: var(--text-primary) !important;
+    background: var(--bg-input) !important;
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--mk);
+    border-radius: 10px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+}
+body[class*="layout-"] .toast:is([data-type="success"], .success) { --mk: var(--success-color); }
+body[class*="layout-"] .toast:is([data-type="info"], .info)       { --mk: var(--info-color); }
+body[class*="layout-"] .toast:is([data-type="warning"], .warning) { --mk: var(--warning-color); }
+body[class*="layout-"] .toast:is([data-type="error"], .error)     { --mk: var(--danger-color); }
+body[class*="layout-"] .toast:hover { border-color: var(--mk); transform: translateX(2px); }
+body[class*="layout-"] .toast::before { background: var(--primary-soft); opacity: .45; box-shadow: none; }
+body[class*="layout-"] .toast::after  { background: var(--primary-soft); opacity: .3; }
+body[class*="layout-"] .toast .icon {
+    color: var(--mk);
+    background: var(--bg-card);
+    border: 1px solid var(--mk);
+    box-shadow: 0 0 10px var(--primary-glow, transparent);
+}
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+    body[class*="layout-"] .toast { background: color-mix(in srgb, var(--mk) 7%, var(--bg-input)) !important; }
+    body[class*="layout-"] .toast::before { background: color-mix(in srgb, var(--mk) 12%, transparent); opacity: 1; }
+    body[class*="layout-"] .toast::after  { background: color-mix(in srgb, var(--mk) 8%, transparent); opacity: 1; }
+    body[class*="layout-"] .toast .icon {
+        background: color-mix(in srgb, var(--mk) 16%, transparent);
+        box-shadow: 0 0 12px color-mix(in srgb, var(--mk) 30%, transparent);
+    }
+}
+body[class*="layout-"] .toast .copy,
+body[class*="layout-"] .toast .copy strong { color: var(--text-primary); }
+body[class*="layout-"] .toast .copy strong > span:first-child { color: var(--mk); }
+body[class*="layout-"] .toast .copy > span { color: var(--text-secondary, var(--text-muted)); }
+body[class*="layout-"] .toast .meta-badge {
+    color: var(--text-secondary, var(--text-muted));
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+}
+body[class*="layout-"] .toast :is(.dismiss, .ai-btn) {
+    color: var(--text-muted);
+    background: transparent;
+    border: 1px solid var(--border-color);
+}
+body[class*="layout-"] .toast :is(.dismiss, .ai-btn):hover { color: var(--mk); border-color: var(--mk); background: var(--bg-card); }
+body[class*="layout-"] :is(.empty, .empty-logs) { background: var(--bg-input); border-color: var(--border-color); color: var(--text-muted); }
+
+/* ── 9.15 Contraste do texto secundário (WCAG AA ≥ 4.5:1) ────────────────────
+   O "texto apagado" dos temas escuros coloridos ficava abaixo de 4,5:1
+   (âmbar #b45309 = 3,9:1; roxo #9333ea = 3,7:1). Mantém a mesma cor-base do tema. */
+html[data-color-theme="amber"], html[data-color-theme="orange"] { --text-muted: #c98a3e !important; }
+html[data-color-theme="red"], html[data-color-theme="crimson"]  { --text-muted: #e57373 !important; }
+html[data-color-theme="purple"]                                 { --text-muted: #b388f5 !important; }

@@ -1,6 +1,6 @@
 <#
 ==============================================================================
-GBOC System v14.7.4 Enterprise Edition
+GBOC System v14.7.6 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
@@ -391,7 +391,7 @@ Write-Step "Criando scripts de controle e execucao em $TargetDir..."
 if ($InstallMode -in @("Server", "Both")) {
     $sLines = @(
         "@echo off",
-        "title GBOC Server v14.7.4 Enterprise",
+        "title GBOC Server v14.7.6 Enterprise",
         "cd /d ""$ServerDir""",
         "set SERVER_PORT=$ServerPort",
         "set SERVER_HOST=0.0.0.0",
@@ -406,7 +406,7 @@ if ($InstallMode -in @("Server", "Both")) {
 if ($InstallMode -in @("Agent", "Both")) {
     $aLines = @(
         "@echo off",
-        "title GBOC Agent v14.7.4 Enterprise",
+        "title GBOC Agent v14.7.6 Enterprise",
         "cd /d ""$AgentDir""",
         "set AGENT_PORT=$AgentPort",
         "set AGENT_HOST=0.0.0.0",

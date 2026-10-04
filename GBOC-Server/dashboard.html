@@ -1575,6 +1575,9 @@ function gbocToggleSidebarCollapse(){
                         <tr><td colspan="7" style="text-align:center;color:var(--text-muted)">Carregando dados de armazenamento...</td></tr>
                     </tbody>
                 </table>
+            </div>
+        </div>
+
         <!-- TAB: WORKLOADS (CARGAS PROTEGIDAS) -->
         <div id="tab-workloads" class="tab-section">
             <div class="panel">
@@ -1737,7 +1740,7 @@ function gbocToggleSidebarCollapse(){
                     <button class="btn btn-primary" onclick="if(typeof runEngineDiscovery==='function')runEngineDiscovery()"><i class="fas fa-search"></i> Redescobrir Motores Legados</button>
                 </div>
                 <p style="font-size:0.88em;color:var(--text-muted);margin-bottom:20px">
-                    Migração automática de jobs, repositórios e senhas de motores legados (Restic, Duplicati, etc.) para o <strong>Motor Nativo GBOC (FastCDC v4 / Zstd / AES-256-GCM / WORM)</strong>.
+                    Escolha o agente, as tarefas que usam motores externos (Restic, Kopia, Duplicati) e o repositório de destino: as tarefas passam a rodar no <strong>Motor Nativo GBOC</strong> a partir da próxima execução. Os backups antigos continuam no repositório de origem para restauração.
                 </p>
 
                 <div class="panel step-wizard-nav" style="background:var(--bg-card);padding:14px 20px;border-radius:12px;border:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
@@ -2263,13 +2266,12 @@ function gbocToggleSidebarCollapse(){
         async function loadLogAgentFilter(){
             try{
                 const r=await fetch(`${API}/agents`);
-                const agents=await r.json();
+                const data=await r.json();
+                const agents=Array.isArray(data)?data:(data.agents||[]);
                 const sel=document.getElementById('log-agent');
                 const current=sel.value;
-                sel.innerHTML='<option value="">Todos os Agentes</option>';
-                (agents||[]).forEach(a=>{
-                    sel.innerHTML+=`<option value="${a.agent_id}">${a.hostname||a.agent_id}</option>`;
-                });
+                sel.innerHTML='<option value="">Todos os Agentes</option>'+agents.map(a=>
+                    `<option value="${escapeHtml(a.agent_id)}">${escapeHtml(a.hostname||a.agent_id)}</option>`).join('');
                 if(current)sel.value=current;
             }catch(e){console.error('loadLogAgentFilter:',e)}
         }
@@ -2283,7 +2285,8 @@ function gbocToggleSidebarCollapse(){
             document.querySelectorAll('#tab-logs .filter').forEach(b => {
                 b.classList.toggle('active', b === btn);
             });
-            renderServerLogs(true);
+            // Busca no banco os registros do nível escolhido (não só entre os 300 já carregados)
+            loadLogs();
         }
 
         function handleServerLogSearch() {
@@ -2291,11 +2294,12 @@ function gbocToggleSidebarCollapse(){
             renderServerLogs(false);
         }
 
-        function mapLogToType(level) {
+        function mapLogToType(level, message) {
             const lvl = (level || 'info').toLowerCase();
-            if (lvl.includes('err') || lvl.includes('crit') || lvl.includes('fatal')) return 'error';
-            if (lvl.includes('warn')) return 'warning';
-            if (lvl.includes('succ') || lvl.includes('ok')) return 'success';
+            const msg = (message || '').toLowerCase();
+            if (lvl.includes('err') || lvl.includes('crit') || lvl.includes('fatal') || msg.includes('[error]') || msg.includes('[critical]') || msg.includes('falha') || msg.includes('error:')) return 'error';
+            if (lvl.includes('warn') || msg.includes('[warning]') || msg.includes('[warn]') || msg.includes('alerta') || msg.includes('threshold=') || msg.includes('[perf-slow]')) return 'warning';
+            if (lvl.includes('succ') || lvl.includes('ok') || msg.includes('[success]') || msg.includes('[ok]') || msg.includes('sucesso') || msg.includes('concluíd') || msg.includes('concluido') || msg.includes('migrada com sucesso') || msg.includes('iniciado com sucesso')) return 'success';
             return 'info';
         }
 
@@ -2387,7 +2391,8 @@ function gbocToggleSidebarCollapse(){
                 const search = document.getElementById('log-search')?.value || '';
                 _serverLogSearchTerm = search;
                 let url = `${API}/logs?limit=300`;
-                if(agent) url += `&agent_id=${agent}`;
+                if(agent) url += `&agent_id=${encodeURIComponent(agent)}`;
+                if(_serverActiveLogFilter && _serverActiveLogFilter !== 'all') url += `&type=${_serverActiveLogFilter}`;
                 if(search) url += `&search=${encodeURIComponent(search)}`;
 
                 const [logsRes, statsRes] = await Promise.allSettled([
@@ -2412,7 +2417,8 @@ function gbocToggleSidebarCollapse(){
                     const data = logsRes.value;
                     const rawLogs = data.logs || [];
                     _serverAllLogs = rawLogs.map((l, idx) => {
-                        const type = mapLogToType(l.level);
+                        const calculatedType = mapLogToType(l.level, l.message);
+                        const type = (_serverActiveLogFilter && _serverActiveLogFilter !== 'all') ? _serverActiveLogFilter : calculatedType;
                         return {
                             id: l.id || `${Date.now()}_${idx}`,
                             type: type,

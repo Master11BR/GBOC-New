@@ -414,9 +414,13 @@ class RansomwareShield:
         self.entropy_thread: Optional[threading.Thread] = None
         
         # Graceful shutdown (signal só funciona na main thread)
+        # Encadeia com o handler anterior (uvicorn/serviço): antes o Shield "engolia" o
+        # SIGINT/SIGTERM e o Agente não encerrava (Ctrl+C / parada do serviço).
+        self._prev_handlers = {}
         try:
-            signal.signal(signal.SIGINT, self._shutdown)
-            signal.signal(signal.SIGTERM, self._shutdown)
+            for _sig in (signal.SIGINT, signal.SIGTERM):
+                self._prev_handlers[_sig] = signal.getsignal(_sig)
+                signal.signal(_sig, self._shutdown)
         except (ValueError, OSError):
             pass  # Não estamos na main thread — OK, agent_server gerencia shutdown
         atexit.register(self.stop)
@@ -475,6 +479,11 @@ class RansomwareShield:
     def _shutdown(self, signum=None, frame=None):
         self.logger.info(f"Sinal {signum} - shutdown gracioso")
         self.stop()
+        prev = getattr(self, '_prev_handlers', {}).get(signum)
+        if callable(prev) and prev is not self._shutdown:
+            prev(signum, frame)
+        elif prev == signal.SIG_DFL and signum == signal.SIGINT:
+            raise KeyboardInterrupt
 
     def handle_threat(self, alert: ThreatAlert):
         """Processa ameaça detectada."""
