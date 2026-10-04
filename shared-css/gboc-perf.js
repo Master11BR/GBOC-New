@@ -11,6 +11,22 @@
     'use strict';
 
     // ------------------------------------------------------------------
+    // escapeHtml(text) — helper global único (Server + Agent).
+    // Páginas que já definem a sua própria versão continuam usando a delas.
+    // Sem ele, a lista de logs do Server quebrava (ReferenceError) e ficava vazia.
+    // ------------------------------------------------------------------
+    if (typeof global.escapeHtml !== 'function') {
+        global.escapeHtml = function (text) {
+            return String(text == null ? '' : text)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        };
+    }
+
+    // ------------------------------------------------------------------
     // safeRender(el, nextHtml) — evita .innerHTML = mesmo HTML
     // Quando os dados do polling nao mudaram, nao dispara reflow.
     // Economiza ~90% dos reflows em dashboards com polling frequente.

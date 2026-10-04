@@ -126,6 +126,10 @@ def run_auto_migrations(conn):
 
             defensive_statements = [
                 "ALTER TABLE repositories ADD COLUMN IF NOT EXISTS encryption_password TEXT;",
+                # Bases antigas criaram "alerts" sem estas colunas (HTTP 500 em /api/alerts/)
+                "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS acknowledged BOOLEAN DEFAULT FALSE;",
+                "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS resolved BOOLEAN DEFAULT FALSE;",
+                "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS details TEXT;",
                 "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;",
                 "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS source_paths TEXT;",
                 "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS engine TEXT DEFAULT 'restic';",

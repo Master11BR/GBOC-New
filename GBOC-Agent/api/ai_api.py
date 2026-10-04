@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 14.7.4 - GBOC Copilot AI Assistant API (Agent)
+GBOC 14.7.6 - GBOC Copilot AI Assistant API (Agent)
 Chat multi-provedor, configuração de provedores e diagnóstico do nó com telemetria real.
 
 Observação de segurança: os prefixos /api/ai e /api/v1/ai não são mais públicos no

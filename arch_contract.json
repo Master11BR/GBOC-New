@@ -1,6 +1,6 @@
 {
   "system": "GBOC System Enterprise",
-  "version": "14.7.4",
+  "version": "14.7.6",
   "strict_modularization": true,
   "rules": [
     {

@@ -45,6 +45,8 @@ async def initialize_server():
     db_manager.create_index_if_not_exists("agents", "idx_agent_last_heartbeat", "(last_heartbeat)")
     db_manager.create_index_if_not_exists("agent_metrics", "idx_metrics_agent_time", "(agent_id, timestamp DESC)")
     db_manager.create_index_if_not_exists("agent_logs", "idx_logs_agent_time", "(agent_id, timestamp DESC)")
+    db_manager.create_index_if_not_exists("agent_logs", "idx_logs_timestamp_desc", "(timestamp DESC)")
+    db_manager.create_index_if_not_exists("agent_logs", "idx_logs_level_time", "(level, timestamp DESC)")
     db_manager.create_index_if_not_exists("agent_task_executions", "idx_exec_agent_status", "(agent_id, status)")
     print("✓ Índices criados\n")
 

@@ -12,180 +12,193 @@ from datetime import datetime
 
 logger = logging.getLogger("gboc_engine_migrator")
 
+NATIVE_ENGINES = ('gboc_native', 'native', 'gboc', 'gboc_native_v4', 'gboc native')
+
+
 class GBOCEngineMigrator:
     """
-    Motor de Descoberta e Migração de Configurações de Backup Legadas/Externas
-    para o Motor Nativo GBOC (FastCDC v4 / Zstd / AES-256-GCM / Imutabilidade WORM).
+    Migração de tarefas de motores externos (Restic, Kopia, Duplicati) para o Motor Nativo GBOC.
+
+    Zero-Mock: lê e grava somente no banco do Agente (tabelas ``tasks`` e ``repositories``).
+    A migração troca o motor da tarefa e aponta para um repositório nativo; os backups antigos
+    permanecem intactos no repositório de origem (continuam disponíveis para restauração).
     """
 
-    def __init__(self):
-        self.agent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.data_dir = os.path.join(self.agent_dir, "data")
-        os.makedirs(self.data_dir, exist_ok=True)
+    def _conn(self):
+        from shared_core import get_shared_core
+        return get_shared_core().get_db_connection()
+
+    @staticmethod
+    def _is_native(engine: Any) -> bool:
+        return str(engine or '').strip().lower() in NATIVE_ENGINES
 
     def discover_engines(self) -> Dict[str, Any]:
-        """
-        Varre o sistema (100% Zero-Mock) em busca de tarefas, repositórios e senhas
-        configurados em motores como Restic, Duplicati, Windows Backup e GBOC Legacy.
-        """
-        discovered_engines = []
-        discovered_tasks = []
-        discovered_repositories = []
-        discovered_credentials = []
+        tasks: List[Dict[str, Any]] = []
+        repositories: List[Dict[str, Any]] = []
+        with self._conn() as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT t.id, t.name, COALESCE(t.engine, ''), t.repository_id, r.name, t.source_paths,
+                       t.schedule_enabled, t.schedule_cron, t.retention_days, t.enabled
+                FROM tasks t LEFT JOIN repositories r ON r.id = t.repository_id
+                ORDER BY t.name
+            """)
+            for row in cur.fetchall():
+                engine = row[2] or ''
+                tasks.append({
+                    "id": row[0],
+                    "name": row[1],
+                    "current_engine": engine or 'não definido',
+                    "repository_id": row[3],
+                    "repository_name": row[4],
+                    "source_paths": [p for p in str(row[5] or '').replace(';', '\n').splitlines() if p.strip()],
+                    "schedule": row[7] if row[6] else None,
+                    "retention_days": row[8],
+                    "enabled": bool(row[9]),
+                    "can_migrate": not self._is_native(engine),
+                })
+            cur.execute("""
+                SELECT id, name, type, path, COALESCE(engine, ''), initialized, status,
+                       (COALESCE(password, '') <> '' OR COALESCE(motor_password, '') <> ''
+                        OR COALESCE(encryption_password, '') <> '') AS has_password
+                FROM repositories ORDER BY name
+            """)
+            for row in cur.fetchall():
+                repositories.append({
+                    "id": row[0],
+                    "name": row[1],
+                    "type": row[2],
+                    "target_path": row[3],
+                    "engine_type": row[4] or 'não definido',
+                    "initialized": bool(row[5]),
+                    "status": row[6],
+                    "has_password": bool(row[7]),
+                    "is_native": self._is_native(row[4]),
+                })
+            cur.close()
 
-        # 1. VARREDURA RESTIC (Local / Cloud)
-        restic_cfg_path = os.path.join(self.data_dir, "restic_repositories.json")
-        if os.path.exists(restic_cfg_path):
-            try:
-                with open(restic_cfg_path, "r", encoding="utf-8") as f:
-                    r_repos = json.load(f)
-                    if isinstance(r_repos, list):
-                        for repo in r_repos:
-                            discovered_repositories.append({
-                                "id": f"restic_{repo.get('id', len(discovered_repositories)+1)}",
-                                "engine_type": "Restic CLI/API",
-                                "name": repo.get("name") or repo.get("repo_url", "Repositório Restic"),
-                                "target_path": repo.get("repo_url") or repo.get("path", "S3/Local"),
-                                "storage_type": "cloud_s3" if "s3." in str(repo.get("repo_url")).lower() else "local",
-                                "has_password": bool(repo.get("password") or repo.get("key")),
-                                "raw_config": repo
-                            })
-                            if repo.get("password"):
-                                discovered_credentials.append({
-                                    "target": repo.get("name", "Restic Key"),
-                                    "engine": "Restic",
-                                    "key_alias": f"RESTIC_PASSWORD_{repo.get('id', '1')}"
-                                })
-            except Exception as e:
-                logger.warning(f"Erro ao ler repositórios Restic: {e}")
-
-        # 2. VARREDURA DE TAREFAS AGENDADAS EXISTENTES (GBOC Tasks / Restic / Duplicati)
-        tasks_cfg_path = os.path.join(self.data_dir, "tasks.json")
-        if os.path.exists(tasks_cfg_path):
-            try:
-                with open(tasks_cfg_path, "r", encoding="utf-8") as f:
-                    tasks_data = json.load(f)
-                    if isinstance(tasks_data, list):
-                        for t in tasks_data:
-                            eng = t.get("engine", "legacy")
-                            discovered_tasks.append({
-                                "id": t.get("id"),
-                                "name": t.get("name", "Tarefa de Backup"),
-                                "source_paths": t.get("source_paths") or t.get("paths") or ["C:\\Data"],
-                                "current_engine": eng,
-                                "schedule": t.get("schedule", "0 2 * * *"),
-                                "retention_days": t.get("retention_days", 30),
-                                "can_migrate": eng != "gboc_native_v4",
-                                "raw_config": t
-                            })
-            except Exception as e:
-                logger.warning(f"Erro ao ler tarefas de backup: {e}")
-
-        # 3. VERIFICAÇÃO DE DADOS DE MOTORES INSTALADOS NO SO
-        engines_detected = [
-            {"name": "GBOC Native Engine v4", "installed": True, "active_tasks": sum(1 for t in discovered_tasks if t.get("current_engine") == "gboc_native_v4")},
-            {"name": "Restic Backup Engine", "installed": len(discovered_repositories) > 0, "active_tasks": sum(1 for t in discovered_tasks if "restic" in str(t.get("current_engine")).lower())},
-            {"name": "Duplicati Engine Engine", "installed": os.path.exists("C:\\Program Files\\Duplicati 2") or os.path.exists("/usr/bin/duplicati-cli"), "active_tasks": 0}
-        ]
-
+        by_engine: Dict[str, int] = {}
+        for t in tasks:
+            by_engine[t["current_engine"]] = by_engine.get(t["current_engine"], 0) + 1
+        legacy_tasks = [t for t in tasks if t["can_migrate"]]
         return {
             "status": "success",
             "timestamp": datetime.now().isoformat(),
             "summary": {
-                "total_engines_found": len([e for e in engines_detected if e["installed"]]),
-                "total_tasks_found": len(discovered_tasks),
-                "total_repositories_found": len(discovered_repositories),
-                "total_credentials_found": len(discovered_credentials)
+                "total_engines_found": len(by_engine),
+                "total_tasks_found": len(tasks),
+                "legacy_tasks_found": len(legacy_tasks),
+                "total_repositories_found": len(repositories),
+                "native_repositories_found": sum(1 for r in repositories if r["is_native"]),
+                # Senhas nunca são expostas: só a contagem de repositórios que possuem senha salva
+                "total_credentials_found": sum(1 for r in repositories if r["has_password"]),
             },
-            "engines": engines_detected,
-            "tasks": discovered_tasks,
-            "repositories": discovered_repositories,
-            "credentials": discovered_credentials
+            "engines": [{"name": k, "tasks": v, "native": self._is_native(k)} for k, v in sorted(by_engine.items())],
+            "tasks": tasks,
+            "repositories": repositories,
+            "native_repositories": [r for r in repositories if r["is_native"]],
+            "credentials": [{"target": r["name"], "engine": r["engine_type"], "key_alias": "senha salva no repositório"}
+                            for r in repositories if r["has_password"]],
         }
 
-    def execute_migration(self, selected_task_ids: List[Any], selected_repo_ids: List[str], target_params: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Executa a conversão e criação automatizada no Motor Nativo GBOC (FastCDC v4).
-        """
-        discovery = self.discover_engines()
-        migrated_tasks = []
-        migrated_repos = []
+    def _create_native_repository(self, name: str, motor_password: str) -> Dict[str, Any]:
+        from shared_core import get_shared_core
+        from engines.repository_manager import RepositoryManager
+        rm = RepositoryManager(get_shared_core())
+        return rm.create_repository({
+            "name": name,
+            "type": "local",
+            "engine": "gboc_native",
+            "motor_password": motor_password,
+        })
+
+    def execute_migration(self, selected_task_ids: List[Any], selected_repo_ids: List[str],
+                          target_params: Dict[str, Any]) -> Dict[str, Any]:
         start_time = time.time()
-
-        # 1. MIGRAÇÃO DE REPOSITÓRIOS PARA O MOTOR NATIVO GBOC
-        native_repos_file = os.path.join(self.data_dir, "native_repositories.json")
-        native_repos = []
-        if os.path.exists(native_repos_file):
+        target_params = target_params or {}
+        task_ids = []
+        for x in selected_task_ids or []:
             try:
-                with open(native_repos_file, "r", encoding="utf-8") as f:
-                    native_repos = json.load(f)
-            except Exception:
-                native_repos = []
+                task_ids.append(int(x))
+            except (TypeError, ValueError):
+                continue
+        if not task_ids:
+            return {"status": "error", "message": "Selecione ao menos uma tarefa para migrar."}
 
-        for repo in discovery["repositories"]:
-            if repo["id"] in selected_repo_ids or "all" in selected_repo_ids:
-                new_native_repo = {
-                    "id": f"native_{repo['id']}_{int(time.time())}",
-                    "name": f"{repo['name']} (Migrado Nativo)",
-                    "engine": "gboc_native_v4",
-                    "chunking": target_params.get("chunking", "FastCDC 4KB-4MB"),
-                    "compression": target_params.get("compression", "Zstd-Level3"),
-                    "encryption": target_params.get("encryption", "AES-256-GCM"),
-                    "worm_immutability": target_params.get("worm_immutability", True),
-                    "target_path": repo["target_path"],
-                    "migrated_from": repo["engine_type"],
-                    "migrated_at": datetime.now().isoformat()
-                }
-                native_repos.append(new_native_repo)
-                migrated_repos.append(new_native_repo)
-
-        with open(native_repos_file, "w", encoding="utf-8") as f:
-            json.dump(native_repos, f, indent=2, ensure_ascii=False)
-
-        # 2. MIGRAÇÃO E CONVERSÃO DAS TAREFAS SELECIONADAS PARA O MOTOR NATIVO GBOC
-        tasks_cfg_path = os.path.join(self.data_dir, "tasks.json")
-        all_tasks = []
-        if os.path.exists(tasks_cfg_path):
+        # 1. Repositório nativo de destino: existente ou criado agora
+        target_repo_id = target_params.get("target_repository_id")
+        created_repo = None
+        if not target_repo_id:
+            new_name = (target_params.get("new_repository_name") or "").strip()
+            pwd = str(target_params.get("motor_password") or "")
+            if not new_name:
+                return {"status": "error", "message": "Escolha um repositório nativo de destino ou informe o nome de um novo."}
             try:
-                with open(tasks_cfg_path, "r", encoding="utf-8") as f:
-                    all_tasks = json.load(f)
-            except Exception:
-                all_tasks = []
+                created_repo = self._create_native_repository(new_name, pwd)
+            except Exception as exc:
+                return {"status": "error", "message": f"Falha ao criar o repositório nativo: {exc}"}
+            target_repo_id = (created_repo or {}).get("id") or (created_repo or {}).get("repository", {}).get("id")
+            if not target_repo_id:
+                with self._conn() as conn:
+                    cur = conn.cursor()
+                    cur.execute("SELECT id FROM repositories WHERE name = %s", (new_name,))
+                    row = cur.fetchone()
+                    cur.close()
+                target_repo_id = row[0] if row else None
+            if not target_repo_id:
+                return {"status": "error", "message": "Repositório nativo criado, mas o ID não foi encontrado."}
 
-        for t in all_tasks:
-            t_id = t.get("id")
-            if t_id in selected_task_ids or str(t_id) in [str(x) for x in selected_task_ids]:
-                t["engine"] = "gboc_native_v4"
-                t["native_v4_config"] = {
-                    "chunking_algorithm": "FastCDC",
-                    "min_chunk_kb": 4,
-                    "avg_chunk_kb": 1024,
-                    "max_chunk_kb": 4096,
-                    "compression_algorithm": target_params.get("compression", "Zstd"),
-                    "encryption_algorithm": "AES-256-GCM",
-                    "worm_immutability": target_params.get("worm_immutability", True),
-                    "migrated_at": datetime.now().isoformat()
-                }
-                migrated_tasks.append({
-                    "id": t_id,
-                    "name": t.get("name"),
-                    "status": "migrated_to_native_v4"
-                })
+        migrated, skipped = [], []
+        with self._conn() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT id, name, engine FROM repositories WHERE id = %s", (int(target_repo_id),))
+            repo = cur.fetchone()
+            if not repo or not self._is_native(repo[2]):
+                cur.close()
+                return {"status": "error", "message": "O repositório de destino não existe ou não usa o Motor Nativo GBOC."}
 
-        with open(tasks_cfg_path, "w", encoding="utf-8") as f:
-            json.dump(all_tasks, f, indent=2, ensure_ascii=False)
+            cur.execute("SELECT id, name, engine, repository_id FROM tasks WHERE id = ANY(%s)", (task_ids,))
+            rows = cur.fetchall()
+            found = {r[0] for r in rows}
+            for tid in task_ids:
+                if tid not in found:
+                    skipped.append({"id": tid, "reason": "tarefa não encontrada"})
+            for tid, tname, engine, old_repo in rows:
+                if self._is_native(engine):
+                    skipped.append({"id": tid, "name": tname, "reason": "já usa o Motor Nativo"})
+                    continue
+                cur.execute("UPDATE tasks SET engine = 'gboc_native', repository_id = %s, updated_at = %s WHERE id = %s",
+                            (repo[0], datetime.now(), tid))
+                migrated.append({"id": tid, "name": tname, "from_engine": engine,
+                                 "from_repository_id": old_repo, "to_repository": repo[1]})
+            # Trilha de auditoria (não bloqueia a migração se a tabela tiver outro formato)
+            cur.execute("SAVEPOINT gboc_mig_audit")
+            try:
+                cur.execute(
+                    "INSERT INTO audit_log (action, resource_type, resource_id, resource_name, detail, username) "
+                    "VALUES (%s, %s, %s, %s, %s::jsonb, %s)",
+                    ("engine_migration", "repository", str(repo[0]), repo[1],
+                     json.dumps({"migrated": migrated, "skipped": skipped}, default=str),
+                     str(target_params.get("requested_by") or "gboc-server")))
+                cur.execute("RELEASE SAVEPOINT gboc_mig_audit")
+            except Exception as exc:
+                cur.execute("ROLLBACK TO SAVEPOINT gboc_mig_audit")
+                logger.warning(f"Auditoria da migração não registrada: {exc}")
+            conn.commit()
+            cur.close()
 
         duration = round(time.time() - start_time, 2)
-        logger.info(f"✅ Migração para Motor Nativo GBOC concluída: {len(migrated_tasks)} tarefas e {len(migrated_repos)} repositórios.")
-
+        logger.info(f"Migração para Motor Nativo: {len(migrated)} tarefa(s) -> repositório '{repo[1]}'")
         return {
-            "status": "success",
-            "message": f"Migração para o Motor Nativo GBOC concluída com sucesso em {duration}s!",
+            "status": "success" if migrated else "warning",
+            "message": (f"{len(migrated)} tarefa(s) passam a usar o Motor Nativo GBOC no repositório '{repo[1]}' "
+                        f"a partir da próxima execução. Os backups antigos continuam no repositório de origem."
+                        if migrated else "Nenhuma tarefa foi alterada."),
             "duration_seconds": duration,
-            "migrated_tasks_count": len(migrated_tasks),
-            "migrated_repositories_count": len(migrated_repos),
-            "migrated_tasks": migrated_tasks,
-            "migrated_repositories": migrated_repos
+            "target_repository": {"id": repo[0], "name": repo[1], "created_now": bool(created_repo)},
+            "migrated_tasks_count": len(migrated),
+            "migrated_tasks": migrated,
+            "skipped": skipped,
         }
 
 # Instância Singleton
