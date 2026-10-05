@@ -210,6 +210,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     </div>
 
     <script src="/static/sidebar.js"></script>
+    <script src="/static/repo-details.js?v=14.8.1"></script>
     <script>
         let currentEditingRepoId = null;
 
@@ -386,6 +387,9 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                             </div>
                         </div>
                         <div class="gboc-box-actions">
+                            <button class="gboc-action-btn" style="background:rgba(66,153,225,.15);color:#4299e1" onclick="GBOCRepoDetails.open(${repo.id})" title="Ver todas as configurações${storageType !== 'local' ? ' (inclusive as do bucket na nuvem)' : ''}">
+                                <i class="fas fa-info-circle"></i>
+                            </button>
                             <button class="gboc-action-btn act-test" onclick="initializeRepository(${repo.id},'${repo.name}', ${repo.initialized ? 'true' : 'false'})" title="${repo.initialized ? 'Reinicializar Repositório' : 'Inicializar Repositório'}" style="background:${repo.initialized ? 'rgba(237,137,54,.15)' : 'rgba(72,187,120,.15)'};color:${repo.initialized ? 'var(--warning)' : 'var(--success)'}">
                                 <i class="fas fa-rocket"></i>
                             </button>

@@ -414,7 +414,8 @@
                     <td><input type="number" min="1" max="3650" data-f="days" value="${esc(p.days || 30)}" class="form-control" style="width:80px"></td>
                     <td><select data-f="lock_mode" class="form-control" style="width:auto"><option ${p.lock_mode !== 'GOVERNANCE' ? 'selected' : ''}>COMPLIANCE</option><option ${p.lock_mode === 'GOVERNANCE' ? 'selected' : ''}>GOVERNANCE</option></select></td>
                     <td style="font-size:.8em;max-width:300px">${lc.at ? `${badge(lc.protected ? 'Protegido' : 'Não comprovado', lc.protected ? 'ok' : 'bad')} ${esc(lc.at)}<div>${esc(lc.summary || '')}</div>` : '—'}</td>
-                    <td style="white-space:nowrap"><button class="btn btn-sm" data-isave title="Salvar política"><i class="fas fa-save"></i></button>
+                    <td style="white-space:nowrap"><button class="btn btn-sm" data-idet title="Ver todas as configurações do repositório (inclusive as do bucket na nuvem)"><i class="fas fa-info-circle"></i></button>
+                        <button class="btn btn-sm" data-isave title="Salvar política"><i class="fas fa-save"></i></button>
                         <button class="btn btn-sm" data-icheck title="Verificar"><i class="fas fa-magnifying-glass"></i></button>
                         <button class="btn btn-sm btn-primary" data-iapply title="Aplicar proteção (bucket: retenção padrão; local: somente leitura)"><i class="fas fa-lock"></i> Aplicar</button></td></tr>`; }).join('') || '<tr><td colspan="7">Nenhum repositório.</td></tr>'}
                 </tbody></table>
@@ -430,6 +431,9 @@
             const rowVal = (tr) => ({ mode: tr.querySelector('[data-f=mode]').value, days: +tr.querySelector('[data-f=days]').value, lock_mode: tr.querySelector('[data-f=lock_mode]').value });
             body.querySelectorAll('[data-repo]').forEach(tr => {
                 const id = tr.dataset.repo;
+                tr.querySelector('[data-idet]').onclick = () => window.GBOCRepoDetails
+                    ? window.GBOCRepoDetails.open(id, { get: (p) => api(p) })
+                    : toast('Componente de detalhes não carregado (Ctrl+F5)', 'error');
                 tr.querySelector('[data-isave]').onclick = async () => { try { await api(`api/agent-ops/repositories/${id}/immutability`, { method: 'PUT', body: JSON.stringify(rowVal(tr)) }); toast('Política salva', 'success'); } catch (e) { toast(e.message, 'error'); } };
                 tr.querySelector('[data-icheck]').onclick = async () => { try { const d = await api(`api/agent-ops/repositories/${id}/immutability/check`, { method: 'POST', body: '{}' }); toast(d.result.summary || 'Verificado', d.result.protected ? 'success' : 'warning'); tabOperation(); } catch (e) { toast(e.message, 'error'); } };
                 tr.querySelector('[data-iapply]').onclick = async () => {

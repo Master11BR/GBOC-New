@@ -1989,6 +1989,9 @@ class RestoreManager:
                                   'azure_account_name', 'azure_account_key']:
                         if field in config and config[field] and (field not in repo or not repo.get(field)):
                             repo[field] = config[field]
+                    if isinstance(config, dict) and config.get('secret_enc'):
+                        from engines import repo_secrets
+                        repo_secrets.inject(repo, config)
                 except (json.JSONDecodeError, TypeError):
                     pass
 

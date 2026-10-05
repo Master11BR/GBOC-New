@@ -35,7 +35,9 @@ IGNORE_PATTERNS = shutil.ignore_patterns(
     "*.swp",
     # nunca distribuir chave privada de licença (fica só com o fornecedor)
     "*license_private*.pem",
-    "*_private_key.pem"
+    "*_private_key.pem",
+    # chave local que criptografa as credenciais de nuvem dos repositórios (cada agente gera a sua)
+    ".repo_secrets.key"
 )
 
 def create_unified_requirements(server_req_path: Path, agent_req_path: Path, output_path: Path):

@@ -112,15 +112,29 @@ def _record_check(repo: Dict[str, Any], result: Dict[str, Any]) -> None:
 
 # ───────────────────────── S3 / Wasabi (Object Lock) ─────────────────────────
 
+def resolve_region(cfg: Dict[str, Any]) -> str:
+    """Região informada; senão extraída do endpoint (s3.<região>.wasabisys.com); senão us-east-1."""
+    region = str(cfg.get("region") or "").strip()
+    if region:
+        return region
+    parts = str(cfg.get("endpoint") or "").replace("https://", "").replace("http://", "").split(".")
+    if len(parts) >= 3 and parts[0] == "s3" and parts[1] not in ("wasabisys", "amazonaws"):
+        return parts[1]
+    return "us-east-1"
+
+
 def _s3(repo: Dict[str, Any]):
     import boto3
     from botocore.config import Config
     cfg = repo["config"]
     ak = cfg.get("aws_access_key") or cfg.get("access_key")
     sk = cfg.get("aws_secret_key") or cfg.get("secret_key")
+    if not sk:
+        from engines import repo_secrets
+        sk = repo_secrets.secret_from_config(cfg)
     if not ak or not sk:
         raise ValueError("Credenciais do bucket não configuradas no repositório")
-    region = cfg.get("region") or "us-east-1"
+    region = resolve_region(cfg)
     endpoint = cfg.get("endpoint") or (f"s3.{region}.wasabisys.com" if repo["type"] == "wasabi" else None)
     if endpoint and not endpoint.startswith("http"):
         endpoint = "https://" + endpoint

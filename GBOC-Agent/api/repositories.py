@@ -117,6 +117,20 @@ def _build_connection_summary(result: Dict[str, Any]) -> str:
 # Endpoints
 # ==============================================================================
 
+def _strip_secret_enc(repo_dict: Dict[str, Any]) -> None:
+    """Remove a chave secreta criptografada da resposta e informa apenas se ela existe."""
+    repo_dict.pop('secret_enc', None)
+    cfg = repo_dict.get('config')
+    parsed = None
+    try:
+        parsed = json.loads(cfg) if isinstance(cfg, str) and cfg.strip() else cfg
+    except (ValueError, TypeError):
+        parsed = None
+    if isinstance(parsed, dict):
+        repo_dict['secret_configured'] = bool(parsed.pop('secret_enc', None))
+        repo_dict['config'] = json.dumps(parsed) if isinstance(cfg, str) else parsed
+
+
 @router.get("/")
 async def list_repositories():
     """
@@ -154,6 +168,7 @@ async def list_repositories():
                                    'b2_account_key', 'aws_secret_key', 'azure_account_key',
                                    'cloud_password', 'motor_password']:
                 repo_dict.pop(sensitive_field, None)
+            _strip_secret_enc(repo_dict)
 
             result.append(repo_dict)
 
@@ -281,6 +296,8 @@ async def get_repository(repo_id: int, show_sensitive: bool = False):
             except:
                 pass
         
+        _strip_secret_enc(repo_dict)
+
         # Extrair campos do config para o nível superior (compatibilidade frontend)
         if 'config' in repo_dict and isinstance(repo_dict['config'], dict):
             config = repo_dict['config']
