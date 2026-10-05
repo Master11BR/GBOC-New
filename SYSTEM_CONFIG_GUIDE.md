@@ -1,8 +1,8 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.7.6 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.8.1 Enterprise. Todos os direitos reservados. -->
 
-# 📘 GBOC System v14.7.6 — Guia Master de Configurações, Parâmetros e Controle de IA
+# 📘 GBOC System v14.8.1 — Guia Master de Configurações, Parâmetros e Controle de IA
 
-[![GBOC Version](https://img.shields.io/badge/GBOC%20Version-14.7.6-blue.svg)](file:///d:/GBOC-New/GBOC-New/README.md)
+[![GBOC Version](https://img.shields.io/badge/GBOC%20Version-14.8.1-blue.svg)](file:///d:/GBOC-New/GBOC-New/README.md)
 [![UI Model](https://img.shields.io/badge/UI__MODEL-modern%20(Official)-indigo.svg)]()
 [![Status](https://img.shields.io/badge/status-active-brightgreen.svg)]()
 
@@ -16,9 +16,10 @@
 3. [Configuração da Engine de Inteligência Artificial (Local & Nuvem)](#3-configuração-da-engine-de-inteligência-artificial-local--nuvem)
 4. [Configuração do GBOC Server](#4-configuração-do-gboc-server)
 5. [Configuração do GBOC Agent & SharedCore](#5-configuração-do-gboc-agent--sharedcore)
-6. [Parâmetros de Disaster Recovery, SureRestore Sandbox & Virtual Lab](#6-parâmetros-de-disaster-recovery-surerestore-sandbox--virtual-lab)
-7. [Catálogo e Parâmetros dos 50 Relatórios Avançados](#7-catálogo-e-parâmetros-dos-50-relatórios-avançados)
-8. [Instaladores, Serviços Windows e Desinstalação](#8-instaladores-serviços-windows-e-desinstalação)
+6. [Backup Imutável (WORM / S3 Object Lock)](#6-backup-imutável-worm--s3-object-lock)
+7. [Políticas Centrais & Tokens de Instalação em Massa](#7-políticas-centrais--tokens-de-instalação-em-massa)
+8. [Parâmetros de Disaster Recovery, SureRestore Sandbox & Virtual Lab](#8-parâmetros-de-disaster-recovery-surerestore-sandbox--virtual-lab)
+9. [Instaladores, Serviços Windows e Desinstalação](#9-instaladores-serviços-windows-e-desinstalação)
 
 ---
 
@@ -67,6 +68,7 @@ DLQ_FILE="data/dead_letter_queue.jsonl"
 
 # Engine de IA (Local & Nuvem — Camada Unificada ai_providers.py)
 AI_PROVIDER="auto"                                   # Opções: 'auto', 'ollama', 'openai', 'groq', 'gemini', 'claude', 'deepseek', 'grok', 'kimi', 'mistral', 'cohere'
+AI_TIMEOUT=300                                       # Timeout de resposta em segundos (padrão 300s para nós CPU)
 OLLAMA_URL="http://localhost:11434"                 # Endpoint raiz Ollama (/api/chat)
 OPENAI_API_KEY=""                                    # Opcional (sk-...)
 GROQ_API_KEY=""                                      # Opcional (gsk_...)
@@ -117,7 +119,8 @@ A Engine de IA do GBOC opera sob a camada unificada e simétrica `ai_providers.p
 | Parâmetro | Valor Padrão | Descrição / Opções |
 | :--- | :--- | :--- |
 | `AI_PROVIDER` | `auto` | `auto` (prioriza provedor em nuvem configurado com chave válida; fallback para Ollama Local), `ollama` (on-premises), `openai`, `groq`, `gemini`, `claude`, `deepseek`, `grok`, `kimi`, `mistral`, `cohere`. |
-| `OLLAMA_URL` | `http://localhost:11434` | Endpoint base do Ollama (utiliza API nativa `/api/chat` com streaming estruturado). Timeout de 180s para inferências locais. |
+| `AI_TIMEOUT` | `300` | Tempo limite de resposta da inferência em segundos (configurável na UI via `ai-timeout` / `cfg-ai-timeout`). Padrão de 300s para suportar inferências em CPU com modelos 8B+. |
+| `OLLAMA_URL` | `http://localhost:11434` | Endpoint base do Ollama (utiliza API nativa `/api/chat` com streaming estruturado e prompts sumarizados via `_smart_history_tokens`). |
 | `OPENAI_API_KEY` | `""` | Chave de API para OpenAI (`gpt-4o`, `gpt-4o-mini`). |
 | `GROQ_API_KEY` | `""` | Chave de API para Groq Cloud (`openai/gpt-oss-120b`). |
 | `GEMINI_API_KEY` | `""` | Chave Google Gemini (`gemini-flash-latest`, header `x-goog-api-key`). |
@@ -172,23 +175,50 @@ O `SharedCore` é o orquestrador nativo do Agente.
 
 ---
 
-## 7. 📊 Catálogo e Parâmetros dos 50 Relatórios Avançados
+## 6. 🔒 Backup Imutável (WORM / S3 Object Lock)
 
-O GBOC expõe 50 relatórios executivos via `/api/v1/reports/catalog` e `/api/v1/reports/generate`:
+O GBOC implementa proteção imutável rigorosa contra ransomware e operadores mal-intencionados:
 
-### Relatórios Principais (IDs 1 a 50):
-- **IDs 1 a 30 (Padrão de Mercado)**: Performance de Jobs, Capacidade, Deduplicação, Disponibilidade, Causa Raiz de Falhas, Retenção de Snapshots, Ransomware Shield, Auditoria, SLA RPO/RTO, Custos Cloud, retentativas, DLQ, etc.
-- **IDs 31 a 50 (Exclusivos & IA)**: Esgotamento Preditivo de Armazenamento (31), Score Ransomware (32), Custo por GB DR (33), Gap em CDP (34), ROI Synthetic Full (35), Isolamento Multi-tenant (36), Air-Gap Verifier (37), Rotação de Chaves (38), Matriz de Janela de Backup (39), Log de Autorrecuperação (40), Green Backup Efficiency (41), Potencial de Deduplicação (42), Matriz LGPD/GDPR (43), Ativos Críticos (44), Volumes Desprotegidos (45), Impacto de Latência (46), Resiliência Cloud Outage (47), Log de Remediação Preditiva (48), Simulador Bare-Metal (49), ROI & TCO Executivo (50).
+| Parâmetro / Recurso | Tipo | Descrição |
+| :--- | :--- | :--- |
+| `S3 Object Lock` | Nuvem | Retenção imutável em buckets S3/Wasabi nos modos `GOVERNANCE` ou `COMPLIANCE`. Uploads validam obrigatoriamente hash `Content-MD5`. |
+| `WORM Local` | Disco | Bloqueio de arquivos locais de snapshot como somente leitura e inserção de ACL explícita do Windows (`icacls /deny Everyone:(DE)`). |
+| `Retention Days` | Número | Número de dias de imutabilidade obrigatória durante os quais o agente e o storage recusam exclusão ou modificação. |
 
 ---
 
-## 8. ⚙️ Instaladores, Serviços Windows e Desinstalação
+## 7. 🚀 Políticas Centrais & Tokens de Instalação em Massa
+
+| Recurso | Descrição |
+| :--- | :--- |
+| `Tokens de Instalação` | Gerados na central com vínculo por tenant/organização, validade e limite de usos (`POST /api/v1/fleet/install-tokens`). |
+| `Instalação Unattended` | `install_agent.ps1 -ServerURL <URL> -InstallToken <TOKEN> -Unattended` para implantação automática via GPO, scripts de inicialização ou RMM. |
+| `Políticas de Backup Centrais` | Definição de regras de agenda, retenção, limites de upload, janela de manutenção e imutabilidade aplicadas em massa na frota. |
+| `Detecção de Desvio (Drift)` | Auditoria contínua comparando o estado real reportado pelo agente com a política central homologada, com reaplicação imediata. |
+
+---
+
+## 8. 🛡️ Parâmetros de Disaster Recovery, SureRestore Sandbox & Virtual Lab
+
+| Parâmetro | Valor Padrão | Descrição |
+| :--- | :--- | :--- |
+| `VIRTUAL_LAB_SWITCH_NAME` | `GBOC-Isolated-Lab` | Nome do switch virtual privado Hyper-V sem acesso à placa física (Zero-Collision). |
+| `VIRTUAL_LAB_TIMEOUT_SECONDS` | `120` | Tempo limite de espera para detecção de heartbeat WMI do Guest SO em sandbox. |
+| `P2V_DEFAULT_FORMAT` | `VHDX` | Formato padrão de saída na conversão físico-para-virtual (`VHDX` para Hyper-V/Proxmox QEMU). |
+| `P2V_DYNAMIC_EXPANDABLE` | `true` | Alocação dinâmica de espaço em disco no contêiner VHDX. |
+
+---
+
+## 9. ⚙️ Instaladores, Serviços Windows e Desinstalação
 
 ### Instalação via PowerShell (Como Administrador)
 ```powershell
-# Agente
+# Agente (Instalação Normal)
 cd d:\GBOC-New\GBOC-New\GBOC-Agent
 .\install_agent.ps1
+
+# Agente (Instalação em Massa via Token)
+.\install_agent.ps1 -ServerURL "https://seu-servidor:8000" -InstallToken "SEU_TOKEN" -Unattended
 
 # Servidor
 cd d:\GBOC-New\GBOC-New\GBOC-Server
@@ -214,4 +244,4 @@ cd d:\GBOC-New\GBOC-New\GBOC-Server
 
 ---
 
-**GBOC System v14.7.6** — Guia Oficial de Parâmetros e Configuração.
+**GBOC System v14.8.1** — Guia Oficial de Parâmetros e Configuração.

@@ -13,7 +13,7 @@ import psutil
 try:
     from version_control import __version__ as AGENT_VERSION
 except Exception:
-    AGENT_VERSION = "14.7.0"
+    AGENT_VERSION = "14.8.1"
 
 logger = logging.getLogger("gboc_flagship_reports_agent")
 

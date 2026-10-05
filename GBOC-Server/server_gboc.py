@@ -1,5 +1,5 @@
 """
-GBOC Server 14.7.6
+GBOC Server 14.8.1
 Servidor Central — Real-time Agent Communication + Complete Data Sync + Advanced Analytics
 Banco de dados: PostgreSQL (oficial)
 """
@@ -79,7 +79,7 @@ try:
     from version_control import __version__ as SERVER_VERSION, get_version_info, auto_increment_build
     auto_increment_build()
 except Exception:
-    SERVER_VERSION = "14.6.0"
+    SERVER_VERSION = "14.8.1"
     def get_version_info():
         return {"raw_version": SERVER_VERSION, "semver": SERVER_VERSION}
 
@@ -232,6 +232,14 @@ def release_db(conn):
                 connection_pool.putconn(conn)
         except:
             pass
+
+
+# Avisos/erros do próprio servidor também vão para agent_logs (Logs Globais → "Servidor central")
+try:
+    from modules.logs.server_log_sink import install as _install_server_log_sink
+    _install_server_log_sink(get_db, release_db)
+except Exception as _sink_e:
+    logger.warning(f"Logs do servidor no banco desativados: {_sink_e}")
 
 def init_database():
     conn = None
@@ -494,6 +502,7 @@ def init_database():
                 ('database', 'query_timeout_seconds', '30', 'number', 'Timeout de query (seg)'),
                 ('retention', 'metrics_retention_days', '90', 'number', 'Retenção de métricas (dias)'),
                 ('retention', 'logs_retention_days', '30', 'number', 'Retenção de logs (dias)'),
+                ('retention', 'log_aggregate_retention_days', '730', 'number', 'Retenção do resumo diário de erros de log usado nos relatórios (dias)'),
                 ('retention', 'events_retention_days', '60', 'number', 'Retenção de eventos (dias)'),
                 ('retention', 'reports_retention_days', '365', 'number', 'Retenção de relatórios (dias)'),
                 ('notifications', 'email_enabled', 'false', 'boolean', 'Notificações por e-mail'),
@@ -933,6 +942,7 @@ async def lifespan(app: FastAPI):
         logger.warning(f"Agendador de relatórios não iniciado: {_rs_e}")
     for _mod, _what in (("modules.agents.restore_tests", "testes de restauração"),
                         ("modules.alerts.proactive_alerts", "alertas proativos"),
+                        ("modules.logs.log_aggregates", "resumo diário de logs"),
                         ("modules.reports.billing", "fechamento de faturamento")):
         try:
             __import__(_mod, fromlist=["start_scheduler"]).start_scheduler()
@@ -1510,6 +1520,11 @@ async def websocket_endpoint(websocket: WebSocket, agent_id: str):
     from modules.agents.agent_pairing import request_has_valid_agent_key
     if not request_has_valid_agent_key(websocket.headers):
         logger.warning(f"[AUTH] WebSocket do agente {agent_id} rejeitado: chave de pareamento inválida.")
+        try:
+            from modules.job_alert.failures import note_rejection
+            note_rejection(agent_id, websocket.client.host if websocket.client else "", f"/ws/agents/{agent_id}")
+        except Exception:
+            pass
         await websocket.close(code=4401)
         return
     await manager.connect(websocket, agent_id)
@@ -3297,7 +3312,12 @@ for _mod_name, _label in (("modules.agents.restore_tests", "Restore tests"), ("m
     try:
         app.include_router(__import__(_mod_name, fromlist=["router"]).router)
     except Exception as _e:
-        logger.warning(f"{_label} router: {_e}")
+        logger.error(f"{_label} router não carregado: {_e}", exc_info=True)
+        try:
+            from modules.job_alert.failures import FAILED_MODULES as _FM
+            _FM[_label] = f"{type(_e).__name__}: {_e}"
+        except Exception:
+            pass
 
 try:
     from modules.surerestore.surerestore_router import router as server_surerestore_router
@@ -4392,10 +4412,20 @@ def _run_retention_cleanup(remove_duplicates: bool = True) -> Dict[str, Any]:
     logs_days = retention.get('logs_retention_days', 30)
     events_days = retention.get('events_retention_days', 60)
 
+    # 0 (ou negativo) = manter tudo — antes apagava TODOS os registros
+    def _keep(days, fn):
+        return fn() if int(days or 0) > 0 else 0
+    try:
+        # Resume erros/avisos por dia ANTES de apagar (os relatórios usam o resumo) e aplica a retenção de logs
+        from modules.logs import log_aggregates as _la
+        _logs_deleted = _la.cleanup(logs_days, "automático" if not remove_duplicates else "manutenção")["deleted"]
+    except Exception as _la_e:
+        logger.warning(f"[RETENÇÃO] Resumo de logs indisponível ({_la_e}); limpeza direta")
+        _logs_deleted = _keep(logs_days, lambda: _delete_in_batches('agent_logs', 'timestamp', logs_days))
     deleted = {
-        'agent_metrics': _delete_in_batches('agent_metrics', 'timestamp', metrics_days),
-        'agent_logs': _delete_in_batches('agent_logs', 'timestamp', logs_days),
-        'system_events': _delete_in_batches('system_events', 'created_at', events_days),
+        'agent_metrics': _keep(metrics_days, lambda: _delete_in_batches('agent_metrics', 'timestamp', metrics_days)),
+        'agent_logs': _logs_deleted,
+        'system_events': _keep(events_days, lambda: _delete_in_batches('system_events', 'created_at', events_days)),
     }
     conn = get_db()
     try:

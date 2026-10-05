@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # ==============================================================================
-# GBOC System v14.7.6 Enterprise Edition
+# GBOC System v14.8.1 Enterprise Edition
 # Module: Flagship Reports — coleta de dados reais e construtores (Agent)
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================

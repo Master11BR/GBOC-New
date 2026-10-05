@@ -62,7 +62,7 @@ async def list_tasks_v2(
             query_params = list(params) + [per_page, offset]
 
             cur.execute(f"""
-                SELECT t.id, t.agent_id, t.name, t.type, t.engine, t.status,
+                SELECT t.id, t.agent_id, t.name, t.task_type, t.engine, t.status,
                        t.schedule_cron, t.schedule_enabled, t.last_run, t.last_status,
                        t.created_at
                 FROM agent_tasks t

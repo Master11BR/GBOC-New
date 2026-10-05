@@ -13,6 +13,10 @@
     async function api(path, opts) {
         const r = await fetch(base() + '/api/v1/proactive-alerts' + path, Object.assign({ headers: { 'Content-Type': 'application/json' } }, opts || {}));
         let d; try { d = await r.json(); } catch (e) { d = {}; }
+        if (r.status === 404 && d.detail === 'Not Found') {
+            throw new Error('o módulo de alertas proativos não está ativo neste servidor. Reinicie o serviço do GBOC Server após a atualização; '
+                + 'se continuar, veja o motivo em Jobs com Falha (origem Servidor) ou em Logs Globais > Servidor central.');
+        }
         if (!r.ok) throw new Error((typeof d.detail === 'string' ? d.detail : '') || d.message || ('HTTP ' + r.status));
         return d;
     }

@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 try:
     from version_control import __version__ as GBOC_VERSION
 except Exception:
-    GBOC_VERSION = "14.7.0"
+    GBOC_VERSION = "14.8.1"
 
 def _get_core():
     from shared_core import get_shared_core

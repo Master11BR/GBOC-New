@@ -39,7 +39,7 @@ from shared_core import SharedCore
 try:
     from version_control import __version__ as AGENT_VERSION
 except Exception:
-    AGENT_VERSION = "14.6.0"
+    AGENT_VERSION = "14.8.1"
 
 logger = logging.getLogger(__name__)
 

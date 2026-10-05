@@ -34,7 +34,6 @@ PUBLIC_EXACT = {
     "/api/v1/system/ui-config",
     "/api/v2/system/ui-config",
     "/api/v1/jobs/failed",
-    "/api/v1/server/jobs/failed",
     "/api/v1/enroll",
 }
 PUBLIC_PREFIXES = ("/api/v1/auth/oauth/",
@@ -180,6 +179,11 @@ def install(app, get_user: Callable[[Request], Optional[dict]], auth_enabled: Ca
             if kind == "agent":
                 host = request.client.host if request.client else "?"
                 logger.warning(f"[AUTH] Agente rejeitado ({host} {path}): chave de pareamento ausente ou inválida.")
+                try:   # aparece em Jobs com Falha / Alertas (o agente não consegue sincronizar nada)
+                    from modules.job_alert.failures import note_rejection
+                    note_rejection(request.headers.get("X-GBOC-Agent-Id"), host, path)
+                except Exception:
+                    pass
                 return _deny("AGENT_KEY_INVALID",
                              "Chave de pareamento do agente ausente ou inválida. Configure-a no Agente "
                              "(Configurações > Servidor Central).")

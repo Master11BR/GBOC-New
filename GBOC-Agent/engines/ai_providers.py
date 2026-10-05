@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v14.7.6 Enterprise Edition
+# GBOC System v14.8.1 Enterprise Edition
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================
 """
@@ -131,7 +131,7 @@ GROUNDING_RULE = (
 )
 
 DEFAULT_CLOUD_TIMEOUT = 60.0
-DEFAULT_LOCAL_TIMEOUT = 180.0   # modelos locais em CPU podem levar minutos
+DEFAULT_LOCAL_TIMEOUT = 300.0   # modelos locais em CPU podem levar minutos (5 min)
 MAX_OUTPUT_TOKENS = 1024
 
 
@@ -346,7 +346,7 @@ def _http_error(provider: str, resp: httpx.Response) -> str:
 # Ollama
 # ──────────────────────────────────────────────────────────────────────────────
 
-def list_ollama_models(cfg: dict[str, Any], host_override: str | None = None, timeout: float = 4.0) -> dict[str, Any]:
+def list_ollama_models(cfg: dict[str, Any], host_override: str | None = None, timeout: float = 10.0) -> dict[str, Any]:
     """Consulta /api/tags do Ollama. Retorna {connected, host, models, error}."""
     last_error = "Nenhum host Ollama válido configurado."
     for host in resolve_ollama_hosts(cfg, host_override):
@@ -383,15 +383,16 @@ def _call_ollama(cfg: dict[str, Any], system: str, prompt: str, temperature: flo
                         error=f"Ollama ativo em {info['host']}, mas nenhum modelo está instalado. Execute: ollama pull {model}",
                         duration_seconds=round(time.perf_counter() - start, 2))
     try:
+        timeout_val = _timeout_for(cfg, "ollama")
         resp = httpx.post(
             f"{info['host']}/api/chat",
             json={
                 "model": model,
                 "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
                 "stream": False,
-                "options": {"temperature": temperature, "num_predict": MAX_OUTPUT_TOKENS},
+                "options": {"temperature": temperature, "num_predict": min(MAX_OUTPUT_TOKENS, 512)},
             },
-            timeout=_timeout_for(cfg, "ollama"),
+            timeout=httpx.Timeout(timeout_val, connect=15.0),
         )
         if resp.status_code != 200:
             return AIResult(False, "ollama", provider_label("ollama"), model=model, error=_http_error("ollama", resp),

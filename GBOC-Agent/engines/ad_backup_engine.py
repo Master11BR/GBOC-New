@@ -20,7 +20,7 @@ from typing import Dict, Any, List, Optional
 try:
     from version_control import __version__ as AGENT_VERSION
 except Exception:
-    AGENT_VERSION = "14.6.0"
+    AGENT_VERSION = "14.8.1"
 
 logger = logging.getLogger("gboc_ad_backup_engine")
 

@@ -13,17 +13,17 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     <title>Configurações - GBOC Agent</title>
     
     <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
-    <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.6.0">
-    <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=14.6.0">
-    <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=14.6.0">
-    <link rel="stylesheet" href="/static/ui/models/modern/components.css?v=14.6.0">
-    <link rel="stylesheet" href="/static/ui/models/modern/layout.css?v=14.6.0">
-    <link rel="stylesheet" href="/static/style.css?v=14.6.0">
-    <link rel="stylesheet" href="/static/gboc-themes.css?v=14.6.0">
-    <link rel="stylesheet" href="/static/gboc-layout.css?v=14.6.0">
-    <script src="/static/gboc-perf.js?v=14.6.0"></script>
-    <script src="/static/gboc-layout-manager.js?v=14.6.0"></script>
-    <script src="/static/gboc-modal.js?v=14.6.0"></script>
+    <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.8.1">
+    <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=14.8.1">
+    <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=14.8.1">
+    <link rel="stylesheet" href="/static/ui/models/modern/components.css?v=14.8.1">
+    <link rel="stylesheet" href="/static/ui/models/modern/layout.css?v=14.8.1">
+    <link rel="stylesheet" href="/static/style.css?v=14.8.1">
+    <link rel="stylesheet" href="/static/gboc-themes.css?v=14.8.1">
+    <link rel="stylesheet" href="/static/gboc-layout.css?v=14.8.1">
+    <script src="/static/gboc-perf.js?v=14.8.1"></script>
+    <script src="/static/gboc-layout-manager.js?v=14.8.1"></script>
+    <script src="/static/gboc-modal.js?v=14.8.1"></script>
 <script src="/static/auth_interceptor.js"></script>
     </head>
 <body>
@@ -339,6 +339,12 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                             <label for="task-history-limit"><i class="fas fa-list-ol"></i> Limite de Registros de Histórico de Backup</label>
                             <div class="setting-description">Quantidade de execuções exibidas no histórico do módulo de tarefas.</div>
                             <input type="number" id="task-history-limit" class="form-control" value="10" min="1" max="100">
+                        </div>
+
+                        <div class="setting-item">
+                            <label for="ai-timeout"><i class="fas fa-stopwatch"></i> Tempo Limite de Resposta (segundos)</label>
+                            <div class="setting-description">Padrão: 300s (5 min) para IA Local (Ollama) ou 60s para Nuvem.</div>
+                            <input type="number" id="ai-timeout" class="form-control" value="300" min="10" max="600">
                         </div>
                         
                         <div class="settings-actions" style="background: transparent; border: none; padding: 0; margin-top:15px;">
@@ -1536,6 +1542,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                         keyEl.placeholder = (data.configured_keys || []).length ? 'Chave já configurada — deixe em branco para manter' : 'Cole a chave de API';
                     }
                     if (data.task_history_limit) document.getElementById('task-history-limit').value = data.task_history_limit;
+                    if (data.timeout_seconds) document.getElementById('ai-timeout').value = data.timeout_seconds;
                     toggleAiFields();
                     if (data.provider === 'ollama' || !data.provider) {
                         detectOllamaModels();
@@ -1551,7 +1558,8 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 provider: document.getElementById('ai-provider').value,
                 ollama_host: document.getElementById('ai-ollama-host').value,
                 model: document.getElementById('ai-model').value,
-                task_history_limit: parseInt(document.getElementById('task-history-limit').value, 10) || 10
+                task_history_limit: parseInt(document.getElementById('task-history-limit').value, 10) || 10,
+                timeout_seconds: parseInt(document.getElementById('ai-timeout')?.value, 10) || 300
             };
             const apiKey = document.getElementById('ai-api-key').value.trim();
             if (apiKey) payload.api_key = apiKey;   // o backend grava no campo do provedor selecionado

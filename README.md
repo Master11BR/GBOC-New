@@ -1,21 +1,21 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.7.6 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.8.1 Enterprise. Todos os direitos reservados. -->
 
-# 🚀 GBOC - Gestão & Backup Operations Center (v14.7.6 Enterprise Edition)
+# 🚀 GBOC - Gestão & Backup Operations Center (v14.8.1 Enterprise Edition)
 
-[![GBOC System Version](https://img.shields.io/badge/version-14.7.6--Enterprise-blue.svg)](https://github.com/Master11BR/GBOC-New)
+[![GBOC System Version](https://img.shields.io/badge/version-14.8.1--Enterprise-blue.svg)](https://github.com/Master11BR/GBOC-New)
 [![Python Version](https://img.shields.io/badge/python-3.11%2B%20%7C%203.14-green.svg)](https://www.python.org/)
 [![PostgreSQL](https://img.shields.io/badge/postgresql-16-blue.svg)](https://www.postgresql.org/)
 [![UI Model](https://img.shields.io/badge/UI__MODEL-modern%20(Official)-indigo.svg)]()
 [![Status](https://img.shields.io/badge/status-production--ready-brightgreen.svg)]()
 
-> **GBOC (Gestão & Backup Operations Center v14.7.6 Enterprise Edition)** é a mais avançada plataforma corporativa de orquestração de backup, Disaster Recovery (DR) 100% verificável ponta a ponta, RMM, telemetria real (Zero-Mock Strict), modelo visual universal **Modern UI (UnoCSS)**, **Padrão Oficial de Relatórios v3.0 & Flagships** e resposta cibernética a incidentes.
+> **GBOC (Gestão & Backup Operations Center v14.8.1 Enterprise Edition)** é a mais avançada plataforma corporativa de orquestração de backup, Disaster Recovery (DR) 100% verificável ponta a ponta, RMM, telemetria real (Zero-Mock Strict), modelo visual universal **Modern UI (UnoCSS)**, **Padrão Oficial de Relatórios v3.0 & Flagships** e resposta cibernética a incidentes.
 
 ---
 
 ## 📌 Sumário
 1. [Visão Geral e Arquitetura Operacional](#-visão-geral-e-arquitetura-operacional)
 2. [Estrutura Canônica de Navegação (7 Domínios de Negócio)](#-estrutura-canônica-de-navegação)
-3. [Recursos de Destaque (v14.7.6 Enterprise)](#-recursos-de-destaque-v1476-enterprise)
+3. [Recursos de Destaque (v14.8.1 Enterprise)](#-recursos-de-destaque-v1481-enterprise)
 4. [Padrão Oficial de Relatórios v3.0 & Flagships](#-padrão-oficial-de-relatórios-v30--flagships)
 5. [Disaster Recovery & SureRestore Sandbox Zero-Mock](#-disaster-recovery--surerestore-sandbox-zero-mock)
 6. [Cyber Security Sentinel (ClamAV, YARA, Maltrail, Wazuh, Defender)](#-cyber-security-sentinel)
@@ -26,7 +26,7 @@
 
 ## 🏗️ Visão Geral e Arquitetura Operacional
 
-O GBOC v14.7.6 opera sob o ciclo de vida completo e verificável de proteção contínua:
+O GBOC v14.8.1 opera sob o ciclo de vida completo e verificável de proteção contínua:
 
 ```text
 Política → Backup consistente → Armazenamento → Integridade →
@@ -110,34 +110,31 @@ Configuração
 
 ---
 
-## ⚡ Recursos de Destaque (v14.7.6 Full Stable Enterprise)
+## ⚡ Recursos de Destaque (v14.8.1 Full Stable Enterprise)
 
-- **Recuperação de Corrupção Física de Dados & Alta Performance de Logs (v14.7.6)**:
-  - Reparação autônoma e recuperação física de blocos danificados no PostgreSQL (`agent_logs` com 4.54M+ registros) via `VACUUM FULL` com política de tolerância a páginas corrompidas.
-  - Criação de índices compostos e de alta seletividade (`idx_logs_timestamp_desc` e `idx_logs_level_time`), acelerando a visualização e filtragem de logs de 2.829 ms para 0,39 ms (ganho real de 7.180x de performance).
-  - Modularização completa de rotas em `modules/logs/logs_router.py` com suporte a métricas agregadas `/stats` e categorização semafórica (`all`, `error`, `warning`, `info`, `success`) integrada nativamente ao `dashboard.html`.
-- **Camada Unificada de Provedores de IA (`ai_providers.py`)**:
-  - Código 100% idêntico e simétrico em `GBOC-Server/modules/ai_assistant/` e `GBOC-Agent/engines/`.
-  - Suporte completo a 10 provedores modernos: Ollama Local (`/api/chat`), OpenAI (`gpt-4o`), Groq (`openai/gpt-oss-120b`), Google Gemini (`gemini-flash-latest`), Anthropic Claude (`claude-sonnet-5-5`), DeepSeek (`deepseek-flash`), xAI Grok (`grok-4.7`), Moonshot Kimi (`kimi-k2.6`), Mistral e Cohere v2.
-  - Isolamento estrito de chaves de API e modelos por provedor, eliminando cruzamento indevido de tokens.
-  - Timeouts calibrados para inferências realistas (180s para Ollama local; 60s para nuvem) com regra fixa de ancoragem contextual no prompt de sistema.
-- **Auditoria Rigorosa Zero-Mock (AI_RULES §11)**:
-  - Eliminação definitiva de fallbacks sintéticos e frases fabricadas de integridade ("Nenhum erro registrado", "100% OK").
-  - Consulta direta a dados reais: PostgreSQL 16 (`agents`, `agent_task_executions`) no Server e banco local SQLite + status real do Ransomware Guardian no Agente.
-  - Endpoint `/diagnose` alimentado por telemetria real via `psutil` (CPU, RAM, Discos reais do host).
-  - Rotas de autorrecuperação autônoma (`/auto_fix` e `/api/v2/system/auto-heal`) com retorno formal HTTP 501 e procedimentos manuais auditáveis.
-  - Reescrita completa do REP-F6 (*AI Predictive Suite*) com regressão linear real com R², z-score de anomalias e canários reais (`ai_predictive.py`).
-- **Blindagem de Segurança & OWASP API Compliance**:
-  - Todos os endpoints de IA protegidos por autenticação de sessão, eliminando superfícies anônimas.
-  - Mascaramento e proteção de chaves de API contra exibição ou sobrescrita em texto puro.
-  - Sanitização completa contra XSS no chat Copilot e validação restrita de URIs (apenas HTTP/HTTPS).
-  - Middleware de autenticação do Agente configurado com política defensiva *fail-closed*.
-
-- **Padrão Oficial de Relatórios v3.0 (Zero-Mock Normative)**:
-  - Eliminação de dados sintéticos e resolução dos 10 bugs de telemetria em `reports_api.py`.
-  - Conformidade comercial com Veeam ONE, Rubrik Radar e Datto RMM.
-  - Schema universal v3.0.0 com `score`, `delta`, `metrics` (com targets e status), parecer analítico cruzado de IA e ações recomendadas priorizadas.
-  - Transparência explícita: relatórios sem sensor local retornam `status: "unavailable"` com guias de configuração, sem fabricar números.
+- **Backup Imutável (S3 Object Lock & WORM Local)**:
+  - **S3 Object Lock** nativo (S3/Wasabi/MinIO) por repositório com retenção configurável em dias e modos `GOVERNANCE` ou `COMPLIANCE`. Aplicação automática no bucket e auditoria periódica de bloqueio de objetos.
+  - Uploads de motores de backup com validação obrigatória de cabeçalho `Content-MD5` (incluindo multipart).
+  - **WORM Local para discos**: Bloqueio de arquivos como somente-leitura com ACLs do Windows de negação explícita de exclusão (`Deny Delete`), impedindo ransomware ou operadores de apagar repositórios dentro do período de retenção.
+- **Implantação em Massa de Agentes (Tokens de Instalação)**:
+  - Geração de tokens de instalação centralizados com vínculo por organização (tenant), prazo de expiração e contadores de uso.
+  - Script autônomo `install_agent.ps1 -ServerURL -InstallToken -Unattended` pronto para distribuição em larga escala via GPO, script de logon ou ferramentas de RMM.
+  - Agente registrado por token permanece travado na respectiva organização com resiliência de reconexão de até 72 horas.
+- **Políticas Centrais de Backup com Detecção de Desvio (Drift Detection)**:
+  - Gestão centralizada de regras de backup (agendamento, retenção, limites de banda, janelas de manutenção e políticas de imutabilidade) aplicadas em massa na frota de agentes.
+  - Auditoria em tempo real de conformidade com sinalização semafórica de divergências e botão de reaplicação forçada.
+- **Otimização e Resiliência da IA Local (Ollama)**:
+  - Redução de mais de 85% no payload de prompts operacionais através de filtragem inteligente e truncamento adaptativo de históricos (`_smart_history_tokens`).
+  - Resolução definitiva de erros de timeout em inferências pesadas de CPU com modelos 8B+ (Llama 3), com elevação do timeout padrão para 300s e capping seguro de `num_predict`.
+  - Configuração do parâmetro de timeout diretamente na interface Web (`ai-timeout`) do Server e Agent.
+  - Roteamento acelerado em milissegundos para comandos de ping, navegação e diagnósticos rápidos.
+- **Operação Remota & Comercial MSP**:
+  - **Portal do Cliente MSP (`/portal.html`)**: Painel isolado multi-tenant para visualização de faturas, relatórios executivos com a marca do cliente e saúde da proteção.
+  - **Fechamento Mensal e Tarifação**: Cálculo automatizado por agente ativo, volume armazenado em TB e taxa fixa, com exportação CSV e hash criptográfico de integridade.
+  - **Gerenciamento Remoto de Agentes**: Execução e parada de jobs, restauração remota de snapshots em diretório local do cliente e terminal remoto seguro.
+  - **Catálogo de 20 Relatórios Reais**: Métricas calculadas sobre telemetria real (PostgreSQL/SQLite) com gráficos SVG vetoriais, exportação CSV/JSON e envio agendado por e-mail.
+- **Recuperação de Corrupção Física de Dados & Alta Performance de Logs**:
+  - Reparação autônoma de tabelas no PostgreSQL via rotinas tolerantes a corrupção e criação de índices compostos `idx_logs_timestamp_desc` (aceleração de 7.180x em consultas de log).
 - **Arquitetura Operacional de DR & SureRestore Zero-Mock**:
   - Eliminação definitiva de declarações ou retornos simulados. Um ponto de restauração só recebe o status de *Aprovado* após boot real em VM isolada com validação de heartbeat e consistência de carga.
   - Estados padronizados: `Protegido`, `Em risco`, `Atenção`, `Falhou`, `Não protegido`.
@@ -184,7 +181,21 @@ A partir da versão **14.7.0**, o sistema adota o padrão normativo v3.0 onde os
 
 ---
 
-## 📜 Histórico de Mudanças (Changelog v14.7.6 Enterprise)
+## 📜 Histórico de Mudanças (Changelog v14.8.1 Enterprise)
+
+- **Release 14.8.1 — Backup Imutável, Implantação em Massa, Políticas Centrais, Otimização de IA Local & Comercial MSP (2026-10-05)**:
+  - **Backup Imutável & S3 Object Lock**: Suporte nativo a Object Lock (Wasabi/S3/MinIO) com modos Governance/Compliance, auditoria periódica de bloqueio de objetos e validação de `Content-MD5`. WORM Local para armazenamento em disco com ACLs Windows de negação explícita de exclusão (`Deny Delete`).
+  - **Implantação em Massa (Tokens de Instalação)**: Sistema de tokens gerados no Server com controle de tenant, expiração e quantidade de usos. Suporte a instalação 100% não assistida via `install_agent.ps1 -Unattended` para GPO e RMM.
+  - **Políticas Centrais de Backup com Drift Detection**: Painel centralizado de governança permitindo aplicar parâmetros de backup, retenção, janela de manutenção e banda com detecção de desvio e botão de reaplicação forçada.
+  - **Otimização e Resiliência da IA Local (Ollama)**: Redução de >85% na carga de tokens de prompts através de filtragem inteligente e truncamento adaptativo de históricos (`_smart_history_tokens`). Elevação do timeout padrão para 300s, capping seguro de tokens de saída em CPU e adição do parâmetro configurável `ai-timeout` nas telas de configurações do Server e Agent.
+  - **Comercial MSP & Portal do Cliente**: Portal `/portal.html` dedicado a clientes finais, faturamento mensal consolidado com hash de integridade e exportação CSV, e licenciamento corporativo assinado via Ed25519.
+  - **Sincronização de Distribuição e SemVer 14.8.1**: Atualização global de manifests, templates HTML, instaladores unificados e distribuição física em `GBOC-Distribution`.
+
+- **Release 14.8.0 — Relatórios Reais, Painel de Decisão Executivo, Gerenciamento Remoto & SureRestore (2026-10-04)**:
+  - **20 Relatórios Reais Substituindo Catálogo Estático**: Motor universal `report_core.py` operando com telemetria 100% real (PostgreSQL/SQLite), gráficos vetoriais SVG embutidos, integridade por hash SHA-256 e agendamento automático por e-mail.
+  - **Painel de Decisão Executivo**: Visão holística da saúde do ambiente com KPIs de RPO, agentes online, falhas e recomendações priorizadas com deep link direto para o respectivo relatório.
+  - **Gerenciamento Remoto de Agentes**: Execução de jobs, cancelamento, testes de restauração com validação de hash e terminal remoto WebSocket/HTTP direto.
+  - **Alertas Proativos em Tempo Real**: Monitoramento preemptivo a cada 5 minutos com notificações adaptáveis para Microsoft Teams, Webhook e e-mail antes da ocorrência de falhas graves.
 
 - **Release 14.7.6 — Recuperação de Integridade de Banco de Dados, Índices de Alta Performance & Modularização dos Logs do Sistema**:
   - **Reparação Física do PostgreSQL (`agent_logs`)**: Resolução de corrupção física de blocos de disco (`invalid page in block 73833`) na tabela de 4.542.898 registros via rotina automatizada de `VACUUM FULL VERBOSE` com tolerância controlada, salvaguardando a integridade transacional sem perda de dados históricos.

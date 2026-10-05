@@ -811,7 +811,7 @@ async def get_ransomware_events():
         if not events:
             cur.execute(
                 """
-                SELECT id, COALESCE(event_type,'RANSOMWARE_EVENT'), COALESCE(agent_hostname, 'Servidor Central'), message, created_at
+                SELECT event_id, COALESCE(event_type,'RANSOMWARE_EVENT'), COALESCE(agent_hostname, 'Servidor Central'), message, created_at
                 FROM system_events
                 WHERE event_type ILIKE '%ransomware%' OR event_type ILIKE '%canary%' OR message ILIKE '%ransomware%'
                 ORDER BY created_at DESC
