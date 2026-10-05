@@ -76,7 +76,7 @@ def _normalize_source_paths(value: Union[str, List[str], None]) -> str:
 
 
 @router.get("/")
-async def list_tasks() -> Dict[str, Any]:
+def list_tasks() -> Dict[str, Any]:
     """Lista todas as tarefas"""
     try:
         from shared_core import get_shared_core
@@ -110,7 +110,7 @@ async def list_tasks() -> Dict[str, Any]:
 
 
 @router.post("/")
-async def create_task(task: TaskCreate, request: Request) -> Dict[str, Any]:
+def create_task(task: TaskCreate, request: Request) -> Dict[str, Any]:
     """Cria nova tarefa (normaliza source_paths)"""
     try:
         from shared_core import get_shared_core
@@ -149,7 +149,7 @@ async def create_task(task: TaskCreate, request: Request) -> Dict[str, Any]:
 # ============================================================
 
 @router.get("/status")
-async def get_tasks_status() -> Dict[str, Any]:
+def get_tasks_status() -> Dict[str, Any]:
     """Lista todas as tarefas com status atual (para aba Sistema)"""
     try:
         from shared_core import get_shared_core
@@ -201,7 +201,7 @@ async def get_tasks_status() -> Dict[str, Any]:
 
 
 @router.get("/system/errors/recent")
-async def get_recent_task_errors(limit: int = 100) -> Dict[str, Any]:
+def get_recent_task_errors(limit: int = 100) -> Dict[str, Any]:
     """Retorna histórico recente de falhas de execução com detalhes."""
     try:
         from shared_core import get_shared_core
@@ -230,7 +230,7 @@ async def get_recent_task_errors(limit: int = 100) -> Dict[str, Any]:
 
 
 @router.get("/system/errors/report")
-async def get_task_errors_report(days: int = 7) -> Dict[str, Any]:
+def get_task_errors_report(days: int = 7) -> Dict[str, Any]:
     """Relatório agregado de falhas de tarefas por engine/tarefa."""
     try:
         from shared_core import get_shared_core
@@ -292,7 +292,7 @@ async def get_task_errors_report(days: int = 7) -> Dict[str, Any]:
 # ============================================================
 
 @router.get("/running/detailed")
-async def get_running_tasks_detailed() -> Dict[str, Any]:
+def get_running_tasks_detailed() -> Dict[str, Any]:
     """Retorna execuções em andamento com detalhes para UI de tarefas."""
     try:
         from shared_core import get_shared_core
@@ -327,7 +327,7 @@ async def get_running_tasks_detailed() -> Dict[str, Any]:
         return {"status": "success", "executions": [], "count": 0}
 
 @router.get("/{task_id}")
-async def get_task(task_id: int) -> Dict[str, Any]:
+def get_task(task_id: int) -> Dict[str, Any]:
     """Obtém tarefa por ID"""
     try:
         from shared_core import get_shared_core
@@ -361,7 +361,7 @@ async def get_task(task_id: int) -> Dict[str, Any]:
 
 
 @router.put("/{task_id}")
-async def update_task(task_id: int, task: TaskUpdate, request: Request) -> Dict[str, Any]:
+def update_task(task_id: int, task: TaskUpdate, request: Request) -> Dict[str, Any]:
     """Atualiza tarefa (normaliza source_paths quando presente)"""
     try:
         from shared_core import get_shared_core
@@ -395,7 +395,7 @@ async def update_task(task_id: int, task: TaskUpdate, request: Request) -> Dict[
 
 
 @router.delete("/{task_id}")
-async def delete_task(task_id: int, request: Request) -> Dict[str, Any]:
+def delete_task(task_id: int, request: Request) -> Dict[str, Any]:
     """Deleta tarefa"""
     try:
         from shared_core import get_shared_core
@@ -422,7 +422,7 @@ async def delete_task(task_id: int, request: Request) -> Dict[str, Any]:
 
 
 @router.post("/{task_id}/run")
-async def run_task(task_id: int, request: Request) -> Dict[str, Any]:
+def run_task(task_id: int, request: Request) -> Dict[str, Any]:
     """Coloca uma tarefa na fila para execução e cria um registro em task_executions"""
     try:
         from shared_core import get_shared_core
@@ -508,7 +508,7 @@ async def run_task(task_id: int, request: Request) -> Dict[str, Any]:
 
 
 @router.post("/execution/{execution_id}/stop")
-async def stop_task(execution_id: int) -> Dict[str, Any]:
+def stop_task(execution_id: int) -> Dict[str, Any]:
     """Para uma tarefa em execução"""
     try:
         from shared_core import get_shared_core
@@ -531,7 +531,7 @@ async def stop_task(execution_id: int) -> Dict[str, Any]:
 
 
 @router.get("/{task_id}/history")
-async def get_task_history(task_id: int, limit: int = 20) -> Dict[str, Any]:
+def get_task_history(task_id: int, limit: int = 20) -> Dict[str, Any]:
     """Histórico de execuções"""
     try:
         from shared_core import get_shared_core
@@ -567,7 +567,7 @@ async def get_task_history(task_id: int, limit: int = 20) -> Dict[str, Any]:
 
 
 @router.get("/execution/{exec_id}")
-async def get_execution_status(exec_id: int) -> Dict[str, Any]:
+def get_execution_status(exec_id: int) -> Dict[str, Any]:
     """Status de uma execução"""
     try:
         from shared_core import get_shared_core
@@ -607,7 +607,7 @@ async def get_execution_status(exec_id: int) -> Dict[str, Any]:
 
 
 @router.get("/{task_id}/status")
-async def get_task_status(task_id: int) -> Dict[str, Any]:
+def get_task_status(task_id: int) -> Dict[str, Any]:
     """Status atual de uma tarefa (via TaskManager)"""
     try:
         from shared_core import get_shared_core
@@ -629,7 +629,7 @@ async def get_task_status(task_id: int) -> Dict[str, Any]:
 
 
 @router.get("/execution/{execution_id}/details")
-async def get_execution_details(execution_id: int) -> Dict[str, Any]:
+def get_execution_details(execution_id: int) -> Dict[str, Any]:
     """Obtém detalhes detalhados de uma execução em tempo real"""
     try:
         from shared_core import get_shared_core
@@ -651,7 +651,7 @@ async def get_execution_details(execution_id: int) -> Dict[str, Any]:
 
 
 @router.post("/{task_id}/force-cancel")
-async def force_cancel_task(task_id: int) -> Dict[str, Any]:
+def force_cancel_task(task_id: int) -> Dict[str, Any]:
     """Força cancelamento de tarefa independente do status de execuções"""
     try:
         from shared_core import get_shared_core
@@ -689,7 +689,7 @@ async def force_cancel_task(task_id: int) -> Dict[str, Any]:
 
 
 @router.post("/reset-stuck")
-async def reset_stuck_backups() -> Dict[str, Any]:
+def reset_stuck_backups() -> Dict[str, Any]:
     """Reseta backups que estão presos no status 'running' por mais de 1 hora"""
     try:
         from shared_core import get_shared_core
@@ -718,7 +718,7 @@ async def reset_stuck_backups() -> Dict[str, Any]:
         return {"status": "error", "message": str(e)}
 
 @router.get("/system/password-audit")
-async def task_password_audit(task_id: int = 0, execution_id: int = 0) -> Dict[str, Any]:
+def task_password_audit(task_id: int = 0, execution_id: int = 0) -> Dict[str, Any]:
     """Audita vínculo task/repo e presença de senhas sem expor valores."""
     try:
         from shared_core import get_shared_core

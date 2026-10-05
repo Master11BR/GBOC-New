@@ -17,7 +17,7 @@ logger = logging.getLogger("gboc_overview_module")
 router = APIRouter(prefix="/api/v1/dashboard", tags=["Overview Dashboard"])
 
 @router.get("/stats")
-async def get_dashboard_overview_stats():
+def get_dashboard_overview_stats():
     """Retorna os dados consolidados reais do dashboard principal."""
     conn = None
     try:

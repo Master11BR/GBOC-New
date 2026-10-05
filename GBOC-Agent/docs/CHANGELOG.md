@@ -61,7 +61,23 @@
 - **Jobs com Falha** (antes sempre 0 — lia uma lista em memória que ninguém alimentava): agora mostra backups com falha (falhas seguidas, desde quando, tentativas/escalação), testes de restauração e verificações reprovados, restaurações com falha, **agentes rejeitados por chave de pareamento inválida**, envios de relatório e alertas que falharam, operações em lote com erro, erros do próprio servidor e módulos do servidor que não carregaram. Filtros por período, agente/servidor, cliente e origem; reconhecer/reabrir; histórico de execuções com falha; taxa de recuperação real. "Testar Alertas" envia de verdade pelo canal configurado.
 - **Alertas e Falhas**: a lista "Alertas recentes" estava sempre vazia (uma rota vazia escondia a real). Agora junta alertas proativos, falhas ativas e eventos do sistema, com período e coluna de origem. Quando o módulo de alertas proativos não estiver ativo, a tela explica (reiniciar o serviço) em vez de "Not Found".
 - Datas dos logs exibidas no horário em que foram gravadas (antes apareciam 3 h antes).
+- **Logs do Agente** (Operações > Logs): mesmo padrão do Server — período de 24 h a 12 meses, *Todo o período* (padrão) ou datas personalizadas, total "N de M", **Carregar mais** e estatísticas do período (antes: fixo nas últimas 48 h e no máximo 30 dias pela API).
+- **Retenção automática dos logs do Agente** (antes cresciam sem limite): padrão 90 dias, ajustável no botão *Retenção* (0 = manter tudo), aplicada uma vez por dia em lotes.
+
+### ⚡ Desempenho (lentidão no login e na troca de telas)
+- **Causa principal:** cerca de 180 rotas do Server e do Agente eram assíncronas mas faziam consultas síncronas ao banco — cada uma travava o servidor inteiro enquanto rodava. Com agentes sincronizando, o login e as telas ficavam esperando. Essas rotas agora rodam em paralelo (fora do laço principal), incluindo o login do Agente (hash PBKDF2) e a sincronização completa dos agentes.
+- O painel do Server deixou de carregar no início os dados de abas escondidas (Usuários, Multi-Tenant, Hermes, Migração de motores, Agentes): cada aba carrega ao ser aberta. Isso também evita a tentativa de descobrir motores em agentes inacessíveis a cada abertura do painel (erro 503 que aparecia nos logs).
+- Arquivos CSS/JS ficam 5 minutos em cache do navegador (antes eram revalidados a cada troca de tela, ~20 pedidos por página); fontes e imagens por 1 dia. Depois de uma atualização, Ctrl+F5 aplica na hora.
+- O Agente deixou de consultar o banco a cada requisição só para saber se o login está habilitado (resultado em cache por 60 s).
 - Corrigidas consultas que falhavam em silêncio e agora apareciam nos logs do servidor: controladores de domínio (AD), eventos de ransomware e lista de tarefas da API v2.
+- A versão exibida no cabeçalho (/api/system/info, chamada em toda tela) executava comandos git a cada chamada; agora é lida em segundo plano e fica em cache por 10 minutos.
+- A medição de CPU deixou de "dormir" de 0,5 a 1,5 s dentro das requisições: uma thread mede a CPU a cada segundo e as telas recebem o último valor na hora (GBOC_FAST_METRICS=0 desativa).
+- Comandos do RMM (processos, serviços, executar), status da proteção contra ransomware e CBT rodam fora do laço principal: não travam mais as outras telas enquanto executam.
+
+### 🔑 Correção: chave de pareamento do Agente "não salva / não reconhecida"
+- A chave era salva em C:\ProgramData\GBOC\central_config.json, mas um processo do Agente iniciado antes da troca continuava usando a chave antiga em memória: o Server respondia 401 (AGENT_KEY_INVALID) e recusava o WebSocket (403) indefinidamente. Agora o Agente relê o arquivo a cada 30 s e **aplica** a chave/URL nova (heartbeat, sincronização e WebSocket reconectam sozinhos); ao receber 401 relê o arquivo e tenta de novo na hora.
+- Salvar só a URL (chave em branco) mantém a chave gravada no arquivo — antes podia regravar a chave antiga da memória.
+- Configurações > Servidor Central mostra a chave salva (mascarada, ex.: gboc_pk_…AB12), se o Server a reconhece (verde/vermelho), o arquivo usado e o processo. Os logs passam a mostrar o PID e a chave mascarada, facilitando identificar um segundo processo do Agente rodando com configuração antiga.
 
 ### 🤖 Copilot
 - Guia de uso com os novos tópicos: políticas centrais, implantação em massa, janela/banda, backup imutável, portal do cliente e faturamento/licença.

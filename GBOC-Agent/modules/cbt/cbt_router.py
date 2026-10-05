@@ -9,6 +9,7 @@ import sys
 import json
 import logging
 import platform
+import asyncio
 import subprocess
 from datetime import datetime
 from typing import Dict, Any, Optional
@@ -77,7 +78,7 @@ async def create_vss_snapshot(request: Request):
         }}
     """
     try:
-        res = subprocess.run(
+        res = await asyncio.to_thread(subprocess.run, 
             ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd],
             capture_output=True, text=True, timeout=25
         )
@@ -136,7 +137,7 @@ async def get_bmr_manifest():
     if sys.platform == "win32":
         # 1. Detectar se é UEFI ou Legacy BIOS
         try:
-            firmware_res = subprocess.run(
+            firmware_res = await asyncio.to_thread(subprocess.run, 
                 ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
                  "$env:firmware_type"],
                 capture_output=True, text=True, timeout=5
@@ -153,7 +154,7 @@ async def get_bmr_manifest():
             "ConvertTo-Json -Depth 2"
         )
         try:
-            d_res = subprocess.run(
+            d_res = await asyncio.to_thread(subprocess.run, 
                 ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_disk_cmd],
                 capture_output=True, text=True, timeout=10
             )

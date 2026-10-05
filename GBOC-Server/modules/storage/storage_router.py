@@ -118,7 +118,7 @@ async def get_storage_overview():
     })
 
 @router.get("/history")
-async def get_storage_history(days: int = 30):
+def get_storage_history(days: int = 30):
     """Retorna histórico real de crescimento de dados coletado pelo sistema."""
     days_limit = min(days, 90)
     history = []

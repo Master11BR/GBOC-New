@@ -32,7 +32,7 @@ class OrgUpdateReq(BaseModel):
     status: Optional[str] = None
 
 @router.get("/organizations")
-async def get_tenant_organizations():
+def get_tenant_organizations():
     """Retorna lista de organizações MSP configuradas no banco PostgreSQL."""
     conn = None
     try:
@@ -61,7 +61,7 @@ async def get_tenant_organizations():
         if conn: release_db(conn)
 
 @router.post("/organizations")
-async def create_tenant_organization(req: OrgCreateReq, request: Request):
+def create_tenant_organization(req: OrgCreateReq, request: Request):
     """Cria uma nova organização MSP no banco PostgreSQL."""
     conn = None
     try:
@@ -89,7 +89,7 @@ async def create_tenant_organization(req: OrgCreateReq, request: Request):
         if conn: release_db(conn)
 
 @router.put("/organizations/{org_id}")
-async def update_tenant_organization(org_id: str, req: OrgUpdateReq):
+def update_tenant_organization(org_id: str, req: OrgUpdateReq):
     """Atualiza dados e limites de uma organização MSP."""
     conn = None
     try:
@@ -131,7 +131,7 @@ async def update_tenant_organization(org_id: str, req: OrgUpdateReq):
         if conn: release_db(conn)
 
 @router.delete("/organizations/{org_id}")
-async def delete_tenant_organization(org_id: str):
+def delete_tenant_organization(org_id: str):
     """Exclui uma organização MSP do banco."""
     conn = None
     try:

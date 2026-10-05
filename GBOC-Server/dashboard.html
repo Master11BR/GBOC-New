@@ -1998,7 +1998,7 @@ function gbocToggleSidebarCollapse(){
             } catch(e) {}
 
             if(targetId==='analytics' || id==='diagnostic') loadAnalytics();
-            if(targetId==='agents') loadAgentsTab();
+            if(targetId==='agents') { loadAgentsTab(); if (typeof loadAgentsList === 'function') loadAgentsList(); }
             if(targetId==='rmm') populateRMMAgentSelect();
             if(targetId==='logs'){ loadLogAgentFilter(); loadLogs(); }
             if(targetId==='config' || id==='notifications' || id==='engines') loadConfig();
@@ -2007,11 +2007,12 @@ function gbocToggleSidebarCollapse(){
             if(targetId==='alerts') { loadServerAlerts(); if (window.GBOCProactive) GBOCProactive.init(); }
             if(targetId==='surerestore' && window.GBOCRestoreTests) GBOCRestoreTests.init();
             if(targetId==='replication') loadServerReplication();
-            if(targetId==='users') loadServerUsers();
+            if(targetId==='users') { loadServerUsers(); if (typeof loadAllUsersModule === 'function') loadAllUsersModule(); }
             if(targetId==='reports') { loadReportsTab(); if (window.GBOCReportCenter) GBOCReportCenter.init(); }
             if(targetId==='remote' && window.GBOCRemote) { GBOCRemote.init(); }
             if(targetId==='remote' && window.GBOCFleet) { GBOCFleet.init(); }
             if(targetId==='policies' && window.GBOCPolicies) { GBOCPolicies.init(); }
+            if(targetId==='multitenant' && typeof loadMultiTenantData === 'function') loadMultiTenantData();
             if(targetId==='multitenant' && window.GBOCCommercial) { GBOCCommercial.init(); }
             if(targetId==='job-alert') loadServerJobAlertData();
             if(targetId==='storage') loadServerStorageData();
@@ -4690,6 +4691,13 @@ function gbocToggleSidebarCollapse(){
 
     </script>
     <!-- GBOC Modular JavaScript Modules -->
+    <script>
+        // Abas escondidas não carregam dados no início: cada módulo carrega quando a aba é aberta (switchTab).
+        window.gbocTabHidden = function (tabId) {
+            const t = document.getElementById(tabId);
+            return !!(t && t.classList.contains('tab-section') && !t.classList.contains('active'));
+        };
+    </script>
     <script src="/modules/agents/agents.js"></script>
     <script src="/modules/rmm/rmm.js"></script>
     <script src="/modules/reports/reports.js"></script>

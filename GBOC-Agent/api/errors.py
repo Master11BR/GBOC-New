@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/errors", tags=["errors"])
 
 @router.get("/")
-async def get_errors(limit: int = 50):
+def get_errors(limit: int = 50):
     try:
         from shared_core import get_shared_core
         core = get_shared_core()

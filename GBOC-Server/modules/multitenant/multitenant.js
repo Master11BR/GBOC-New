@@ -7,7 +7,7 @@ var isEditingOrg = false;
 
 document.addEventListener('DOMContentLoaded', function () {
     // Apenas carrega se estiver na rota onde o script é inserido de forma isolada
-    if (document.getElementById('multitenant-org-table')) {
+    if (document.getElementById('multitenant-org-table') && !(window.gbocTabHidden && window.gbocTabHidden('tab-multitenant'))) {
         loadMultiTenantData();
     }
 });

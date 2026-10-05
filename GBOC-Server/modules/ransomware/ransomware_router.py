@@ -5,6 +5,7 @@ import json
 import logging
 import platform
 import socket
+import asyncio
 import subprocess
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -469,7 +470,7 @@ async def sync_ransomware_central():
 
 
 @router.get("/central_stats")
-async def get_central_ransomware_stats(limit: int = 50):
+def get_central_ransomware_stats(limit: int = 50):
     conn = None
     cur = None
     try:
@@ -689,7 +690,7 @@ async def get_ransomware_overview():
 
 
 @router.get("/modules")
-async def get_ransomware_modules():
+def get_ransomware_modules():
     modules = [dict(m) for m in PROTECTION_MODULES_7]
     evidence = {
         "process_guard": False,
@@ -780,7 +781,7 @@ async def get_ransomware_modules():
 
 
 @router.get("/events")
-async def get_ransomware_events():
+def get_ransomware_events():
     events: List[Dict[str, Any]] = []
     conn = None
     cur = None
@@ -858,7 +859,7 @@ async def local_protection_status():
             'Select-Object AMServiceEnabled, AntivirusEnabled, RealTimeProtectionEnabled | '
             'ConvertTo-Json -Depth 2'
         )
-        def_result = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", defender_cmd], capture_output=True, text=True, timeout=10)
+        def_result = await asyncio.to_thread(subprocess.run, ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", defender_cmd], capture_output=True, text=True, timeout=10)
         if def_result.returncode == 0 and def_result.stdout.strip():
             try:
                 d = json.loads(def_result.stdout)
@@ -874,7 +875,7 @@ async def local_protection_status():
                 'Get-CimInstance -Namespace root/SecurityCenter2 -ClassName AntiVirusProduct | '
                 'Select-Object displayName, productState | ConvertTo-Json -Depth 2'
             )
-            cim_result = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", cim_cmd], capture_output=True, text=True, timeout=10)
+            cim_result = await asyncio.to_thread(subprocess.run, ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", cim_cmd], capture_output=True, text=True, timeout=10)
             if cim_result.returncode == 0 and cim_result.stdout.strip():
                 try:
                     products = json.loads(cim_result.stdout)
@@ -892,7 +893,7 @@ async def local_protection_status():
             'StartTime=(Get-Date).AddDays(-3)} -ErrorAction SilentlyContinue -MaxEvents 5 | '
             'Select-Object TimeCreated, Id, Message | ConvertTo-Json -Depth 2'
         )
-        log_result = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", log_cmd], capture_output=True, text=True, timeout=10)
+        log_result = await asyncio.to_thread(subprocess.run, ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", log_cmd], capture_output=True, text=True, timeout=10)
         if log_result.returncode == 0 and log_result.stdout.strip():
             try:
                 logs = json.loads(log_result.stdout)

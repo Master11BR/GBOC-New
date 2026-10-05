@@ -21,7 +21,7 @@ class BulkActionRequest(BaseModel):
 
 @router.get("")
 @router.get("/")
-async def list_agents_v2(
+def list_agents_v2(
     page: int = Query(1, ge=1, description="Número da página"),
     per_page: int = Query(20, ge=1, le=100, description="Itens por página"),
     status: Optional[str] = Query(None, description="Filtrar por status: online, offline, degraded"),
@@ -128,7 +128,7 @@ async def list_agents_v2(
     return build_v2_response(data=agents, meta=meta, execution_time_ms=elapsed)
 
 @router.get("/{agent_id}")
-async def get_agent_detail_v2(agent_id: str):
+def get_agent_detail_v2(agent_id: str):
     """Retorna dados detalhados e status em tempo real de um agente específico."""
     t0 = time.perf_counter()
     

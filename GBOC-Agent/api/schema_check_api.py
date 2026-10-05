@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 @router.get("/schema-check")
-async def check_schema() -> Dict[str, Any]:
+def check_schema() -> Dict[str, Any]:
     """
     Verifica se todas as colunas esperadas existem nas tabelas principais.
     Útil para diagnosticar erros de schema incompleto.
@@ -129,7 +129,7 @@ def _generate_recommendations(missing_columns: Dict[str, List[str]]) -> List[str
 
 
 @router.post("/schema-fix")
-async def fix_schema() -> Dict[str, Any]:
+def fix_schema() -> Dict[str, Any]:
     """
     Tenta corrigir schema executando migrações defensivas manualmente.
     """

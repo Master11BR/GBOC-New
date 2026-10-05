@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });
+    if (window.gbocTabHidden && window.gbocTabHidden('tab-engine-migration')) return;   // painel: descobre ao abrir a aba
     runEngineDiscovery();
 });
 

@@ -65,7 +65,7 @@ async def _agent_call_async(method: str, agent_id: str, path: str, body: Dict[st
 
 
 @router.get("/agents")
-async def migration_agents():
+def migration_agents():
     """Agentes disponíveis para migração (a migração sempre ocorre no Agente dono das tarefas)."""
     from database import db_manager
     conn = db_manager.get_connection()

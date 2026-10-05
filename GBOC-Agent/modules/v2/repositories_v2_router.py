@@ -14,7 +14,7 @@ router = APIRouter(prefix="/repositories", tags=["Repositories v2"])
 
 @router.get("")
 @router.get("/")
-async def list_repositories_v2(
+def list_repositories_v2(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     type: Optional[str] = Query(None, description="local ou cloud"),

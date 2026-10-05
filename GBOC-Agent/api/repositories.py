@@ -132,7 +132,7 @@ def _strip_secret_enc(repo_dict: Dict[str, Any]) -> None:
 
 
 @router.get("/")
-async def list_repositories():
+def list_repositories():
     """
     Lista todos os repositórios configurados.
     Retorna lista de dicts com dados seguros (sem senhas).
@@ -183,7 +183,7 @@ async def list_repositories():
 
 
 @router.post("/", response_model=SuccessResponse)
-async def create_repository(repo: RepositoryCreateRequest, background_tasks: BackgroundTasks):
+def create_repository(repo: RepositoryCreateRequest, background_tasks: BackgroundTasks):
     """
     Cria novo repositório e agenda inicialização em background.
     """
@@ -257,7 +257,7 @@ async def create_repository(repo: RepositoryCreateRequest, background_tasks: Bac
 
 
 @router.get("/{repo_id}")
-async def get_repository(repo_id: int, show_sensitive: bool = False):
+def get_repository(repo_id: int, show_sensitive: bool = False):
     """
     Retorna dados de um repositório específico.
     Mascara senha de criptografia por padrão.
@@ -343,7 +343,7 @@ async def get_repository(repo_id: int, show_sensitive: bool = False):
 
 
 @router.put("/{repo_id}", response_model=SuccessResponse)
-async def update_repository(repo_id: int, repo_data: RepositoryUpdateRequest):
+def update_repository(repo_id: int, repo_data: RepositoryUpdateRequest):
     """
     Atualiza repositório existente.
     Apenas campos fornecidos são atualizados.
@@ -406,7 +406,7 @@ async def update_repository(repo_id: int, repo_data: RepositoryUpdateRequest):
 
 
 @router.delete("/{repo_id}", response_model=SuccessResponse)
-async def delete_repository(repo_id: int, keep_folder: bool = False):
+def delete_repository(repo_id: int, keep_folder: bool = False):
     """
     Exclui repositório e tarefas associadas.
     """
@@ -429,7 +429,7 @@ async def delete_repository(repo_id: int, keep_folder: bool = False):
 
 
 @router.post("/{repo_id}/initialize", response_model=SuccessResponse)
-async def initialize_repository(repo_id: int):
+def initialize_repository(repo_id: int):
     """Inicializa explicitamente um repositório (restic init / kopia repository create)."""
     try:
         from shared_core import get_shared_core
@@ -476,7 +476,7 @@ async def initialize_repository(repo_id: int):
 
 
 @router.post("/test-connection", response_model=SuccessResponse)
-async def test_repository_connection_before_creation(request: RepositoryCreateRequest):
+def test_repository_connection_before_creation(request: RepositoryCreateRequest):
     """Testa conexão com repositório antes da criação"""
     try:
         logger.info(f"🧪 Testando conexão para repositório: {request.name}")
@@ -518,7 +518,7 @@ async def test_repository_connection_before_creation(request: RepositoryCreateRe
 
 
 @router.post("/{repo_id}/test")
-async def test_repository_connection(repo_id: int):
+def test_repository_connection(repo_id: int):
     """
     Testa conexão/acessibilidade do repositório usando testes específicos por tipo.
     """
@@ -568,7 +568,7 @@ async def test_repository_connection(repo_id: int):
 
 
 @router.get("/{repo_id}/validate")
-async def validate_repository_connection(repo_id: int):
+def validate_repository_connection(repo_id: int):
     """
     Valida conexão e retorna detalhes (snapshots, etc).
     """
@@ -612,7 +612,7 @@ async def validate_repository_connection(repo_id: int):
 
 
 @router.post("/fix-stuck")
-async def fix_stuck_repositories():
+def fix_stuck_repositories():
     """
     Corrige repositórios travados em inicialização.
     Útil quando repositórios ficam presos no status "inicializando" devido a erros.

@@ -50,7 +50,7 @@ router = APIRouter(prefix="/api/v1/server/compliance", tags=["Compliance Central
 
 
 @router.get("/dashboard")
-async def compliance_dashboard():
+def compliance_dashboard():
     """
     Painel central de conformidade agregado de todos os agentes.
     Retorna scores ISO 27001 / SOC 2 / HIPAA / LGPD por agente e globais.
@@ -135,7 +135,7 @@ async def compliance_dashboard():
 
 
 @router.get("/violations")
-async def compliance_violations(days: int = Query(default=7, ge=1, le=90)):
+def compliance_violations(days: int = Query(default=7, ge=1, le=90)):
     """
     Lista violações de conformidade (agentes sem backup há mais de X dias,
     backups com falha consecutiva, etc.).
@@ -198,7 +198,7 @@ async def compliance_violations(days: int = Query(default=7, ge=1, le=90)):
 
 
 @router.get("/certificates")
-async def compliance_certificates():
+def compliance_certificates():
     """
     Lista provas digitais de backup (SHA-256 hash dos snapshots) de todos os agentes
     para uso em auditoria ISO 27001 / SOC 2.

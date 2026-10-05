@@ -50,7 +50,7 @@ def _get_current_user_from_req(request: Request) -> Optional[Dict[str, Any]]:
     return None
 
 @router.get("")
-async def get_agents_list(request: Request):
+def get_agents_list(request: Request):
     """Retorna a lista de agentes cadastrados, filtrados pelo tenant_id do usuário logado se aplicável."""
     conn = None
     try:

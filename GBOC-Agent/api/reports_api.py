@@ -429,7 +429,7 @@ async def get_reports_schema():
 
 @router.get("/api/system/health")
 @router.get("/api/v1/system/health")
-async def get_system_health():
+def get_system_health():
     """Health check unificado — expõe versão, uptime, integridade do banco e engines ativos."""
     try:
         from version import GBOC_VERSION, version_string

@@ -43,6 +43,16 @@ except Exception:
 
 logger = logging.getLogger(__name__)
 
+
+def key_hint(key: Optional[str]) -> str:
+    """Identificação segura da chave para logs/tela (nunca a chave inteira)."""
+    if not key:
+        return "(vazia)"
+    if key == LEGACY_DEFAULT_KEY:
+        return "(padrão antiga — inválida)"
+    return f"{key[:8]}…{key[-4:]}" if len(key) > 14 else "…" + key[-2:]
+
+
 class CentralServerClient:
     """Cliente para comunicação com servidor central GBOC"""
 
@@ -76,9 +86,44 @@ class CentralServerClient:
         self._duplicati_monitor_thread: Optional[threading.Thread] = None
         self._duplicati_last_seen: Dict[str, Any] = {}   # backup_id -> último resultado visto
 
+        # Situação da chave junto ao Server (exibida em Configurações > Servidor Central)
+        self.server_auth = "unknown"          # ok | rejected | unknown
+        self.server_auth_at = None
+        self._ws_reconnect = threading.Event()  # pede reconexão do WebSocket (chave/URL alteradas)
+
         # Carregar configuração sem testar conexão
         self._load_configuration_silent()
         self._apply_auth_headers()
+
+    def sync_runtime_config(self, reason: str = "") -> bool:
+        """Relê central_config.json e aplica chave/URL/tenant em memória se mudaram.
+
+        Antes o loop de heartbeat só relia o arquivo, sem aplicar: um processo do agente iniciado antes da
+        troca da chave (ou outro processo que gravou a chave nova) continuava enviando a chave antiga e o
+        Server respondia 401 AGENT_KEY_INVALID / WebSocket 403 indefinidamente."""
+        try:
+            config_manager.reload()
+            new_key = config_manager.get_api_key() or None
+            new_url = (config_manager.get_server_url() or "").rstrip("/") or None
+            new_tenant = config_manager.get_tenant_id()
+            changed = (new_key != self.api_key) or (new_url and new_url != self.server_url) or (new_tenant != self.tenant_id)
+            if not changed:
+                return False
+            key_changed = new_key != self.api_key
+            self.api_key = new_key
+            if new_url:
+                self.server_url = new_url
+            self.tenant_id = new_tenant
+            self._apply_auth_headers()
+            if key_changed:
+                self.server_auth = "unknown"
+            self._ws_reconnect.set()
+            logger.info(f"🔑 Configuração do Servidor Central recarregada do arquivo{(' (' + reason + ')') if reason else ''}: "
+                        f"chave {key_hint(self.api_key)} aplicada (PID {os.getpid()})")
+            return True
+        except Exception as e:
+            logger.warning(f"Falha ao recarregar configuração do Servidor Central: {e}")
+            return False
 
     def _apply_auth_headers(self):
         """Aplica a chave de pareamento (X-GBOC-Agent-Key) em todas as chamadas ao Server."""
@@ -339,6 +384,10 @@ class CentralServerClient:
             self.api_key = api_key
             self.tenant_id = tenant_id
             self._apply_auth_headers()
+            self.server_auth, self.server_auth_at = "ok", datetime.now().isoformat()   # validada acima
+            self._ws_reconnect.set()          # WebSocket reconecta já com a chave nova
+            self._start_websocket()
+            logger.info(f"🔑 Chave de pareamento {key_hint(api_key)} salva em {config_manager.config_file} (PID {os.getpid()})")
             
             # Registrar agente
             registration_result = self._register_agent()
@@ -558,7 +607,11 @@ class CentralServerClient:
 
             except Exception as e:
                 logger.warning(f"⚠️ WebSocket indisponível, próxima tentativa em {_backoff}s")
-                time.sleep(_backoff)
+                # Espera interrompível: chave/URL nova → tenta de novo na hora
+                if self._ws_reconnect.wait(_backoff):
+                    self._ws_reconnect.clear()
+                    _backoff = 30
+                    continue
                 _backoff = min(_backoff * 2, 300)  # backoff exponencial até 5 min
     
     async def _connect_websocket(self, ws_url: str):
@@ -572,7 +625,9 @@ class CentralServerClient:
                 _ssl_ctx.check_hostname = False
                 _ssl_ctx.verify_mode = ssl.CERT_NONE
 
-            _hdrs = outbound_headers(self.agent_id, self.api_key or "")
+            _key_used = self.api_key or ""
+            self._ws_reconnect.clear()
+            _hdrs = outbound_headers(self.agent_id, _key_used)
             try:
                 _ws_cm = websockets.connect(ws_url, ssl=_ssl_ctx, additional_headers=_hdrs)
             except TypeError:  # websockets < 14
@@ -591,6 +646,10 @@ class CentralServerClient:
                         message = await asyncio.wait_for(websocket.recv(), timeout=60.0)
                         await self._handle_websocket_response(message)
                     except asyncio.TimeoutError:
+                        if self._ws_reconnect.is_set() or _key_used != (self.api_key or ""):
+                            logger.info("🔗 Chave/URL do Servidor Central alterada — reconectando WebSocket")
+                            await websocket.close()
+                            return
                         # Enviar heartbeat periódico via WebSocket
                         await self._send_websocket_heartbeat()
                         
@@ -883,12 +942,13 @@ class CentralServerClient:
                 # Log de vida periódico para evitar percepção de travamento
                 if current_time - last_alive_log >= 60:
                     ws_ok = self.websocket_thread.is_alive() if self.websocket_thread else False
-                    logger.info(f"💓 Agent ativo (heartbeat thread OK, websocket={'ON' if ws_ok else 'OFF'})")
+                    logger.info(f"💓 Agent ativo (PID {os.getpid()}, heartbeat thread OK, websocket={'ON' if ws_ok else 'OFF'}, "
+                                f"chave {key_hint(self.api_key)}, Server: {self.server_auth})")
                     last_alive_log = current_time
 
                 # Verificar configuração a cada 30 segundos
                 if current_time - last_config_check >= 30:
-                    config_manager.reload()
+                    self.sync_runtime_config()          # relê E aplica chave/URL (antes só relia)
                     last_config_check = current_time
 
                 # Obter intervalos da configuração
@@ -959,7 +1019,22 @@ class CentralServerClient:
 
             if response.status_code == 200:
                 self.last_heartbeat = datetime.now()
+                self.server_auth, self.server_auth_at = "ok", self.last_heartbeat.isoformat()
                 logger.debug("💓 Heartbeat enviado com sucesso")
+            elif response.status_code == 401:
+                self.server_auth, self.server_auth_at = "rejected", datetime.now().isoformat()
+                # Outra janela/processo pode ter gravado a chave nova: aplica e tenta de novo uma vez
+                if self.sync_runtime_config("heartbeat recusado"):
+                    retry = self._session.post(f"{self.server_url}/api/v1/agents/heartbeat", json=heartbeat_data,
+                                               headers={"Content-Type": "application/json"}, timeout=30)
+                    if retry.status_code == 200:
+                        self.last_heartbeat = datetime.now()
+                        self.server_auth, self.server_auth_at = "ok", self.last_heartbeat.isoformat()
+                        logger.info("💓 Heartbeat aceito com a chave recarregada")
+                        return
+                logger.warning(f"⚠️ Heartbeat recusado (401): chave {key_hint(self.api_key)} não reconhecida pelo Server "
+                               f"(PID {os.getpid()}, arquivo {config_manager.config_file}). Copie a chave atual em "
+                               f"Server > Configurações Gerais > Pareamento de Agentes e salve em Agente > Configurações > Servidor Central.")
             else:
                 logger.warning(f"⚠️ Heartbeat retornou: {response.status_code} - {response.text}")
 
@@ -1504,6 +1579,11 @@ class CentralServerClient:
         return {
             "configured": bool(self.server_url and self.api_key),
             "paired": bool(self.api_key and self.api_key != LEGACY_DEFAULT_KEY),
+            "key_hint": key_hint(self.api_key) if self.api_key else None,
+            "server_auth": self.server_auth,            # ok | rejected | unknown
+            "server_auth_at": self.server_auth_at,
+            "config_file": str(config_manager.config_file),
+            "pid": os.getpid(),
             "server_url": self.server_url,
             "agent_id": self.agent_id,
             "is_registered": self.is_registered,

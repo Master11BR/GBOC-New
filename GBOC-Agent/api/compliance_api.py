@@ -264,7 +264,7 @@ def _evaluate_rules():
 # ─── Score endpoint ───────────────────────────────────────────────
 
 @router.get("/score")
-async def compliance_score():
+def compliance_score():
     """Calculate and return current compliance score."""
     rules = _evaluate_rules()
     passing = sum(1 for r in rules if r['status'] == 'pass')
@@ -316,7 +316,7 @@ class PolicyCreate(BaseModel):
 
 
 @router.get("/policies")
-async def list_policies():
+def list_policies():
     """List all compliance policies."""
     core = _get_core()
     try:
@@ -335,7 +335,7 @@ async def list_policies():
 
 
 @router.post("/policies")
-async def create_policy(body: PolicyCreate):
+def create_policy(body: PolicyCreate):
     """Create a compliance policy."""
     core = _get_core()
     try:
@@ -353,7 +353,7 @@ async def create_policy(body: PolicyCreate):
 
 
 @router.delete("/policies/{policy_id}")
-async def delete_policy(policy_id: int):
+def delete_policy(policy_id: int):
     """Delete a compliance policy."""
     core = _get_core()
     try:
@@ -369,7 +369,7 @@ async def delete_policy(policy_id: int):
 # ─── Audit ────────────────────────────────────────────────────────
 
 @router.post("/audit")
-async def run_audit():
+def run_audit():
     """Run a full compliance audit and record results."""
     rules = _evaluate_rules()
     passing = sum(1 for r in rules if r['status'] == 'pass')
@@ -393,7 +393,7 @@ async def run_audit():
 
 
 @router.get("/audit/history")
-async def audit_history(limit: int = 20):
+def audit_history(limit: int = 20):
     """Get compliance audit history."""
     core = _get_core()
     try:

@@ -13,7 +13,7 @@ router = APIRouter(prefix="/api/engines", tags=["engines"])
 
 
 @router.get("/validate")
-async def validate_all_engines() -> Dict[str, Any]:
+def validate_all_engines() -> Dict[str, Any]:
     """
     Valida todos os motores de backup instalados
     Retorna status detalhado de cada motor
@@ -62,7 +62,7 @@ async def validate_all_engines() -> Dict[str, Any]:
 
 
 @router.get("/validate/{engine_name}")
-async def validate_engine(engine_name: str) -> Dict[str, Any]:
+def validate_engine(engine_name: str) -> Dict[str, Any]:
     """
     Valida um motor específico
     """
@@ -98,7 +98,7 @@ async def validate_engine(engine_name: str) -> Dict[str, Any]:
 
 
 @router.get("/report")
-async def get_engine_validation_report() -> Dict[str, Any]:
+def get_engine_validation_report() -> Dict[str, Any]:
     """
     Retorna relatório completo de validação dos motores em formato texto
     """
@@ -123,7 +123,7 @@ async def get_engine_validation_report() -> Dict[str, Any]:
 
 
 @router.post("/test-connection")
-async def test_repository_connection(data: Dict[str, Any]) -> Dict[str, Any]:
+def test_repository_connection(data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Testa conexão com um repositório antes de criá-lo
     """

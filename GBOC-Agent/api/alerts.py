@@ -145,7 +145,7 @@ async def create_alert(request: Request) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/{alert_id}")
-async def get_alert(alert_id: int) -> Dict[str, Any]:
+def get_alert(alert_id: int) -> Dict[str, Any]:
     """Obtém detalhes de um alerta"""
     try:
         core = get_shared_core()
@@ -180,7 +180,7 @@ async def get_alert(alert_id: int) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.put("/{alert_id}/acknowledge")
-async def acknowledge_alert(alert_id: int) -> Dict[str, Any]:
+def acknowledge_alert(alert_id: int) -> Dict[str, Any]:
     """Marca alerta como reconhecido"""
     try:
         core = get_shared_core()
@@ -212,7 +212,7 @@ async def acknowledge_alert(alert_id: int) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.put("/{alert_id}/resolve")
-async def resolve_alert(alert_id: int) -> Dict[str, Any]:
+def resolve_alert(alert_id: int) -> Dict[str, Any]:
     """Marca alerta como resolvido"""
     try:
         core = get_shared_core()
@@ -244,7 +244,7 @@ async def resolve_alert(alert_id: int) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/{alert_id}")
-async def delete_alert(alert_id: int) -> Dict[str, Any]:
+def delete_alert(alert_id: int) -> Dict[str, Any]:
     """Remove alerta"""
     try:
         core = get_shared_core()
@@ -368,7 +368,7 @@ async def get_alert_summary() -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/trends/{period}")
-async def get_alert_trends(period: str) -> Dict[str, Any]:
+def get_alert_trends(period: str) -> Dict[str, Any]:
     """Tendências de alertas por período"""
     try:
         core = get_shared_core()
@@ -424,7 +424,7 @@ async def get_alert_trends(period: str) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/test")
-async def create_test_alerts() -> Dict[str, Any]:
+def create_test_alerts() -> Dict[str, Any]:
     """Cria alertas de teste para demonstração"""
     try:
         core = get_shared_core()

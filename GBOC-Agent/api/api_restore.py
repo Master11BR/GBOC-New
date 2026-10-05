@@ -24,7 +24,7 @@ class RestoreRequest(BaseModel):
 
 
 @router.get("/snapshots/{repo_id}")
-async def get_snapshots(repo_id: str):
+def get_snapshots(repo_id: str):
     """
     Lista snapshots REAIS de um repositório ou backup do Duplicati
     
@@ -79,7 +79,7 @@ async def get_snapshots(repo_id: str):
 
 
 @router.get("/files/{repo_id}/{snapshot_id}")
-async def get_files(
+def get_files(
     repo_id: int,
     snapshot_id: str,
     path: str = "/"
@@ -122,7 +122,7 @@ async def get_files(
 
 
 @router.post("/")
-async def restore_files(request: RestoreRequest):
+def restore_files(request: RestoreRequest):
     """
     Inicia restauração assíncrona de arquivos
     
@@ -163,7 +163,7 @@ async def restore_files(request: RestoreRequest):
 
 
 @router.get("/status/{restore_id}")
-async def get_restore_status(restore_id: int):
+def get_restore_status(restore_id: int):
     """Obtém status de uma restauração em andamento ou concluída."""
     try:
         from shared_core import get_shared_core
@@ -185,7 +185,7 @@ async def get_restore_status(restore_id: int):
 
 
 @router.get("/active")
-async def get_active_restore_api():
+def get_active_restore_api():
     """Retorna lista de processos de restauração atualmente em execução paralela no agente."""
     try:
         from shared_core import get_shared_core
@@ -209,7 +209,7 @@ async def get_active_restore_api():
 
 @router.post("/cancel/{restore_id}")
 @router.post("/abort/{restore_id}")
-async def cancel_restore_endpoint(restore_id: int):
+def cancel_restore_endpoint(restore_id: int):
     """Cancela um processo de restauração ativo ou travado no agente."""
     try:
         from shared_core import get_shared_core
@@ -230,7 +230,7 @@ async def cancel_restore_endpoint(restore_id: int):
 
 
 @router.get("/history")
-async def get_restore_history(limit: int = 50):
+def get_restore_history(limit: int = 50):
     """
     Lista histórico de restaurações
     
@@ -294,7 +294,7 @@ async def get_restore_history(limit: int = 50):
 
 
 @router.get("/health")
-async def health_check():
+def health_check():
     """Verifica se o módulo de restauração está funcionando"""
     try:
         from shared_core import get_shared_core
@@ -322,7 +322,7 @@ async def health_check():
 
 
 @router.get("/diagnose/{repo_id}")
-async def diagnose_restore_snapshots(repo_id: int):
+def diagnose_restore_snapshots(repo_id: int):
     """Diagnóstico rápido para falhas em listagem de snapshots."""
     try:
         from shared_core import get_shared_core

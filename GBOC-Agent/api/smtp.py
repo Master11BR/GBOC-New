@@ -33,7 +33,7 @@ class SMTPTest(BaseModel):
 
 
 @router.post("/configure")
-async def configure_smtp(config: SMTPConfig) -> Dict[str, Any]:
+def configure_smtp(config: SMTPConfig) -> Dict[str, Any]:
     """Salva configuração SMTP no banco de dados"""
     try:
         from shared_core import get_shared_core
@@ -177,7 +177,7 @@ async def send_email_async(server: str, port: int, username: str, password: str,
 
 
 @router.get("/config")
-async def get_smtp_config() -> Dict[str, Any]:
+def get_smtp_config() -> Dict[str, Any]:
     """Retorna configuração SMTP atual (sem senha)"""
     try:
         from shared_core import get_shared_core

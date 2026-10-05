@@ -140,7 +140,7 @@ async def get_system_info():
         raise HTTPException(500, str(e))
 
 @router.get("/health")
-async def get_system_health():
+def get_system_health():
     """Obtém saúde geral do sistema"""
     try:
         import psutil
@@ -221,7 +221,7 @@ async def get_system_health():
         raise HTTPException(500, str(e))
 
 @router.get("/health/schema")
-async def get_schema_health():
+def get_schema_health():
     """Valida presença de tabelas/colunas críticas do schema do agente."""
     try:
         from shared_core import get_shared_core, USE_POSTGRESQL
@@ -336,7 +336,7 @@ async def get_changelog():
 
 
 @router.post("/db/migrate")
-async def trigger_cross_database_migration():
+def trigger_cross_database_migration():
     """Executa a migração sem perda de dados entre bancos (SQLite <-> PostgreSQL)."""
     try:
         import os

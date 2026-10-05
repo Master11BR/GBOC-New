@@ -56,7 +56,7 @@ async def scan_post() -> Dict[str, Any]:
 @router.post("/execute")
 @router.post("/duplicati")
 @router.post("/native")
-async def execute_import_to_native() -> Dict[str, Any]:
+def execute_import_to_native() -> Dict[str, Any]:
     """Executa a conversão/importação de todos os motores e do Duplicati para o Motor Nativo do GBOC."""
     if not RealBackupImporter:
         raise HTTPException(status_code=503, detail="Motor de importação não encontrado")

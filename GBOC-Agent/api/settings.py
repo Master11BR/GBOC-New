@@ -18,7 +18,7 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 
 @router.post("/reset-install")
-async def reset_install() -> Dict[str, Any]:
+def reset_install() -> Dict[str, Any]:
     """Reseta o sistema para estado de instalação limpa — apaga repositórios, tarefas, execuções e configurações"""
     try:
         core = get_shared_core()
@@ -106,7 +106,7 @@ async def reset_install() -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/")
-async def get_all_settings() -> Dict[str, Any]:
+def get_all_settings() -> Dict[str, Any]:
     """Obtém todas as configurações"""
     try:
         core = get_shared_core()
@@ -143,7 +143,7 @@ async def get_all_settings() -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/{category}")
-async def get_category_settings(category: str) -> Dict[str, Any]:
+def get_category_settings(category: str) -> Dict[str, Any]:
     """Obtém configurações de uma categoria específica"""
     try:
         core = get_shared_core()
@@ -308,7 +308,7 @@ async def bulk_update_settings(request: Request) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/reset/{category}")
-async def reset_category_settings(category: str) -> Dict[str, Any]:
+def reset_category_settings(category: str) -> Dict[str, Any]:
     """Reseta configurações de uma categoria para valores padrão"""
     try:
         core = get_shared_core()
@@ -391,7 +391,7 @@ async def get_settings_schema() -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/export")
-async def export_settings() -> Dict[str, Any]:
+def export_settings() -> Dict[str, Any]:
     """Exporta configurações atuais"""
     try:
         core = get_shared_core()

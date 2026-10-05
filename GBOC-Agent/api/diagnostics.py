@@ -164,7 +164,7 @@ async def get_network_info() -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/history")
-async def get_diagnostic_history(limit: int = 20) -> Dict[str, Any]:
+def get_diagnostic_history(limit: int = 20) -> Dict[str, Any]:
     """Histórico de diagnósticos"""
     try:
         core = get_shared_core()

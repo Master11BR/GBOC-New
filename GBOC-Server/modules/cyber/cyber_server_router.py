@@ -67,7 +67,7 @@ class ITILWebhookRequest(BaseModel):
 
 
 @router.get("/threats")
-async def cyber_global_threats():
+def cyber_global_threats():
     """
     Lista de todas as ameaças detectadas por todos os agentes
     (Shannon Entropy anomalies, YARA matches, ransomware events).
@@ -138,7 +138,7 @@ async def trigger_remote_cleanroom(req: CleanroomTriggerRequest):
 
 
 @router.get("/itil/incidents")
-async def itil_incidents_global():
+def itil_incidents_global():
     """
     Lista incidentes ITSM (ServiceNow / Jira) abertos por falhas de backup.
     Agrega system_events de tipo 'backup_failed' ou 'error' como incidentes.
@@ -206,7 +206,7 @@ async def itil_manual_webhook(req: ITILWebhookRequest):
 
 
 @router.post("/threats/{event_id}/acknowledge")
-async def acknowledge_threat(event_id: int):
+def acknowledge_threat(event_id: int):
     """Marca uma ameaça/evento como lida (acknowledged)."""
     conn = None
     try:

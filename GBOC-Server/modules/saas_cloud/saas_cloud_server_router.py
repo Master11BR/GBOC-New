@@ -63,7 +63,7 @@ class FailoverTriggerRequest(BaseModel):
 
 
 @router.get("/protection/status")
-async def saas_protection_global_status():
+def saas_protection_global_status():
     """
     Status centralizado de proteção SaaS de todos os agentes.
     Agrega dados de M365, Google Workspace, Entra ID de cada agente.
@@ -105,7 +105,7 @@ async def saas_protection_global_status():
 
 
 @router.get("/kubernetes/pvcs")
-async def kubernetes_pvcs_global():
+def kubernetes_pvcs_global():
     """
     Status dos backups de Persistent Volume Claims (PVCs) Kubernetes por cluster/agente.
     """
@@ -142,7 +142,7 @@ async def kubernetes_pvcs_global():
 
 
 @router.get("/cloud-failover/status")
-async def cloud_failover_status():
+def cloud_failover_status():
     """
     Status de failovers multi-cloud ativos e histórico recente.
     """
