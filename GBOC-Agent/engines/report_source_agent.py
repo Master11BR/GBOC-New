@@ -171,6 +171,12 @@ class AgentReportSource:
     def verifications(self, start, end, agent_ids=None):
         return self._tag([dict(v) for v in self._inventory()["verifications"]])
 
+    def restore_tests(self, start, end, agent_ids=None):
+        return self._tag([dict(t, ext_id=t.get("id")) for t in self._inventory().get("restore_tests", [])])
+
+    def immutability(self, agent_ids=None):
+        return self._tag([dict(r) for r in self._inventory().get("immutability", [])])
+
     def job_failures(self, start, end, agent_ids=None):
         return self._tag([dict(f) for f in self._inventory()["job_failures"]])
 

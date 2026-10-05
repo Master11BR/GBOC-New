@@ -6,7 +6,39 @@
 
 ---
 
-## 14.8.0 — 2026-10-04 (Relatórios reais, Painel de Decisão e Gerenciamento Remoto) — pendente de build
+## 14.8.1 — 2026-10-04 (Backup imutável, Implantação em massa, Políticas centrais, Operação e Comercial MSP) — pendente de build
+
+### 🔒 Backup imutável
+- **S3 Object Lock** (S3/Wasabi): por repositório, com dias de retenção e modo GOVERNANCE/COMPLIANCE. Aplica a retenção padrão no bucket (ou cria um bucket já com Object Lock) e **verifica** versionamento, retenção e se o objeto mais recente está de fato bloqueado.
+- Uploads do motor nativo em buckets com Object Lock passam a enviar Content-MD5 (inclusive em multipart), exigido pelo S3.
+- **WORM local** para repositórios em disco: arquivos ficam somente leitura até o fim da retenção (no Windows também com ACL de negação de exclusão); o agente recusa apagar arquivos ou o repositório enquanto houver retenção.
+- REP-11 ganhou a tabela “Backup imutável por repositório”, com indicador e recomendações.
+
+### 🚀 Implantação em massa de agentes
+- **Tokens de instalação** no Server (organização, validade, limite de usos, revogação), com comando de uma linha para GPO/RMM.
+- `install_agent.ps1 -ServerURL -InstallToken -Unattended` instala sem perguntas e registra o agente já vinculado à organização (sem troca manual de chave). Se o Server estiver inacessível, o agente tenta de novo a cada 5 min por até 72 h.
+- O agente registrado por token fica **travado na organização** (o heartbeat não altera o tenant).
+
+### 🧭 Políticas centrais com detecção de desvio
+- Nova tela **Políticas e Implantação**: alcance (todos / organização / agentes), prioridade, filtro de tarefas, agendamento, retenção, novas tentativas, janela de manutenção, banda e imutabilidade.
+- Aplicação em lote nos agentes e coluna de **Conformidade** comparando o que cada agente informa com a política (versão, janelas, banda, agendamento, retenção, imutabilidade), com botão Reaplicar.
+
+### ⏱️ Operação
+- **Janela de manutenção** por agente (inclusive virando a noite): backups agendados não iniciam dentro dela; execuções puladas ficam registradas.
+- **Limite de banda** de upload (padrão e por faixa de horário) aplicado a restic, kopia, duplicati e ao motor nativo.
+- **Restauração pelo Server**: no Gerenciamento Remoto, aba Restaurar — navegar snapshots/arquivos e restaurar numa pasta do agente, acompanhando o status. O motor nativo agora restaura pastas selecionadas corretamente.
+
+### 💼 Comercial MSP
+- **Portal do cliente** (`/portal.html`): usuários com perfil *client* veem apenas a própria organização — situação, relatórios com a marca do cliente e faturas; o restante do sistema fica bloqueado para eles.
+- **Fechamento mensal**: preço por agente, por TB e taxa fixa por organização; pré-visualização, fechamento (só meses encerrados, com hash de integridade), reabertura, exportação CSV e fechamento automático opcional.
+- **Licenciamento por número de agentes**: chave assinada (Ed25519) com limite e validade, alerta 30 dias antes do vencimento e 15 dias de carência. A ferramenta `tools/license_tool.py` (do fornecedor, não distribuída) gera as chaves; o pacote nunca inclui a chave privada.
+
+### 🤖 Copilot
+- Guia de uso com os novos tópicos: políticas centrais, implantação em massa, janela/banda, backup imutável, portal do cliente e faturamento/licença.
+
+---
+
+## 14.8.0 — 2026-10-04 (Relatórios reais, Painel de Decisão, Gerenciamento Remoto, Alertas proativos e Testes de restauração) — pendente de build
 
 ### 📊 Relatórios reais (substituem o catálogo de 50)
 - Os 50 relatórios antigos geravam o mesmo conteúdo com números fixos (ex.: “85 MB/s”, “3 Organizações”). Foram substituídos por **20 relatórios calculados sobre dados reais**, com um motor único (`report_core.py`, idêntico no Server e no Agente):
@@ -36,6 +68,27 @@
 - Novo inventário sincronizado (`POST /api/v1/sync/inventory`): execuções de 30 dias, histórico de tamanho dos repositórios, restaurações, verificações, falhas, volumes e replicação — antes as execuções só chegavam pelo WebSocket.
 - Repositórios com status `ready` passam a ser medidos e sincronizados.
 - Endereço do agente gravado como `ip:9200` gerava URLs `http://ip:9200:9200` (RMM/migração).
+
+### 🚨 Alertas proativos (e-mail e Microsoft Teams)
+- O Server avalia os dados a cada 5 minutos (ajustável) com os mesmos critérios dos relatórios e avisa **antes** do incidente: repositório que esgota em N dias, disco/volume acima de N%, RPO estourado há N horas (ou tarefa que nunca concluiu), N falhas seguidas, agente sem contato há N minutos e teste de restauração reprovado.
+- Canais: e-mail (SMTP de Notificações), **Microsoft Teams** (webhook do canal, cartão adaptável) e webhook genérico; um aviso por ciclo agrupando novos alertas, lembretes e normalizações.
+- Quadro **Alertas proativos** em Alertas e Falhas: reconhecer (para os lembretes), encerrar, histórico de 30 dias, regras com limites/severidade/canais por regra, “repetir a cada N horas” e botões de teste. Também registrados na Central de Alertas.
+
+### 🧪 Testes de restauração com evidência
+- Novo no Agente: restaura de verdade uma amostra do snapshot mais recente em pasta temporária e confere cada arquivo — SHA-256 do manifesto (motor nativo) ou tamanho + SHA-256 do original inalterado (restic/kopia/Duplicati); registra duração, arquivos, hashes e um hash da evidência (`/api/agent-ops/restore-test`).
+- No Server (**Restaurar e Validar**): testar agora, agendar (diário/semanal/mensal, amostra e tamanho máximo), resultados com evidência por arquivo; teste reprovado gera alerta proativo e o aprovado encerra o alerta.
+- Resultados sincronizados no inventário e usados em **REP-09** (tabela de evidências, repositórios sem restauração comprovada) e **REP-10** (critério “recuperação testada” só conta testes/verificações aprovados; coluna “Último teste de restauração”).
+
+### 🛰️ Ações em lote e atualização remota do Agent
+- **Operações em lote** (Gerenciamento Remoto): sincronizar, executar tarefas (todas ou por nome), pausar/retomar agendamentos (retoma exatamente as tarefas pausadas), parar execuções, testar repositórios, teste de restauração e atualizar o Agent — vários agentes por vez, resultado por agente, histórico de lotes e auditoria. Agentes offline são ignorados sem esperar o tempo limite.
+- **Atualização remota do GBOC Agent**: o Server publica o pacote (gerado da pasta Agent/GBOC-Agent ao lado do Server ou enviado em ZIP), com SHA-256; o agente baixa pelo próprio canal de sincronização (funciona atrás de NAT), confere hash, caminhos e sintaxe, guarda cópia dos arquivos substituídos (rollback disponível) e reinicia o serviço (NSSM). config/, data/, logs/, repositórios e ferramentas locais nunca são alterados. A lista da frota mostra versão e agentes desatualizados.
+- Chamadas HTTP diretas ao agente agora desistem da conexão em 8 s (antes podiam esperar todo o tempo limite com o agente inacessível).
+
+### 🎨 Relatórios com a marca do cliente (white-label)
+- **Marca nos relatórios** (Central de Relatórios): marca padrão do provedor e marca por cliente (nome, logotipo, cor, rodapé e contato). Relatórios filtrados por cliente saem com a marca dele e “Relatório preparado por” o provedor — na tela, no HTML/PDF e nos e-mails.
+- Agendamentos com cliente podem **enviar também aos contatos do cliente** (e-mails cadastrados na marca do cliente).
+- Copilot: novos tópicos sobre alertas proativos, testes de restauração, operações em lote/atualização e marca nos relatórios.
+- Testes: `tests/test_ops_features.py`.
 
 ### 🧰 Outras correções
 - Bibliotecas locais: Font Awesome, Chart.js e o CSS do login agora são servidos de `/static/vendor` (sem depender de CDN/internet).

@@ -186,7 +186,12 @@ class LocalStorageBackend(StorageBackend):
         try:
             if not file_to_delete.exists():
                 return {"success": False, "error": "Arquivo não encontrado"}
-            
+
+            # Backup imutável: arquivos protegidos (somente leitura) não são apagados pelo GBOC
+            import stat as _stat
+            if not (os.stat(file_to_delete).st_mode & _stat.S_IWRITE):
+                return {"success": False, "error": "Arquivo protegido (backup imutável) — exclusão bloqueada até o fim da retenção"}
+
             os.remove(file_to_delete)
             return {"success": True}
         except Exception as e:

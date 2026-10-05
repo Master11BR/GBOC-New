@@ -141,6 +141,15 @@ class Scheduler:
                 task_id, task_name, cron_expr = row[0], row[1], row[2]
                 try:
                     if cron_matches_now(cron_expr, now):
+                        # Janela de manutenção: backups agendados não iniciam (manuais continuam permitidos)
+                        try:
+                            from engines import operation_settings as _ops
+                            _in_mw, _win = _ops.in_maintenance(now)
+                        except Exception:
+                            _in_mw, _win = False, None
+                        if _in_mw:
+                            _ops.record_skip(task_id, task_name, _win)
+                            continue
                         self.logger.info(f"[SCHEDULER] Disparando tarefa agendada: {task_name} (id={task_id}, cron={cron_expr})")
                         result = task_manager.trigger_task(task_id)
                         if result.get('status') == 'success':

@@ -17,6 +17,16 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 # - Serviço Windows do Agent (opcional)
 # ============================================================================
 
+# Instalação em massa (GPO/Intune/script gerado no GBOC Server):
+#   .\install_agent.ps1 -ServerURL "https://gboc.empresa.com.br:8000" -InstallToken "gbi_..." -Unattended
+#   -Unattended responde automaticamente às perguntas (usa Python existente, instala o serviço) e aborta
+#   em situações que exigiriam decisão manual (ex.: falha na instalação do PostgreSQL).
+param(
+	[string]$ServerURL = "",
+	[string]$InstallToken = "",
+	[switch]$Unattended
+)
+
 #Requires -RunAsAdministrator
 
 $ErrorActionPreference = "Stop"
@@ -160,7 +170,7 @@ if ($pythonInstalled) {
 	$pyVersion = & $pythonExe --version 2>&1
 	Write-Warning "Python já instalado: $pyVersion"
 	Write-Host "    Use a instalação existente? (S/N): " -NoNewline -ForegroundColor Yellow
-	$response = Read-Host
+	$response = if ($Unattended) { Write-Host "S (automático)"; "S" } else { Read-Host }
 	if ($response -eq "N" -or $response -eq "n") {
 		$pythonInstalled = $false
 	}
@@ -255,7 +265,13 @@ else {
 			Write-Host "    4. Cancelar instalação"
 
 			Write-Host "`n    Escolha uma opção (1-4): " -NoNewline -ForegroundColor Yellow
-			$choice = Read-Host
+			if ($Unattended) {
+				Write-Host "4 (modo automático: instale o PostgreSQL e execute novamente)"
+				$choice = "4"
+			}
+			else {
+				$choice = Read-Host
+			}
 
 			switch ($choice) {
 				"1" {
@@ -487,7 +503,7 @@ if (-not $dbCreated) {
 	Write-Host "       \c $DB_NAME"
 	Write-Host "       GRANT ALL ON SCHEMA public TO $DB_USER;"
 	Write-Host "`n    Deseja continuar mesmo assim? (S/N): " -NoNewline -ForegroundColor Yellow
-	$continue = Read-Host
+	$continue = if ($Unattended) { Write-Host "N (automático)"; "N" } else { Read-Host }
 
 	if ($continue -ne "S" -and $continue -ne "s") {
 		exit 1
@@ -634,8 +650,8 @@ Write-Success "Variáveis de ambiente criadas"
 
 Write-Step "Instalando GBOC Agent"
 
-# Copiar arquivos do Agent
-$sourceDir = Split-Path -Parent $PSScriptRoot
+# Copiar arquivos do Agent (instalador na pasta do Agent ou em uma subpasta dela)
+$sourceDir = if (Test-Path "$PSScriptRoot\agent_server.py") { $PSScriptRoot } else { Split-Path -Parent $PSScriptRoot }
 if (Test-Path "$sourceDir\agent_server.py") {
 	Write-Host "    Copiando arquivos do Agent..."
 	Copy-Item -Path "$sourceDir\*" -Destination $AGENT_DIR -Recurse -Force
@@ -705,7 +721,7 @@ Write-Success "Script de inicialização criado"
 
 Write-Host "`n"
 Write-Host "Deseja instalar o GBOC Agent como serviço do Windows? (S/N): " -NoNewline -ForegroundColor Yellow
-$installService = Read-Host
+$installService = if ($Unattended) { Write-Host "S (automático)"; "S" } else { Read-Host }
 
 if ($installService -eq "S" -or $installService -eq "s") {
 	Write-Step "Configurando serviço Windows"
@@ -757,6 +773,33 @@ if ($installService -eq "S" -or $installService -eq "s") {
 	Write-Host "    Iniciando serviço..."
 	Start-Service $serviceName
 	Write-Success "Serviço $serviceName criado e iniciado (LocalSystem)"
+}
+
+# ============================================================================
+# INSCRIÇÃO NO GBOC SERVER (token de instalação)
+# ============================================================================
+
+if ($ServerURL -and $InstallToken) {
+	Write-Step "Inscrevendo o agente no GBOC Server ($ServerURL)"
+	Push-Location $AGENT_DIR
+	$prevEap = $ErrorActionPreference
+	$ErrorActionPreference = "Continue"
+	try {
+		$enrollOut = & "$PYTHON_DIR\python.exe" -m core.enrollment --server $ServerURL --token $InstallToken 2>&1 | Out-String
+	}
+	finally { $ErrorActionPreference = $prevEap; Pop-Location }
+	if ($LASTEXITCODE -eq 0) {
+		Write-Success "Agente inscrito no Server: $($enrollOut.Trim())"
+	}
+	else {
+		# Sem rede/Server no momento: o serviço tenta novamente sozinho (enroll.json)
+		$seedDir = "C:\ProgramData\GBOC"
+		New-Item -ItemType Directory -Force -Path $seedDir | Out-Null
+		@{ server_url = $ServerURL; install_token = $InstallToken } | ConvertTo-Json | Set-Content -Path "$seedDir\enroll.json" -Encoding UTF8
+		Write-Warning "Inscrição não concluída agora ($($enrollOut.Trim())). O serviço tentará novamente a cada 5 minutos."
+	}
+	$svc = Get-Service -Name "GBOCAgent" -ErrorAction SilentlyContinue
+	if ($svc) { Restart-Service "GBOCAgent" -ErrorAction SilentlyContinue }
 }
 
 # ============================================================================

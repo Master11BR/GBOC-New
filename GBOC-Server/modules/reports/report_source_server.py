@@ -169,6 +169,21 @@ class ServerReportSource:
                                FROM agent_verifications WHERE COALESCE(finished_at, started_at) >= %s
                                AND COALESCE(finished_at, started_at) <= %s {cl}""", (start, end) + p)
 
+    def restore_tests(self, start, end, agent_ids=None):
+        cl, p = self._agent_clause("agent_id", agent_ids)
+        return self._qsafe(f"""SELECT agent_id, ext_id, repository_id, repository_name, engine, task_name, snapshot_id, snapshot_time,
+                                      status, files_tested, files_ok, files_hash_verified, bytes_restored, duration_seconds,
+                                      error_message, evidence_hash, triggered_by, started_at, completed_at
+                               FROM agent_restore_tests WHERE started_at >= %s AND started_at <= %s {cl}""", (start, end) + p)
+
+    def immutability(self, agent_ids=None):
+        cl, p = self._agent_clause("agent_id", agent_ids)
+        out = []
+        for r in self._qsafe(f"SELECT agent_id, immutability FROM agent_operation WHERE 1=1 {cl}", p):
+            for item in (r.get("immutability") or []):
+                out.append({**item, "agent_id": r["agent_id"]})
+        return out
+
     def job_failures(self, start, end, agent_ids=None):
         cl, p = self._agent_clause("agent_id", agent_ids)
         return self._qsafe(f"""SELECT agent_id, ext_id, task_id, task_name, failure_reason, retry_count, max_retries, status, escalated,

@@ -339,7 +339,13 @@ class GBOCNativeEngine:
 
             entries = manifest.get('entries', [])
             if selected_files:
-                entries = [e for e in entries if e['path'] in selected_files]
+                # Aceita arquivos e pastas, com ou sem "/" inicial (navegação mostra "/pasta/arquivo")
+                sel = {str(s).replace('\\', '/').strip('/') for s in selected_files if str(s).strip('/ ')}
+                if sel:
+                    def _wanted(p):
+                        p = p.replace('\\', '/').strip('/')
+                        return any(p == s or p.startswith(s + '/') for s in sel)
+                    entries = [e for e in entries if _wanted(e['path'])]
 
             restored = 0
             errors = 0

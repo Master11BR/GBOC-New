@@ -32,7 +32,10 @@ IGNORE_PATTERNS = shutil.ignore_patterns(
     "logs",
     "startup_*.log",
     "*.tmp",
-    "*.swp"
+    "*.swp",
+    # nunca distribuir chave privada de licença (fica só com o fornecedor)
+    "*license_private*.pem",
+    "*_private_key.pem"
 )
 
 def create_unified_requirements(server_req_path: Path, agent_req_path: Path, output_path: Path):

@@ -432,6 +432,8 @@ def init_database():
         cur.execute("ALTER TABLE server_auth_users ADD COLUMN IF NOT EXISTS tenant_id VARCHAR(100) REFERENCES msp_organizations(org_id) ON DELETE SET NULL")
         cur.execute("ALTER TABLE server_auth_users ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active'")
         cur.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS tenant_id VARCHAR(100) REFERENCES msp_organizations(org_id) ON DELETE SET NULL")
+        # Cliente definido pelo Server (inscrição por token): o agente não consegue trocar o próprio cliente
+        cur.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS tenant_locked BOOLEAN DEFAULT FALSE")
 
 
         cur.execute('''
@@ -722,6 +724,19 @@ class BackupReport(BaseModel):
     total_bytes: Optional[int] = 0
 
 
+def _ensure_license_allows(agent_id: str, tenant_id: Optional[str]) -> None:
+    """Licença/limite do cliente: só bloqueia agentes NOVOS (os já cadastrados continuam funcionando)."""
+    try:
+        from modules.multitenant.licensing import can_add_agent
+        ok, msg = can_add_agent(agent_id, tenant_id)
+    except Exception as _lic_err:
+        logger.warning(f"[LICENÇA] Verificação indisponível: {_lic_err}")
+        return
+    if not ok:
+        logger.warning(f"[LICENÇA] Agente {agent_id} recusado: {msg}")
+        raise PermissionError(msg)
+
+
 def ensure_agent_exists(conn, agent_id: str, data: Optional[Dict] = None):
     """Garante que o agente exista na tabela agents antes de salvar métricas/sync."""
     payload = data or {}
@@ -733,6 +748,7 @@ def ensure_agent_exists(conn, agent_id: str, data: Optional[Dict] = None):
     available_tools = payload.get('available_tools') or []
     tools = json.dumps(available_tools) if not isinstance(available_tools, str) else available_tools
     tenant_id = payload.get('tenant_id')
+    _ensure_license_allows(agent_id, tenant_id)
     cur.execute('''
         INSERT INTO agents (agent_id, hostname, ip_address, os_info, agent_version, available_tools, last_heartbeat, status, tenant_id)
         VALUES (%s, %s, %s, %s, %s, %s, LOCALTIMESTAMP, 'online', %s)
@@ -744,7 +760,7 @@ def ensure_agent_exists(conn, agent_id: str, data: Optional[Dict] = None):
             available_tools = COALESCE(EXCLUDED.available_tools, agents.available_tools),
             last_heartbeat = LOCALTIMESTAMP,
             status = 'online',
-            tenant_id = COALESCE(EXCLUDED.tenant_id, agents.tenant_id)
+            tenant_id = CASE WHEN agents.tenant_locked THEN agents.tenant_id ELSE COALESCE(EXCLUDED.tenant_id, agents.tenant_id) END
     ''', (agent_id, hostname, ip_address, os_info, agent_version, tools, tenant_id))
     snapshot_id: Optional[str] = None
     error: Optional[str] = None
@@ -915,6 +931,13 @@ async def lifespan(app: FastAPI):
         _start_report_scheduler()
     except Exception as _rs_e:
         logger.warning(f"Agendador de relatórios não iniciado: {_rs_e}")
+    for _mod, _what in (("modules.agents.restore_tests", "testes de restauração"),
+                        ("modules.alerts.proactive_alerts", "alertas proativos"),
+                        ("modules.reports.billing", "fechamento de faturamento")):
+        try:
+            __import__(_mod, fromlist=["start_scheduler"]).start_scheduler()
+        except Exception as _sc_e:
+            logger.warning(f"Agendador de {_what} não iniciado: {_sc_e}")
     if os.getenv("GBOC_AUTO_RETENTION", "1") != "0":
         threading.Thread(target=_retention_scheduler_loop, name="gboc-retention", daemon=True).start()
     yield
@@ -1418,6 +1441,10 @@ async def server_auth_logout(request: Request, response: Response):
 async def register(data: AgentRegister):
     conn = None
     try:
+        try:
+            await asyncio.to_thread(_ensure_license_allows, data.agent_id, data.tenant_id)
+        except PermissionError as _pe:
+            raise HTTPException(403, str(_pe))
         conn = get_db(); cur = conn.cursor()
         tools = json.dumps(data.available_tools) if data.available_tools else "[]"
         cur.execute('''
@@ -1427,12 +1454,14 @@ async def register(data: AgentRegister):
                 hostname=EXCLUDED.hostname, ip_address=EXCLUDED.ip_address, 
                 os_info=EXCLUDED.os_info, agent_version=EXCLUDED.agent_version,
                 available_tools=EXCLUDED.available_tools, last_heartbeat=LOCALTIMESTAMP, status='online',
-                tenant_id=COALESCE(EXCLUDED.tenant_id, agents.tenant_id)
+                tenant_id=CASE WHEN agents.tenant_locked THEN agents.tenant_id ELSE COALESCE(EXCLUDED.tenant_id, agents.tenant_id) END
         ''', (data.agent_id, data.hostname, data.ip_address, data.os_info, data.agent_version, tools, data.tenant_id))
         log_event(conn, 'system', f"Novo agente registrado: {data.hostname}", data.hostname)
         conn.commit()
         await notify_dashboard_update()
         return {"status": "success"}
+    except HTTPException:
+        raise
     except Exception as e:
         if conn: conn.rollback()
         raise HTTPException(500, str(e))
@@ -1463,7 +1492,7 @@ async def handle_realtime_heartbeat(agent_id: str, data: Dict) -> Dict:
                 UPDATE agents SET
                     last_heartbeat=LOCALTIMESTAMP, status='online',
                     cpu_usage=%s, ram_usage=%s, disk_usage=%s,
-                    tenant_id=COALESCE(%s, tenant_id)
+                    tenant_id=CASE WHEN tenant_locked THEN tenant_id ELSE COALESCE(%s, tenant_id) END
                 WHERE agent_id=%s
             ''', (data.get('cpu_usage'), data.get('ram_usage'), data.get('disk_usage'), data.get('tenant_id'), agent_id))
             conn.commit()
@@ -2001,16 +2030,18 @@ async def heartbeat(data: AgentHeartbeat):
             UPDATE agents SET 
                 last_heartbeat=LOCALTIMESTAMP, status='online', 
                 cpu_usage=%s, ram_usage=%s, disk_usage=%s, jobs_count=%s, jobs_summary=%s,
-                tenant_id=COALESCE(%s, tenant_id)
+                tenant_id=CASE WHEN tenant_locked THEN tenant_id ELSE COALESCE(%s, tenant_id) END
             WHERE agent_id=%s
         ''', (data.cpu_usage, data.ram_usage, data.disk_usage, data.jobs_count, jobs, data.tenant_id, data.agent_id))
         if cur.rowcount == 0:
-            cur.close(); release_db(conn)
+            cur.close(); release_db(conn); conn = None
             await register(AgentRegister(agent_id=data.agent_id, hostname=data.hostname, tenant_id=data.tenant_id))
             return {"status": "registered"}
         conn.commit()
         await notify_dashboard_update()
         return {"status": "success"}
+    except HTTPException:
+        raise
     except Exception as e:
         if conn: conn.rollback()
         raise HTTPException(500, str(e))
@@ -3257,6 +3288,16 @@ try:
     from modules.agents.inventory_sync import router as server_inventory_router
     app.include_router(server_inventory_router)
 except Exception as _e: logger.warning(f"Inventory router: {_e}")
+
+for _mod_name, _label in (("modules.agents.restore_tests", "Restore tests"), ("modules.alerts.proactive_alerts", "Proactive alerts"),
+                          ("modules.agents.fleet_ops", "Fleet operations"), ("modules.reports.branding", "Report branding"),
+                          ("modules.agents.policies", "Central policies"), ("modules.agents.enrollment", "Mass enrollment"),
+                          ("modules.multitenant.licensing", "Licensing"), ("modules.reports.billing", "Billing"),
+                          ("modules.portal.portal_router", "Client portal")):
+    try:
+        app.include_router(__import__(_mod_name, fromlist=["router"]).router)
+    except Exception as _e:
+        logger.warning(f"{_label} router: {_e}")
 
 try:
     from modules.surerestore.surerestore_router import router as server_surerestore_router

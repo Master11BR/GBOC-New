@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portal do Cliente — Backups</title>
+<link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
+<style>
+:root { --brand:#2a78d6; --ink:#1f2328; --ink2:#5f6368; --line:#e3e4e8; --bg:#f4f5f7; --card:#fff; --ok:#0a7a0a; --warn:#9a6400; --bad:#b42323; }
+@media (prefers-color-scheme: dark) { :root { --ink:#e8eaed; --ink2:#a8adb3; --line:#30343a; --bg:#15171a; --card:#1e2125; --ok:#4cc36a; --warn:#e6b450; --bad:#ff7b72; } }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.5 "Segoe UI", Inter, Roboto, Arial, sans-serif; }
+header { background:var(--card); border-bottom:3px solid var(--brand); padding:14px 22px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+.brand { display:flex; align-items:center; gap:12px; }
+.brand img { max-height:42px; max-width:200px; }
+.brand h1 { margin:0; font-size:1.15em; }
+.brand small { display:block; color:var(--ink2); font-size:.78em; font-weight:500; }
+.who { display:flex; gap:10px; align-items:center; color:var(--ink2); font-size:.85em; }
+button, .btn { background:var(--card); color:var(--ink); border:1px solid var(--line); border-radius:7px; padding:6px 12px; cursor:pointer; font:inherit; text-decoration:none; display:inline-flex; gap:6px; align-items:center; }
+.btn.primary { background:var(--brand); border-color:var(--brand); color:#fff; }
+main { max-width:1200px; margin:0 auto; padding:18px; }
+nav.tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px; }
+nav.tabs button.on { background:var(--brand); color:#fff; border-color:var(--brand); }
+.kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px; margin-bottom:16px; }
+.kpi { background:var(--card); border:1px solid var(--line); border-top:4px solid var(--brand); border-radius:10px; padding:12px 14px; }
+.kpi .l { font-size:.75em; text-transform:uppercase; letter-spacing:.4px; color:var(--ink2); }
+.kpi .v { font-size:1.6em; font-weight:750; margin-top:2px; }
+.kpi .s { font-size:.8em; color:var(--ink2); }
+.card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; margin-bottom:16px; }
+.card h2 { font-size:1em; margin:0 0 10px; }
+table { width:100%; border-collapse:collapse; font-size:.9em; }
+th { text-align:left; color:var(--ink2); font-weight:600; border-bottom:1px solid var(--line); padding:6px 8px; font-size:.85em; }
+td { border-bottom:1px solid var(--line); padding:7px 8px; vertical-align:top; }
+.pill { display:inline-block; padding:1px 8px; border-radius:10px; font-size:.78em; font-weight:600; }
+.ok { color:var(--ok); } .warn { color:var(--warn); } .bad { color:var(--bad); }
+.pill.ok { background:color-mix(in srgb, var(--ok) 14%, transparent); } .pill.warn { background:color-mix(in srgb, var(--warn) 16%, transparent); } .pill.bad { background:color-mix(in srgb, var(--bad) 14%, transparent); }
+.bars { display:flex; align-items:flex-end; gap:3px; height:120px; padding-top:6px; }
+.bars div { flex:1; display:flex; flex-direction:column-reverse; min-width:4px; }
+.bars span { display:block; }
+.legend { font-size:.78em; color:var(--ink2); margin-top:6px; display:flex; gap:12px; }
+.legend i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:4px; vertical-align:-1px; }
+.empty { color:var(--ink2); padding:8px 0; }
+.grid2 { display:grid; grid-template-columns:repeat(auto-fit,minmax(360px,1fr)); gap:16px; }
+iframe { width:100%; height:75vh; border:1px solid var(--line); border-radius:8px; background:#fff; }
+footer { text-align:center; color:var(--ink2); font-size:.78em; padding:20px; }
+@media (max-width: 640px) { main { padding:12px; } header { padding:12px; } .grid2 { grid-template-columns:1fr; } td, th { padding:6px 4px; } }
+</style>
+</head>
+<body>
+<header>
+    <div class="brand" id="brand"><i class="fas fa-shield-halved" style="font-size:1.6em;color:var(--brand)"></i><h1>Portal do Cliente<small>Carregando…</small></h1></div>
+    <div class="who"><span id="who"></span><button id="logout"><i class="fas fa-right-from-bracket"></i> Sair</button></div>
+</header>
+<main>
+    <nav class="tabs" id="tabs">
+        <button data-t="status" class="on"><i class="fas fa-gauge"></i> Situação</button>
+        <button data-t="reports"><i class="fas fa-file-contract"></i> Relatórios</button>
+        <button data-t="invoices"><i class="fas fa-file-invoice-dollar"></i> Faturas</button>
+    </nav>
+    <section id="v-status"><p class="empty"><i class="fas fa-spinner fa-spin"></i> Carregando…</p></section>
+    <section id="v-reports" hidden></section>
+    <section id="v-invoices" hidden></section>
+</main>
+<footer id="foot"></footer>
+<script>
+(function () {
+    'use strict';
+    const qs = new URLSearchParams(location.search);
+    const tq = qs.get('tenant_id') ? 'tenant_id=' + encodeURIComponent(qs.get('tenant_id')) : '';
+    const url = (p, extra) => `/api/v1/portal/${p}${(tq || extra) ? '?' + [tq, extra].filter(Boolean).join('&') : ''}`;
+    const esc = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const money = (v, c) => (+v || 0).toLocaleString('pt-BR', { style: 'currency', currency: c || 'BRL' });
+    const gb = (b) => ((+b || 0) / 1073741824).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' GB';
+    async function get(p) {
+        const r = await fetch(p, { credentials: 'same-origin' });
+        if (r.status === 401) { location.href = '/login.html'; throw new Error('Sessão expirada'); }
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.detail || d.message || ('HTTP ' + r.status));
+        return d;
+    }
+    const tone = (t) => t === 'ok' ? 'ok' : t === 'warn' ? 'warn' : 'bad';
+
+    function brand(d) {
+        const b = d.branding || {};
+        if (b.primary_color && /^#[0-9a-f]{6}$/i.test(b.primary_color)) document.documentElement.style.setProperty('--brand', b.primary_color);
+        const name = b.display_name || d.tenant.name;
+        const logo = b.logo_data && /^data:image\//.test(b.logo_data) ? `<img src="${esc(b.logo_data)}" alt="">` : '<i class="fas fa-shield-halved" style="font-size:1.6em;color:var(--brand)"></i>';
+        document.getElementById('brand').innerHTML = `${logo}<h1>${esc(name)}<small>Portal de backups${b.provider_name ? ' · ' + esc(b.provider_name) : ''}</small></h1>`;
+        document.title = `${name} — Portal de backups`;
+        document.getElementById('foot').textContent = (b.provider_name ? `Serviço prestado por ${b.provider_name}` : 'GBOC') + (b.contact ? ' · ' + b.contact : '') + ` · atualizado em ${d.generated_at}`;
+    }
+
+    function bars(daily) {
+        const max = Math.max(1, ...daily.success.map((v, i) => v + (daily.failed[i] || 0)));
+        return `<div class="bars">${daily.labels.map((l, i) => `<div title="${esc(l)}: ${daily.success[i]} ok, ${daily.failed[i]} falha(s)">
+            <span style="height:${daily.success[i] / max * 110}px;background:var(--brand)"></span><span style="height:${daily.failed[i] / max * 110}px;background:var(--bad)"></span></div>`).join('')}</div>
+            <div class="legend"><span><i style="background:var(--brand)"></i>Concluídos</span><span><i style="background:var(--bad)"></i>Com falha</span><span>${esc(daily.labels[0])} – ${esc(daily.labels[daily.labels.length - 1])}</span></div>`;
+    }
+
+    async function status() {
+        const box = document.getElementById('v-status');
+        try {
+            const d = await get(url('summary'));
+            brand(d);
+            const k = d.kpis;
+            const rate = k.success_pct;
+            box.innerHTML = `<div class="kpis">
+                <div class="kpi"><div class="l">Backups concluídos (30 dias)</div><div class="v ${rate == null ? '' : rate >= 95 ? 'ok' : rate >= 80 ? 'warn' : 'bad'}">${rate == null ? '—' : rate.toLocaleString('pt-BR') + '%'}</div><div class="s">${k.runs} execução(ões)</div></div>
+                <div class="kpi"><div class="l">Rotinas em dia</div><div class="v ${k.tasks && k.tasks_in_rpo === k.tasks ? 'ok' : 'warn'}">${k.tasks_in_rpo}/${k.tasks}</div><div class="s">dentro do prazo de proteção</div></div>
+                <div class="kpi"><div class="l">Servidores</div><div class="v">${k.agents_online}/${k.agents}</div><div class="s">comunicando agora</div></div>
+                <div class="kpi"><div class="l">Dados protegidos</div><div class="v">${esc(k.storage)}</div><div class="s">armazenamento de backup</div></div>
+                <div class="kpi"><div class="l">Teste de restauração</div><div class="v ${k.last_restore_test_ok ? 'ok' : k.last_restore_test ? 'bad' : ''}" style="font-size:1.05em">${k.last_restore_test ? (k.last_restore_test_ok ? 'Aprovado' : 'Com problema') : 'Não realizado'}</div><div class="s">${esc(k.last_restore_test || 'nenhum nos últimos 30 dias')}</div></div>
+            </div>
+            ${d.alerts.length ? `<div class="card" style="border-left:4px solid var(--bad)"><h2><i class="fas fa-triangle-exclamation bad"></i> Pontos de atenção</h2>${d.alerts.map(a => `<div style="margin-bottom:6px"><span class="pill ${a.severity === 'critical' ? 'bad' : 'warn'}">${a.severity === 'critical' ? 'Crítico' : 'Aviso'}</span> <b>${esc(a.title)}</b><div style="font-size:.85em;color:var(--ink2)">${esc(a.message)} · desde ${esc(a.since)}</div></div>`).join('')}</div>` : ''}
+            <div class="grid2">
+                <div class="card"><h2>Execuções por dia</h2>${bars(d.daily)}</div>
+                <div class="card"><h2>Servidores</h2><table><thead><tr><th>Servidor</th><th>Situação</th><th>Último backup</th><th>Rotinas</th></tr></thead><tbody>
+                    ${d.agents.map(a => `<tr><td><b>${esc(a.hostname)}</b></td><td><span class="pill ${a.status === 'online' ? 'ok' : 'bad'}">${a.status === 'online' ? 'online' : 'sem comunicação'}</span></td><td>${esc(a.last_backup)}</td><td>${a.tasks_in_rpo}/${a.tasks} em dia</td></tr>`).join('') || '<tr><td colspan="4" class="empty">Nenhum servidor.</td></tr>'}</tbody></table></div>
+            </div>
+            <div class="card"><h2>Rotinas de backup</h2><table><thead><tr><th>Servidor</th><th>Rotina</th><th>Agenda</th><th>Último backup com sucesso</th><th>Situação</th></tr></thead><tbody>
+                ${d.tasks.map(t => `<tr><td>${esc(t.hostname)}</td><td><b>${esc(t.task)}</b></td><td>${esc(t.schedule)}</td><td>${esc(t.last_success)}</td><td><span class="pill ${tone(t.tone)}">${esc(t.status)}</span></td></tr>`).join('') || '<tr><td colspan="5" class="empty">Nenhuma rotina.</td></tr>'}</tbody></table></div>
+            ${d.restore_tests.length ? `<div class="card"><h2>Testes de restauração</h2><table><thead><tr><th>Data</th><th>Repositório</th><th>Resultado</th><th>Arquivos conferidos</th></tr></thead><tbody>
+                ${d.restore_tests.map(t => `<tr><td>${esc(t.date)}</td><td>${esc(t.repository)}</td><td><span class="pill ${t.status === 'passed' ? 'ok' : 'bad'}">${t.status === 'passed' ? 'Aprovado' : t.status === 'partial' ? 'Parcial' : 'Reprovado'}</span></td><td>${esc(t.files)}</td></tr>`).join('')}</tbody></table></div>` : ''}`;
+        } catch (e) { box.innerHTML = `<div class="card bad">${esc(e.message)}</div>`; }
+    }
+
+    async function reports() {
+        const box = document.getElementById('v-reports');
+        if (box.dataset.ok) return;
+        try {
+            const d = await get(url('reports'));
+            box.innerHTML = `<div class="card"><h2>Relatórios</h2><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+                <select id="rp" style="padding:6px;border-radius:7px;border:1px solid var(--line);background:var(--card);color:var(--ink)">${d.reports.map(r => `<option value="${esc(r.code)}">${esc(r.name)}</option>`).join('')}</select>
+                <select id="rd" style="padding:6px;border-radius:7px;border:1px solid var(--line);background:var(--card);color:var(--ink)"><option value="7">7 dias</option><option value="30" selected>30 dias</option><option value="90">90 dias</option><option value="365">12 meses</option></select>
+                <button class="btn primary" id="ropen"><i class="fas fa-eye"></i> Ver</button><button class="btn" id="rprint"><i class="fas fa-print"></i> Imprimir / PDF</button><button class="btn" id="rcsv"><i class="fas fa-file-csv"></i> CSV</button></div>
+                <iframe id="rf" title="Relatório"></iframe></div>`;
+            const go = (fmt) => url('reports/' + box.querySelector('#rp').value, `days=${box.querySelector('#rd').value}&format=${fmt}`);
+            box.querySelector('#ropen').onclick = () => { box.querySelector('#rf').src = go('embed'); };
+            box.querySelector('#rprint').onclick = () => window.open(go('html'), '_blank');
+            box.querySelector('#rcsv').onclick = () => { location.href = go('csv'); };
+            box.querySelector('#rf').src = go('embed');
+            box.dataset.ok = '1';
+        } catch (e) { box.innerHTML = `<div class="card bad">${esc(e.message)}</div>`; }
+    }
+
+    async function invoices() {
+        const box = document.getElementById('v-invoices');
+        try {
+            const d = await get(url('invoices'));
+            box.innerHTML = `<div class="card"><h2>Faturas (meses fechados)</h2>${!d.invoices.length ? '<p class="empty">Nenhum mês fechado ainda.</p>' : `<table><thead><tr><th>Mês</th><th>Servidores</th><th>Armazenamento</th><th>Backups</th><th style="text-align:right">Valor</th><th></th></tr></thead><tbody>
+                ${d.invoices.map(i => `<tr><td><b>${esc(i.period)}</b></td><td>${i.agents}</td><td>${gb(i.storage_bytes)}</td><td>${i.executions} (${i.success} ok)</td><td style="text-align:right"><b>${money(i.amount, i.currency)}</b></td>
+                    <td><a class="btn" href="${url('invoices/' + i.period)}"><i class="fas fa-file-csv"></i> Demonstrativo</a></td></tr>`).join('')}</tbody></table>
+                <p style="font-size:.78em;color:var(--ink2)">Valores congelados no fechamento do mês: servidores ativos no mês e pico de armazenamento.</p>`}</div>`;
+        } catch (e) { box.innerHTML = `<div class="card bad">${esc(e.message)}</div>`; }
+    }
+
+    document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => {
+        document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b));
+        ['status', 'reports', 'invoices'].forEach(t => { document.getElementById('v-' + t).hidden = t !== b.dataset.t; });
+        ({ status, reports, invoices })[b.dataset.t]();
+    });
+    document.getElementById('logout').onclick = async () => {
+        try { await fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'same-origin' }); } catch (e) { /* segue */ }
+        try { ['gboc_token', 'gboc_server_token', 'gboc_user', 'gboc_server_user'].forEach(k => localStorage.removeItem(k)); } catch (e) { /* armazenamento indisponível */ }
+        document.cookie = 'gboc_server_token=; Max-Age=0; path=/'; document.cookie = 'gboc_token=; Max-Age=0; path=/';
+        location.href = '/login.html';
+    };
+    fetch('/api/v1/auth/status', { credentials: 'same-origin' }).then(r => r.json()).then(d => {
+        if (d.user) document.getElementById('who').textContent = d.user.display_name || d.user.username;
+    }).catch(() => {});
+    status();
+    setInterval(() => { if (!document.hidden && !document.getElementById('v-status').hidden) status(); }, 120000);
+})();
+</script>
+</body>
+</html>

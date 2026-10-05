@@ -271,6 +271,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"[ERROR] Erro na inicializacao do Core: {e}")
 
+    # Inscrição automática (instalação em massa): C:\ProgramData\GBOC\enroll.json com URL + token de instalação
+    try:
+        import threading as _enroll_th
+        from core.enrollment import seed_loop
+        _enroll_th.Thread(target=seed_loop, name="gboc-enroll", daemon=True).start()
+    except Exception as e:
+        logger.warning(f"[INSCRIÇÃO] Verificação do enroll.json indisponível: {e}")
+
     # Inicializar cliente do servidor central
     try:
         from server_config import config_manager
@@ -706,6 +714,7 @@ API_MODULES = [
     ("api.ai_api", "router"),  # ✅ GBOC Copilot AI Assistant (/api/ai)
     ("api.ai_api", "router_v1"),  # ✅ GBOC Copilot AI Assistant v1 (/api/v1/ai)
     ("api.diagnostics", "router_v1"),  # ✅ IA de diagnóstico v1 (/api/v1/diagnostics/ai-*)
+    ("api.agent_ops_api", "router"),  # ✅ Teste de restauração, atualização remota e pausa de agendamentos
 ]
 
 

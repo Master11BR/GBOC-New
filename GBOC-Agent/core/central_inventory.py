@@ -205,6 +205,26 @@ def build_inventory(conn, days: int = 30, max_executions: int = 1000) -> Dict[st
                               "finished_at": v.get("verified_at"), "errors_found": None,
                               "summary": f"boot={v.get('boot_time_seconds')}s rede={v.get('network_check')} app={v.get('app_check')}"})
 
+    restore_tests = _rows(cur, """
+        SELECT id, repository_id, repository_name, engine, task_id, task_name, snapshot_id, snapshot_time, status,
+               files_tested, files_ok, files_hash_verified, bytes_restored, duration_seconds, error_message,
+               evidence_hash, details, triggered_by, started_at, completed_at
+        FROM restore_tests WHERE started_at >= %s ORDER BY started_at DESC LIMIT 200
+    """, (since - timedelta(days=60),))
+    for t in restore_tests:
+        if isinstance(t.get("details"), str):
+            try:
+                t["details"] = json.loads(t["details"])
+            except ValueError:
+                t["details"] = []
+        verifications.append({"kind": "restore_test", "ext_id": t.get("id"),
+                              "subject": t.get("repository_name") or f"Repositório {t.get('repository_id')}",
+                              "status": "completed" if t.get("status") == "passed" else t.get("status"),
+                              "started_at": t.get("started_at"), "finished_at": t.get("completed_at"),
+                              "errors_found": max(0, int(t.get("files_tested") or 0) - int(t.get("files_ok") or 0)),
+                              "summary": f"{t.get('files_ok') or 0}/{t.get('files_tested') or 0} arquivos conferidos, "
+                                         f"{t.get('files_hash_verified') or 0} por hash, {t.get('duration_seconds') or 0}s"})
+
     failures = _rows(cur, """
         SELECT id, task_id, task_name, failure_reason, retry_count, max_retries, status, escalated,
                first_failed_at, last_retried_at, resolved_at
@@ -227,6 +247,23 @@ def build_inventory(conn, days: int = 30, max_executions: int = 1000) -> Dict[st
     except Exception:
         pass
 
+    operation, immutability = {}, []
+    try:
+        from engines import operation_settings as _ops
+        _d = _ops.load(force=True)
+        operation = {"maintenance_windows": _d.get(_ops.KEY_WINDOWS) or [], "bandwidth": _d.get(_ops.KEY_BANDWIDTH) or {},
+                     "central_policy": _d.get(_ops.KEY_POLICY)}
+    except Exception as exc:
+        logger.debug(f"[INVENTÁRIO] operação: {exc}")
+    try:
+        from engines import immutability as _imm
+        immutability = [{"repo_id": r["id"], "name": r["name"], "type": r["type"], "engine": r["engine"],
+                         "mode": r["policy"]["mode"], "days": r["policy"]["days"], "lock_mode": r["policy"]["lock_mode"],
+                         "last_check": r["policy"].get("last_check"), "supported_modes": r["supported_modes"]}
+                        for r in _imm.overview()]
+    except Exception as exc:
+        logger.debug(f"[INVENTÁRIO] imutabilidade: {exc}")
+
     return {
         "schema": 1,
         "collected_at": datetime.now().isoformat(),
@@ -236,6 +273,9 @@ def build_inventory(conn, days: int = 30, max_executions: int = 1000) -> Dict[st
         "task_executions": execs,
         "restores": restores,
         "verifications": verifications,
+        "restore_tests": restore_tests,
+        "operation": operation,
+        "immutability": immutability,
         "job_failures": failures,
         "replication": replication,
         "volumes": _volumes(),

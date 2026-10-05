@@ -93,7 +93,7 @@ async def agent_call(agent_id: str, method: str, path: str, query: Optional[Dict
         headers = {"Content-Type": "application/json", **agent_headers()}
         for scheme in ("http", "https"):
             try:
-                async with httpx.AsyncClient(timeout=timeout, verify=False) as client:
+                async with httpx.AsyncClient(timeout=httpx.Timeout(timeout, connect=8.0), verify=False) as client:
                     r = await client.request(method, f"{scheme}://{host}:{port}/{path}", params=query or None,
                                              content=json.dumps(body) if body is not None else None, headers=headers)
                 ctype = r.headers.get("content-type", "")

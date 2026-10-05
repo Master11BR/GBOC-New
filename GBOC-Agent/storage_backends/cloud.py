@@ -160,13 +160,23 @@ class CloudStorageBackend(StorageBackend):
         Returns:
             Dict com status
         """
+        # Bucket com Object Lock (backup imutável): envio com Content-MD5 em cada requisição, exigido pelo S3/Wasabi
+        if self.config.get('object_lock') and str(self.config.get('type', '')).lower() in ('s3', 'wasabi'):
+            return self._upload_md5(local_path, remote_name)
         try:
             if not self.container:
                 self.container = self.driver.get_container(container_name=self.container_name)
 
             with open(local_path, 'rb') as f:
+                # Limite de banda de upload (janela/horário do agente ou política central)
+                limit = float(getattr(self, 'upload_limit_bps', 0) or 0)
+                if limit > 0:
+                    from engines.operation_settings import ThrottledReader
+                    stream = iter(ThrottledReader(f, limit))
+                else:
+                    stream = f
                 obj = self.driver.upload_object_via_stream(
-                    iterator=f,
+                    iterator=stream,
                     container=self.container,
                     object_name=remote_name
                 )
@@ -175,6 +185,70 @@ class CloudStorageBackend(StorageBackend):
 
         except Exception as e:
             error_msg = f"Falha ao fazer upload: {e}"
+            self.logger.error(error_msg)
+            return {"success": False, "message": error_msg, "error": "upload_failed"}
+
+    PART_SIZE = 64 * 1024 * 1024
+
+    def _s3_client(self):
+        import boto3
+        cfg = self.config
+        region = cfg.get('region') or 'us-east-1'
+        endpoint = cfg.get('endpoint') or (f"s3.{region}.wasabisys.com" if str(cfg.get('type')).lower() == 'wasabi' else None)
+        if endpoint and not endpoint.startswith('http'):
+            endpoint = 'https://' + endpoint
+        return boto3.client('s3', aws_access_key_id=cfg.get('access_key') or cfg.get('aws_access_key'),
+                            aws_secret_access_key=cfg.get('secret_key') or cfg.get('aws_secret_key'),
+                            region_name=region, endpoint_url=endpoint)
+
+    def _upload_md5(self, local_path: str, remote_name: str) -> Dict[str, Any]:
+        """Upload com Content-MD5 (objeto único até 64 MB; acima, multipart com MD5 por parte)."""
+        import base64
+        import hashlib
+        import os
+        import time
+        md5b64 = lambda b: base64.b64encode(hashlib.md5(b).digest()).decode('ascii')
+        limit = float(getattr(self, 'upload_limit_bps', 0) or 0)
+        t0, sent = time.monotonic(), 0
+
+        def throttle(n):
+            nonlocal sent
+            sent += n
+            if limit > 0:
+                wait = sent / limit - (time.monotonic() - t0)
+                if wait > 0:
+                    time.sleep(wait)
+        try:
+            s3 = self._s3_client()
+            bucket = self.container_name
+            size = os.path.getsize(local_path)
+            with open(local_path, 'rb') as f:
+                if size <= self.PART_SIZE:
+                    data = f.read()
+                    throttle(len(data))
+                    s3.put_object(Bucket=bucket, Key=remote_name, Body=data, ContentMD5=md5b64(data))
+                else:
+                    up = s3.create_multipart_upload(Bucket=bucket, Key=remote_name)
+                    parts = []
+                    try:
+                        n = 1
+                        while True:
+                            chunk = f.read(self.PART_SIZE)
+                            if not chunk:
+                                break
+                            throttle(len(chunk))
+                            r = s3.upload_part(Bucket=bucket, Key=remote_name, UploadId=up['UploadId'], PartNumber=n,
+                                               Body=chunk, ContentMD5=md5b64(chunk))
+                            parts.append({'ETag': r['ETag'], 'PartNumber': n})
+                            n += 1
+                        s3.complete_multipart_upload(Bucket=bucket, Key=remote_name, UploadId=up['UploadId'],
+                                                     MultipartUpload={'Parts': parts})
+                    except Exception:
+                        s3.abort_multipart_upload(Bucket=bucket, Key=remote_name, UploadId=up['UploadId'])
+                        raise
+            return {"success": True, "message": f"Arquivo enviado como {remote_name} (Object Lock)"}
+        except Exception as e:
+            error_msg = f"Falha ao fazer upload (Object Lock): {e}"
             self.logger.error(error_msg)
             return {"success": False, "message": error_msg, "error": "upload_failed"}
 
