@@ -525,6 +525,22 @@ class RepositoryManager:
         if not repo:
             raise ValueError(f"Repositório {repo_id} não encontrado")
 
+        # Backup imutável (proteção local): não apaga arquivos ainda dentro da retenção
+        should_delete_files = bool(delete_files) if delete_files is not None else not keep_folder
+        if should_delete_files and str(repo.get('type') or '').lower() == 'local':
+            try:
+                from engines import immutability as _imm
+                _r = _imm._repo_row(repo_id)
+                if _imm.get_policy(_r)["mode"] == "local_worm":
+                    _st = _imm.check_local(_r)
+                    if _st.get("in_retention"):
+                        raise ValueError(f"Repositório com backup imutável: {_st['in_retention']} arquivo(s) ainda dentro da "
+                                         f"retenção de {_imm.get_policy(_r)['days']} dia(s). Exclua mantendo os arquivos ou aguarde o prazo.")
+            except ValueError:
+                raise
+            except Exception as _imm_err:
+                logger.warning(f"Verificação de imutabilidade ignorada: {_imm_err}")
+
         try:
             with self._get_conn() as conn:
                 cursor = conn.cursor()

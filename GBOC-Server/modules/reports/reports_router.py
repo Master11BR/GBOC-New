@@ -93,15 +93,28 @@ def _filename(rep: Dict[str, Any], ext: str) -> str:
     return f"GBOC_{rep['code']}_{datetime.now().strftime('%Y%m%d_%H%M')}.{ext}"
 
 
-def _respond(rep: Dict[str, Any], format: str):
+def _branding_for(rep: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    try:
+        from modules.reports.branding import get_branding
+        return get_branding(rep.get("tenant_id"))
+    except Exception as e:
+        logger.warning(f"Marca do relatório indisponível: {e}")
+        return None
+
+
+async def _respond(rep: Dict[str, Any], format: str):
+    if format in ("html", "embed", "download", "pdf"):
+        brand = await asyncio.to_thread(_branding_for, rep)
+    else:
+        brand = None
     if format == "json":
         return JSONResponse(rc.report_json(rep))
     if format == "csv":
         return StreamingResponse(io.BytesIO(rc.render_csv(rep).encode("utf-8-sig")), media_type="text/csv; charset=utf-8",
                                  headers={"Content-Disposition": f"attachment; filename={_filename(rep, 'csv')}"})
     if format == "download":
-        return HTMLResponse(rc.render_html(rep), headers={"Content-Disposition": f"attachment; filename={_filename(rep, 'html')}"})
-    return HTMLResponse(rc.render_html(rep, embedded=(format == "embed")))
+        return HTMLResponse(rc.render_html(rep, branding=brand), headers={"Content-Disposition": f"attachment; filename={_filename(rep, 'html')}"})
+    return HTMLResponse(rc.render_html(rep, embedded=(format == "embed"), branding=brand))
 
 
 @router.get("/catalog")
@@ -118,7 +131,7 @@ async def get_report_v2(report_ref: str, days: int = Query(30, ge=1, le=730), ag
                         format: str = Query("html", pattern="^(html|embed|download|csv|json)$")):
     """Gera um relatório real. format: html (visualizar/imprimir), embed, download, csv ou json."""
     rep = await _build_async(report_ref, days, agent_id, tenant_id)
-    return _respond(rep, format)
+    return await _respond(rep, format)
 
 
 @router.post("/generate")
@@ -147,7 +160,7 @@ async def export_report(report_id: str, format: str = Query("html", pattern="^(h
                         tenant_id: Optional[str] = Query(None), print: Optional[str] = Query(None)):
     """Exporta o relatório: HTML (imprimir/PDF), CSV ou JSON."""
     rep = await _build_async(report_id, days, agent_id, tenant_id)
-    return _respond(rep, "html" if format == "pdf" else format)
+    return await _respond(rep, "html" if format == "pdf" else format)
 
 
 @router.get("/consolidated")

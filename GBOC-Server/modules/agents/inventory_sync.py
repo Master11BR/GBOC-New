@@ -161,6 +161,14 @@ SCHEMA_SQL = [
         tasks INTEGER, repositories INTEGER, executions INTEGER,
         agent_version VARCHAR(50)
     )""",
+    """CREATE TABLE IF NOT EXISTS agent_operation (
+        agent_id VARCHAR(255) PRIMARY KEY,
+        maintenance_windows JSONB,
+        bandwidth JSONB,
+        central_policy JSONB,
+        immutability JSONB,
+        updated_at TIMESTAMP DEFAULT LOCALTIMESTAMP
+    )""",
     "CREATE INDEX IF NOT EXISTS idx_ate_started ON agent_task_executions (started_at)",
     "CREATE INDEX IF NOT EXISTS idx_ate_agent_started ON agent_task_executions (agent_id, started_at)",
 ]
@@ -169,6 +177,9 @@ SCHEMA_SQL = [
 def _db():
     from database import db_manager
     return db_manager
+
+
+_rt_schema_ready = [False]
 
 
 def ensure_schema(conn=None) -> None:
@@ -392,6 +403,30 @@ def store_inventory(conn, agent_id: str, inv: Dict[str, Any]) -> Dict[str, int]:
         """, [(agent_id, v.get("mountpoint"), v.get("fstype"), _int(v.get("total_bytes")), _int(v.get("used_bytes")),
                _int(v.get("free_bytes"))) for v in vols if v.get("mountpoint")])
     counts["volumes"] = len(vols)
+
+    if "operation" in inv or "immutability" in inv:
+        op = inv.get("operation") or {}
+        cur.execute("""
+            INSERT INTO agent_operation (agent_id, maintenance_windows, bandwidth, central_policy, immutability, updated_at)
+            VALUES (%s, %s::jsonb, %s::jsonb, %s::jsonb, %s::jsonb, LOCALTIMESTAMP)
+            ON CONFLICT (agent_id) DO UPDATE SET maintenance_windows=EXCLUDED.maintenance_windows, bandwidth=EXCLUDED.bandwidth,
+                central_policy=EXCLUDED.central_policy, immutability=EXCLUDED.immutability, updated_at=LOCALTIMESTAMP
+        """, (agent_id, json.dumps(op.get("maintenance_windows") or []), json.dumps(op.get("bandwidth") or {}),
+              json.dumps(op.get("central_policy")), json.dumps(inv.get("immutability") or [], default=str)))
+        counts["operation"] = 1
+
+    if inv.get("restore_tests"):
+        cur.execute("SAVEPOINT gboc_rt")
+        try:
+            from modules.agents.restore_tests import SCHEMA_SQL as _RT_SCHEMA, store_results
+            if not _rt_schema_ready[0]:
+                for _sql in _RT_SCHEMA:
+                    cur.execute(_sql)
+                _rt_schema_ready[0] = True
+            counts["restore_tests"] = store_results(conn, agent_id, inv["restore_tests"])
+        except Exception as exc:
+            cur.execute("ROLLBACK TO SAVEPOINT gboc_rt")
+            logger.warning(f"[INVENTÁRIO] Testes de restauração de {agent_id} ignorados: {exc}")
 
     cur.execute("""
         INSERT INTO agent_inventory_status (agent_id, last_inventory_at, collected_at, tasks, repositories, executions)

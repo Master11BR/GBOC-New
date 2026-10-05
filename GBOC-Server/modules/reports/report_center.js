@@ -48,7 +48,8 @@
             </div>
             <div id="rc-sched-form" style="display:none;margin-top:12px"></div>
             <div id="rc-sched-list" style="margin-top:10px;font-size:.88em"></div>
-        </div>`;
+        </div>
+        <div class="panel" style="padding:14px;margin-top:16px" id="rc-brand"></div>`;
         root.querySelector('#rc-new-sched').addEventListener('click', () => schedForm(state.current && state.current.kind === 'real' ? state.current.ref : null));
         root.querySelector('#rc-search').addEventListener('input', (e) => { state.search = e.target.value.toLowerCase(); renderGrid(); });
         ['rc-days', 'rc-agent', 'rc-tenant'].forEach(id => root.querySelector('#' + id).addEventListener('change', () => {
@@ -187,7 +188,7 @@
                 ${list.map(s => `<tr>
                     <td><strong>${esc(s.name)}</strong>${s.enabled ? '' : ' <span class="badge badge-warning">pausado</span>'}</td>
                     <td>${esc(s.report_code)}</td><td>${esc(s.description)}</td><td>${esc(s.days)} dias</td>
-                    <td style="max-width:220px;overflow-wrap:anywhere">${esc(s.recipients)}</td>
+                    <td style="max-width:220px;overflow-wrap:anywhere">${esc(s.recipients) || ''}${s.send_to_client ? `${s.recipients ? '<br>' : ''}<span class="badge badge-info"><i class="fas fa-user-tie"></i> contatos do cliente</span>` : ''}</td>
                     <td>${s.last_run_at ? esc(new Date(s.last_run_at).toLocaleString('pt-BR')) : '—'}
                         ${s.last_status === 'error' ? `<br><span style="color:var(--danger);font-size:.85em" title="${esc(s.last_error)}"><i class="fas fa-triangle-exclamation"></i> ${esc((s.last_error || '').slice(0, 60))}</span>` : (s.last_status === 'sent' ? ' <i class="fas fa-check" style="color:var(--success)"></i>' : '')}</td>
                     <td>${s.next_run_at ? esc(new Date(s.next_run_at).toLocaleString('pt-BR')) : '—'}</td>
@@ -233,6 +234,8 @@
                 <label style="font-size:.82em">Período do relatório<select id="sf-days" class="form-control">
                     ${[7, 30, 90, 180, 365].map(d => `<option value="${d}" ${String(d) === String(days) ? 'selected' : ''}>Últimos ${d} dias</option>`).join('')}</select></label>
                 <label style="font-size:.82em;grid-column:1/-1">Destinatários (separados por vírgula)<input id="sf-to" class="form-control" placeholder="diretoria@cliente.com.br, ti@cliente.com.br"></label>
+                ${tenant ? `<label style="font-size:.82em;grid-column:1/-1;display:flex;gap:8px;align-items:center"><input type="checkbox" id="sf-client" checked>
+                    Enviar também aos contatos do cliente (cadastrados em "Marca nos relatórios") — o relatório sai com a marca do cliente</label>` : ''}
             </div>
             <div style="font-size:.78em;color:var(--text-muted);margin-top:6px">Escopo: ${agent ? 'agente selecionado no filtro' : 'todos os agentes'}${tenant ? ' · cliente selecionado' : ''}. O envio usa o SMTP de Configurações &gt; Notificações e anexa o relatório em HTML (pronto para PDF) e CSV.</div>
             <div style="display:flex;gap:8px;margin-top:10px">
@@ -249,7 +252,8 @@
             const [hh, mm] = (f.querySelector('#sf-time').value || '08:00').split(':');
             const body = { report_code: f.querySelector('#sf-rep').value, frequency: freq.value, weekday: +f.querySelector('#sf-wd').value,
                 day_of_month: +f.querySelector('#sf-dom').value, hour: +hh, minute: +mm, days: +f.querySelector('#sf-days').value,
-                recipients: f.querySelector('#sf-to').value, agent_id: agent || null, tenant_id: tenant || null };
+                recipients: f.querySelector('#sf-to').value, agent_id: agent || null, tenant_id: tenant || null,
+                send_to_client: !!(f.querySelector('#sf-client') && f.querySelector('#sf-client').checked) };
             const r = await fetch(base() + '/api/v1/reports/schedules', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
             const d = await r.json().catch(() => ({}));
             if (!r.ok) { alert(d.detail || d.message || 'Não foi possível salvar.'); return; }
@@ -260,6 +264,92 @@
         f.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
+
+    // ── Marca nos relatórios (white-label por cliente) ──
+    const BR = { list: [], tenants: [], key: '_default', company: '' };
+    async function loadBranding() {
+        const box = document.getElementById('rc-brand');
+        if (!box) return;
+        try {
+            const d = await fetch(base() + '/api/v1/reports/branding').then(r => r.json());
+            BR.list = d.branding || []; BR.tenants = d.tenants || []; BR.company = d.company_name || '';
+            renderBranding();
+        } catch (e) { box.innerHTML = `<p style="color:var(--danger)">Erro ao carregar a marca: ${esc(e.message)}</p>`; }
+    }
+
+    function renderBranding() {
+        const box = document.getElementById('rc-brand');
+        const cur = BR.list.find(b => b.scope_key === BR.key) || {};
+        const isDefault = BR.key === '_default';
+        const tenantName = (BR.tenants.find(t => t.org_id === BR.key) || {}).name || BR.key;
+        const configured = new Set(BR.list.map(b => b.scope_key));
+        box.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+                <h4 style="margin:0;font-size:.98em"><i class="fas fa-palette" style="color:var(--primary)"></i> Marca nos relatórios (white-label)</h4>
+                <select id="br-key" class="form-control" style="width:auto;min-width:260px">
+                    <option value="_default" ${isDefault ? 'selected' : ''}>Padrão — sua empresa (provedor)${configured.has('_default') ? ' ✓' : ''}</option>
+                    ${BR.tenants.map(t => `<option value="${esc(t.org_id)}" ${t.org_id === BR.key ? 'selected' : ''}>Cliente: ${esc(t.name)} (${t.agents} agente${t.agents == 1 ? '' : 's'})${configured.has(t.org_id) ? ' ✓' : ''}</option>`).join('')}
+                </select>
+            </div>
+            <p style="font-size:.8em;color:var(--text-muted);margin:0 0 10px">${isDefault
+                ? 'Usada em todos os relatórios. Relatórios filtrados por cliente usam a marca do cliente (quando cadastrada) com "Relatório preparado por" a sua empresa.'
+                : `Usada quando o relatório é filtrado pelo cliente <b>${esc(tenantName)}</b> e nos envios agendados para ele. Campos vazios herdam a marca padrão.`}</p>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;align-items:start">
+                <label style="font-size:.82em">Nome exibido<input id="br-name" class="form-control" maxlength="120" value="${esc(cur.display_name || '')}" placeholder="${esc(isDefault ? (BR.company || 'Sua empresa') : tenantName)}"></label>
+                <label style="font-size:.82em">Cor principal<div style="display:flex;gap:6px"><input id="br-color" type="color" value="${esc(cur.primary_color || '#2a78d6')}" style="width:52px;height:36px;border:1px solid var(--border);border-radius:6px;background:none;padding:2px">
+                    <input id="br-color-t" class="form-control" value="${esc(cur.primary_color || '')}" placeholder="#2a78d6 (padrão)" maxlength="7"></div></label>
+                <label style="font-size:.82em">Contato no rodapé<input id="br-contact" class="form-control" maxlength="200" value="${esc(cur.contact || '')}" placeholder="suporte@empresa.com.br · (11) 4000-0000"></label>
+                <label style="font-size:.82em;grid-column:1/-1">Texto do rodapé<input id="br-footer" class="form-control" maxlength="400" value="${esc(cur.footer_text || '')}" placeholder="Ex.: Documento confidencial — uso interno do cliente."></label>
+                ${isDefault ? '' : `<label style="font-size:.82em;grid-column:1/-1">E-mails do cliente para envio automático (separados por vírgula)<input id="br-emails" class="form-control" value="${esc(cur.client_emails || '')}" placeholder="diretoria@cliente.com.br, ti@cliente.com.br"></label>`}
+                <div style="font-size:.82em;grid-column:1/-1">Logotipo (PNG, JPG, SVG ou WEBP, até 300 KB)
+                    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:4px">
+                        <div id="br-logo-prev" style="min-width:120px;min-height:48px;border:1px dashed var(--border);border-radius:6px;padding:6px;background:#fff;display:flex;align-items:center;justify-content:center">
+                            ${cur.logo_data ? `<img src="${esc(cur.logo_data)}" alt="" style="max-height:48px;max-width:220px">` : '<span style="color:#888;font-size:.85em">sem logotipo</span>'}</div>
+                        <input type="file" id="br-logo" accept="image/png,image/jpeg,image/svg+xml,image/webp,image/gif" class="form-control" style="width:auto">
+                        <button class="btn btn-sm" id="br-logo-rm" type="button"><i class="fas fa-eraser"></i> Remover logotipo</button>
+                    </div></div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+                <button class="btn btn-sm btn-primary" id="br-save"><i class="fas fa-save"></i> Salvar marca</button>
+                <button class="btn btn-sm" id="br-preview"><i class="fas fa-eye"></i> Pré-visualizar (REP-01)</button>
+                ${cur.scope_key ? '<button class="btn btn-sm" id="br-del" style="color:var(--danger)"><i class="fas fa-trash"></i> Remover marca</button>' : ''}
+            </div>`;
+        let logo = cur.logo_data || null;
+        box.querySelector('#br-key').onchange = (e) => { BR.key = e.target.value; renderBranding(); };
+        const ct = box.querySelector('#br-color-t'), cc = box.querySelector('#br-color');
+        cc.oninput = () => { ct.value = cc.value; };
+        ct.oninput = () => { if (/^#[0-9a-fA-F]{6}$/.test(ct.value)) cc.value = ct.value; };
+        box.querySelector('#br-logo').onchange = (e) => {
+            const file = e.target.files[0]; if (!file) return;
+            if (file.size > 300 * 1024) { alert('O logotipo deve ter até 300 KB.'); e.target.value = ''; return; }
+            const rd = new FileReader();
+            rd.onload = () => { logo = rd.result; box.querySelector('#br-logo-prev').innerHTML = `<img src="${esc(logo)}" alt="" style="max-height:48px;max-width:220px">`; };
+            rd.readAsDataURL(file);
+        };
+        box.querySelector('#br-logo-rm').onclick = () => { logo = null; box.querySelector('#br-logo-prev').innerHTML = '<span style="color:#888;font-size:.85em">sem logotipo</span>'; };
+        box.querySelector('#br-save').onclick = async () => {
+            const body = { display_name: box.querySelector('#br-name').value, primary_color: ct.value.trim(), logo_data: logo,
+                contact: box.querySelector('#br-contact').value, footer_text: box.querySelector('#br-footer').value,
+                client_emails: box.querySelector('#br-emails') ? box.querySelector('#br-emails').value : '' };
+            const r = await fetch(`${base()}/api/v1/reports/branding/${encodeURIComponent(BR.key)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+            const d = await r.json().catch(() => ({}));
+            if (!r.ok) { alert(d.detail || d.message || 'Não foi possível salvar.'); return; }
+            if (typeof showToast === 'function') showToast('Marca salva', 'success');
+            loadBranding();
+        };
+        box.querySelector('#br-preview').onclick = () => {
+            const q = new URLSearchParams({ format: 'html', days: document.getElementById('rc-days')?.value || 30 });
+            if (!isDefault) q.set('tenant_id', BR.key);
+            window.open(`${base()}/api/v1/reports/v2/REP-01?${q}`, '_blank');
+        };
+        const del = box.querySelector('#br-del');
+        if (del) del.onclick = async () => {
+            if (!confirm('Remover a marca personalizada? Os relatórios voltam ao visual padrão.')) return;
+            await fetch(`${base()}/api/v1/reports/branding/${encodeURIComponent(BR.key)}`, { method: 'DELETE' });
+            loadBranding();
+        };
+    }
+
     window.GBOCReportCenter = {
         init() {
             const root = document.getElementById('report-center');
@@ -267,6 +357,7 @@
             if (!state.loaded) { shell(root); loadFilters(); state.loaded = true; }
             loadCatalog();
             loadSchedules();
+            loadBranding();
         },
         open: openReport,
     };

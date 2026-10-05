@@ -202,6 +202,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                     <div class="nav-link nav-sub" onclick="switchTab('agents',this)"><i class="fas fa-server"></i> <span>Agentes & MSP</span></div>
                     <div class="nav-link nav-sub" onclick="switchTab('multitenant',this)"><i class="fas fa-building"></i> <span>Multi-Tenant MSP</span></div>
                     <div class="nav-link nav-sub" onclick="switchTab('remote',this)"><i class="fas fa-satellite-dish"></i> <span>Gerenciamento Remoto</span></div>
+                    <div class="nav-link nav-sub" onclick="switchTab('policies',this)"><i class="fas fa-sitemap"></i> <span>Políticas e Implantação</span></div>
                 <div class="nav-link nav-sub" onclick="switchTab('rmm',this)"><i class="fas fa-terminal"></i> <span>RMM & Terminal</span></div>
                 </div>
             </div>
@@ -407,7 +408,10 @@ function gbocToggleSidebarCollapse(){
 
         <!-- TAB: RMM & TERMINAL -->
         <!-- TAB: GERENCIAMENTO REMOTO (modules/agents/remote_mgmt.js) -->
-        <div id="tab-remote" class="tab-section"><div id="remote-mgmt"></div></div>
+        <div id="tab-remote" class="tab-section"><div id="fleet-ops"></div><div id="remote-mgmt"></div></div>
+
+        <!-- TAB: POLÍTICAS E IMPLANTAÇÃO (modules/agents/policies.js) -->
+        <div id="tab-policies" class="tab-section"><div id="policies-center"></div></div>
 
         <div id="tab-rmm" class="tab-section">
             <div class="panel">
@@ -437,6 +441,8 @@ function gbocToggleSidebarCollapse(){
 
         <!-- TAB: SURERESTORE SANDBOX -->
         <div id="tab-surerestore" class="tab-section">
+            <!-- Testes de restauração agendados com evidência (modules/agents/restore_tests.js) -->
+            <div id="restore-tests"></div>
             <div class="panel">
                 <h3><i class="fas fa-microscope" style="color:var(--warning);margin-right:8px"></i> SureRestore — Verificação Automatizada de Boot em Sandbox</h3>
                 <p style="color:var(--text-muted);font-size:0.9em">Testa a inicialização real do backup em uma Máquina Virtual Sandbox isolada (Hyper-V / QEMU) e valida integridade de serviços e arquivos.</p>
@@ -694,6 +700,8 @@ function gbocToggleSidebarCollapse(){
                     </div>
                 </div>
             </div>
+            <!-- Licença e faturamento mensal (modules/multitenant/commercial.js) -->
+            <div id="msp-commercial" style="margin-top:20px"></div>
         </div>
 
         <!-- TAB: ANALYTICS -->
@@ -1142,6 +1150,8 @@ function gbocToggleSidebarCollapse(){
                     <button class="btn btn-primary" onclick="loadServerAlerts()"><i class="fas fa-sync-alt"></i> Atualizar</button>
                 </div>
             </div>
+            <!-- Alertas proativos (modules/alerts/proactive_alerts.js) -->
+            <div id="proactive-alerts"></div>
             <div class="kpi-grid" style="margin-bottom:20px">
                 <div class="kpi-card">
                     <div class="kpi-header"><span>Total Alertas</span><div class="kpi-icon orange"><i class="fas fa-bell"></i></div></div>
@@ -1941,11 +1951,15 @@ function gbocToggleSidebarCollapse(){
             if(targetId==='config' || id==='notifications' || id==='engines') loadConfig();
             if(targetId==='ransomware') loadServerRansomware();
             if(targetId==='compliance' || id==='audit') loadServerCompliance();
-            if(targetId==='alerts') loadServerAlerts();
+            if(targetId==='alerts') { loadServerAlerts(); if (window.GBOCProactive) GBOCProactive.init(); }
+            if(targetId==='surerestore' && window.GBOCRestoreTests) GBOCRestoreTests.init();
             if(targetId==='replication') loadServerReplication();
             if(targetId==='users') loadServerUsers();
             if(targetId==='reports') { loadReportsTab(); if (window.GBOCReportCenter) GBOCReportCenter.init(); }
             if(targetId==='remote' && window.GBOCRemote) { GBOCRemote.init(); }
+            if(targetId==='remote' && window.GBOCFleet) { GBOCFleet.init(); }
+            if(targetId==='policies' && window.GBOCPolicies) { GBOCPolicies.init(); }
+            if(targetId==='multitenant' && window.GBOCCommercial) { GBOCCommercial.init(); }
             if(targetId==='job-alert') loadServerJobAlertData();
             if(targetId==='storage') loadServerStorageData();
             if(targetId==='workloads') loadServerWorkloads();
@@ -4509,6 +4523,11 @@ function gbocToggleSidebarCollapse(){
     <script src="/modules/reports/report_center.js"></script>
     <script src="/modules/reports/decision_panel.js"></script>
     <script src="/modules/agents/remote_mgmt.js"></script>
+    <script src="/modules/agents/fleet_ops.js"></script>
+    <script src="/modules/agents/restore_tests.js"></script>
+    <script src="/modules/alerts/proactive_alerts.js"></script>
+    <script src="/modules/agents/policies.js"></script>
+    <script src="/modules/multitenant/commercial.js"></script>
     <script src="/modules/multitenant/multitenant.js"></script>
     <script src="/modules/users/users.js"></script>
     <script src="/modules/engine_migration/engine_migration.js"></script>

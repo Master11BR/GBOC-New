@@ -1100,9 +1100,17 @@ class RestoreManager:
             raise RuntimeError("RepositoryManager não está disponível no core.")
 
         backend = self.core.repository_manager.get_backend(repo['id'])
-        
-        # O "path" dentro do snapshot não se aplica diretamente ao nosso modelo de zips,
-        # mas podemos listar o conteúdo dos zips. Por simplicidade, vamos listar os zips.
+
+        # Snapshots v3 têm manifesto: navegação real por pastas, com tamanho e hash de cada arquivo
+        try:
+            from native_engine.engine import GBOCNativeEngine
+            eng = GBOCNativeEngine(task_config={'repository': repo}, storage_backend=backend)
+            if eng._load_manifest(snapshot_id):
+                return eng.list_files(snapshot_id, path or '/')
+        except Exception as _mf_err:
+            logger.debug(f"Manifesto do snapshot {snapshot_id} indisponível: {_mf_err}")
+
+        # Snapshots antigos (sem manifesto): lista os arquivos compactados
         all_files = backend.list_files(sub_path=snapshot_id)
         
         files = []

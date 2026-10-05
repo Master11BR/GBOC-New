@@ -35,8 +35,11 @@ PUBLIC_EXACT = {
     "/api/v2/system/ui-config",
     "/api/v1/jobs/failed",
     "/api/v1/server/jobs/failed",
+    "/api/v1/enroll",
 }
-PUBLIC_PREFIXES = ("/api/v1/auth/oauth/",)
+PUBLIC_PREFIXES = ("/api/v1/auth/oauth/",
+                   # Instalação em massa: autenticadas pelo token de instalação (validado na própria rota)
+                   "/api/v1/enroll/")
 
 AGENT_EXACT = {
     "/api/v1/agents/register",
@@ -55,6 +58,16 @@ AGENT_PATTERNS = (
     re.compile(r"^/api/v1/server/(power-tools|hermes)/agents/[^/]+/stats$"),
 )
 LOOPBACK_EXACT = {"/api/system/shutdown", "/api/v1/system/shutdown"}
+# Perfil "client" (Portal do Cliente): só acessa o portal (dados forçados à própria organização)
+CLIENT_ALLOWED_PREFIXES = ("/api/v1/portal/",)
+CLIENT_ALLOWED_EXACT = {"/api/v1/auth/status", "/api/v1/auth/logout", "/api/v1/auth/change-password", "/api/v1/version"}
+CLIENT_PAGES_ALLOWED = ("/portal.html", "/login.html", "/login")
+
+
+def client_blocked(user: Optional[dict], path: str) -> bool:
+    if not user or str(user.get("role") or "").lower() != "client":
+        return False
+    return not (path in CLIENT_ALLOWED_EXACT or path.startswith(CLIENT_ALLOWED_PREFIXES))
 _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost", "testclient"}
 
 
@@ -120,6 +133,21 @@ def install(app, get_user: Callable[[Request], Optional[dict]], auth_enabled: Ca
         return user
 
     @app.middleware("http")
+    async def _gboc_client_pages(request: Request, call_next):
+        """Usuário do Portal do Cliente que abre o painel/páginas internas é levado ao portal."""
+        path = request.url.path
+        if request.method == "GET" and not path.startswith("/api/") and (path == "/" or path.endswith(".html")) \
+                and not path.startswith(CLIENT_PAGES_ALLOWED) and _token_of(request):
+            try:
+                user = await _cached_user(request)
+            except Exception:
+                user = None
+            if user and str(user.get("role") or "").lower() == "client":
+                from fastapi.responses import RedirectResponse
+                return RedirectResponse("/portal.html", status_code=302)
+        return await call_next(request)
+
+    @app.middleware("http")
     async def _gboc_auth_guard(request: Request, call_next):
         path = request.url.path
         if request.method == "OPTIONS" or not path.startswith("/api/"):
@@ -140,6 +168,8 @@ def install(app, get_user: Callable[[Request], Optional[dict]], auth_enabled: Ca
 
             user = await _cached_user(request)
             if user:
+                if client_blocked(user, path):
+                    return _deny("PORTAL_ONLY", "Seu acesso é ao Portal do Cliente.", 403)
                 request.state.user = user
                 response = await call_next(request)
                 # Alteração de usuários/perfis/senhas: sessões em cache precisam ser revalidadas

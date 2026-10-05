@@ -29,7 +29,8 @@ ROLES_HIERARCHY_MATRIX = [
     {"role": "operator", "label": "MSP Operator", "description": "Gerenciamento de agentes, execuções de RMM, disparo de backups e restauração.", "permissions": ["AGENTS_WRITE", "RMM_EXEC", "JOBS_EXEC", "REPORTS_READ"]},
     {"role": "specialist", "label": "Backup Specialist", "description": "Criação, edição e execução de rotinas de backup, CBT e SureRestore.", "permissions": ["JOBS_WRITE", "CBT_WRITE", "RESTORE_EXEC", "REPORTS_READ"]},
     {"role": "auditor", "label": "Auditor", "description": "Acesso completo a logs de auditoria, eventos do Ransomware Guardian e compliance.", "permissions": ["LOGS_READ", "AUDIT_READ", "GUARDIAN_READ", "COMPLIANCE_READ"]},
-    {"role": "readonly", "label": "ReadOnly", "description": "Visualização de dashboards, estatísticas e relatórios sem permissão de alteração.", "permissions": ["DASHBOARD_READ", "REPORTS_READ"]}
+    {"role": "readonly", "label": "ReadOnly", "description": "Visualização de dashboards, estatísticas e relatórios sem permissão de alteração.", "permissions": ["DASHBOARD_READ", "REPORTS_READ"]},
+    {"role": "client", "label": "Cliente (portal)", "description": "Acesso somente ao Portal do Cliente: situação dos próprios backups, relatórios e faturas da sua organização.", "permissions": ["PORTAL_READ"]}
 ]
 
 def _get_current_user_from_req(request: Request) -> Optional[Dict[str, Any]]:
@@ -268,6 +269,9 @@ async def create_user_endpoint(req: UserCreateReq, request: Request):
         cur = conn.cursor()
         pw_hash = _hash_password(req.password)
         
+        if (req.role or "").lower() == "client" and not req.tenant_id:
+            raise HTTPException(400, "Usuário do portal (perfil Cliente) precisa estar vinculado a uma organização.")
+
         # Validar se o tenant existe se for especificado
         if req.tenant_id:
             cur.execute("SELECT 1 FROM msp_organizations WHERE org_id = %s", (req.tenant_id,))
@@ -324,6 +328,11 @@ async def update_user_endpoint(user_id: int, req: UserUpdateReq, request: Reques
             updates.append("display_name = %s")
             params.append(req.display_name)
         if req.role is not None:
+            if req.role.lower() == "client":
+                cur.execute("SELECT tenant_id FROM server_auth_users WHERE id = %s", (user_id,))
+                cur_tenant = (cur.fetchone() or [None])[0]
+                if not (req.tenant_id if req.tenant_id is not None else cur_tenant):
+                    raise HTTPException(400, "Usuário do portal (perfil Cliente) precisa estar vinculado a uma organização.")
             updates.append("role = %s")
             params.append(req.role)
         if req.tenant_id is not None:

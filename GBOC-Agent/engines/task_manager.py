@@ -868,6 +868,16 @@ class TaskManager:
 
             self.monitor.start_backup(task_id, execution_id, task_name, task.get('repo_name', 'Unknown'))
 
+            # Limite de banda de upload vigente agora (janela/horário configurados no agente ou pela política central)
+            try:
+                from engines import operation_settings as _ops
+                task['_upload_mbps'] = _ops.current_upload_mbps()
+                if task['_upload_mbps']:
+                    logger.info(f"📶 Limite de upload aplicado: {task['_upload_mbps']:g} Mbps")
+            except Exception as _bw_err:
+                task['_upload_mbps'] = 0
+                logger.debug(f"Limite de banda indisponível: {_bw_err}")
+
             if engine in ('restic', 'restic_native', 'restic native'):
                 result = self._run_restic_backup(task, execution_id)
             elif engine in ('duplicati', 'duplicati_native', 'duplicati native'):
@@ -896,6 +906,13 @@ class TaskManager:
                 )
                 self.monitor.complete_backup(task_id, snapshot_id=snapshot_id)
                 logger.info(f"✅ Tarefa {task_name} concluída com sucesso")
+
+                # 🔒 Backup imutável (repositório local): protege os arquivos recém-gravados
+                try:
+                    from engines import immutability as _imm
+                    _imm.after_backup(task.get('repository_id'))
+                except Exception as _imm_err:
+                    logger.warning(f"[IMUTÁVEL] Aviso: {_imm_err}")
 
                 # 🛡️ Auto-Verificação Pós-Backup (SureRestore On-Completion)
                 try:
@@ -960,6 +977,9 @@ class TaskManager:
                 return {"success": False, "error": "Formato inválido para caminhos de origem"}
 
             cmd = [restic, "backup", "--json"] + source_paths
+            _kib = self._upload_limit_kib(task)
+            if _kib:
+                cmd[2:2] = ["--limit-upload", str(_kib)]
 
             self._current_process = subprocess.Popen(
                 cmd,
@@ -1155,6 +1175,9 @@ class TaskManager:
                 *enc_args,
                 *auth_args
             ]
+            _kib = self._upload_limit_kib(task)
+            if _kib:
+                cmd.append(f"--throttle-upload={_kib}KB")
 
             self._current_process = subprocess.Popen(
                 cmd,
@@ -1287,6 +1310,17 @@ class TaskManager:
                 connect_err = (c.stderr or c.stdout or 'Falha ao conectar repositório Kopia').strip()
                 return {"success": False, "error": connect_err}
 
+            # Limite de banda: throttle do repositório Kopia (definido a cada execução; "unlimited" remove)
+            _kib = self._upload_limit_kib(task)
+            try:
+                _thr = subprocess.run([kopia, 'repository', 'throttle', 'set', '--config-file', config_path,
+                                       f"--upload-bytes-per-second={_kib * 1024 if _kib else 'unlimited'}"],
+                                      env=env, capture_output=True, text=True, timeout=60)
+                if _thr.returncode != 0 and _kib:
+                    logger.warning(f"Kopia: limite de banda não aplicado: {(_thr.stderr or _thr.stdout or '').strip()[:200]}")
+            except Exception as _thr_err:
+                logger.debug(f"Kopia throttle: {_thr_err}")
+
             cmd = [kopia, 'snapshot', 'create', '--config-file', config_path] + source_paths
 
             self._current_process = subprocess.Popen(
@@ -1319,6 +1353,15 @@ class TaskManager:
 
         except Exception as e:
             return {"success": False, "error": str(e)}
+
+    @staticmethod
+    def _upload_limit_kib(task: Dict) -> int:
+        """Limite de upload vigente em KiB/s (0 = sem limite)."""
+        try:
+            from engines.operation_settings import mbps_to_kib
+            return mbps_to_kib(float(task.get('_upload_mbps') or 0))
+        except Exception:
+            return 0
 
     def _run_gboc_native_backup(self, task: Dict, execution_id: int) -> Dict:
         """Executa backup com engine GBOC Native."""
@@ -1357,7 +1400,19 @@ class TaskManager:
                 'prefix': task.get('prefix')
             }
 
+            # Backup imutável (S3 Object Lock): uploads com Content-MD5
+            try:
+                _rc = json.loads(task.get('repo_config') or '{}') if isinstance(task.get('repo_config'), str) else (task.get('repo_config') or {})
+                if ((_rc.get('immutability') or {}).get('mode') == 'object_lock'):
+                    repo_cfg['object_lock'] = True
+            except (ValueError, TypeError):
+                pass
             backend = RepositoryManager(self.core)._create_backend_from_config(repo_cfg)
+            if repo_cfg.get('object_lock'):
+                backend.config['object_lock'] = True
+            _kib = self._upload_limit_kib(task)
+            if _kib:
+                backend.upload_limit_bps = _kib * 1024       # usado no upload em nuvem (CloudStorageBackend)
             engine = GBOCNativeEngine({'source_paths': source_paths}, backend)
             result = engine.run_backup()
 

@@ -46,6 +46,7 @@
         <div id="rm-summary" class="kpi-grid" style="margin-bottom:14px"></div>
         <div id="rm-tabs" style="display:flex;gap:6px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:12px">
             ${[['tasks', 'fa-list-check', 'Tarefas'], ['running', 'fa-spinner', 'Em execução'], ['repos', 'fa-database', 'Repositórios'],
+               ['restore', 'fa-clock-rotate-left', 'Restaurar'], ['operation', 'fa-shield-halved', 'Operação e imutabilidade'],
                ['logs', 'fa-file-lines', 'Logs'], ['alerts', 'fa-bell', 'Alertas'], ['config', 'fa-sliders', 'Sincronização']]
                 .map(([k, i, l]) => `<button class="btn btn-sm ${k === S.tab ? 'btn-primary' : ''}" data-rt="${k}"><i class="fas ${i}"></i> ${l}</button>`).join('')}
             <span id="rm-channel-used" style="margin-left:auto;font-size:.78em;color:var(--text-muted);align-self:center"></span>
@@ -189,7 +190,19 @@
                 <table class="data-table"><thead><tr><th>Repositório</th><th>Motor</th><th>Tipo</th><th>Destino</th><th>Status</th><th></th></tr></thead><tbody>
                 ${repos.map(r => `<tr><td><strong>${esc(r.name)}</strong></td><td>${esc(r.engine)}</td><td>${esc(r.type)}</td>
                     <td style="font-size:.82em;max-width:360px;overflow-wrap:anywhere">${esc(r.path || r.bucket || '—')}</td><td>${badge(r.status || '—', ['active', 'ready'].includes(r.status) ? 'ok' : 'warn')}</td>
-                    <td><button class="btn btn-sm" data-test="${r.id}"><i class="fas fa-vial"></i> Testar acesso</button></td></tr>`).join('')}</tbody></table>`;
+                    <td style="white-space:nowrap"><button class="btn btn-sm" data-test="${r.id}"><i class="fas fa-vial"></i> Testar acesso</button>
+                        <button class="btn btn-sm" data-rtest="${r.id}" title="Restaura uma amostra do último snapshot e confere o SHA-256"><i class="fas fa-vial-circle-check"></i> Testar restauração</button></td></tr>`).join('')}</tbody></table>`;
+            document.querySelectorAll('#rm-body [data-rtest]').forEach(b => b.onclick = async () => {
+                b.disabled = true;
+                try {
+                    const r = await fetch(`${base()}/api/v1/restore-tests/run`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent_id: S.agent, repository_id: b.dataset.rtest }) });
+                    const d2 = await r.json().catch(() => ({}));
+                    if (!r.ok) throw new Error(d2.detail || d2.message || ('HTTP ' + r.status));
+                    toast('Teste de restauração iniciado — acompanhe em "Restaurar e Validar"', 'success');
+                    if (typeof switchTab === 'function') { switchTab('surerestore'); setTimeout(() => window.GBOCRestoreTests && GBOCRestoreTests.init(S.agent), 300); }
+                } catch (e) { toast('Falha: ' + e.message, 'error'); }
+                finally { b.disabled = false; }
+            });
             document.querySelectorAll('#rm-body [data-test]').forEach(b => b.onclick = async () => {
                 b.disabled = true; b.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testando';
                 try { const r = await api(`api/repositories/${b.dataset.test}/test`, { method: 'POST', body: '{}' }); toast(r.message || (r.success === false ? 'Falhou' : 'Repositório acessível'), r.success === false ? 'error' : 'success'); }
@@ -267,10 +280,175 @@
 
     function markTab() { document.querySelectorAll('#rm-tabs [data-rt]').forEach(x => x.classList.toggle('btn-primary', x.dataset.rt === S.tab)); }
 
+
+    // ── Restaurar arquivos a partir do Server ──
+    const RS = { repo: null, snap: null, path: '/', sel: new Set(), poll: null };
+    async function tabRestore() {
+        loading('Carregando repositórios...');
+        try {
+            const d = await api('api/repositories/');
+            const repos = Array.isArray(d) ? d : (d.repositories || []);
+            const body = document.getElementById('rm-body');
+            body.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+                <select id="rs-repo" class="form-control" style="width:auto;min-width:220px"><option value="">Repositório...</option>${repos.map(r => `<option value="${r.id}">${esc(r.name)} (${esc(r.engine)})</option>`).join('')}</select>
+                <select id="rs-snap" class="form-control" style="width:auto;min-width:240px" disabled><option>Snapshot...</option></select>
+                <span id="rs-crumb" style="font-size:.85em;color:var(--text-muted)"></span></div>
+                <div id="rs-files" style="max-height:420px;overflow:auto"></div>
+                <div id="rs-action" style="margin-top:10px"></div><div id="rs-status" style="margin-top:10px"></div>`;
+            body.querySelector('#rs-repo').onchange = (e) => loadSnaps(e.target.value);
+            if (RS.repo && repos.some(r => String(r.id) === String(RS.repo))) { body.querySelector('#rs-repo').value = RS.repo; loadSnaps(RS.repo, true); }
+        } catch (e) { fail(e); }
+    }
+    async function loadSnaps(repo, keep) {
+        RS.repo = repo; if (!keep) { RS.snap = null; RS.path = '/'; RS.sel.clear(); }
+        const sel = document.getElementById('rs-snap');
+        if (!repo) { sel.disabled = true; return; }
+        sel.innerHTML = '<option>Carregando...</option>';
+        try {
+            const d = await api(`api/restore/snapshots/${encodeURIComponent(repo)}`);
+            const sn = (d.snapshots || []).sort((a, b) => String(b.time || b.id).localeCompare(String(a.time || a.id)));
+            sel.disabled = false;
+            sel.innerHTML = sn.length ? sn.map(x => `<option value="${esc(x.full_id || x.id)}">${dt(x.time) !== '—' ? dt(x.time) : esc(x.id)} · ${esc(String(x.id).slice(0, 14))}</option>`).join('') : '<option value="">Nenhum snapshot</option>';
+            sel.onchange = () => { RS.snap = sel.value; RS.path = '/'; RS.sel.clear(); browse(); };
+            if (sn.length) { if (!(keep && RS.snap)) RS.snap = sel.value; else sel.value = RS.snap; browse(); }
+        } catch (e) { sel.innerHTML = `<option>${esc(e.message)}</option>`; }
+    }
+    async function browse() {
+        const box = document.getElementById('rs-files');
+        box.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        document.getElementById('rs-crumb').innerHTML = `Pasta: <code>${esc(RS.path)}</code>`;
+        try {
+            const d = await api(`api/restore/files/${encodeURIComponent(RS.repo)}/${encodeURIComponent(RS.snap)}?path=${encodeURIComponent(RS.path)}`);
+            const files = d.files || [];
+            const up = RS.path !== '/' ? `<tr><td colspan="4"><a href="#" id="rs-up"><i class="fas fa-level-up-alt"></i> ..</a></td></tr>` : '';
+            box.innerHTML = `<table class="data-table"><thead><tr><th style="width:28px"></th><th>Nome</th><th>Tipo</th><th>Tamanho</th></tr></thead><tbody>${up}
+                ${files.map(f => { const dir = f.type === 'dir' || f.is_dir; return `<tr><td><input type="checkbox" data-p="${esc(f.path)}" ${RS.sel.has(f.path) ? 'checked' : ''}></td>
+                    <td>${dir ? `<a href="#" data-dir="${esc(f.path)}"><i class="fas fa-folder" style="color:var(--warning)"></i> ${esc(f.name)}</a>` : `<i class="fas fa-file"></i> ${esc(f.name)}`}</td>
+                    <td>${dir ? 'Pasta' : 'Arquivo'}</td><td>${dir ? '' : bytes(f.size)}</td></tr>`; }).join('') || '<tr><td colspan="4">Pasta vazia.</td></tr>'}</tbody></table>`;
+            const upa = box.querySelector('#rs-up'); if (upa) upa.onclick = (e) => { e.preventDefault(); RS.path = RS.path.replace(/\/[^/]+\/?$/, '') || '/'; browse(); };
+            box.querySelectorAll('[data-dir]').forEach(a => a.onclick = (e) => { e.preventDefault(); RS.path = a.dataset.dir; browse(); });
+            box.querySelectorAll('[data-p]').forEach(c => c.onchange = () => { c.checked ? RS.sel.add(c.dataset.p) : RS.sel.delete(c.dataset.p); actionBar(); });
+            actionBar();
+        } catch (e) { box.innerHTML = `<span style="color:var(--danger)">${esc(e.message)}</span>`; }
+    }
+    function actionBar() {
+        const box = document.getElementById('rs-action');
+        const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
+        box.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;border-top:1px solid var(--border);padding-top:10px">
+            <b>${RS.sel.size} item(ns) selecionado(s)</b>
+            <input id="rs-target" class="form-control" style="flex:1;min-width:260px" value="${esc(RS.target || ('C:\\GBOC-Restore\\' + stamp))}" title="Pasta de destino no agente">
+            <label style="font-size:.82em"><input type="checkbox" id="rs-over"> Sobrescrever existentes</label>
+            <button class="btn btn-primary" id="rs-go" ${RS.sel.size ? '' : 'disabled'}><i class="fas fa-rotate-left"></i> Restaurar no agente</button></div>
+            <div style="font-size:.76em;color:var(--text-muted);margin-top:4px">Restaura na máquina do agente, na pasta indicada (recomendado: pasta nova, sem sobrescrever os originais). Fica registrado na auditoria.</div>`;
+        box.querySelector('#rs-go').onclick = async () => {
+            RS.target = box.querySelector('#rs-target').value.trim();
+            if (!RS.target) { toast('Informe a pasta de destino', 'warning'); return; }
+            if (!confirm(`Restaurar ${RS.sel.size} item(ns) em ${RS.target} no agente?`)) return;
+            try {
+                const r = await api('api/restore/', { method: 'POST', body: JSON.stringify({ repository_id: RS.repo, snapshot_id: RS.snap, files: [...RS.sel], target_path: RS.target, options: { overwrite: box.querySelector('#rs-over').checked } }) });
+                toast('Restauração iniciada no agente', 'success'); pollRestore(r.restore_id);
+            } catch (e) { toast('Falha: ' + e.message, 'error'); }
+        };
+    }
+    function pollRestore(id) {
+        clearInterval(RS.poll);
+        const box = document.getElementById('rs-status');
+        const tick = async () => {
+            try {
+                const d = (await api(`api/restore/status/${id}`)).data || {};
+                const st = String(d.status || '').toLowerCase();
+                box.innerHTML = `<div style="border:1px solid var(--border);border-radius:8px;padding:10px">Restauração #${id}: ${badge(d.status || '—', stTone(st))}
+                    · ${esc(d.files_restored ?? 0)} arquivo(s) · ${bytes(d.bytes_restored)} ${d.duration_seconds ? '· ' + dur(d.duration_seconds) : ''}
+                    ${d.error_message ? `<div style="color:var(--danger);font-size:.85em">${esc(d.error_message)}</div>` : ''}${d.target_path ? `<div style="font-size:.8em;color:var(--text-muted)">Destino: ${esc(d.target_path)}</div>` : ''}</div>`;
+                if (!['running', 'preparing', 'pending'].includes(st)) clearInterval(RS.poll);
+            } catch (e) { clearInterval(RS.poll); box.innerHTML = `<span style="color:var(--danger)">${esc(e.message)}</span>`; }
+        };
+        tick(); RS.poll = setInterval(tick, 3000);
+    }
+
+    // ── Janela de manutenção, limite de banda e backup imutável ──
+    const DAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+    function winRow(w, mbps) {
+        return `<div class="op-win" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:4px 0">
+            ${DAYS.map((d, i) => `<label style="font-size:.78em"><input type="checkbox" data-d="${i}" ${(w.days || []).includes(i) ? 'checked' : ''}> ${d}</label>`).join('')}
+            <input type="time" data-s value="${esc(w.start || '08:00')}" class="form-control" style="width:auto"> até <input type="time" data-e value="${esc(w.end || '18:00')}" class="form-control" style="width:auto">
+            ${mbps ? `<input type="number" min="0" step="any" data-m value="${esc(w.mbps ?? 10)}" class="form-control" style="width:90px"> Mbps` : `<input data-l value="${esc(w.label || '')}" placeholder="descrição" class="form-control" style="width:150px">`}
+            <button class="btn btn-sm" data-rm type="button"><i class="fas fa-xmark"></i></button></div>`;
+    }
+    function readWins(box, mbps) {
+        return [...box.querySelectorAll('.op-win')].map(r => {
+            const o = { days: [...r.querySelectorAll('[data-d]:checked')].map(c => +c.dataset.d), start: r.querySelector('[data-s]').value, end: r.querySelector('[data-e]').value };
+            if (mbps) o.mbps = +r.querySelector('[data-m]').value || 0; else o.label = r.querySelector('[data-l]').value;
+            return o;
+        });
+    }
+    async function tabOperation() {
+        loading('Carregando configurações do agente...');
+        try {
+            const [op, im] = await Promise.all([api('api/agent-ops/operation'), api('api/agent-ops/immutability')]);
+            const body = document.getElementById('rm-body');
+            const bw = op.bandwidth || {};
+            const pol = op.central_policy;
+            body.innerHTML = `
+                <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+                    ${badge(op.now.in_maintenance ? 'Em manutenção agora: ' + op.now.window : 'Fora de janela de manutenção', op.now.in_maintenance ? 'warn' : 'ok')}
+                    ${badge(op.now.upload_limit_mbps ? `Upload limitado a ${op.now.upload_limit_mbps} Mbps agora` : 'Upload sem limite agora', op.now.upload_limit_mbps ? 'info' : 'ok')}
+                    ${op.next_window ? badge('Próxima janela: ' + dt(op.next_window.at), 'info') : ''}
+                    ${pol ? badge(`Política central: ${pol.name} v${pol.version}`, 'info') : ''}
+                </div>
+                <fieldset style="border:1px solid var(--border);border-radius:8px;padding:10px"><legend style="font-size:.88em">Janelas de manutenção — backups agendados não iniciam (manuais continuam)</legend>
+                    <div id="op-mw">${(op.maintenance_windows || []).map(w => winRow(w)).join('')}</div>
+                    <button class="btn btn-sm" id="op-mw-add" type="button"><i class="fas fa-plus"></i> Janela</button></fieldset>
+                <fieldset style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-top:10px"><legend style="font-size:.88em">Limite de banda de upload (restic, Kopia, Duplicati e nativo em nuvem)</legend>
+                    <label style="font-size:.85em">Padrão (Mbps, 0 = sem limite) <input type="number" min="0" step="any" id="op-bw-def" value="${esc(bw.default_mbps || 0)}" class="form-control" style="width:110px;display:inline-block"></label>
+                    <div id="op-bw">${(bw.rules || []).map(w => winRow(w, true)).join('')}</div>
+                    <button class="btn btn-sm" id="op-bw-add" type="button"><i class="fas fa-plus"></i> Regra por horário</button></fieldset>
+                <div style="margin-top:8px;display:flex;gap:8px;align-items:center"><button class="btn btn-primary" id="op-save"><i class="fas fa-save"></i> Salvar no agente</button>
+                    ${pol ? '<span style="font-size:.78em;color:var(--warning)">Este agente segue uma política central — alterações locais aparecerão como "fora da política".</span>' : ''}</div>
+                ${(op.recent_skips || []).length ? `<div style="font-size:.8em;margin-top:8px"><b>Execuções adiadas pela janela:</b> ${op.recent_skips.slice(0, 5).map(x => `${esc(x.task_name)} (${esc(x.at)})`).join(', ')}</div>` : ''}
+                <h4 style="margin:16px 0 6px;font-size:.92em"><i class="fas fa-lock"></i> Backup imutável por repositório</h4>
+                <table class="data-table"><thead><tr><th>Repositório</th><th>Tipo</th><th>Imutabilidade</th><th>Dias</th><th>Bloqueio</th><th>Última verificação</th><th></th></tr></thead><tbody>
+                ${(im.repositories || []).map(r => { const p = r.policy || {}; const lc = p.last_check || {};
+                    return `<tr data-repo="${r.id}"><td><strong>${esc(r.name)}</strong></td><td>${esc(r.type)}/${esc(r.engine)}</td>
+                    <td><select data-f="mode" class="form-control" style="width:auto">${r.supported_modes.map(m => `<option value="${m}" ${p.mode === m ? 'selected' : ''}>${{ off: 'Desativada', object_lock: 'S3 Object Lock', local_worm: 'Proteção local' }[m]}</option>`).join('')}</select></td>
+                    <td><input type="number" min="1" max="3650" data-f="days" value="${esc(p.days || 30)}" class="form-control" style="width:80px"></td>
+                    <td><select data-f="lock_mode" class="form-control" style="width:auto"><option ${p.lock_mode !== 'GOVERNANCE' ? 'selected' : ''}>COMPLIANCE</option><option ${p.lock_mode === 'GOVERNANCE' ? 'selected' : ''}>GOVERNANCE</option></select></td>
+                    <td style="font-size:.8em;max-width:300px">${lc.at ? `${badge(lc.protected ? 'Protegido' : 'Não comprovado', lc.protected ? 'ok' : 'bad')} ${esc(lc.at)}<div>${esc(lc.summary || '')}</div>` : '—'}</td>
+                    <td style="white-space:nowrap"><button class="btn btn-sm" data-isave title="Salvar política"><i class="fas fa-save"></i></button>
+                        <button class="btn btn-sm" data-icheck title="Verificar"><i class="fas fa-magnifying-glass"></i></button>
+                        <button class="btn btn-sm btn-primary" data-iapply title="Aplicar proteção (bucket: retenção padrão; local: somente leitura)"><i class="fas fa-lock"></i> Aplicar</button></td></tr>`; }).join('') || '<tr><td colspan="7">Nenhum repositório.</td></tr>'}
+                </tbody></table>
+                <p style="font-size:.76em;color:var(--text-muted)">S3 Object Lock (AWS/Wasabi) impede apagar os backups até o fim da retenção — inclusive com a senha do repositório. COMPLIANCE não pode ser encurtado por ninguém; GOVERNANCE pode ser removido por contas com permissão especial. O bucket precisa ter Object Lock habilitado. Proteção local: arquivos somente leitura + ACL no Windows.</p>`;
+            const bindRm = () => body.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => b.closest('.op-win').remove());
+            body.querySelector('#op-mw-add').onclick = () => { body.querySelector('#op-mw').insertAdjacentHTML('beforeend', winRow({ days: [0, 1, 2, 3, 4], start: '08:00', end: '12:00' })); bindRm(); };
+            body.querySelector('#op-bw-add').onclick = () => { body.querySelector('#op-bw').insertAdjacentHTML('beforeend', winRow({ days: [0, 1, 2, 3, 4], start: '08:00', end: '18:00', mbps: 20 }, true)); bindRm(); };
+            bindRm();
+            body.querySelector('#op-save').onclick = async () => {
+                try { await api('api/agent-ops/operation', { method: 'PUT', body: JSON.stringify({ maintenance_windows: readWins(body.querySelector('#op-mw')), bandwidth: { default_mbps: +body.querySelector('#op-bw-def').value || 0, rules: readWins(body.querySelector('#op-bw'), true) } }) });
+                    toast('Configuração salva no agente', 'success'); tabOperation(); } catch (e) { toast('Falha: ' + e.message, 'error'); }
+            };
+            const rowVal = (tr) => ({ mode: tr.querySelector('[data-f=mode]').value, days: +tr.querySelector('[data-f=days]').value, lock_mode: tr.querySelector('[data-f=lock_mode]').value });
+            body.querySelectorAll('[data-repo]').forEach(tr => {
+                const id = tr.dataset.repo;
+                tr.querySelector('[data-isave]').onclick = async () => { try { await api(`api/agent-ops/repositories/${id}/immutability`, { method: 'PUT', body: JSON.stringify(rowVal(tr)) }); toast('Política salva', 'success'); } catch (e) { toast(e.message, 'error'); } };
+                tr.querySelector('[data-icheck]').onclick = async () => { try { const d = await api(`api/agent-ops/repositories/${id}/immutability/check`, { method: 'POST', body: '{}' }); toast(d.result.summary || 'Verificado', d.result.protected ? 'success' : 'warning'); tabOperation(); } catch (e) { toast(e.message, 'error'); } };
+                tr.querySelector('[data-iapply]').onclick = async () => {
+                    const v = rowVal(tr);
+                    if (v.mode === 'off') { toast('Escolha o tipo de imutabilidade', 'warning'); return; }
+                    if (!confirm(v.mode === 'object_lock' ? `Aplicar retenção ${v.lock_mode} de ${v.days} dias ao bucket? Os novos backups NÃO poderão ser apagados antes do prazo.` : `Proteger os arquivos de backup dos últimos ${v.days} dias (somente leitura)?`)) return;
+                    try { await api(`api/agent-ops/repositories/${id}/immutability`, { method: 'PUT', body: JSON.stringify(v) });
+                        const d = await api(`api/agent-ops/repositories/${id}/immutability/apply`, { method: 'POST', body: '{}' });
+                        toast(d.result.summary || 'Aplicado', d.result.protected ? 'success' : 'warning'); tabOperation(); } catch (e) { toast(e.message, 'error'); }
+                };
+            });
+        } catch (e) { fail(e); }
+    }
+
     function renderTab() {
         clearInterval(S.timer);
         if (!S.agent) { document.getElementById('rm-body').innerHTML = '<p style="color:var(--text-muted)">Selecione um agente.</p>'; return; }
-        ({ tasks: tabTasks, running: tabRunning, repos: tabRepos, logs: tabLogs, alerts: tabAlerts, config: tabConfig }[S.tab] || tabTasks)();
+        ({ tasks: tabTasks, running: tabRunning, repos: tabRepos, logs: tabLogs, alerts: tabAlerts, config: tabConfig,
+           restore: tabRestore, operation: tabOperation }[S.tab] || tabTasks)();
         if (S.tab === 'running') S.timer = setInterval(() => {
             const t = document.getElementById('tab-remote');
             if (!document.hidden && t && t.classList.contains('active') && S.tab === 'running') tabRunning(); else clearInterval(S.timer);

@@ -84,6 +84,7 @@ def ensure_schema() -> None:
     with _lock:
         if not _ready:
             _exec(_SCHEMA, fetch=False)
+            _exec("ALTER TABLE report_schedules ADD COLUMN IF NOT EXISTS send_to_client BOOLEAN DEFAULT FALSE", fetch=False)
             _ready = True
 
 
@@ -134,21 +135,31 @@ def _send(schedule: Dict[str, Any]) -> Dict[str, Any]:
     from modules.reports import report_core as rc
     from modules.reports.report_source_server import ServerReportSource
 
+    from modules.reports.branding import client_emails, get_branding
+
     cfg = _smtp_config()
     host, user = cfg.get("smtp_host", ""), cfg.get("smtp_username", "")
     if not host:
         raise RuntimeError("SMTP não configurado (Configurações > Notificações).")
     recipients = [r.strip() for r in str(schedule.get("recipients") or "").replace(";", ",").split(",") if r.strip()]
+    tenant = schedule.get("tenant_id") or None
+    if schedule.get("send_to_client") and tenant:
+        extra = client_emails(tenant)
+        if not extra and not recipients:
+            raise RuntimeError("O cliente não tem e-mails cadastrados (Relatórios → Marca do cliente).")
+        recipients += [e for e in extra if e.lower() not in {r.lower() for r in recipients}]
     if not recipients:
         raise RuntimeError("Nenhum destinatário informado.")
+    brand = get_branding(tenant)
     agent_ids = [a for a in str(schedule.get("agent_id") or "").split(",") if a.strip()] or None
     with ServerReportSource() as src:
         rep = rc.build_report(src, schedule["report_code"], days=int(schedule.get("days") or 30),
                               agent_ids=agent_ids, tenant_id=schedule.get("tenant_id") or None)
-    html_doc = rc.render_html(rep)
+    html_doc = rc.render_html(rep, branding=brand)
     stamp = datetime.now().strftime("%Y%m%d_%H%M")
     msg = MIMEMultipart()
-    msg["Subject"] = f"[GBOC] {rep['code']} {rep['title']} — {rep['scope']}"
+    sender_name = ((brand or {}).get("provider_name") or (brand or {}).get("display_name") or "GBOC") if brand else "GBOC"
+    msg["Subject"] = f"[{sender_name}] {rep['title']} — {rep['scope']}"
     msg["From"] = cfg.get("smtp_from") or user or "gboc@localhost"
     msg["To"] = ", ".join(recipients)
     kp = "".join(f"<li><b>{rc.esc(k['label'])}:</b> {rc.esc(k['value'])}</li>" for k in rep.get("kpis", []))
@@ -165,6 +176,16 @@ def _send(schedule: Dict[str, Any]) -> Dict[str, Any]:
         c = MIMEApplication(rc.render_csv(rep).encode("utf-8-sig"), _subtype="csv")
         c.add_header("Content-Disposition", "attachment", filename=f"GBOC_{rep['code']}_{stamp}.csv")
         msg.attach(c)
+    smtp_deliver(msg, cfg)
+    return {"status": "sent", "message": f"Enviado para {len(recipients)} destinatário(s)."}
+
+
+def smtp_deliver(msg, cfg: Optional[Dict[str, str]] = None) -> None:
+    """Entrega uma mensagem pelo SMTP de Configurações > Notificações (465 = SSL; demais portas = STARTTLS quando houver)."""
+    cfg = cfg if cfg is not None else _smtp_config()
+    host, user = cfg.get("smtp_host", ""), cfg.get("smtp_username", "")
+    if not host:
+        raise RuntimeError("SMTP não configurado (Configurações > Notificações).")
     port = int(cfg.get("smtp_port") or 587)
     if port == 465:
         with smtplib.SMTP_SSL(host, port, timeout=30) as s:
@@ -180,7 +201,24 @@ def _send(schedule: Dict[str, Any]) -> Dict[str, Any]:
             if user:
                 s.login(user, cfg.get("smtp_password", ""))
             s.send_message(msg)
-    return {"status": "sent", "message": f"Enviado para {len(recipients)} destinatário(s)."}
+
+
+def send_html_mail(subject: str, html_body: str, recipients: List[str],
+                   attachments: Optional[List[tuple]] = None) -> None:
+    """E-mail HTML simples (alertas, avisos). attachments = [(nome, bytes, subtipo)]."""
+    cfg = _smtp_config()
+    if not recipients:
+        raise RuntimeError("Nenhum destinatário informado.")
+    msg = MIMEMultipart()
+    msg["Subject"] = subject
+    msg["From"] = cfg.get("smtp_from") or cfg.get("smtp_username") or "gboc@localhost"
+    msg["To"] = ", ".join(recipients)
+    msg.attach(MIMEText(html_body, "html", "utf-8"))
+    for name, data, sub in attachments or []:
+        a = MIMEApplication(data, _subtype=sub)
+        a.add_header("Content-Disposition", "attachment", filename=name)
+        msg.attach(a)
+    smtp_deliver(msg, cfg)
 
 
 def _run_and_record(schedule: Dict[str, Any]) -> Dict[str, Any]:
@@ -234,8 +272,9 @@ def _validate(body: Dict[str, Any]) -> Dict[str, Any]:
     if freq not in FREQS:
         raise HTTPException(400, "Frequência inválida (daily, weekly ou monthly).")
     recipients = str(body.get("recipients") or "").strip()
-    if not recipients or "@" not in recipients:
-        raise HTTPException(400, "Informe ao menos um e-mail de destino.")
+    send_to_client = bool(body.get("send_to_client")) and bool(body.get("tenant_id"))
+    if (not recipients or "@" not in recipients) and not send_to_client:
+        raise HTTPException(400, "Informe ao menos um e-mail de destino (ou marque o envio aos contatos do cliente).")
     try:
         hour = int(body.get("hour", 8))
         minute = int(body.get("minute", 0))
@@ -248,7 +287,7 @@ def _validate(body: Dict[str, Any]) -> Dict[str, Any]:
             "hour": hour, "minute": minute, "weekday": int(body.get("weekday") or 0) % 7,
             "day_of_month": max(1, min(28, int(body.get("day_of_month") or 1))), "days": days,
             "agent_id": (body.get("agent_id") or None), "tenant_id": (body.get("tenant_id") or None),
-            "recipients": recipients[:2000], "attach_csv": bool(body.get("attach_csv", True)),
+            "recipients": recipients[:2000], "attach_csv": bool(body.get("attach_csv", True)), "send_to_client": send_to_client,
             "enabled": bool(body.get("enabled", True))}
 
 
@@ -271,9 +310,9 @@ async def create_schedule(request: Request):
     await asyncio.to_thread(ensure_schema)
     rows = await asyncio.to_thread(_exec, """
         INSERT INTO report_schedules (name, report_code, frequency, hour, minute, weekday, day_of_month, days, agent_id,
-            tenant_id, recipients, attach_csv, enabled, created_by)
+            tenant_id, recipients, attach_csv, enabled, created_by, send_to_client)
         VALUES (%(name)s, %(report_code)s, %(frequency)s, %(hour)s, %(minute)s, %(weekday)s, %(day_of_month)s, %(days)s,
-            %(agent_id)s, %(tenant_id)s, %(recipients)s, %(attach_csv)s, %(enabled)s, %(created_by)s) RETURNING *""",
+            %(agent_id)s, %(tenant_id)s, %(recipients)s, %(attach_csv)s, %(enabled)s, %(created_by)s, %(send_to_client)s) RETURNING *""",
         {**v, "created_by": _user(request)})
     return {"status": "success", "schedule": _serialize(rows[0])}
 
@@ -282,10 +321,12 @@ async def create_schedule(request: Request):
 async def update_schedule(schedule_id: int, request: Request):
     body = await request.json()
     v = _validate(body or {})
+    await asyncio.to_thread(ensure_schema)
     rows = await asyncio.to_thread(_exec, """
         UPDATE report_schedules SET name=%(name)s, report_code=%(report_code)s, frequency=%(frequency)s, hour=%(hour)s,
             minute=%(minute)s, weekday=%(weekday)s, day_of_month=%(day_of_month)s, days=%(days)s, agent_id=%(agent_id)s,
-            tenant_id=%(tenant_id)s, recipients=%(recipients)s, attach_csv=%(attach_csv)s, enabled=%(enabled)s
+            tenant_id=%(tenant_id)s, recipients=%(recipients)s, attach_csv=%(attach_csv)s, enabled=%(enabled)s,
+            send_to_client=%(send_to_client)s
         WHERE id=%(id)s RETURNING *""", {**v, "id": schedule_id})
     if not rows:
         raise HTTPException(404, "Agendamento não encontrado.")

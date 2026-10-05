@@ -748,6 +748,21 @@ class ReportContext:
         return self._get("verifications", lambda: self._flt(self.source.verifications(self.start, self.end, agent_ids=self.agent_ids)))
 
     @property
+    def restore_tests(self):
+        def load():
+            fn = getattr(self.source, "restore_tests", None)
+            return self._flt(fn(self.start, self.end, agent_ids=self.agent_ids)) if fn else []
+        return self._get("restore_tests", load)
+
+    @property
+    def immutability(self):
+        """Política/estado de backup imutável por repositório (sincronizado pelos agentes)."""
+        def load():
+            fn = getattr(self.source, "immutability", None)
+            return self._flt(fn(agent_ids=self.agent_ids)) if fn else []
+        return self._get("immutability", load)
+
+    @property
     def job_failures(self):
         return self._get("job_failures", lambda: self._flt(self.source.job_failures(self.start, self.end, agent_ids=self.agent_ids)))
 
@@ -1526,29 +1541,56 @@ def rep_fleet_inventory(ctx: ReportContext) -> Dict[str, Any]:
     return {"kpis": kpis, "charts": charts, "tables": tables, "findings": findings, "recommendations": recs}
 
 
+RT_LABEL = {"passed": "Aprovado", "partial": "Parcial", "failed": "Reprovado", "error": "Não executado", "running": "Em execução"}
+
+
+def _rt_ok(t: Dict[str, Any]) -> bool:
+    return str(t.get("status") or "").lower() == "passed"
+
+
 def rep_restores_tests(ctx: ReportContext) -> Dict[str, Any]:
     rs = ctx.restores
-    vs = ctx.verifications
+    vs = [v for v in ctx.verifications if v.get("kind") != "restore_test"]   # testes automatizados têm tabela própria
+    rts = ctx.restore_tests
     ok = [r for r in rs if norm_status(r.get("status")) == "success"]
     durs = [to_float(r.get("duration_seconds")) for r in ok if to_float(r.get("duration_seconds")) is not None]
     vok = [v for v in vs if norm_status(v.get("status")) == "success" or str(v.get("status") or "").lower() in ("passed", "healthy", "valid")]
     vfail = [v for v in vs if v not in vok]
+    rt_ok = [t for t in rts if _rt_ok(t)]
+    rt_bad = [t for t in rts if not _rt_ok(t) and str(t.get("status") or "").lower() != "running"]
+    rt_durs = [to_float(t.get("duration_seconds")) for t in rt_ok if to_float(t.get("duration_seconds")) is not None]
     kpis = [
         _kpi("Restaurações", fmt_int(len(rs)), f"{fmt_int(len(ok))} com sucesso"),
         _kpi("Sucesso nas restaurações", fmt_pct(_rate(len(ok), len(rs))), "", _tone_rate(_rate(len(ok), len(rs)), 95.0) if rs else "neutral"),
         _kpi("Volume restaurado", fmt_bytes(sum(to_float(r.get("bytes_restored")) or 0 for r in ok))),
         _kpi("Tempo médio de restauração", fmt_duration(statistics.mean(durs)) if durs else "—", "RTO observado"),
+        _kpi("Testes de restauração", f"{fmt_int(len(rt_ok))}/{fmt_int(len(rts))}", "aprovados (automatizados)",
+             "bad" if rt_bad else ("ok" if rts else "neutral")),
         _kpi("Verificações", fmt_int(len(vs)), f"{fmt_int(len(vfail))} com problema", "bad" if vfail else ("ok" if vs else "neutral")),
     ]
-    charts = [_chart("Restaurações por dia", svg_bars(ctx.day_labels, [
-        {"name": "Sucesso", "values": _daily_counts(ctx, ok, "created_at"), "tone": "ok"},
-        {"name": "Falha", "values": _daily_counts(ctx, [r for r in rs if r not in ok], "created_at"), "tone": "bad"}]), {})]
+    if rt_durs:
+        kpis.insert(4, _kpi("Duração média do teste", fmt_duration(statistics.mean(rt_durs)), "amostra restaurada e conferida"))
+    charts = [_chart("Restaurações e testes por dia", svg_bars(ctx.day_labels, [
+        {"name": "Restauração OK", "values": _daily_counts(ctx, ok, "created_at"), "tone": "ok"},
+        {"name": "Teste aprovado", "values": _daily_counts(ctx, rt_ok, "started_at"), "color": SERIES[0]},
+        {"name": "Falha", "values": [a + b for a, b in zip(_daily_counts(ctx, [r for r in rs if r not in ok], "created_at"),
+                                                           _daily_counts(ctx, rt_bad, "started_at"))], "tone": "bad"}]), {})]
     rows_r = [[fmt_dt(r.get("created_at")), ctx.host(r.get("agent_id")), r.get("repository_name") or "—", r.get("snapshot_id") or "—",
                r.get("target_path") or "—", cell(STATUS_LABEL.get(norm_status(r.get("status")), r.get("status")),
                                                   "ok" if r in ok else "bad"),
                f"{fmt_int(r.get('files_restored'))}/{fmt_int(r.get('total_files'))}", fmt_bytes(r.get("bytes_restored")),
                fmt_duration(r.get("duration_seconds")), (r.get("error_message") or "")[:160]]
               for r in sorted(rs, key=lambda r: to_dt(r.get("created_at")) or datetime.min, reverse=True)]
+    rows_t = [[fmt_dt(t.get("started_at")), ctx.host(t.get("agent_id")), t.get("repository_name") or "—",
+               f"{t.get('snapshot_id') or '—'}" + (f" ({fmt_dt(t.get('snapshot_time'))})" if t.get("snapshot_time") else ""),
+               cell(RT_LABEL.get(str(t.get("status") or "").lower(), t.get("status") or "—"),
+                    "ok" if _rt_ok(t) else "warn" if str(t.get("status")).lower() == "partial" else "bad"),
+               f"{fmt_int(t.get('files_ok'))}/{fmt_int(t.get('files_tested'))}", fmt_int(t.get("files_hash_verified")),
+               fmt_bytes(t.get("bytes_restored")), fmt_duration(t.get("duration_seconds")),
+               ("Agendado" if str(t.get("triggered_by") or "").startswith("server:schedule") else "Manual"),
+               (str(t.get("evidence_hash") or "")[:16] + "…") if t.get("evidence_hash") else "—",
+               (t.get("error_message") or "")[:160]]
+              for t in sorted(rts, key=lambda t: to_dt(t.get("started_at")) or datetime.min, reverse=True)]
     rows_v = [[fmt_dt(v.get("finished_at") or v.get("started_at")), ctx.host(v.get("agent_id")),
                {"integrity": "Integridade do repositório", "surebackup": "SureBackup (boot/aplicação)"}.get(v.get("kind"), v.get("kind")),
                v.get("subject") or "—", cell(v.get("status") or "—", "ok" if v in vok else "bad"),
@@ -1557,16 +1599,32 @@ def rep_restores_tests(ctx: ReportContext) -> Dict[str, Any]:
     verified = {(v.get("agent_id"), v.get("subject")) for v in vs if v.get("kind") == "integrity"}
     never = [rp for rp in ctx.repos if (rp.get("agent_id"), rp.get("name")) not in verified]
     rows_n = [[ctx.host(rp.get("agent_id")), rp.get("name"), rp.get("engine") or "—", fmt_bytes(rp.get("size_bytes"))] for rp in never]
+    rt_tested = {(t.get("agent_id"), t.get("repository_name")) for t in rt_ok}
+    rt_tested |= {(r.get("agent_id"), r.get("repository_name")) for r in ok}
+    untested = [rp for rp in ctx.repos if (rp.get("agent_id"), rp.get("name")) not in rt_tested]
+    rows_u = [[ctx.host(rp.get("agent_id")), rp.get("name"), rp.get("engine") or "—", fmt_bytes(rp.get("size_bytes"))] for rp in untested]
     tables = [
+        _table("Testes de restauração automatizados (evidência)",
+               ["Data", "Agente", "Repositório", "Snapshot", "Resultado", "Arquivos conferidos", "Por hash", "Volume", "Duração",
+                "Origem", "Evidência (SHA-256)", "Observação"], rows_t,
+               note="Cada teste restaura de verdade uma amostra do snapshot mais recente e confere tamanho e SHA-256 de cada arquivo.",
+               empty="Nenhum teste de restauração automatizado no período."),
         _table("Restaurações realizadas", ["Data", "Agente", "Repositório", "Snapshot", "Destino", "Status", "Arquivos", "Volume", "Duração", "Erro"], rows_r),
-        _table("Verificações de integridade e testes de recuperação", ["Data", "Agente", "Tipo", "Objeto", "Resultado", "Erros", "Resumo"], rows_v),
+        _table("Verificações de integridade e SureBackup", ["Data", "Agente", "Tipo", "Objeto", "Resultado", "Erros", "Resumo"], rows_v),
+        _table("Repositórios sem restauração comprovada no período", ["Agente", "Repositório", "Motor", "Tamanho"], rows_u,
+               empty="Todos os repositórios tiveram restauração ou teste aprovado no período."),
         _table("Repositórios sem verificação de integridade no período", ["Agente", "Repositório", "Motor", "Tamanho"], rows_n,
                empty="Todos os repositórios foram verificados no período."),
     ]
     findings, recs = [], []
-    if not rs and not vs:
+    if not rs and not vs and not rts:
         findings.append({"tone": "warn", "text": "Nenhuma restauração ou teste de recuperação registrado no período: a recuperação não foi comprovada."})
-        recs.append("Agendar testes periódicos de restauração (ex.: mensal) para comprovar o RTO e a integridade dos backups.")
+    if rt_bad:
+        findings.append({"tone": "bad", "text": f"{len(rt_bad)} teste(s) de restauração com problema (reprovado, parcial ou não executado): a recuperação desses repositórios não foi comprovada."})
+        recs.append("Investigar os testes reprovados (detalhe no agente) e verificar a integridade do repositório afetado.")
+    if untested:
+        findings.append({"tone": "warn", "text": f"{len(untested)} repositório(s) sem restauração comprovada no período."})
+        recs.append("Agendar testes de restauração automáticos (Gerenciamento Remoto → Testes de restauração), ao menos mensais.")
     if never:
         findings.append({"tone": "warn", "text": f"{len(never)} repositório(s) sem verificação de integridade no período."})
         recs.append("Agendar a verificação de integridade dos repositórios ao menos uma vez por mês.")
@@ -1583,7 +1641,12 @@ def rep_dr_readiness(ctx: ReportContext) -> Dict[str, Any]:
     offsite_agents = {r.get("agent_id") for r in ctx.repos if (r.get("type") or "local").lower() not in ("local", "")}
     offsite_agents |= {p.get("agent_id") for p in ctx.replication if p.get("enabled") is not False}
     tested = {r.get("agent_id") for r in ctx.restores if norm_status(r.get("status")) == "success"}
-    tested |= {v.get("agent_id") for v in ctx.verifications}
+    tested |= {t.get("agent_id") for t in ctx.restore_tests if _rt_ok(t)}
+    tested |= {v.get("agent_id") for v in ctx.verifications if v.get("kind") != "restore_test" and
+               (norm_status(v.get("status")) == "success" or str(v.get("status") or "").lower() in ("passed", "healthy", "valid"))}
+    last_test: Dict[Any, Dict[str, Any]] = {}
+    for t in sorted(ctx.restore_tests, key=lambda t: to_dt(t.get("started_at")) or datetime.min):
+        last_test[t.get("agent_id")] = t
     pending = {f.get("agent_id") for f in ctx.job_failures if not f.get("resolved_at")}
     recent_ok = defaultdict(lambda: None)
     for r in ctx.runs:
@@ -1606,7 +1669,10 @@ def rep_dr_readiness(ctx: ReportContext) -> Dict[str, Any]:
         score = sum(checks) / len(checks) * 100
         scores.append((ctx.host(aid), round(score)))
         tone = "ok" if score >= 83 else "warn" if score >= 50 else "bad"
-        rows.append([ctx.host(aid)] + [cell("✔" if c else "✘", "ok" if c else "bad") for c in checks] + [cell(f"{score:.0f}/100", tone)])
+        lt = last_test.get(aid)
+        lt_cell = cell(f"{RT_LABEL.get(str(lt.get('status') or '').lower(), lt.get('status'))} em {fmt_date(lt.get('started_at'))}",
+                       "ok" if _rt_ok(lt) else "bad") if lt else cell("Nunca", "warn")
+        rows.append([ctx.host(aid)] + [cell("✔" if c else "✘", "ok" if c else "bad") for c in checks] + [lt_cell, cell(f"{score:.0f}/100", tone)])
     avg = statistics.mean([s for _, s in scores]) if scores else None
     ready = sum(1 for _, s in scores if s >= 83)
     kpis = [
@@ -1619,7 +1685,9 @@ def rep_dr_readiness(ctx: ReportContext) -> Dict[str, Any]:
     order = sorted(scores, key=lambda x: x[1])
     charts = [_chart("Pontuação de prontidão por agente", svg_hbar([n for n, _ in order], [s for _, s in order],
                      tones=["ok" if s >= 83 else "warn" if s >= 50 else "bad" for _, s in order], max_items=25))]
-    tables = [_table("Critérios de prontidão para recuperação de desastres", ["Agente"] + crit + ["Pontuação"], rows)]
+    tables = [_table("Critérios de prontidão para recuperação de desastres", ["Agente"] + crit + ["Último teste de restauração", "Pontuação"], rows,
+                     note="Recuperação testada = restauração bem-sucedida, teste de restauração aprovado ou verificação sem erros no período.")]
+    bad_tests = [t for t in ctx.restore_tests if str(t.get("status") or "").lower() in ("failed", "partial", "error")]
     findings, recs = [], []
     for i, label in enumerate(crit):
         miss = [r[0] for r in rows if r[1 + i]["v"] == "✘"]
@@ -1627,8 +1695,10 @@ def rep_dr_readiness(ctx: ReportContext) -> Dict[str, Any]:
             findings.append({"tone": "bad" if i in (0, 1, 5) else "warn", "text": f"{label}: não atendido em {len(miss)} agente(s)."})
     if any(a["agent_id"] not in offsite_agents for a in ctx.agents):
         recs.append("Configurar uma cópia fora do host (repositório em nuvem ou política de replicação) para cumprir a regra 3-2-1.")
+    if bad_tests:
+        findings.append({"tone": "bad", "text": f"{len(bad_tests)} teste(s) de restauração com problema (reprovado, parcial ou não executado) no período."})
     if any(a["agent_id"] not in tested for a in ctx.agents):
-        recs.append("Realizar e registrar testes de restauração/verificação para comprovar a recuperabilidade.")
+        recs.append("Agendar testes de restauração automáticos (Gerenciamento Remoto → Testes de restauração) para comprovar a recuperabilidade.")
     return {"kpis": kpis, "charts": charts, "tables": tables, "findings": findings, "recommendations": recs}
 
 
@@ -1660,6 +1730,34 @@ def rep_security(ctx: ReportContext) -> Dict[str, Any]:
     findings = [{"tone": "bad", "text": f"{len(open_inc)} incidente(s) de segurança ainda em aberto."}] if open_inc else \
                [{"tone": "ok", "text": "Nenhum incidente de segurança em aberto."}]
     recs = ["Isolar o host afetado, validar os snapshots anteriores ao evento e restaurar de um ponto limpo."] if open_inc else []
+
+    # Backup imutável (defesa contra ransomware e exclusão)
+    imm = ctx.immutability
+    if imm:
+        mode_lbl = {"object_lock": "S3 Object Lock", "local_worm": "Proteção local", "off": "Desativada"}
+        protected = [r for r in imm if r.get("mode") not in (None, "off") and (r.get("last_check") or {}).get("protected")]
+        cloud_open = [r for r in imm if r.get("type") in ("s3", "wasabi") and r.get("mode") != "object_lock"]
+        rows_m = []
+        for r in sorted(imm, key=lambda r: (r.get("mode") != "off", ctx.host(r.get("agent_id")).lower())):
+            lc = r.get("last_check") or {}
+            st = ("Comprovada" if lc.get("protected") else "Não comprovada") if r.get("mode") not in (None, "off") else "Sem proteção"
+            rows_m.append([ctx.host(r.get("agent_id")), r.get("name") or "—", f"{r.get('type') or '—'}/{r.get('engine') or '—'}",
+                           cell(mode_lbl.get(r.get("mode"), r.get("mode") or "—"), "ok" if r.get("mode") == "object_lock" else
+                                "warn" if r.get("mode") == "local_worm" else "bad"),
+                           f"{r.get('days')} dias ({r.get('lock_mode') or '—'})" if r.get("mode") not in (None, "off") else "—",
+                           cell(st, "ok" if lc.get("protected") else "bad" if r.get("mode") not in (None, "off") else "neutral"),
+                           fmt_dt(lc.get("at")) if lc.get("at") else "—", (lc.get("summary") or "")[:200]])
+        kpis.append(_kpi("Repositórios imutáveis", f"{fmt_int(len(protected))}/{fmt_int(len(imm))}", "proteção comprovada",
+                         "ok" if imm and len(protected) == len(imm) else "warn" if protected else "bad"))
+        tables.append(_table("Backup imutável por repositório", ["Agente", "Repositório", "Tipo/motor", "Imutabilidade", "Retenção",
+                                                                    "Situação", "Última verificação", "Detalhe"], rows_m,
+                             note="S3 Object Lock bloqueia a exclusão até o fim da retenção, inclusive pelo próprio GBOC; a proteção local "
+                                  "(somente leitura + ACL) evita exclusões acidentais, mas pode ser removida por um administrador do servidor."))
+        if cloud_open:
+            findings.append({"tone": "warn", "text": f"{len(cloud_open)} repositório(s) em nuvem sem Object Lock: os backups podem ser apagados por quem tiver a credencial."})
+            recs.append("Ativar S3 Object Lock (retenção COMPLIANCE) nos buckets de backup — Políticas centrais ou Gerenciamento Remoto > Operação.")
+        if not protected:
+            findings.append({"tone": "bad", "text": "Nenhum repositório com imutabilidade comprovada: um ataque pode apagar backups e produção juntos."})
     return {"kpis": kpis, "charts": charts, "tables": tables, "findings": findings, "recommendations": recs}
 
 
@@ -2147,7 +2245,7 @@ def build_report(source: Any, ref: Any, days: int = 30, agent_ids: Optional[List
         scope = ", ".join(ctx.host(a) for a in ctx.agent_ids[:6]) + ("…" if len(ctx.agent_ids) > 6 else "")
     if tenant_id:
         tn = next((t.get("name") for t in ctx.tenants if t.get("tenant_id") == tenant_id), tenant_id)
-        scope = f"Cliente {tn}" + ("" if scope == "Todos os agentes" else f" · {scope}")
+        scope = (tn if str(tn).lower().startswith("cliente") else f"Cliente {tn}") + ("" if scope == "Todos os agentes" else f" · {scope}")
     if ctx.info.get("product") == "agent":
         scope = f"Agente {ctx.info.get('hostname') or ''}".strip()
     notes = _coverage_notes(ctx) + list(body.get("notes") or [])
@@ -2155,7 +2253,7 @@ def build_report(source: Any, ref: Any, days: int = 30, agent_ids: Optional[List
         "id": spec["id"], "code": spec["code"], "title": spec["name"], "category": spec["category"],
         "description": spec["description"], "audience": spec.get("audience"),
         "period": {"start": ctx.start.isoformat(), "end": ctx.end.isoformat(), "days": ctx.days},
-        "scope": scope, "product": ctx.info.get("product"), "organization": ctx.info.get("organization") or "",
+        "scope": scope, "tenant_id": tenant_id, "product": ctx.info.get("product"), "organization": ctx.info.get("organization") or "",
         "generated_at": datetime.now().isoformat(timespec="seconds"), "engine_version": REPORT_ENGINE_VERSION,
         "platform": ctx.info.get("platform") or "GBOC",
         "kpis": body.get("kpis", []), "charts": body.get("charts", []), "tables": body.get("tables", []),
@@ -2232,9 +2330,28 @@ def _cell_html(c: Any) -> str:
     return esc(c)
 
 
-def render_html(rep: Dict[str, Any], embedded: bool = False) -> str:
+_HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
+_LOGO_RE = re.compile(r"^data:image/(png|jpeg|gif|webp|svg\+xml);base64,[A-Za-z0-9+/=\s]+$")
+
+
+def clean_branding(b: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Valida a marca usada no cabeçalho/rodapé (cor #RRGGBB, logo em data URI de imagem)."""
+    if not b:
+        return None
+    out = {"display_name": str(b.get("display_name") or "").strip()[:120],
+           "primary_color": b.get("primary_color") if _HEX_RE.match(str(b.get("primary_color") or "")) else None,
+           "logo_data": b.get("logo_data") if _LOGO_RE.match(str(b.get("logo_data") or "")) else None,
+           "footer_text": str(b.get("footer_text") or "").strip()[:400],
+           "contact": str(b.get("contact") or "").strip()[:200],
+           "provider_name": str(b.get("provider_name") or "").strip()[:120]}
+    return out if (out["display_name"] or out["logo_data"] or out["primary_color"]) else None
+
+
+def render_html(rep: Dict[str, Any], embedded: bool = False, branding: Optional[Dict[str, Any]] = None) -> str:
+    brand = clean_branding(branding)
+    brand_color = (brand or {}).get("primary_color") or "#2a78d6"
     kpis = "".join(
-        f'<div class="kpi" style="border-top-color:{_TONE_CSS.get(k.get("tone"), "#2a78d6") if k.get("tone") not in (None, "neutral") else "#2a78d6"}">'
+        f'<div class="kpi" style="border-top-color:{_TONE_CSS.get(k.get("tone"), brand_color) if k.get("tone") not in (None, "neutral") else brand_color}">'
         f'<div class="kl">{esc(k["label"])}</div><div class="kv">{esc(k["value"])}</div>'
         f'<div class="ks">{(_TONE_ICON.get(k.get("tone"), "") + " ") if (k.get("tone") not in (None, "neutral") and k.get("sub")) else ""}{esc(k.get("sub", ""))}</div></div>'
         for k in rep.get("kpis", []))
@@ -2260,12 +2377,27 @@ def render_html(rep: Dict[str, Any], embedded: bool = False) -> str:
     org = esc(rep.get("organization") or "")
     toolbar = "" if embedded else (
         '<div class="toolbar no-print"><button onclick="window.print()">Imprimir / Salvar PDF</button></div>')
+    if brand:
+        logo = f'<img src="{esc(brand["logo_data"])}" alt="" style="max-height:48px;max-width:220px;display:block;margin-bottom:4px">' if brand.get("logo_data") else ""
+        prov = brand.get("provider_name")
+        sub = esc(brand["display_name"]) if (brand.get("display_name") and logo) else ""
+        if prov and prov.lower() != (brand.get("display_name") or "").lower():
+            sub = (sub + " · " if sub else "") + "Relatório preparado por " + esc(prov)
+        brand_html = (f'<div class="brand">{logo}{"" if logo else esc(brand.get("display_name") or "GBOC")}'
+                      f'<small>{sub or esc(rep.get("platform") or "")}</small></div>')
+        foot_left = esc(brand.get("footer_text")) or "Relatório gerado a partir de dados reais sincronizados pelos agentes GBOC — nenhum valor estimado sem indicação."
+        if brand.get("contact"):
+            foot_left += " · " + esc(brand["contact"])
+    else:
+        brand_html = (f'<div class="brand">GBOC<small>{esc(rep.get("platform") or "")}'
+                      f'{(" · " + org) if (org and org.lower() not in (rep.get("platform") or "").lower()) else ""}</small></div>')
+        foot_left = "Relatório gerado a partir de dados reais sincronizados pelos agentes GBOC — nenhum valor estimado sem indicação."
     return f"""<!DOCTYPE html>
 <html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{esc(rep['code'])} — {esc(rep['title'])}</title>
 <style>
 @page {{ size: A4; margin: 14mm 12mm 16mm; @bottom-right {{ content: "Página " counter(page) " de " counter(pages); font-size: 9px; color: #777; }} }}
-:root {{ --ink:{INK}; --ink2:{INK2}; --line:#e2e1dc; --brand:#2a78d6; }}
+:root {{ --ink:{INK}; --ink2:{INK2}; --line:#e2e1dc; --brand:{brand_color}; }}
 * {{ box-sizing: border-box; }}
 body {{ margin:0; background:#f4f4f1; color:var(--ink); font:13px/1.45 "Segoe UI", Inter, Roboto, Arial, sans-serif; }}
 .page {{ max-width: 1080px; margin: 0 auto; background:#fff; padding: 28px 34px 40px; }}
@@ -2307,7 +2439,7 @@ footer {{ margin-top:26px; border-top:1px solid var(--line); padding-top:10px; f
 @media print {{ table {{ font-size:9.5px; }} th, td {{ padding:3px 4px; }} th {{ white-space:normal; }} body {{ background:#fff; }} .page {{ padding:0; max-width:none; }} .no-print {{ display:none; }} h2 {{ break-after:avoid; }} }}
 </style></head>
 <body>{toolbar}<div class="page">
-<header><div><div class="brand">GBOC<small>{esc(rep.get('platform') or '')}{(' · ' + org) if (org and org.lower() not in (rep.get('platform') or '').lower()) else ''}</small></div>
+<header><div>{brand_html}
 <h1>{esc(rep['title'])}</h1><div style="color:var(--ink2);font-size:12px">{esc(rep['code'])} · {esc(rep['category'])}{(' · Público: ' + esc(rep['audience'])) if rep.get('audience') else ''}</div></div>
 <div class="meta"><div><b>Período:</b> {esc(period)}</div><div><b>Escopo:</b> {esc(rep['scope'])}</div><div><b>Emitido em:</b> {esc(fmt_dt(rep['generated_at']))}</div></div></header>
 <p class="desc">{esc(rep['description'])}</p>
@@ -2317,6 +2449,6 @@ footer {{ margin-top:26px; border-top:1px solid var(--line); padding-top:10px; f
 {('<h2>Gráficos</h2><div class="charts">' + charts + '</div>') if charts else ''}
 {('<h2>Detalhamento</h2>' + ''.join(tables)) if tables else ''}
 {('<h2>Observações sobre os dados</h2><ul class="notes">' + notes + '</ul>') if notes else ''}
-<footer><span>Relatório gerado a partir de dados reais sincronizados pelos agentes GBOC — nenhum valor estimado sem indicação.</span>
+<footer><span>{foot_left}</span>
 <span>Integridade: {esc(rep.get('integrity'))} · Motor de relatórios {esc(rep.get('engine_version'))}</span></footer>
 </div></body></html>"""
