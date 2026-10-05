@@ -1,6 +1,6 @@
 <!--
 ==============================================================================
-GBOC System v14.6.0 Enterprise Edition
+GBOC System v14.8.1 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
@@ -39,23 +39,23 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     
     
     <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
-    <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.6.0">
-    <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=14.6.0">
-    <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=14.6.0">
-    <link rel="stylesheet" href="/static/ui/models/modern/components.css?v=14.6.0">
-    <link rel="stylesheet" href="/static/ui/models/modern/layout.css?v=14.6.0">
-    <link rel="stylesheet" href="/static/style.css?v=14.6.0">
-    <link rel="stylesheet" href="/static/gboc-themes.css?v=14.6.0">
-    <link rel="stylesheet" href="/static/gboc-layout.css?v=14.6.0">
-    <script src="/static/gboc-perf.js?v=14.6.0"></script>
-    <script src="/static/gboc-layout-manager.js?v=14.6.0"></script>
-    <script src="/static/gboc-modal.js?v=14.6.0"></script>
-<link rel="stylesheet" href="/static/gboc-hardware-hud.css?v=14.6.0">
+    <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.8.1">
+    <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=14.8.1">
+    <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=14.8.1">
+    <link rel="stylesheet" href="/static/ui/models/modern/components.css?v=14.8.1">
+    <link rel="stylesheet" href="/static/ui/models/modern/layout.css?v=14.8.1">
+    <link rel="stylesheet" href="/static/style.css?v=14.8.1">
+    <link rel="stylesheet" href="/static/gboc-themes.css?v=14.8.1">
+    <link rel="stylesheet" href="/static/gboc-layout.css?v=14.8.1">
+    <script src="/static/gboc-perf.js?v=14.8.1"></script>
+    <script src="/static/gboc-layout-manager.js?v=14.8.1"></script>
+    <script src="/static/gboc-modal.js?v=14.8.1"></script>
+<link rel="stylesheet" href="/static/gboc-hardware-hud.css?v=14.8.1">
     <script src="/static/vendor/chart.umd.min.js"></script>
     <script src="/modules/storage/storage.js?v=14.6.0"></script>
-    <script src="/modules/job_alert/job_alert.js?v=14.6.0"></script>
-    <script src="/static/ai_assistant.js?v=14.6.0"></script>
-    <script src="/static/gboc-hardware-hud.js?v=14.6.0"></script>
+    <script src="/modules/job_alert/job_alert.js?v=14.8.1"></script>
+    <script src="/static/ai_assistant.js?v=14.8.1"></script>
+    <script src="/static/gboc-hardware-hud.js?v=14.8.1"></script>
     <style>
         *{box-sizing:border-box;margin:0;padding:0}
         body{font-family:'Segoe UI',Inter,system-ui,sans-serif;background:var(--bg-main);color:var(--text-primary);min-height:100vh;display:flex;transition:background .3s,color .3s}
@@ -322,7 +322,7 @@ function gbocToggleSidebarCollapse(){
 
     <main class="main-content">
         <div class="header">
-            <h1 class="page-title"><i class="fas fa-chart-line"></i> GBOC Analytics <span style="font-size:0.5em;opacity:0.7" id="versionBadge">v14.6.0</span></h1>
+            <h1 class="page-title"><i class="fas fa-chart-line"></i> GBOC Analytics <span style="font-size:0.5em;opacity:0.7" id="versionBadge">v14.8.1</span></h1>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                 <button class="btn btn-warning" onclick="openAIDiagnosticModal()"><i class="fas fa-brain"></i> IA Diagnóstico</button>
                 <button class="btn btn-success" onclick="pushSync()"><i class="fas fa-upload"></i> Push Sync</button>
@@ -428,7 +428,7 @@ function gbocToggleSidebarCollapse(){
                     <button class="btn btn-warning" onclick="loadRMMProcesses()"><i class="fas fa-tasks"></i> Processos</button>
                     <button class="btn btn-danger" onclick="toggleRMMIsolation()"><i class="fas fa-network-wired"></i> Isolamento de Rede</button>
                 </div>
-                <div style="background:#0d1117;color:#00ff66;font-family:monospace;padding:16px;border-radius:8px;min-height:220px;max-height:400px;overflow-y:auto;white-space:pre-wrap" id="rmm-terminal-output">> GBOC RMM Remote Terminal v14.6.0 Ready. Digite um comando para executar no agente nativo.</div>
+                <div style="background:#0d1117;color:#00ff66;font-family:monospace;padding:16px;border-radius:8px;min-height:220px;max-height:400px;overflow-y:auto;white-space:pre-wrap" id="rmm-terminal-output">> GBOC RMM Remote Terminal v14.8.1 Ready. Digite um comando para executar no agente nativo.</div>
             </div>
             <div class="panel" style="margin-top:16px">
                 <h3><i class="fas fa-microchip" style="color:var(--success)"></i> Processos em Tempo Real (Top RAM/CPU)</h3>
@@ -803,9 +803,12 @@ function gbocToggleSidebarCollapse(){
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
                 <h2 style="font-size:1.3em;margin:0"><i class="fas fa-file-alt" style="color:var(--primary);margin-right:8px"></i> Logs dos Agentes &amp; Servidor</h2>
                 <div style="display:flex;gap:8px">
+                    <button class="btn btn-secondary" onclick="toggleLogRetention()"><i class="fas fa-broom"></i> Retenção e limpeza</button>
                     <button class="btn btn-secondary" onclick="loadLogs()"><i class="fas fa-sync-alt"></i> Atualizar</button>
                 </div>
             </div>
+
+            <section class="panel" id="log-retention-panel" style="display:none;margin-bottom:14px"></section>
 
             <section class="panel log-toast-panel">
                 <nav class="filters" aria-label="Filtro de notificações de logs">
@@ -821,8 +824,27 @@ function gbocToggleSidebarCollapse(){
                         <i class="fas fa-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:12px;"></i>
                         <input type="text" id="log-search" placeholder="Buscar nos logs..." oninput="handleServerLogSearch()" onkeyup="if(event.key==='Enter')loadLogs()" style="width:100%;background:var(--bg-input);color:var(--text);border:1px solid var(--border);padding:9px 14px 9px 34px;border-radius:8px;font-size:.9em;outline:none;">
                     </div>
+                    <select id="log-period" onchange="onLogPeriodChange()" title="Período" style="background:var(--bg-input);color:var(--text);border:1px solid var(--border);padding:9px 14px;border-radius:8px;font-size:.9em;outline:none;cursor:pointer;">
+                        <option value="24">Últimas 24 horas</option>
+                        <option value="168">Últimos 7 dias</option>
+                        <option value="720">Últimos 30 dias</option>
+                        <option value="2160">Últimos 90 dias</option>
+                        <option value="4320">Últimos 180 dias</option>
+                        <option value="8760">Últimos 12 meses</option>
+                        <option value="0" selected>Todo o período</option>
+                        <option value="custom">Personalizado…</option>
+                    </select>
+                    <span id="log-custom-range" style="display:none;gap:6px;align-items:center">
+                        <input type="date" id="log-start" onchange="loadLogs()" style="background:var(--bg-input);color:var(--text);border:1px solid var(--border);padding:7px 10px;border-radius:8px">
+                        <span style="color:var(--text-muted)">até</span>
+                        <input type="date" id="log-end" onchange="loadLogs()" style="background:var(--bg-input);color:var(--text);border:1px solid var(--border);padding:7px 10px;border-radius:8px">
+                    </span>
                     <select id="log-agent" onchange="loadLogs()" style="background:var(--bg-input);color:var(--text);border:1px solid var(--border);padding:9px 14px;border-radius:8px;font-size:.9em;outline:none;cursor:pointer;">
-                        <option value="">Todos os Agentes</option>
+                        <option value="">Todos (agentes e servidor)</option>
+                        <option value="__server__">Servidor central</option>
+                    </select>
+                    <select id="log-tenant" onchange="loadLogs()" style="display:none;background:var(--bg-input);color:var(--text);border:1px solid var(--border);padding:9px 14px;border-radius:8px;font-size:.9em;outline:none;cursor:pointer;">
+                        <option value="">Todos os clientes</option>
                     </select>
                 </div>
 
@@ -835,6 +857,7 @@ function gbocToggleSidebarCollapse(){
 
                 <section class="list" id="server-toast-list" aria-live="polite" style="max-height:650px;overflow-y:auto;padding-right:4px"></section>
                 <div class="empty" id="server-toast-empty">Nenhum log encontrado para o filtro selecionado.</div>
+                <div style="text-align:center;margin-top:10px"><button class="btn btn-secondary" id="log-more" style="display:none" onclick="loadLogs(true)"><i class="fas fa-angle-double-down"></i> Carregar mais</button></div>
             </section>
         </div>
 
@@ -1147,6 +1170,11 @@ function gbocToggleSidebarCollapse(){
                         <option value="warning">Aviso</option>
                         <option value="info">Info</option>
                     </select>
+                    <select id="srv-alert-days" onchange="loadServerAlerts()" title="Período" style="background:var(--bg-input);color:var(--text);border:1px solid var(--border);padding:8px 12px;border-radius:6px;font-size:.9em">
+                        <option value="1">Últimas 24 horas</option><option value="7">Últimos 7 dias</option>
+                        <option value="30" selected>Últimos 30 dias</option><option value="90">Últimos 90 dias</option>
+                        <option value="365">Últimos 12 meses</option><option value="0">Todo o período</option>
+                    </select>
                     <button class="btn btn-primary" onclick="loadServerAlerts()"><i class="fas fa-sync-alt"></i> Atualizar</button>
                 </div>
             </div>
@@ -1168,10 +1196,10 @@ function gbocToggleSidebarCollapse(){
             </div>
             <div id="srv-alerts-grid" class="kpi-grid" style="grid-template-columns:repeat(auto-fill,minmax(340px,1fr));margin-bottom:20px"></div>
             <div class="panel">
-                <h3><i class="fas fa-list" style="color:var(--primary)"></i> Alertas Recentes (todos os agentes)</h3>
+                <h3><i class="fas fa-list" style="color:var(--primary)"></i> Alertas e falhas (agentes e servidor)</h3>
                 <table class="data-table">
-                    <thead><tr><th>Severidade</th><th>Agente</th><th>Título</th><th>Mensagem</th><th>Data</th></tr></thead>
-                    <tbody id="srv-alerts-table"><tr><td colspan="5" style="text-align:center;color:var(--text-muted)">Carregando...</td></tr></tbody>
+                    <thead><tr><th>Severidade</th><th>Origem</th><th>Agente</th><th>Título</th><th>Mensagem</th><th>Data</th></tr></thead>
+                    <tbody id="srv-alerts-table"><tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Carregando...</td></tr></tbody>
                 </table>
             </div>
         </div>
@@ -1487,50 +1515,66 @@ function gbocToggleSidebarCollapse(){
             </div>
         </div>
 
-        <!-- TAB: JOB ALERT -->
+        <!-- TAB: JOB ALERT (modules/job_alert/job_alert.js) -->
         <div id="tab-job-alert" class="tab-section">
             <div class="panel">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:12px">
-                    <h3><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i> Central de Jobs com Falha & Monitor de Alertas</h3>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:12px">
+                    <h3><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i> Central de Jobs com Falha — agentes e servidor</h3>
                     <div style="display:flex;gap:8px">
                         <button class="btn btn-warning" onclick="testServerAlertChannel()"><i class="fas fa-paper-plane"></i> Testar Alertas</button>
                         <button class="btn btn-primary" onclick="loadServerJobAlertData()"><i class="fas fa-sync-alt"></i> Atualizar</button>
                     </div>
                 </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+                    <select id="jf-days" onchange="loadServerJobAlertData()" style="background:var(--bg-input);color:var(--text);border:1px solid var(--border);padding:8px 12px;border-radius:6px;font-size:.88em">
+                        <option value="1">Últimas 24 horas</option><option value="7">Últimos 7 dias</option>
+                        <option value="30" selected>Últimos 30 dias</option><option value="90">Últimos 90 dias</option>
+                        <option value="180">Últimos 180 dias</option><option value="365">Últimos 12 meses</option><option value="0">Todo o período</option>
+                    </select>
+                    <select id="jf-agent" onchange="loadServerJobAlertData()" style="background:var(--bg-input);color:var(--text);border:1px solid var(--border);padding:8px 12px;border-radius:6px;font-size:.88em"><option value="">Todos (agentes e servidor)</option><option value="__server__">Servidor central</option></select>
+                    <select id="jf-tenant" onchange="loadServerJobAlertData()" style="background:var(--bg-input);color:var(--text);border:1px solid var(--border);padding:8px 12px;border-radius:6px;font-size:.88em;display:none"><option value="">Todos os clientes</option></select>
+                    <select id="jf-origin" onchange="loadServerJobAlertData()" style="background:var(--bg-input);color:var(--text);border:1px solid var(--border);padding:8px 12px;border-radius:6px;font-size:.88em"><option value="">Agentes e servidor</option><option value="agent">Somente agentes</option><option value="server">Somente servidor</option></select>
+                    <select id="jf-status" onchange="renderServerJobFailures()" style="background:var(--bg-input);color:var(--text);border:1px solid var(--border);padding:8px 12px;border-radius:6px;font-size:.88em"><option value="active">Somente ativas</option><option value="">Ativas, recuperadas e reconhecidas</option></select>
+                </div>
 
                 <div class="kpi-grid" style="margin-bottom:20px">
                     <div class="kpi-card">
-                        <div class="kpi-header"><span>Jobs com Falha</span><div class="kpi-icon red"><i class="fas fa-exclamation-circle"></i></div></div>
-                        <div class="kpi-value" id="srv-job-failed-count">0</div>
-                        <div class="kpi-sub">Falhas ativas</div>
+                        <div class="kpi-header"><span>Falhas ativas</span><div class="kpi-icon red"><i class="fas fa-exclamation-circle"></i></div></div>
+                        <div class="kpi-value" id="srv-job-failed-count">—</div>
+                        <div class="kpi-sub" id="srv-job-failed-split">agentes · servidor</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-header"><span>Agentes afetados</span><div class="kpi-icon blue"><i class="fas fa-server"></i></div></div>
+                        <div class="kpi-value" id="srv-job-agents">—</div>
+                        <div class="kpi-sub">com falha ativa</div>
                     </div>
                     <div class="kpi-card">
                         <div class="kpi-header"><span>Escalações</span><div class="kpi-icon orange"><i class="fas fa-bell"></i></div></div>
-                        <div class="kpi-value" id="srv-job-escalated-count">0</div>
-                        <div class="kpi-sub">Notificações enviadas</div>
+                        <div class="kpi-value" id="srv-job-escalated-count">—</div>
+                        <div class="kpi-sub">alertas enviados no período</div>
                     </div>
                     <div class="kpi-card">
-                        <div class="kpi-header"><span>Taxa de Resolução</span><div class="kpi-icon green"><i class="fas fa-check-double"></i></div></div>
-                        <div class="kpi-value" id="srv-job-resolved-rate">100%</div>
-                        <div class="kpi-sub">Recuperados</div>
+                        <div class="kpi-header"><span>Taxa de recuperação</span><div class="kpi-icon green"><i class="fas fa-check-double"></i></div></div>
+                        <div class="kpi-value" id="srv-job-resolved-rate">—</div>
+                        <div class="kpi-sub">backups e testes que voltaram a funcionar</div>
                     </div>
                 </div>
 
+                <div style="overflow-x:auto">
                 <table class="data-table">
                     <thead>
-                        <tr>
-                            <th>Status</th>
-                            <th>ID da Tarefa / Job</th>
-                            <th>Agente Origem</th>
-                            <th>Causa do Erro</th>
-                            <th>Retentativas</th>
-                            <th>Ações</th>
-                        </tr>
+                        <tr><th>Status</th><th>Tipo</th><th>Tarefa / item</th><th>Origem</th><th>Causa do erro</th><th>Falhas</th><th>Última falha</th><th>Ações</th></tr>
                     </thead>
                     <tbody id="table-server-job-failures">
-                        <tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Carregando falhas de jobs...</td></tr>
+                        <tr><td colspan="8" style="text-align:center;color:var(--text-muted)">Carregando falhas...</td></tr>
                     </tbody>
                 </table>
+                </div>
+                <details style="margin-top:16px" ontoggle="if(this.open) loadServerJobHistory()">
+                    <summary style="cursor:pointer;font-weight:600"><i class="fas fa-history"></i> Histórico de execuções com falha no período</summary>
+                    <div style="overflow-x:auto;margin-top:10px"><table class="data-table"><thead><tr><th>Data</th><th>Tipo</th><th>Agente</th><th>Tarefa</th><th>Erro</th></tr></thead>
+                    <tbody id="table-server-job-history"><tr><td colspan="5" style="text-align:center;color:var(--text-muted)">Carregando...</td></tr></tbody></table></div>
+                </details>
             </div>
         </div>
 
@@ -1825,6 +1869,15 @@ function gbocToggleSidebarCollapse(){
         const API = '/api/v1';
         let mainChart = null;
 
+        // Datas "sem fuso" gravadas no horário local da máquina (logs dos agentes/servidor, eventos): exibe como estão,
+        // sem converter de UTC (fmtDateTime trata valores sem fuso como UTC e os mostrava 3 h antes).
+        function fmtLocalNaive(value){
+            if(!value) return '—';
+            const s=String(value);
+            if(/[zZ]|[+-]\d{2}:?\d{2}$/.test(s)) return fmtDateTime(s);
+            const d=new Date(s.replace(' ','T'));
+            return Number.isNaN(d.getTime()) ? s : d.toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+        }
         function fmtDateTime(value){
             if(!value) return '—';
             try{
@@ -2281,10 +2334,114 @@ function gbocToggleSidebarCollapse(){
                 const agents=Array.isArray(data)?data:(data.agents||[]);
                 const sel=document.getElementById('log-agent');
                 const current=sel.value;
-                sel.innerHTML='<option value="">Todos os Agentes</option>'+agents.map(a=>
+                sel.innerHTML='<option value="">Todos (agentes e servidor)</option><option value="__server__">Servidor central</option>'+agents.map(a=>
                     `<option value="${escapeHtml(a.agent_id)}">${escapeHtml(a.hostname||a.agent_id)}</option>`).join('');
                 if(current)sel.value=current;
             }catch(e){console.error('loadLogAgentFilter:',e)}
+            try{
+                const r=await fetch(`${API}/tenant/organizations`);
+                if(!r.ok) return;
+                const d=await r.json();
+                const orgs=d.organizations||d.tenants||(Array.isArray(d)?d:[]);
+                const ts=document.getElementById('log-tenant');
+                if(!ts||!orgs.length) return;
+                const cur=ts.value;
+                ts.innerHTML='<option value="">Todos os clientes</option>'+orgs.map(o=>`<option value="${escapeHtml(o.org_id||o.tenant_id||o.id)}">${escapeHtml(o.name||o.org_id)}</option>`).join('');
+                ts.value=cur; ts.style.display='';
+            }catch(e){}
+        }
+
+        function onLogPeriodChange(){
+            const custom=document.getElementById('log-period').value==='custom';
+            document.getElementById('log-custom-range').style.display=custom?'inline-flex':'none';
+            if(custom){
+                const e=document.getElementById('log-end'), s=document.getElementById('log-start');
+                if(!e.value) e.value=new Date().toISOString().slice(0,10);
+                if(!s.value){const d=new Date();d.setDate(d.getDate()-30);s.value=d.toISOString().slice(0,10);}
+            }
+            loadLogs();
+        }
+
+        function _logQuery(){
+            const q=new URLSearchParams();
+            const per=document.getElementById('log-period')?.value||'0';
+            if(per==='custom'){
+                const s=document.getElementById('log-start')?.value, e=document.getElementById('log-end')?.value;
+                if(s) q.set('start',s); if(e) q.set('end',e);
+                q.set('hours','0');
+            } else q.set('hours',per);
+            const agent=document.getElementById('log-agent')?.value||'';
+            const tenant=document.getElementById('log-tenant')?.value||'';
+            const search=document.getElementById('log-search')?.value||'';
+            if(agent) q.set('agent_id',agent);
+            if(tenant) q.set('tenant_id',tenant);
+            if(search) q.set('search',search);
+            return q;
+        }
+
+        function _logPeriodLabel(){
+            const sel=document.getElementById('log-period');
+            if(!sel) return 'todo o período';
+            if(sel.value==='custom'){
+                const f=v=>v?v.split('-').reverse().join('/'):'…';
+                return `${f(document.getElementById('log-start').value)} a ${f(document.getElementById('log-end').value)}`;
+            }
+            return sel.options[sel.selectedIndex].text.toLowerCase();
+        }
+
+        function toggleLogRetention(){
+            const p=document.getElementById('log-retention-panel');
+            const show=p.style.display==='none';
+            p.style.display=show?'':'none';
+            if(show) loadLogRetention();
+        }
+
+        async function loadLogRetention(){
+            const p=document.getElementById('log-retention-panel');
+            p.innerHTML='<div style="padding:10px;color:var(--text-muted)"><i class="fas fa-spinner fa-spin"></i> Carregando…</div>';
+            const res=await _fetchJsonSafe(`${API}/logs/retention`);
+            if(!res.ok){p.innerHTML=`<div style="color:var(--danger)">Retenção indisponível: ${escapeHtml(res.error)}</div>`;return;}
+            const d=res.data, n=v=>Number(v||0).toLocaleString('pt-BR');
+            const mb=b=>b==null?'—':(b/1048576).toLocaleString('pt-BR',{maximumFractionDigits:1})+' MB';
+            p.innerHTML=`
+                <h3 style="margin:0 0 10px;font-size:1em"><i class="fas fa-broom" style="color:var(--primary)"></i> Retenção e limpeza de logs</h3>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;font-size:.86em;margin-bottom:12px">
+                    <div><div style="color:var(--text-muted)">Logs detalhados guardados</div><b>${n(d.raw_count)}</b> · ${mb(d.table_size_bytes)}</div>
+                    <div><div style="color:var(--text-muted)">Disponíveis desde</div><b>${d.raw_oldest?fmtLocalNaive(d.raw_oldest):'—'}</b></div>
+                    <div><div style="color:var(--text-muted)">Resumo diário de erros (relatórios)</div><b>${d.aggregate_oldest?d.aggregate_oldest.split('-').reverse().join('/'):'—'}</b> → ${n(d.aggregate_days)} dia(s)</div>
+                    <div><div style="color:var(--text-muted)">Última limpeza</div><b>${d.last_cleanup?fmtLocalNaive(d.last_cleanup):'nunca'}</b><div style="color:var(--text-muted)">${escapeHtml(d.last_cleanup_result||'')}</div></div>
+                </div>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+                    <label style="font-size:.84em">Manter logs detalhados por (dias, 0 = sempre)<br><input type="number" id="lr-days" min="0" max="3650" value="${d.logs_retention_days}" style="width:120px;background:var(--bg-input);color:var(--text);border:1px solid var(--border);padding:7px 10px;border-radius:8px"></label>
+                    <label style="font-size:.84em">Manter resumo diário por (dias, 0 = sempre)<br><input type="number" id="lr-agg" min="0" max="3650" value="${d.log_aggregate_retention_days}" style="width:120px;background:var(--bg-input);color:var(--text);border:1px solid var(--border);padding:7px 10px;border-radius:8px"></label>
+                    <button class="btn btn-primary" onclick="saveLogRetention()"><i class="fas fa-save"></i> Salvar</button>
+                    <button class="btn btn-danger" onclick="runLogCleanup()"><i class="fas fa-broom"></i> Limpar agora</button>
+                </div>
+                <p style="font-size:.78em;color:var(--text-muted);margin:10px 0 0">A limpeza roda sozinha uma vez por dia. Antes de apagar, os erros e avisos de cada dia são resumidos — os relatórios usam esse resumo, então limpar os logs detalhados não altera os relatórios de eventos e erros. Para relatórios de 12 meses, mantenha o resumo por pelo menos 365 dias.</p>`;
+        }
+
+        async function saveLogRetention(){
+            const body={logs_retention_days:+document.getElementById('lr-days').value, log_aggregate_retention_days:+document.getElementById('lr-agg').value};
+            try{
+                const r=await fetch(`${API}/logs/retention`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+                const d=await r.json().catch(()=>({}));
+                if(!r.ok||d.status==='error') throw new Error(d.message||d.detail||('HTTP '+r.status));
+                if(typeof showToast==='function') showToast('Retenção salva','success');
+                loadLogRetention();
+            }catch(e){ alert('Falha ao salvar: '+e.message); }
+        }
+
+        async function runLogCleanup(){
+            const days=+document.getElementById('lr-days').value;
+            if(!days){ alert('A retenção está em 0 (manter sempre) — nada será apagado.'); }
+            else if(!confirm(`Apagar os logs detalhados com mais de ${days} dia(s)? Os erros e avisos ficam no resumo diário usado pelos relatórios.`)) return;
+            try{
+                const r=await fetch(`${API}/logs/cleanup`,{method:'POST'});
+                const d=await r.json().catch(()=>({}));
+                if(!r.ok||d.status==='error') throw new Error(d.message||d.detail||('HTTP '+r.status));
+                alert(`Limpeza concluída: ${Number(d.result.deleted||0).toLocaleString('pt-BR')} log(s) apagado(s).`);
+                loadLogRetention(); loadLogs();
+            }catch(e){ alert('Falha na limpeza: '+e.message); }
         }
 
         let _serverActiveLogFilter = 'all';
@@ -2414,56 +2571,55 @@ function gbocToggleSidebarCollapse(){
             if (b && v && v.version) b.textContent = 'v' + v.version;
         }).catch(() => {});
 
-        async function loadLogs(){
-            const agent = document.getElementById('log-agent')?.value || '';
-            const search = document.getElementById('log-search')?.value || '';
+        let _serverLogOffset = 0;
+        const _LOG_PAGE = 300;
+        async function loadLogs(more){
+            more = more === true;
             const empty = document.getElementById('server-toast-empty');
-            _serverLogSearchTerm = search;
-            const buildUrls = (hours) => {
-                let url = `${API}/logs?limit=300&hours=${hours}`;
-                if(agent) url += `&agent_id=${encodeURIComponent(agent)}`;
-                if(_serverActiveLogFilter && _serverActiveLogFilter !== 'all') url += `&type=${_serverActiveLogFilter}`;
-                if(search) url += `&search=${encodeURIComponent(search)}`;
-                return [url, `${API}/logs/stats?hours=${hours}` + (agent ? `&agent_id=${encodeURIComponent(agent)}` : '')];
-            };
-            let windowLabel = '7 dias';
-            let [url, statsUrl] = buildUrls(168);
-            let [logsRes, statsRes] = await Promise.all([_fetchJsonSafe(url), _fetchJsonSafe(statsUrl)]);
-            // Sem logs nos últimos 7 dias (ex.: relógio/fuso diferente entre agente e servidor): mostra todo o histórico
-            if (statsRes.ok && Number(statsRes.data.total || 0) === 0) {
-                [url, statsUrl] = buildUrls(0);
-                [logsRes, statsRes] = await Promise.all([_fetchJsonSafe(url), _fetchJsonSafe(statsUrl)]);
-                windowLabel = 'todo o período';
-            }
+            const moreBtn = document.getElementById('log-more');
+            _serverLogSearchTerm = document.getElementById('log-search')?.value || '';
+            const q = _logQuery();
+            if (!more) _serverLogOffset = 0;
+            const lq = new URLSearchParams(q);
+            lq.set('limit', _LOG_PAGE); lq.set('offset', _serverLogOffset);
+            if(_serverActiveLogFilter && _serverActiveLogFilter !== 'all') lq.set('type', _serverActiveLogFilter);
+            if(!more) lq.set('with_total', 'true');
+            const [logsRes, statsRes] = await Promise.all([
+                _fetchJsonSafe(`${API}/logs?${lq}`),
+                more ? Promise.resolve(null) : _fetchJsonSafe(`${API}/logs/stats?${q}`)
+            ]);
 
             const statsEl = document.getElementById('log-stats');
-            if (statsEl) {
+            if (statsEl && statsRes) {
                 if (statsRes.ok) {
                     const s = statsRes.data;
                     const n = v => Number(v || 0).toLocaleString('pt-BR');
+                    const range = s.oldest ? ` · de ${fmtLocalNaive(s.oldest)} a ${fmtLocalNaive(s.newest)}` : '';
                     statsEl.innerHTML = `
-                        <span><i class="fas fa-list"></i> Total (${windowLabel}): <strong>${n(s.total)}</strong></span>
+                        <span><i class="fas fa-list"></i> Total (${escapeHtml(_logPeriodLabel())}): <strong>${n(s.total)}</strong></span>
                         <span style="color:var(--danger)"><i class="fas fa-times-circle"></i> Erros: <strong>${n(s.errors)}</strong></span>
                         <span style="color:var(--warning)"><i class="fas fa-exclamation-triangle"></i> Avisos: <strong>${n(s.warnings)}</strong></span>
                         <span style="color:var(--success)"><i class="fas fa-check-circle"></i> Sucesso: <strong>${n(s.success)}</strong></span>
-                        <span style="color:var(--info)"><i class="fas fa-info-circle"></i> Info: <strong>${n(s.info)}</strong></span>`;
+                        <span style="color:var(--info)"><i class="fas fa-info-circle"></i> Info: <strong>${n(s.info)}</strong></span>
+                        <span><i class="fas fa-server"></i> Do servidor: <strong>${n(s.server_logs)}</strong></span>
+                        <span style="opacity:.8">${range}</span>`;
                 } else {
                     statsEl.innerHTML = `<span style="color:var(--danger)"><i class="fas fa-triangle-exclamation"></i> Estatísticas indisponíveis: ${escapeHtml(statsRes.error)}</span>`;
                 }
             }
 
             if (!logsRes.ok) {
-                _serverAllLogs = [];
-                renderServerLogs(false);
+                if (!more) { _serverAllLogs = []; renderServerLogs(false); }
                 if (empty) {
                     empty.innerHTML = `<i class="fas fa-triangle-exclamation" style="color:var(--danger)"></i> Não foi possível carregar os logs: ${escapeHtml(logsRes.error)}`;
                     empty.classList.add('show');
                 }
+                if (moreBtn) moreBtn.style.display = 'none';
                 return;
             }
             if (empty) empty.textContent = 'Nenhum log encontrado para o filtro selecionado.';
             const rawLogs = logsRes.data.logs || [];
-            _serverAllLogs = rawLogs.map((l, idx) => {
+            const mapped = rawLogs.map((l, idx) => {
                 const calculatedType = mapLogToType(l.level, l.message);
                 const type = (_serverActiveLogFilter && _serverActiveLogFilter !== 'all') ? _serverActiveLogFilter : calculatedType;
                 return {
@@ -2471,13 +2627,20 @@ function gbocToggleSidebarCollapse(){
                     type: type,
                     icon: getLogIcon(type),
                     title: (l.level || type).toUpperCase(),
-                    agent: l.agent_name || l.agent_id || 'Servidor',
+                    agent: l.agent_name || l.agent_id || 'Servidor central',
                     source: l.source || 'core',
                     message: l.message || '',
-                    timestamp: l.timestamp ? fmtDateTime(l.timestamp) : ''
+                    timestamp: l.timestamp ? fmtLocalNaive(l.timestamp) : ''
                 };
             });
-            renderServerLogs(true);
+            _serverAllLogs = more ? _serverAllLogs.concat(mapped) : mapped;
+            _serverLogOffset += rawLogs.length;
+            if (!more) window._serverLogMatched = logsRes.data.matched;
+            renderServerLogs(!more);
+            const matched = window._serverLogMatched;
+            const count = document.getElementById('server-toast-count');
+            if (count && matched != null) count.textContent = `(${_serverAllLogs.length.toLocaleString('pt-BR')} de ${Number(matched).toLocaleString('pt-BR')})`;
+            if (moreBtn) moreBtn.style.display = logsRes.data.has_more ? '' : 'none';
         }
 
         async function loadConfig(){
@@ -2582,6 +2745,12 @@ function gbocToggleSidebarCollapse(){
                             <div>
                                 <label style="font-size:0.85em;font-weight:600;display:block;margin-bottom:6px" for="cfg-task-history-limit"><i class="fas fa-list-ol"></i> Limite de Registros de Histórico de Backup</label>
                                 <input type="number" id="cfg-task-history-limit" value="10" min="1" max="100" style="width:140px;padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:.9em">
+                            </div>
+
+                            <div>
+                                <label style="font-size:0.85em;font-weight:600;display:block;margin-bottom:6px" for="cfg-ai-timeout"><i class="fas fa-stopwatch"></i> Tempo Limite de Resposta (segundos)</label>
+                                <input type="number" id="cfg-ai-timeout" value="300" min="10" max="600" style="width:140px;padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:.9em">
+                                <small style="display:block;color:var(--text-muted);margin-top:4px">Padrão: 300s (5 min) para IA Local (Ollama) ou 60s para Nuvem.</small>
                             </div>
                         </div>
 
@@ -2826,6 +2995,7 @@ function gbocToggleSidebarCollapse(){
                     keyEl.placeholder = (cfg.configured_keys || []).includes(provider) ? 'Chave já configurada — deixe em branco para manter' : 'Cole a chave de API';
                 }
                 if(document.getElementById('cfg-task-history-limit')) document.getElementById('cfg-task-history-limit').value = cfg.task_history_limit || 10;
+                if(document.getElementById('cfg-ai-timeout')) document.getElementById('cfg-ai-timeout').value = cfg.timeout_seconds || (isLocal ? 300 : 60);
                 toggleAiFieldsServer();
                 if (isLocal) detectOllamaModelsServer();
             } catch(e){
@@ -2844,8 +3014,9 @@ function gbocToggleSidebarCollapse(){
                 const endpoint = document.getElementById('cfg-ai-endpoint').value.trim();
                 const limit = parseInt(document.getElementById('cfg-task-history-limit').value || '10', 10);
                 const isLocal = _AI_LOCAL_PROVIDERS.includes(provider);
+                const timeoutVal = parseInt(document.getElementById('cfg-ai-timeout')?.value || (isLocal ? '300' : '60'), 10);
 
-                const payload = { provider, task_history_limit: limit, ollama_url: endpoint || 'http://localhost:11434' };
+                const payload = { provider, task_history_limit: limit, timeout_seconds: timeoutVal, ollama_url: endpoint || 'http://localhost:11434' };
                 if (model) {
                     payload.model = model;
                     payload[isLocal ? 'ollama_model' : `${provider}_model`] = model;
@@ -3530,10 +3701,11 @@ function gbocToggleSidebarCollapse(){
         async function loadServerAlerts(){
             const sev=document.getElementById('srv-alert-sev')?.value||'';
             try{
-                let url=`${API}/server/alerts/overview`;
-                if(sev)url+=`?severity=${sev}`;
+                const days=document.getElementById('srv-alert-days')?.value||'30';
+                let url=`${API}/server/alerts/overview?days=${days}`;
+                if(sev)url+=`&severity=${sev}`;
                 const r=await fetch(url);
-                if(!r.ok){showTabPlaceholder('srv-alerts-table',5,'Endpoint não disponível');return}
+                if(!r.ok){const t=await r.text();showTabPlaceholder('srv-alerts-table',6,'Erro ao carregar alertas (HTTP '+r.status+'): '+escapeHtml(t.slice(0,200)));return}
                 const d=await r.json();
                 document.getElementById('sa-total').textContent=d.total||0;
                 document.getElementById('sa-unread').textContent=d.unread||0;
@@ -3543,7 +3715,7 @@ function gbocToggleSidebarCollapse(){
                 const grid=document.getElementById('srv-alerts-grid');
                 if(!alerts.length){
                     if(grid) grid.innerHTML='';
-                    tb.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--text-muted)">Nenhum alerta</td></tr>';
+                    tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Nenhum alerta ou falha no período</td></tr>';
                     return;
                 }
 
@@ -3551,9 +3723,9 @@ function gbocToggleSidebarCollapse(){
                     grid.innerHTML=alerts.slice(0,12).map(a=>{
                         const m=sevMeta(a.severity||'info');
                         return `<div class="agent-card ${m.card}">
-                            <div class="agent-name"><i class="fas ${m.icon}" style="margin-right:8px;color:${m.color}"></i>${a.title||'—'}</div>
-                            <div class="agent-ip">${a.hostname||a.agent_name||'—'} · ${a.created_at?fmtDateTime(a.created_at):'—'}</div>
-                            <div style="font-size:.85em;color:var(--text-muted);max-height:40px;overflow:hidden;text-overflow:ellipsis">${a.message||''}</div>
+                            <div class="agent-name"><i class="fas ${m.icon}" style="margin-right:8px;color:${m.color}"></i>${escapeHtml(a.title||'—')}</div>
+                            <div class="agent-ip">${escapeHtml(a.hostname||a.agent_name||'—')} · ${a.created_at?fmtLocalNaive(a.created_at):'—'}</div>
+                            <div style="font-size:.85em;color:var(--text-muted);max-height:40px;overflow:hidden;text-overflow:ellipsis">${escapeHtml(a.message||'')}</div>
                             <div style="margin-top:10px"><span class="badge ${m.badge}">${(a.severity||'info').toUpperCase()}</span></div>
                         </div>`;
                     }).join('');
@@ -3563,13 +3735,14 @@ function gbocToggleSidebarCollapse(){
                     const m=sevMeta(a.severity||'info');
                     return `<tr>
                         <td><span class="badge ${m.badge}">${(a.severity||'info').toUpperCase()}</span></td>
-                        <td style="font-weight:600">${a.hostname||a.agent_name||'—'}</td>
-                        <td style="font-weight:600">${a.title||'—'}</td>
-                        <td style="font-size:.85em;color:var(--text-muted);max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(a.message||'').replace(/"/g,'&quot;')}">${a.message||''}</td>
-                        <td style="font-size:.82em;color:var(--text-muted);white-space:nowrap">${a.created_at?fmtDateTime(a.created_at):'—'}</td>
+                        <td style="font-size:.82em">${escapeHtml(a.origin||'evento')}${a.status?`<div style="color:var(--text-muted)">${escapeHtml(a.status)}</div>`:''}</td>
+                        <td style="font-weight:600">${escapeHtml(a.hostname||a.agent_name||'—')}</td>
+                        <td style="font-weight:600">${escapeHtml(a.title||'—')}</td>
+                        <td style="font-size:.85em;color:var(--text-muted);max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(a.message||'')}">${escapeHtml(a.message||'')}</td>
+                        <td style="font-size:.82em;color:var(--text-muted);white-space:nowrap">${a.created_at?fmtLocalNaive(a.created_at):'—'}</td>
                     </tr>`;
                 }).join('');
-            }catch(e){showTabPlaceholder('srv-alerts-table',5,'Erro ao carregar: '+e.message)}
+            }catch(e){showTabPlaceholder('srv-alerts-table',6,'Erro ao carregar: '+e.message)}
         }
 
         async function loadServerReplication(){

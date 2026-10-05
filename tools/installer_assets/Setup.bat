@@ -1,11 +1,11 @@
 @echo off
 REM ==============================================================================
-REM GBOC System v14.7.6 Full Stable Enterprise Edition
+REM GBOC System v14.8.1 Full Stable Enterprise Edition
 REM Copyright (c) 2026 Master11BR. Todos os direitos reservados.
 REM ==============================================================================
 
 setlocal EnableDelayedExpansion
-title Instalador GBOC System v14.7.6 Enterprise
+title Instalador GBOC System v14.8.1 Enterprise
 
 REM Verifica privilégios de Administrador
 net session >nul 2>&1

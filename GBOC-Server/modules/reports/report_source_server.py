@@ -220,21 +220,63 @@ class ServerReportSource:
             rows = [r for r in rows if r.get("agent_id") in s]
         return rows
 
+    # Erros/avisos de log: dias inteiros já resumidos vêm de agent_log_daily (sobrevivem à limpeza dos logs);
+    # o restante (hoje, bordas do período, dias ainda não resumidos) vem dos logs brutos.
+    def _log_agg_days(self, start, end) -> List[Any]:
+        from datetime import timedelta as _td
+        first = (start + _td(days=1)).date() if (start.hour or start.minute or start.second) else start.date()
+        last = end.date() - _td(days=1) if (end.hour, end.minute) < (23, 59) else end.date()
+        if last < first:
+            return []
+        return [r["day"] for r in self._qsafe("SELECT DISTINCT day FROM agent_log_daily WHERE day >= %s AND day <= %s AND day < CURRENT_DATE",
+                                              (first, last))]
+
     def log_error_summary(self, start, end, agent_ids=None):
+        days = self._log_agg_days(start, end)
         cl, p = self._agent_clause("agent_id", agent_ids)
-        return self._qsafe(f"""SELECT agent_id, source, UPPER(level) AS level, COUNT(*) AS count, MAX(timestamp) AS last,
-                                      (ARRAY_AGG(LEFT(message, 220) ORDER BY timestamp DESC))[1] AS sample
-                               FROM agent_logs
-                               WHERE timestamp >= %s AND timestamp <= %s
-                                 AND (level ILIKE 'err%%' OR level ILIKE 'crit%%' OR level ILIKE 'fatal%%' OR level ILIKE 'warn%%') {cl}
-                               GROUP BY agent_id, source, UPPER(level) ORDER BY COUNT(*) DESC LIMIT 300""", (start, end) + p)
+        raw = self._qsafe(f"""SELECT agent_id, source, UPPER(level) AS level, COUNT(*) AS count, MAX(timestamp) AS last,
+                                     (ARRAY_AGG(LEFT(message, 220) ORDER BY timestamp DESC))[1] AS sample
+                              FROM agent_logs
+                              WHERE timestamp >= %s AND timestamp <= %s AND NOT (timestamp::date = ANY(%s::date[]))
+                                AND (level ILIKE 'err%%' OR level ILIKE 'crit%%' OR level ILIKE 'fatal%%' OR level ILIKE 'warn%%') {cl}
+                              GROUP BY agent_id, source, UPPER(level) ORDER BY COUNT(*) DESC LIMIT 300""", (start, end, days) + p)
+        if not days:
+            return raw
+        cl2, p2 = self._agent_clause("NULLIF(agent_key, '')", agent_ids)
+        agg = self._qsafe(f"""SELECT NULLIF(agent_key, '') AS agent_id, NULLIF(source, '') AS source, level, SUM(count) AS count,
+                                     MAX(last_ts) AS last, (ARRAY_AGG(sample ORDER BY last_ts DESC))[1] AS sample
+                              FROM agent_log_daily WHERE day = ANY(%s::date[]) {cl2}
+                              GROUP BY 1, 2, 3""", (days,) + p2)
+        merged: Dict[Any, Dict[str, Any]] = {}
+        for r in raw + agg:
+            k = (r.get("agent_id"), r.get("source"), r.get("level"))
+            m = merged.get(k)
+            if not m:
+                merged[k] = dict(r, count=int(r.get("count") or 0))
+                continue
+            m["count"] += int(r.get("count") or 0)
+            if r.get("last") and (not m.get("last") or r["last"] > m["last"]):
+                m["last"], m["sample"] = r["last"], r.get("sample")
+        return sorted(merged.values(), key=lambda r: -r["count"])[:300]
 
     def log_error_daily(self, start, end, agent_ids=None):
+        days = self._log_agg_days(start, end)
         cl, p = self._agent_clause("agent_id", agent_ids)
-        return self._qsafe(f"""SELECT to_char(date_trunc('day', timestamp), 'YYYY-MM-DD') AS day, COUNT(*) AS count
-                               FROM agent_logs WHERE timestamp >= %s AND timestamp <= %s
+        rows = self._qsafe(f"""SELECT to_char(date_trunc('day', timestamp), 'YYYY-MM-DD') AS day, COUNT(*) AS count
+                               FROM agent_logs WHERE timestamp >= %s AND timestamp <= %s AND NOT (timestamp::date = ANY(%s::date[]))
                                  AND (level ILIKE 'err%%' OR level ILIKE 'crit%%' OR level ILIKE 'fatal%%') {cl}
-                               GROUP BY 1""", (start, end) + p)
+                               GROUP BY 1""", (start, end, days) + p)
+        if days:
+            cl2, p2 = self._agent_clause("NULLIF(agent_key, '')", agent_ids)
+            rows += self._qsafe(f"""SELECT to_char(day, 'YYYY-MM-DD') AS day, SUM(count) AS count FROM agent_log_daily
+                                    WHERE day = ANY(%s::date[]) AND (level ILIKE 'err%%' OR level ILIKE 'crit%%' OR level ILIKE 'fatal%%') {cl2}
+                                    GROUP BY 1""", (days,) + p2)
+        return rows
+
+    def log_coverage(self):
+        """Início dos dados de erro de log disponíveis (resumo diário ou logs brutos)."""
+        r = self._qsafe("""SELECT LEAST((SELECT MIN(day)::timestamp FROM agent_log_daily), (SELECT MIN(timestamp) FROM agent_logs)) AS t""")
+        return r[0]["t"] if r else None
 
     def security(self, start, end, agent_ids=None):
         cl, p = self._agent_clause("agent_id", agent_ids)

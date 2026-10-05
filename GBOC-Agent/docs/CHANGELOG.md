@@ -1,4 +1,4 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.7.6 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.8.1 Enterprise. Todos os direitos reservados. -->
 
 # GBOC — Changelog de Atualizações
 
@@ -6,7 +6,7 @@
 
 ---
 
-## 14.8.1 — 2026-10-04 (Backup imutável, Implantação em massa, Políticas centrais, Operação e Comercial MSP) — pendente de build
+## 14.8.1 — 2026-10-05 (Backup imutável, Implantação em massa, Políticas centrais, IA Local Ollama e Comercial MSP)
 
 ### 🔒 Backup imutável
 - **S3 Object Lock** (S3/Wasabi): por repositório, com dias de retenção e modo GOVERNANCE/COMPLIANCE. Aplica a retenção padrão no bucket (ou cria um bucket já com Object Lock) e **verifica** versionamento, retenção e se o objeto mais recente está de fato bloqueado.
@@ -22,6 +22,16 @@
 ### 🧭 Políticas centrais com detecção de desvio
 - Nova tela **Políticas e Implantação**: alcance (todos / organização / agentes), prioridade, filtro de tarefas, agendamento, retenção, novas tentativas, janela de manutenção, banda e imutabilidade.
 - Aplicação em lote nos agentes e coluna de **Conformidade** comparando o que cada agente informa com a política (versão, janelas, banda, agendamento, retenção, imutabilidade), com botão Reaplicar.
+
+### 🤖 Otimização e Resiliência da IA Local (Ollama & Multi-Provedores)
+- **Eliminação de Timeout no Ollama CPU com Modelos 8B+ (ex: Llama 3)**:
+  - Otimização drástica na montagem de prompts de sistema e contexto operacional: redução superior a 85% no payload de entrada através da poda dinâmica de dumps massivos do banco de dados quando o usuário realiza perguntas conceituais, de documentação ou de navegação ("Como funciona...", "Onde fica...").
+  - Truncamento e sumarização inteligente do histórico de conversas (`_smart_history_tokens`) e limitação segura de `num_predict` local no Ollama para evitar loops de geração em CPU que estouravam conexões HTTP.
+  - Roteamento instantâneo em milissegundos para pings e testes de conectividade do assistente.
+  - Elevação do timeout padrão da inferência local de 180s para 300s (5 minutos), permitindo que nós rodando exclusivamente em CPU completem o processamento de respostas longas sem interrupção de socket.
+- **Configuração de Tempo Limite de Resposta na UI (`ai-timeout`)**:
+  - Novo parâmetro configurável na aba de Configurações do GBOC Server (`cfg-ai-timeout`) e do GBOC Agent (`ai-timeout`): permite ajustar o timeout de resposta da IA em segundos diretamente pela interface gráfica, persistido em `gboc_system_settings`.
+  - Tratamento aprimorado de erros de rede HTTPX com mensagens transparentes e amigáveis ao usuário caso o modelo local exceda o tempo configurado ou esteja sob carga extrema.
 
 ### ⏱️ Operação
 - **Janela de manutenção** por agente (inclusive virando a noite): backups agendados não iniciam dentro dela; execuções puladas ficam registradas.
@@ -43,12 +53,22 @@
 - Repositórios em nuvem criados antes desta versão: abra **Editar** e informe a chave secreta novamente (o Detalhes avisa quando ela não está salva).
 - A região do bucket passa a ser deduzida do endpoint da Wasabi quando não informada.
 
+### 🩺 Logs Globais, Jobs com Falha e Alertas — dados reais de agentes e do próprio servidor
+- **Logs Globais**: abre em *Todo o período* (antes só 7 dias), com os mesmos filtros dos relatórios — 24 h, 7/30/90/180 dias, 12 meses, todo o período ou datas personalizadas, agente, **Servidor central** e cliente — além de busca, contagem "N de M" e **Carregar mais**.
+- **Logs do próprio servidor**: avisos e erros do Server (módulos, autenticação, agendadores, exceções) passam a ser gravados junto com os dos agentes, como origem "Servidor central" (sem travar o servidor; mensagens repetidas são agrupadas).
+- **Retenção e limpeza** (botão em Logs Globais): mostra quantidade, tamanho, desde quando há logs e a última limpeza; permite ajustar os dias e limpar na hora. A limpeza automática diária continua; **0 = manter tudo** (antes 0 apagava tudo).
+- **Os relatórios não perdem dados com a limpeza**: antes de apagar, os erros/avisos de cada dia são resumidos (resumo guardado por 730 dias por padrão) e o relatório de eventos e logs usa esse resumo. Quando o período pedido é anterior aos dados disponíveis, o relatório avisa.
+- **Jobs com Falha** (antes sempre 0 — lia uma lista em memória que ninguém alimentava): agora mostra backups com falha (falhas seguidas, desde quando, tentativas/escalação), testes de restauração e verificações reprovados, restaurações com falha, **agentes rejeitados por chave de pareamento inválida**, envios de relatório e alertas que falharam, operações em lote com erro, erros do próprio servidor e módulos do servidor que não carregaram. Filtros por período, agente/servidor, cliente e origem; reconhecer/reabrir; histórico de execuções com falha; taxa de recuperação real. "Testar Alertas" envia de verdade pelo canal configurado.
+- **Alertas e Falhas**: a lista "Alertas recentes" estava sempre vazia (uma rota vazia escondia a real). Agora junta alertas proativos, falhas ativas e eventos do sistema, com período e coluna de origem. Quando o módulo de alertas proativos não estiver ativo, a tela explica (reiniciar o serviço) em vez de "Not Found".
+- Datas dos logs exibidas no horário em que foram gravadas (antes apareciam 3 h antes).
+- Corrigidas consultas que falhavam em silêncio e agora apareciam nos logs do servidor: controladores de domínio (AD), eventos de ransomware e lista de tarefas da API v2.
+
 ### 🤖 Copilot
 - Guia de uso com os novos tópicos: políticas centrais, implantação em massa, janela/banda, backup imutável, portal do cliente e faturamento/licença.
 
 ---
 
-## 14.8.0 — 2026-10-04 (Relatórios reais, Painel de Decisão, Gerenciamento Remoto, Alertas proativos e Testes de restauração) — pendente de build
+## 14.8.0 — 2026-10-04 (Relatórios reais, Painel de Decisão, Gerenciamento Remoto, Alertas proativos e Testes de restauração)
 
 ### 📊 Relatórios reais (substituem o catálogo de 50)
 - Os 50 relatórios antigos geravam o mesmo conteúdo com números fixos (ex.: “85 MB/s”, “3 Organizações”). Foram substituídos por **20 relatórios calculados sobre dados reais**, com um motor único (`report_core.py`, idêntico no Server e no Agente):

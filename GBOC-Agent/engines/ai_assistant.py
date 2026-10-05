@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 14.7.6 - Multi-Provider AI Assistant Engine (GBOC Copilot AI - Agent)
+GBOC 14.8.1 - Multi-Provider AI Assistant Engine (GBOC Copilot AI - Agent)
 
 Provedores: Ollama Local (padrão/fallback), DeepSeek, Groq, Google Gemini, OpenAI,
 Anthropic Claude, xAI Grok, Moonshot Kimi, Mistral e Cohere — via engines/ai_providers.py.
@@ -226,13 +226,27 @@ def query_ai_assistant(prompt: str, provider_override: str | None = None) -> dic
         return {"status": "error", "message": "Prompt excede o limite de 8000 caracteres."}
 
     cfg = load_ai_config()
-    data = collect_agent_operational_data()
-    system = f"{cfg.get('system_prompt') or DEFAULT_AI_CONFIG['system_prompt']}\n\n{aip.GROUNDING_RULE}\n\n[CONTEXTO REAL DO AGENTE GBOC]:\n{_format_context(data)}"
-    kb_topics = kb.find_topics(clean_prompt, "agent", limit=3)
-    kb_ctx = kb.format_for_prompt(kb_topics, "agent")
-    if kb_ctx:
-        system += "\n\n" + kb_ctx + "\n\n[MAPA DE FUNÇÕES]:\n" + kb.menu_map("agent")
+    clean_lower = clean_prompt.lower().strip(".! ")
+    is_test = clean_lower in ("responda apenas com ok", "ok", "ping", "teste", "test", "hello")
+    is_howto = kb.is_howto_question(clean_prompt)
+    kb_topics = kb.find_topics(clean_prompt, "agent", limit=2)
+    base_prompt = cfg.get("system_prompt") or DEFAULT_AI_CONFIG["system_prompt"]
 
+    data: dict[str, Any] = {"available": False}
+    if is_test:
+        system = f"{base_prompt}\n\nResponda apenas: OK."
+    elif is_howto:
+        kb_ctx = kb.format_for_prompt(kb_topics, "agent") if kb_topics else ""
+        system = f"{base_prompt}\n\n{aip.GROUNDING_RULE}"
+        if kb_ctx:
+            system += f"\n\n[GUIA DE USO DO GBOC]:\n{kb_ctx}"
+        system += f"\n\n[MAPA DE FUNÇÕES]:\n{kb.menu_map('agent')}"
+    else:
+        data = collect_agent_operational_data()
+        system = f"{base_prompt}\n\n{aip.GROUNDING_RULE}\n\n[CONTEXTO REAL DO AGENTE GBOC]:\n{_format_context(data)}"
+        kb_ctx = kb.format_for_prompt(kb_topics, "agent") if kb_topics else ""
+        if kb_ctx:
+            system += f"\n\n[GUIA DE USO DO GBOC]:\n{kb_ctx}"
 
     primary, fallback = aip.chat_with_fallback(cfg, system, clean_prompt, provider=provider_override)
     if primary.ok:
@@ -253,6 +267,10 @@ def query_ai_assistant(prompt: str, provider_override: str | None = None) -> dic
             "answer": warning + f"🔄 **Fallback automático (Ollama Local - {fallback.model})**:\n{fallback.answer}",
             "duration_seconds": round(primary.duration_seconds + fallback.duration_seconds, 2),
         }
+
+    if not data.get("available"):
+        data = collect_agent_operational_data()
+
     return {
         "status": "success", "is_llm_real": False, "primary_error": primary.error,
         "fallback_error": fallback.error if fallback else None,
@@ -260,3 +278,4 @@ def query_ai_assistant(prompt: str, provider_override: str | None = None) -> dic
         "answer": warning + _kb_or_native(clean_prompt, kb_topics, lambda: _native_report(data), "agent"),
         "duration_seconds": round(primary.duration_seconds + (fallback.duration_seconds if fallback else 0), 2),
     }
+

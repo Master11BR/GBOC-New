@@ -2022,7 +2022,7 @@ def rep_events_logs(ctx: ReportContext) -> Dict[str, Any]:
     charts = [_chart("Erros e avisos nos logs por dia", svg_bars(ctx.day_labels, [{"name": "Erros", "values": err_series, "tone": "bad"}])),
               _chart("Eventos por tipo", svg_hbar(list(types.keys()), list(types.values()))) if types else None]
     charts = [c for c in charts if c]
-    rows_src = [[ctx.host(e.get("agent_id")), e.get("source") or "—", e.get("level") or "—", fmt_int(e.get("count")), fmt_dt(e.get("last")),
+    rows_src = [[ctx.host(e.get("agent_id")) if e.get("agent_id") else "Servidor central", e.get("source") or "—", e.get("level") or "—", fmt_int(e.get("count")), fmt_dt(e.get("last")),
                  (e.get("sample") or "")[:200]] for e in sorted(errs, key=lambda e: -int(e.get("count") or 0))[:100]]
     rows_ev = [[fmt_dt(e.get("ts")), ctx.host(e.get("agent_id")) if e.get("agent_id") else (e.get("agent") or "—"), e.get("type") or "—",
                 cell(e.get("severity") or "info", {"critical": "bad", "error": "bad", "warning": "warn"}.get(str(e.get("severity")).lower())),
@@ -2033,8 +2033,16 @@ def rep_events_logs(ctx: ReportContext) -> Dict[str, Any]:
     findings = []
     if by_agent:
         top_a, n = by_agent.most_common(1)[0]
-        findings.append({"tone": "warn", "text": f"{ctx.host(top_a)} concentra {fmt_pct(n / err_total * 100)} dos erros de log ({fmt_int(n)})."})
-    return {"kpis": kpis, "charts": charts, "tables": tables, "findings": findings, "recommendations": []}
+        findings.append({"tone": "warn", "text": f"{ctx.host(top_a) if top_a else 'Servidor central'} concentra {fmt_pct(n / err_total * 100)} dos erros de log ({fmt_int(n)})."})
+    recs = []
+    cov_fn = getattr(ctx.source, "log_coverage", None)
+    cov = to_dt(cov_fn()) if cov_fn else None
+    if cov and cov.date() > ctx.start.date():
+        findings.append({"tone": "info", "text": f"Os erros de log só estão disponíveis a partir de {fmt_dt(cov)} — antes disso os logs já tinham sido "
+                                                 "apagados pela retenção. Eventos e execuções não são afetados."})
+        recs.append("Para relatórios de períodos longos, mantenha a retenção do resumo diário de logs (Logs Globais > Retenção) "
+                    "maior ou igual ao maior período usado nos relatórios.")
+    return {"kpis": kpis, "charts": charts, "tables": tables, "findings": findings, "recommendations": recs}
 
 
 def rep_task_scorecard(ctx: ReportContext) -> Dict[str, Any]:

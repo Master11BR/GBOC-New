@@ -1,6 +1,6 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.7.6 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.8.1 Enterprise. Todos os direitos reservados. -->
 
-# 📦 GBOC System v14.7.6 Enterprise — Guia Oficial de Instaladores & Implantação
+# 📦 GBOC System v14.8.1 Enterprise — Guia Oficial de Instaladores & Implantação
 
 Este guia detalha a instalação e implantação do **GBOC Server (Servidor Central)** e do **GBOC Agent (Agente Local e Remoto LAN)**.
 
@@ -47,6 +47,14 @@ Para instalar o GBOC Agent em outros servidores ou estações de trabalho sem pr
 
 ```powershell
 .\GBOC-Agent\scripts\install_agent_remote.ps1 -ComputerName "SRV-FINANCEIRO" -ServerURL "http://192.168.1.100:8000"
+```
+
+### 3.1 Implantação em Massa Não Assistida via Token (GPO / Script / RMM)
+Para implantação em dezenas ou centenas de máquinas sem intervenção humana:
+1. Gere um Token de Instalação na aba **Políticas e Implantação** do GBOC Server.
+2. Execute o comando com parâmetros de linha de comando:
+```powershell
+powershell -ExecutionPolicy Bypass -File .\GBOC-Agent\install_agent.ps1 -ServerURL "https://seu-servidor:8000" -InstallToken "SEU_TOKEN_AQUI" -Unattended
 ```
 
 ---

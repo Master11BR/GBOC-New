@@ -29,7 +29,7 @@ async def get_ad_central_summary():
         cur = conn.cursor()
         
         # Buscar agentes identificados como Controladores de Domínio ou Windows Server
-        cur.execute("SELECT agent_id, hostname, ip_address, status, os_type, last_seen FROM agents WHERE os_type ILIKE '%Windows%' OR os_type ILIKE '%Server%' ORDER BY last_seen DESC LIMIT 50")
+        cur.execute("SELECT agent_id, hostname, ip_address, status, os_info, last_heartbeat FROM agents WHERE os_info ILIKE '%Windows%' OR os_info ILIKE '%Server%' ORDER BY last_heartbeat DESC NULLS LAST LIMIT 50")
         rows = cur.fetchall()
         
         controllers = []

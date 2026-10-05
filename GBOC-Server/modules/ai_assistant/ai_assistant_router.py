@@ -1,4 +1,4 @@
-# GBOC System v14.7.6 Enterprise Edition
+# GBOC System v14.8.1 Enterprise Edition
 # Module: Server AI Copilot Assistant
 # Provedores: Ollama Local, DeepSeek, Groq, Gemini, OpenAI, Claude, Grok, Kimi, Mistral, Cohere
 # Camada de provedores: modules/ai_assistant/ai_providers.py
@@ -251,14 +251,15 @@ def _format_context(data: dict[str, Any]) -> str:
         f"Agentes registrados: {data['agents_total']} (online na última hora: {data['agents_online']}, "
         f"sem heartbeat há mais de 60 min: {data['agents_total'] - data['agents_online']})"
     )
-    for a in data["agents_offline_sample"]:
+    for a in data.get("agents_offline_sample", [])[:3]:
         lines.append(f"  - Sem heartbeat: {a['hostname']} (último: {a['last_heartbeat'] or 'nunca'})")
     lines.append(
         f"Execuções nos últimos 7 dias: {data['executions_7d']} (sucesso: {data['success_7d']}, "
         f"falha: {data['failed_7d']}; falhas nas últimas 24h: {data['failed_24h']})"
     )
-    for f in data["recent_failures"]:
-        lines.append(f"  - Falha em {f['started_at']}: {f['hostname'] or '?'} / {f['task_name']} — {f['error'] or 'sem mensagem de erro registrada'}")
+    for f in data.get("recent_failures", [])[:3]:
+        err_msg = (f.get("error") or "sem mensagem de erro registrada")[:120]
+        lines.append(f"  - Falha em {f.get('started_at')}: {f.get('hostname') or '?'} / {f.get('task_name')} — {err_msg}")
     return "\n".join(lines)
 
 
@@ -325,14 +326,28 @@ def query_server_ai_assistant(prompt: str, provider_override: str | None = None)
         return {"status": "error", "message": "Prompt excede o limite de 8000 caracteres."}
 
     cfg = load_server_ai_config()
-    data = _collect_server_operational_data()
-    context_info = _format_context(data)
-    system = f"{cfg.get('system_prompt') or DEFAULT_SERVER_AI_CONFIG['system_prompt']}\n\n{aip.GROUNDING_RULE}\n\n[CONTEXTO OPERACIONAL REAL DO SERVIDOR CENTRAL GBOC]:\n{context_info}"
-    kb_topics = kb.find_topics(clean_prompt, "server", limit=3)
-    kb_ctx = kb.format_for_prompt(kb_topics, "server")
-    if kb_ctx:
-        system += "\n\n" + kb_ctx + "\n\n[MAPA DE FUNÇÕES]:\n" + kb.menu_map("server")
+    clean_lower = clean_prompt.lower().strip(".! ")
+    is_test = clean_lower in ("responda apenas com ok", "ok", "ping", "teste", "test", "hello")
+    is_howto = kb.is_howto_question(clean_prompt)
+    kb_topics = kb.find_topics(clean_prompt, "server", limit=2)
+    base_prompt = cfg.get("system_prompt") or DEFAULT_SERVER_AI_CONFIG["system_prompt"]
 
+    data: dict[str, Any] = {"available": False}
+    if is_test:
+        system = f"{base_prompt}\n\nResponda apenas: OK."
+    elif is_howto:
+        kb_ctx = kb.format_for_prompt(kb_topics, "server") if kb_topics else ""
+        system = f"{base_prompt}\n\n{aip.GROUNDING_RULE}"
+        if kb_ctx:
+            system += f"\n\n[GUIA DE USO DO GBOC]:\n{kb_ctx}"
+        system += f"\n\n[MAPA DE FUNÇÕES]:\n{kb.menu_map('server')}"
+    else:
+        data = _collect_server_operational_data()
+        context_info = _format_context(data)
+        system = f"{base_prompt}\n\n{aip.GROUNDING_RULE}\n\n[CONTEXTO OPERACIONAL REAL DO SERVIDOR CENTRAL GBOC]:\n{context_info}"
+        kb_ctx = kb.format_for_prompt(kb_topics, "server") if kb_topics else ""
+        if kb_ctx:
+            system += f"\n\n[GUIA DE USO DO GBOC]:\n{kb_ctx}"
 
     primary, fallback = aip.chat_with_fallback(cfg, system, clean_prompt, provider=provider_override)
 
@@ -354,6 +369,9 @@ def query_server_ai_assistant(prompt: str, provider_override: str | None = None)
             "answer": warning + f"🔄 **Fallback automático (Ollama Local - {fallback.model})**:\n{fallback.answer}",
             "duration_seconds": round(primary.duration_seconds + fallback.duration_seconds, 2),
         }
+
+    if not data.get("available"):
+        data = _collect_server_operational_data()
 
     return {
         "status": "success", "is_llm_real": False, "primary_error": primary.error,

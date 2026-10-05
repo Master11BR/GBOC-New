@@ -19,7 +19,7 @@ from typing import Dict, Any, List, Optional
 try:
     from version import GBOC_VERSION as AGENT_VERSION
 except ImportError:
-    AGENT_VERSION = "14.6.0"
+    AGENT_VERSION = "14.8.1"
 
 try:
     from engines.v4_reports_engine import (
@@ -434,8 +434,8 @@ async def get_system_health():
     try:
         from version import GBOC_VERSION, version_string
     except ImportError:
-        GBOC_VERSION = "14.6.0"
-        version_string = lambda: "GBOC Agent v14.6.0 Enterprise"
+        GBOC_VERSION = "14.8.1"
+        version_string = lambda: "GBOC Agent v14.8.1 Enterprise"
 
     import psutil, os, time
     proc = psutil.Process(os.getpid())

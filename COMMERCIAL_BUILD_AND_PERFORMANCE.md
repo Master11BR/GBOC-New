@@ -1,8 +1,8 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.6.0 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.8.1 Enterprise. Todos os direitos reservados. -->
 
-# 🚀 GBOC System v14.6.0 — Roteiro de Desempenho, Qualidade Comercial e Compilação Standalone
+# 🚀 GBOC System v14.8.1 — Roteiro de Desempenho, Qualidade Comercial e Compilação Standalone
 
-[![GBOC Version](https://img.shields.io/badge/GBOC%20Version-14.6.0-blue.svg)](file:///d:/GBOC-New/GBOC-New/README.md)
+[![GBOC Version](https://img.shields.io/badge/GBOC%20Version-14.8.1-blue.svg)](file:///d:/GBOC-New/GBOC-New/README.md)
 [![Commercial Ready](https://img.shields.io/badge/commercial-ready-brightgreen.svg)]()
 
 > **Roteiro Técnico para Transformar o GBOC em um Produto Comercial de Alta Performance, Protegido contra Engenharia Reversa e Compilável em Executáveis Standalone Autônomos (`.exe` / Binários Linux)**.
@@ -12,7 +12,7 @@
 ## 📌 Sumário
 1. [Compilação Standalone sem Dependência de Python (PyInstaller & Nuitka)](#1-compilação-standalone-sem-dependência-de-python)
 2. [Proteção de Código e Ofuscação (PyArmor / C-Extensions)](#2-proteção-de-código-e-ofuscação)
-3. [Otimizações de Desempenho e Alta Escala (v14.6.0)](#3-otimizações-de-desempenho-e-alta-escala)
+3. [Otimizações de Desempenho e Alta Escala (v14.8.1)](#3-otimizações-de-desempenho-e-alta-escala)
 4. [Empacotamento Comercial Industrial (Inno Setup / MSI)](#4-empacotamento-comercial-industrial)
 
 ---

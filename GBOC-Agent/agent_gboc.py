@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-🚀 GBOC Agent 14.6.0 - Servidor Principal
+🚀 GBOC Agent 14.8.1 - Servidor Principal
 Servidor FastAPI com arquitetura modular limpa
 """
 
@@ -67,7 +67,7 @@ try:
     from version_control import __version__ as AGENT_VERSION, get_version_info, auto_increment_build
     auto_increment_build()
 except Exception:
-    AGENT_VERSION = "14.6.0"
+    AGENT_VERSION = "14.8.1"
     def get_version_info():
         return {"raw_version": AGENT_VERSION, "semver": AGENT_VERSION}
 

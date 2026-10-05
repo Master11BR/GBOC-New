@@ -15,7 +15,7 @@ from database import db_manager
 try:
     from version_control import __version__ as SERVER_VERSION
 except Exception:
-    SERVER_VERSION = "14.6.0"
+    SERVER_VERSION = "14.8.1"
 
 logger = logging.getLogger("gboc_reports_module")
 router = APIRouter(prefix="/api/v1/reports", tags=["Relatórios Executivos"])

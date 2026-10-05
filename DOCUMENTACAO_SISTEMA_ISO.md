@@ -1,17 +1,17 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.7.6 Enterprise Edition. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.8.1 Enterprise Edition. Todos os direitos reservados. -->
 
-# 🏆 GBOC System v14.7.6 Full Stable Enterprise — Relatório de Auditoria e Documentação Técnica no Padrão ISO (ISO/IEC 25010, ISO/IEC 12207, ISO 22301 & ISO 27001)
+# 🏆 GBOC System v14.8.1 Full Stable Enterprise — Relatório de Auditoria e Documentação Técnica no Padrão ISO (ISO/IEC 25010, ISO/IEC 12207, ISO 22301 & ISO 27001)
 
 **Documento Oficial de Engenharia de Software e Garantia de Qualidade**  
 **Organização**: GBOC Enterprise Operations Center  
-**Versão do Sistema**: 14.7.6 Full Stable Enterprise Edition  
+**Versão do Sistema**: 14.8.1 Full Stable Enterprise Edition  
 **Padrões de Referência**: ISO/IEC 25010:2011 (System and Software Quality Models), ISO/IEC 12207:2017 (Software Life Cycle Processes), ISO 22301 (Business Continuity Management) e ISO/IEC 27001 (Information Security Management).
 
 ---
 
 ## 📌 Sumário Executivo
 
-Este documento apresenta a especificação técnica formal e a avaliação de conformidade do **GBOC System (v14.7.6 Enterprise)** em relação aos padrões internacionais de qualidade de software, engenharia de processos, continuidade de negócios (DR) e segurança da informação, assegurando aderência estrita às diretrizes de governança (`.agents/AGENTS.md` e `ARCHITECTURE_POLICIES.md`).
+Este documento apresenta a especificação técnica formal e a avaliação de conformidade do **GBOC System (v14.8.1 Enterprise)** em relação aos padrões internacionais de qualidade de software, engenharia de processos, continuidade de negócios (DR) e segurança da informação, assegurando aderência estrita às diretrizes de governança (`.agents/AGENTS.md` e `ARCHITECTURE_POLICIES.md`).
 
 ---
 
@@ -163,6 +163,22 @@ A norma **ISO/IEC 25010** especifica 8 características de qualidade de software
   - Aperfeiçoamento de `mapLogToType(level, message)` em `dashboard.html` cruzando níveis com marcadores semânticos de conclusão, assegurando aderência estrita à **Zero-Mock Policy (§11)**.
 - **ISO/IEC 12207 — Empacotamento de Distribuição e Integridade do Instalador**:
   - Sincronização e verificação de integridade dos componentes de release (`make_distribution.py`, `Setup.bat`, `Setup.ps1`, `package_manifest.json`) para a versão oficial **14.7.6 Full Stable Enterprise**.
+
+### 2.7. Backup Imutável, Implantação em Massa, Políticas Centrais e Resiliência de IA (Release 14.8.1)
+- **ISO/IEC 27001 & ISO 22301 — Imutabilidade de Dados e Proteção Anti-Ransomware (WORM & S3 Object Lock)**:
+  - Implementação de WORM local para repositórios em disco com aplicação de ACLs de negação de exclusão do Windows (`Deny Delete`) e S3 Object Lock com retenção de conformidade (`GOVERNANCE`/`COMPLIANCE`).
+  - Imposição de cálculo e envio de `Content-MD5` em todas as operações de upload para buckets S3/Wasabi com Object Lock ativo.
+- **ISO/IEC 12207 — Implantação em Larga Escala e Automação de Frota**:
+  - Implementação de tokens de instalação centralizados com controle de tenant, expiração e limites de uso.
+  - Suporte a instalação não assistida (`install_agent.ps1 -Unattended`) para GPO, scripts de logon e plataformas RMM.
+- **ISO/IEC 25010 — Governança e Detecção de Desvio (Drift Detection)**:
+  - Painel de políticas centrais com auditoria contínua de conformidade (agenda, retenção, limites de banda, janelas de manutenção) e mecanismo de reaplicação imediata.
+- **ISO/IEC 25010 — Eficiência de Desempenho e Resiliência de IA Local**:
+  - Otimização algorítmica de prompts no assistente de IA, reduzindo em mais de 85% a sobrecarga de tokens de entrada em consultas operacionais.
+  - Elevação do timeout padrão de inferência local para 300s com capping de tokens de saída em CPU, eliminando erros de timeout no Ollama com modelos 8B+ (Llama 3).
+  - Configuração dinâmica de timeout (`ai-timeout`) exposta na interface de usuário e persistida com integridade.
+- **ISO/IEC 12207 — Empacotamento de Distribuição e Integridade do Instalador**:
+  - Sincronização e verificação de integridade dos componentes de release (`make_distribution.py`, `Setup.bat`, `Setup.ps1`, `package_manifest.json`) para a versão oficial **14.8.1 Full Stable Enterprise**.
 
 
 

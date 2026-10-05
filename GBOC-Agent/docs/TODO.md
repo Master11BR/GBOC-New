@@ -1,8 +1,8 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.7.0 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.8.1 Enterprise. Todos os direitos reservados. -->
 
-# TODO: Consolidação do Sistema GBOC (v14.7.0)
+# TODO: Consolidação do Sistema GBOC (v14.8.1)
 
-## Status: ✅ Concluído (Release v14.7.0)
+## Status: ✅ Concluído (Release v14.8.1)
 
 ### 1. Migração do Modelo de Repositório ✅ COMPLETED
 - [x] Criar modelos separados LocalRepository e CloudRepository em models.py
@@ -47,7 +47,14 @@
 - [x] Atualização do `README.md` principal na raiz para v14.7.0
 - [x] Atualização do `INSTALADORES_README.md` para v14.7.0
 - [x] Atualização de `DOCUMENTACAO_SISTEMA_ISO.md` e `SYSTEM_CONFIG_GUIDE.md` para v14.7.0
-- [x] Registro detalhado no `CHANGELOG.md`
 - [x] Verificação Universal CSS (`tools/sync_css.py --verify`) 100% aprovada
 - [x] Geração do pacote de distribuição oficial sincronizado em `GBOC-Distribution` via `build_installer_package.ps1`
+
+### 7. Backup Imutável, Implantação em Massa, Políticas e IA Local (v14.8.1) ✅ COMPLETED
+- [x] Backup Imutável (S3 Object Lock em nuvem e WORM Local em disco com ACLs Windows `Deny Delete`)
+- [x] Implantação em massa de agentes via Tokens de Instalação (`install_agent.ps1 -Unattended`)
+- [x] Políticas Centrais com Detecção de Desvio (drift detection), agendamento, janelas de manutenção e limites de banda
+- [x] Resolução de Timeout do Ollama local em CPU: redução de >85% no prompt, truncamento adaptativo de históricos e `ai-timeout` configurável (padrão 300s)
+- [x] Atualização SemVer 14.8.1, documentação formal, padronização HTML/CSS e pacote `GBOC-Distribution`
+
 
