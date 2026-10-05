@@ -164,6 +164,18 @@ async def put_operation(request: Request):
     return {"status": "success", **(await asyncio.to_thread(ops.status))}
 
 
+# ───────────────────────── detalhes do repositório ─────────────────────────
+
+@router.get("/repositories/{repo_id}/details")
+async def repository_details(repo_id: str, live: bool = False):
+    """Todas as configurações do repositório (segredos nunca são devolvidos); live=true consulta o provedor agora."""
+    from engines import repo_inspect
+    try:
+        return {"status": "success", **(await asyncio.to_thread(repo_inspect.details, repo_id, live))}
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+
+
 # ───────────────────────── backup imutável ─────────────────────────
 
 @router.get("/immutability")

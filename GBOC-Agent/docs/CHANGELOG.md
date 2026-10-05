@@ -33,6 +33,16 @@
 - **Fechamento mensal**: preço por agente, por TB e taxa fixa por organização; pré-visualização, fechamento (só meses encerrados, com hash de integridade), reabertura, exportação CSV e fechamento automático opcional.
 - **Licenciamento por número de agentes**: chave assinada (Ed25519) com limite e validade, alerta 30 dias antes do vencimento e 15 dias de carência. A ferramenta `tools/license_tool.py` (do fornecedor, não distribuída) gera as chaves; o pacote nunca inclui a chave privada.
 
+### 🗂️ Repositórios — todas as configurações, inclusive as do bucket na nuvem
+- Novo botão **Detalhes** (ícone ⓘ) em cada repositório do Agente e no Server (Gerenciamento Remoto > Operação e imutabilidade).
+- Mostra a configuração salva (bucket, prefixo, região, endpoint efetivo, chave de acesso mascarada, situação da chave secreta e da senha), como o motor enxerga o destino, imutabilidade, último tamanho medido, tarefas que gravam no repositório e, para disco local, espaço livre/total.
+- **Consultar nuvem agora** lê do provedor (S3/Wasabi): latência, região real do bucket, versionamento, Object Lock e retenção padrão, criptografia, ciclo de vida, bloqueio de acesso público, política, ACL, tags, CORS, log de acesso, replicação, objetos sob o prefixo (quantidade, tamanho, mais antigo/recente, classes) e o bloqueio do objeto mais recente. Para B2/Azure/GCS: conexão e objetos. Segredos nunca são exibidos.
+
+### 🔑 Correção: chave secreta dos repositórios em nuvem
+- A chave secreta (S3/Wasabi/B2/Azure) digitada ao criar ou editar o repositório era descartada e o agente passava a usar a senha do motor no lugar — os backups em nuvem falhavam na autenticação. Agora ela é salva **criptografada** (chave local `data/.repo_secrets.key`, que nunca entra no pacote de distribuição).
+- Repositórios em nuvem criados antes desta versão: abra **Editar** e informe a chave secreta novamente (o Detalhes avisa quando ela não está salva).
+- A região do bucket passa a ser deduzida do endpoint da Wasabi quando não informada.
+
 ### 🤖 Copilot
 - Guia de uso com os novos tópicos: políticas centrais, implantação em massa, janela/banda, backup imutável, portal do cliente e faturamento/licença.
 

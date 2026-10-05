@@ -90,6 +90,13 @@ class RepositoryManager:
             if data.get('gcs_project_id'):
                 base['gcs_project_id'] = data.get('gcs_project_id')
 
+        # Chave secreta do provedor: guardada criptografada (antes era descartada)
+        if repo_type != 'local':
+            from engines import repo_secrets
+            sec = repo_secrets.secret_from_data(data)
+            if sec:
+                base['secret_enc'] = repo_secrets.encrypt(sec)
+
         return {k: v for k, v in base.items() if v is not None and v != ''}
 
     def initialize_repository(self, repo_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -124,6 +131,11 @@ class RepositoryManager:
                 logger.warning(f"[RM] Config JSON inválido para repositório: {e!r} | raw: {str(raw_config)[:100]}")
             except Exception as e:
                 logger.warning(f"[RM] Erro ao decodificar config JSON: {e!r}")
+            else:
+                if isinstance(config, dict) and config.get('secret_enc'):
+                    from engines import repo_secrets
+                    repo_secrets.inject(normalized, config)
+                normalized.pop('secret_enc', None)
 
         # Uniformizar todos os campos de senha possíveis para evitar falha de recuperação
         p = (
@@ -422,6 +434,14 @@ class RepositoryManager:
                 config_data['azure_account_name'] = ak_val
             else:
                 config_data['access_key'] = ak_val
+
+        # Nova chave secreta do provedor: guardar criptografada ("" limpa)
+        from engines import repo_secrets
+        new_secret = repo_secrets.secret_from_data(data)
+        if new_secret:
+            config_data['secret_enc'] = repo_secrets.encrypt(new_secret)
+        elif any(data.get(f) == '' for f in repo_secrets.SECRET_FIELDS):
+            config_data.pop('secret_enc', None)
 
         # RM08: Remover senhas e secret keys em texto plano do config JSON
         for secret_key in ['secret_key', 'aws_secret_key', 'b2_account_key', 'azure_account_key', 'motor_password']:

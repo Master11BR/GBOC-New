@@ -846,6 +846,13 @@ class TaskManager:
                     task['aws_secret_key'] = config.get('aws_secret_key') or config.get('secret_key', '')
                     task['b2_account_id'] = config.get('b2_account_id') or config.get('access_key', '')
                     task['b2_account_key'] = config.get('b2_account_key') or config.get('secret_key', '')
+                    if config.get('secret_enc'):
+                        from engines import repo_secrets
+                        _sec = repo_secrets.secret_from_config(config)
+                        if _sec:
+                            task['aws_secret_key'] = task['aws_secret_key'] or _sec
+                            task['b2_account_key'] = task['b2_account_key'] or _sec
+                            task.setdefault('azure_account_key', _sec)
                     task['endpoint'] = config.get('endpoint', '')
                     task['region'] = config.get('region', '')
                     task['prefix'] = config.get('prefix', '')
