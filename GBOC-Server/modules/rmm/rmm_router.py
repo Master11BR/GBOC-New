@@ -4,6 +4,7 @@
 
 import os
 import sys
+import asyncio
 import subprocess
 import logging
 import time
@@ -327,7 +328,7 @@ async def rmm_kill_process(request: Request):
             return JSONResponse({"status": "success", "message": f"Processo '{p_name}' (PID {pid}) encerrado no Servidor."})
         elif pid > 0:
             cmd = ["taskkill", "/F", "/PID", str(pid)] if os.name == 'nt' else ["kill", "-9", str(pid)]
-            subprocess.run(cmd, capture_output=True)
+            await asyncio.to_thread(subprocess.run, cmd, capture_output=True)
             return JSONResponse({"status": "success", "message": f"Processo PID {pid} encerrado no Servidor."})
 
         return JSONResponse({"status": "error", "message": "PID invalido"}, status_code=400)

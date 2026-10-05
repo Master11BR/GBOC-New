@@ -17,7 +17,7 @@ logger = logging.getLogger("gboc_backups_module")
 router = APIRouter(prefix="/api/v1/backups", tags=["Backups"])
 
 @router.get("/recent")
-async def get_recent_backups():
+def get_recent_backups():
     """Retorna o histórico recente de backups."""
     conn = None
     try:

@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/statistics", tags=["statistics"])
 
 @router.get("/")
-async def get_statistics():
+def get_statistics():
     """Retorna estatísticas gerais"""
     try:
         from shared_core import get_shared_core
@@ -42,7 +42,7 @@ async def get_statistics():
         return {"status": "error", "statistics": {}}
 
 @router.get("/summary")
-async def get_statistics_summary(period: str = Query("month", description="Período: day, week, month, year")):
+def get_statistics_summary(period: str = Query("month", description="Período: day, week, month, year")):
     """Retorna um resumo de estatísticas para o período especificado"""
     try:
         from shared_core import get_shared_core
@@ -105,7 +105,7 @@ async def get_statistics_summary(period: str = Query("month", description="Perí
         return {"status": "error", "message": str(e)}
 
 @router.get("/daily")
-async def get_daily_statistics(days: int = Query(30, description="Número de dias a considerar")):
+def get_daily_statistics(days: int = Query(30, description="Número de dias a considerar")):
     """Retorna estatísticas diárias dos últimos N dias"""
     try:
         from shared_core import get_shared_core
@@ -143,7 +143,7 @@ async def get_daily_statistics(days: int = Query(30, description="Número de dia
         return {"status": "error", "message": str(e)}
 
 @router.get("/throughput")
-async def get_throughput_statistics(days: int = Query(30, description="Número de dias a considerar")):
+def get_throughput_statistics(days: int = Query(30, description="Número de dias a considerar")):
     """Retorna dados de throughput (dados e velocidade) dos últimos N dias"""
     try:
         from shared_core import get_shared_core
@@ -182,7 +182,7 @@ async def get_throughput_statistics(days: int = Query(30, description="Número d
         return {"status": "error", "message": str(e)}
 
 @router.get("/engines/comparison")
-async def get_engines_comparison(period: str = Query("month", description="Período: day, week, month, year")):
+def get_engines_comparison(period: str = Query("month", description="Período: day, week, month, year")):
     """Retorna comparação de estatísticas entre diferentes engines"""
     try:
         from shared_core import get_shared_core
@@ -251,7 +251,7 @@ async def get_engines_comparison(period: str = Query("month", description="Perí
         return {"status": "error", "message": str(e)}
 
 @router.get("/errors/trend")
-async def get_errors_trend(days: int = Query(30, description="Número de dias a considerar")):
+def get_errors_trend(days: int = Query(30, description="Número de dias a considerar")):
     """Retorna tendência de erros dos últimos N dias"""
     try:
         from shared_core import get_shared_core

@@ -1,5 +1,6 @@
 // Module: Agents Controller (agents.js)
 document.addEventListener('DOMContentLoaded', () => {
+    if (window.gbocTabHidden && window.gbocTabHidden('tab-agents')) return;   // painel: carrega ao abrir a aba
     loadAgentsList();
 });
 

@@ -82,7 +82,7 @@ class UserPasswordReq(BaseModel):
     new_password: str
 
 @router.get("")
-async def get_users_list():
+def get_users_list():
     """Retorna a lista completa de usuários cadastrados no Servidor, incluindo o tenant."""
     conn = None
     try:
@@ -132,7 +132,7 @@ async def get_users_list():
         if conn: release_db(conn)
 
 @router.get("/roles")
-async def get_roles_matrix():
+def get_roles_matrix():
     """Retorna a matriz oficial dos 5 níveis de acesso e hierarquia de permissões."""
     roles = []
     for r in ROLES_HIERARCHY_MATRIX:
@@ -228,7 +228,7 @@ async def get_permissions_catalog():
     return JSONResponse({"status": "success", "permissions": perms, "grouped_by_module": grouped})
 
 @router.get("/audit")
-async def get_audit_trail():
+def get_audit_trail():
     """Retorna a trilha de auditoria cadastrada no banco PostgreSQL."""
     conn = None
     try:
@@ -259,7 +259,7 @@ async def get_audit_trail():
         if conn: release_db(conn)
 
 @router.post("")
-async def create_user_endpoint(req: UserCreateReq, request: Request):
+def create_user_endpoint(req: UserCreateReq, request: Request):
     """Cria um novo usuário associado ou não a um tenant."""
     if len(req.password) < 4:
         raise HTTPException(400, "Senha deve ter pelo menos 4 caracteres")
@@ -308,7 +308,7 @@ async def create_user_endpoint(req: UserCreateReq, request: Request):
         if conn: release_db(conn)
 
 @router.put("/{user_id}")
-async def update_user_endpoint(user_id: int, req: UserUpdateReq, request: Request):
+def update_user_endpoint(user_id: int, req: UserUpdateReq, request: Request):
     """Atualiza dados de exibição, perfil, empresa (tenant) e status de um usuário."""
     conn = None
     try:
@@ -378,7 +378,7 @@ async def update_user_endpoint(user_id: int, req: UserUpdateReq, request: Reques
         if conn: release_db(conn)
 
 @router.post("/{user_id}/password")
-async def change_user_password(user_id: int, req: UserPasswordReq, request: Request):
+def change_user_password(user_id: int, req: UserPasswordReq, request: Request):
     """Redefine a senha de um usuário."""
     if len(req.new_password) < 4:
         raise HTTPException(400, "Nova senha deve ter pelo menos 4 caracteres")
@@ -421,7 +421,7 @@ async def change_user_password(user_id: int, req: UserPasswordReq, request: Requ
         if conn: release_db(conn)
 
 @router.delete("/{user_id}")
-async def delete_user_endpoint(user_id: int, request: Request):
+def delete_user_endpoint(user_id: int, request: Request):
     """Remove um usuário do Servidor Central."""
     conn = None
     try:

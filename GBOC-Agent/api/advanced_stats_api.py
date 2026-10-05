@@ -252,7 +252,7 @@ async def get_predictions():
         _log_endpoint_perf("/api/advanced-stats/predictions", request_start)
 
 @router.get("/trends")
-async def get_trends(days: int = 30):
+def get_trends(days: int = 30):
     """Obtém análise de tendências"""
     request_start = time.perf_counter()
     try:
@@ -291,7 +291,7 @@ async def get_trends(days: int = 30):
 
 
 @router.get("/trend")
-async def get_trend(days: int = 7):
+def get_trend(days: int = 7):
     """Daily backup trend (success/failed per day) — used by Dashboard charts + heatmap."""
     request_start = time.perf_counter()
     try:
@@ -319,7 +319,7 @@ async def get_trend(days: int = 7):
 
 
 @router.get("/distribution")
-async def get_distribution():
+def get_distribution():
     """Task execution status distribution (for pie/doughnut chart)."""
     request_start = time.perf_counter()
     try:
@@ -343,7 +343,7 @@ async def get_distribution():
 
 
 @router.get("/recent-executions")
-async def get_recent_executions(limit: int = 30):
+def get_recent_executions(limit: int = 30):
     """Recent task executions for timeline widget."""
     request_start = time.perf_counter()
     try:

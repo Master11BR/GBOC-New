@@ -18,7 +18,7 @@ class BulkRunRequest(BaseModel):
 
 @router.get("")
 @router.get("/")
-async def list_tasks_v2(
+def list_tasks_v2(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     status: Optional[str] = Query(None),
@@ -63,7 +63,7 @@ async def list_tasks_v2(
     return build_v2_response(data=tasks, meta=meta, execution_time_ms=elapsed)
 
 @router.post("/bulk-run")
-async def bulk_run_agent_tasks_v2(payload: BulkRunRequest):
+def bulk_run_agent_tasks_v2(payload: BulkRunRequest):
     """Executa múltiplas tarefas no agente em uma única chamada."""
     t0 = time.perf_counter()
     results = []

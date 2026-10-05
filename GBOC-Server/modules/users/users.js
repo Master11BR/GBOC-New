@@ -10,6 +10,7 @@ var availablePermissions = [];
 var permissionsGrouped = {};
 
 document.addEventListener('DOMContentLoaded', function () {
+    if (window.gbocTabHidden && window.gbocTabHidden('tab-users')) return;   // painel: carrega ao abrir a aba
     loadAllUsersModule();
 });
 

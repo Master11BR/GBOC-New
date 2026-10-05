@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/backup", tags=["backup"])
 
 @router.post("/run-all")
-async def run_all_backups():
+def run_all_backups():
     """Executa todos os backups habilitados com retentativas"""
     try:
         from shared_core import get_shared_core
@@ -59,7 +59,7 @@ async def run_all_backups():
         return {"status": "error", "message": str(e)}
 
 @router.post("/stop-all")
-async def stop_all_backups():
+def stop_all_backups():
     """Para todos os backups em execução"""
     try:
         from shared_core import get_shared_core

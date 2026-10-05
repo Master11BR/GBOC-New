@@ -85,7 +85,7 @@ class BurstSyncPayload(BaseModel):
 # ==============================================================================
 
 @router.get("/agents")
-async def hermes_all_agents():
+def hermes_all_agents():
     """
     Lista todos os agentes registrados com seu status de conectividade
     e estatísticas de fila offline (se disponíveis).
@@ -129,7 +129,7 @@ async def hermes_all_agents():
 
 
 @router.get("/queue/stats")
-async def hermes_queue_stats_global():
+def hermes_queue_stats_global():
     """
     Estatísticas globais de filas offline de todos os agentes conectados.
     Inclui totais de mensagens pendentes e histórico de burst syncs.
@@ -174,7 +174,7 @@ async def hermes_queue_stats_global():
 
 
 @router.get("/mesh")
-async def hermes_global_mesh():
+def hermes_global_mesh():
     """
     Topologia global da rede mesh de todos os agentes.
     Combina dados de todos os agentes para uma visão de rede unificada.
@@ -239,7 +239,7 @@ async def hermes_remote_heal(agent_id: str, cmd: HermesHealCommand):
 
 
 @router.post("/burst-sync")
-async def hermes_receive_burst_sync(payload: BurstSyncPayload):
+def hermes_receive_burst_sync(payload: BurstSyncPayload):
     """
     Endpoint chamado pelo agente Hermes durante o Burst Sync após reconexão offline.
     Persiste as mensagens da fila offline do agente no banco PostgreSQL central.

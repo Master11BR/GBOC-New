@@ -31,7 +31,7 @@ def _get_core():
 
 
 @router.get("/backup-report/csv")
-async def export_backup_report_csv(days: int = 30):
+def export_backup_report_csv(days: int = 30):
     """Exporta relatório de backups em CSV"""
     core = _get_core()
     try:
@@ -79,7 +79,7 @@ async def export_backup_report_csv(days: int = 30):
 
 
 @router.get("/backup-report/json")
-async def export_backup_report_json(days: int = 30):
+def export_backup_report_json(days: int = 30):
     """Exporta relatório completo em JSON"""
     core = _get_core()
     try:

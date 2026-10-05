@@ -326,7 +326,7 @@ async def get_sla_compliance():
 
 
 @router.get("/tasks-at-risk")
-async def get_tasks_at_risk():
+def get_tasks_at_risk():
     """Identifica tarefas em risco — falhas consecutivas, sem backup recente, RPO violado"""
     core = _get_core()
     try:
@@ -390,7 +390,7 @@ async def get_tasks_at_risk():
 
 
 @router.get("/error-classification")
-async def get_error_classification():
+def get_error_classification():
     """Classifica e agrupa erros por tipo/padrão"""
     core = _get_core()
     try:

@@ -8,7 +8,7 @@ class ForceStopRequest(BaseModel):
     execution_id: int
 
 @router.post("/force-stop")
-async def force_stop_endpoint(request: ForceStopRequest):
+def force_stop_endpoint(request: ForceStopRequest):
     """
     Força a parada de uma tarefa que pode estar travada.
     - Se o processo estiver rodando, ele é terminado.

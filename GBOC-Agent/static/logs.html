@@ -459,6 +459,9 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                     <button class="btn btn-secondary" onclick="refreshLogs()">
                         <i class="fas fa-sync-alt"></i> Atualizar
                     </button>
+                    <button class="btn btn-secondary" onclick="toggleRetention()">
+                        <i class="fas fa-broom"></i> Retenção
+                    </button>
                     <button class="btn btn-secondary" onclick="clearAllBackendLogs()">
                         <i class="fas fa-trash"></i> Limpar Tudo
                     </button>
@@ -490,7 +493,24 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                             <option value="server">Servidor</option>
                             <option value="diagnostic">Diagnóstico</option>
                         </select>
+                        <select id="periodFilter" onchange="onPeriodChange()" class="module-select" title="Período">
+                            <option value="24">Últimas 24 horas</option>
+                            <option value="168">Últimos 7 dias</option>
+                            <option value="720">Últimos 30 dias</option>
+                            <option value="2160">Últimos 90 dias</option>
+                            <option value="4320">Últimos 180 dias</option>
+                            <option value="8760">Últimos 12 meses</option>
+                            <option value="0" selected>Todo o período</option>
+                            <option value="custom">Personalizado…</option>
+                        </select>
+                        <span id="customRange" style="display:none;gap:6px;align-items:center">
+                            <input type="date" id="logStart" class="module-select" onchange="loadLogs()">
+                            <span style="color:var(--text-muted)">até</span>
+                            <input type="date" id="logEnd" class="module-select" onchange="loadLogs()">
+                        </span>
                     </div>
+                    <div id="retentionPanel" style="display:none;margin:10px 0;padding:12px;border:1px solid var(--border);border-radius:10px;font-size:.88em"></div>
+                    <div id="logStats" style="font-size:.84em;color:var(--text-muted);margin:6px 0 10px"></div>
 
                     <div class="toolbar">
                         <span>Notificações &amp; Registros <span class="count" id="count"></span></span>
@@ -499,6 +519,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 
                     <section class="list" id="list" aria-live="polite"></section>
                     <div class="empty" id="empty">Nenhuma notificação deste tipo encontrada.</div>
+                    <div style="text-align:center;margin-top:10px"><button class="btn btn-secondary" id="loadMore" style="display:none" onclick="loadLogs(true)"><i class="fas fa-angle-double-down"></i> Carregar mais</button></div>
                     <div id="aiLogDiagModal" style="display:none;margin-top:16px;padding:14px;border-radius:12px;background:rgba(99,102,241,0.12);border:1px solid var(--primary);font-size:0.88em;color:var(--text);"></div>
                 </section>
             </div>
@@ -643,22 +664,69 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             render(false);
         }
 
-        async function loadLogs() {
+        let logOffset = 0;
+        const PAGE = 500;
+
+        function onPeriodChange() {
+            const custom = document.getElementById('periodFilter').value === 'custom';
+            document.getElementById('customRange').style.display = custom ? 'inline-flex' : 'none';
+            if (custom) {
+                const e = document.getElementById('logEnd'), st = document.getElementById('logStart');
+                if (!e.value) e.value = new Date().toISOString().slice(0, 10);
+                if (!st.value) { const d = new Date(); d.setDate(d.getDate() - 30); st.value = d.toISOString().slice(0, 10); }
+            }
+            refreshLogs();
+        }
+
+        function periodQuery() {
+            const q = new URLSearchParams();
+            const per = document.getElementById('periodFilter')?.value || '0';
+            if (per === 'custom') {
+                const st = document.getElementById('logStart')?.value, e = document.getElementById('logEnd')?.value;
+                if (st) q.set('start', st);
+                if (e) q.set('end', e);
+                q.set('hours', '0');
+            } else q.set('hours', per);
+            return q;
+        }
+
+        async function loadStats() {
+            try {
+                const r = await fetch('/api/logs/stats?' + periodQuery());
+                const d = await r.json();
+                if (d.status !== 'success') throw new Error(d.message || 'erro');
+                const lv = d.by_level || {};
+                const n = (v) => Number(v || 0).toLocaleString('pt-BR');
+                const sum = (...k) => k.reduce((a, x) => a + (lv[x] || 0), 0);
+                document.getElementById('logStats').innerHTML =
+                    `<i class="fas fa-list"></i> Total no período: <b>${n(d.total)}</b> · ` +
+                    `<span style="color:var(--danger)">Erros: <b>${n(sum('ERROR', 'CRITICAL'))}</b></span> · ` +
+                    `<span style="color:var(--warning)">Avisos: <b>${n(sum('WARNING', 'WARN'))}</b></span>` +
+                    (d.oldest ? ` · de ${formatTimestamp(d.oldest)} a ${formatTimestamp(d.newest)}` : '');
+            } catch (e) {
+                document.getElementById('logStats').textContent = 'Estatísticas indisponíveis: ' + e.message;
+            }
+        }
+
+        async function loadLogs(more) {
+            more = more === true;
             if (isLoading) return;
             isLoading = true;
             try {
-                let url = '/api/logs/?hours=48&limit=500';
+                if (!more) logOffset = 0;
+                const q = periodQuery();
+                q.set('limit', PAGE);
+                q.set('offset', logOffset);
                 const moduleFilter = document.getElementById('moduleFilter');
-                if (moduleFilter && moduleFilter.value) {
-                    url += '&module=' + moduleFilter.value;
-                }
-                const response = await fetch(url);
+                if (moduleFilter && moduleFilter.value) q.set('module', moduleFilter.value);
+                const response = await fetch('/api/logs/?' + q);
                 if (!response.ok) throw new Error('HTTP ' + response.status);
 
                 const data = await response.json();
+                if (data.status === 'error') throw new Error(data.message || 'erro ao consultar');
                 const rawLogs = data.logs || [];
 
-                allLogs = rawLogs.map((log, idx) => {
+                const mapped = rawLogs.map((log, idx) => {
                     const msg = log.message || '';
                     const type = mapLogToType(log.level, msg);
                     const origLevel = (log.level || '').toUpperCase();
@@ -677,8 +745,13 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                         timestamp: formatTimestamp(log.timestamp)
                     };
                 });
+                allLogs = more ? allLogs.concat(mapped) : mapped;
+                logOffset += rawLogs.length;
 
-                render(true);
+                render(!more);
+                if (data.total != null) count.textContent = `(${allLogs.length.toLocaleString('pt-BR')} de ${Number(data.total).toLocaleString('pt-BR')})`;
+                document.getElementById('loadMore').style.display = data.has_more ? '' : 'none';
+                if (!more) loadStats();
             } catch (error) {
                 console.error('Erro ao carregar logs:', error);
                 if (allLogs.length === 0) {
@@ -698,8 +771,44 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 }
             } finally {
                 isLoading = false;
-                scheduleRefresh();
+                if (!more && logOffset <= PAGE) scheduleRefresh();
             }
+        }
+
+        function toggleRetention() {
+            const p = document.getElementById('retentionPanel');
+            const show = p.style.display === 'none';
+            p.style.display = show ? '' : 'none';
+            if (show) loadRetention();
+        }
+
+        async function loadRetention() {
+            const p = document.getElementById('retentionPanel');
+            try {
+                const r = await fetch('/api/logs/retention');
+                const d = await r.json();
+                const mb = (b) => b == null ? '—' : (b / 1048576).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' MB';
+                p.innerHTML = `<b><i class="fas fa-broom"></i> Retenção dos logs do agente</b>
+                    <div style="margin:6px 0">${Number(d.count || 0).toLocaleString('pt-BR')} registro(s) · ${mb(d.size_bytes)} · desde ${d.oldest ? formatTimestamp(d.oldest) : '—'}</div>
+                    <label>Manter por (dias, 0 = sempre) <input type="number" id="retDays" min="0" max="3650" value="${d.logs_retention_days}" class="module-select" style="width:110px"></label>
+                    <button class="btn btn-primary" onclick="saveRetention()"><i class="fas fa-save"></i> Salvar</button>
+                    <button class="btn btn-secondary" onclick="runRetention()"><i class="fas fa-broom"></i> Aplicar agora</button>
+                    <div style="color:var(--text-muted);margin-top:6px">A limpeza roda sozinha uma vez por dia. Os logs já enviados ao Servidor Central continuam lá conforme a retenção do servidor.</div>`;
+            } catch (e) { p.textContent = 'Retenção indisponível: ' + e.message; }
+        }
+
+        async function saveRetention() {
+            const days = +document.getElementById('retDays').value;
+            const r = await fetch('/api/logs/retention', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ logs_retention_days: days }) });
+            if (!r.ok) { const d = await r.json().catch(() => ({})); alert('Falha: ' + (d.detail || r.status)); return; }
+            loadRetention();
+        }
+
+        async function runRetention() {
+            const r = await fetch('/api/logs/cleanup', { method: 'POST' });
+            const d = await r.json().catch(() => ({}));
+            alert(`${Number(d.deleted || 0).toLocaleString('pt-BR')} registro(s) removido(s).`);
+            loadRetention(); refreshLogs();
         }
 
         function scheduleRefresh() {

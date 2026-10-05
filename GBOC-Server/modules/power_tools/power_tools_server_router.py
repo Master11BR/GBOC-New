@@ -72,7 +72,7 @@ class RemoteUSBRequest(BaseModel):
 
 
 @router.get("/bitrot/status")
-async def bitrot_global_status():
+def bitrot_global_status():
     """
     Status de integridade contra bitrot de todos os agentes conectados.
     Agrega os últimos resultados de scrubbing de cada agente.
@@ -142,7 +142,7 @@ async def trigger_remote_scrub(req: RemoteScrubRequest):
 
 
 @router.get("/rdr/status")
-async def rdr_global_status():
+def rdr_global_status():
     """
     Status dos Rapid Delta Restores em andamento em todos os agentes.
     """

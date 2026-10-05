@@ -4,6 +4,7 @@
    ============================================================================ */
 
 document.addEventListener('DOMContentLoaded', () => {
+    if (window.gbocTabHidden && window.gbocTabHidden('tab-hermes')) return;   // painel: carrega ao abrir a aba
     loadHermesServerData();
 });
 

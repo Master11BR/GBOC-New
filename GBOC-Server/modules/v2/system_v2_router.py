@@ -130,7 +130,7 @@ async def get_system_info_v2(request: Request):
     return build_v2_response(data=telemetry, execution_time_ms=elapsed)
 
 @router.get("/health")
-async def get_system_health_v2(request: Request):
+def get_system_health_v2(request: Request):
     """Diagnóstico abrangente de saúde do sistema com latência do banco de dados."""
     t0 = time.perf_counter()
     

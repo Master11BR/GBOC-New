@@ -4,6 +4,7 @@
 
 import os
 import sys
+import asyncio
 import subprocess
 import logging
 import time
@@ -61,7 +62,7 @@ async def rmm_execute_command(request: Request):
             # Default: PowerShell
             shell_cmd = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", cmd] if os.name == 'nt' else ["bash", "-c", cmd]
 
-        res = subprocess.run(shell_cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout)
+        res = await asyncio.to_thread(subprocess.run, shell_cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout)
         duration = round(time.time() - start_time, 3)
 
         stdout = (res.stdout or "").strip()
@@ -152,9 +153,9 @@ async def rmm_kill_process(request: Request):
             p.terminate()
         else:
             if os.name == 'nt':
-                subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True)
+                await asyncio.to_thread(subprocess.run, ["taskkill", "/F", "/PID", str(pid)], capture_output=True)
             else:
-                subprocess.run(["kill", "-9", str(pid)], capture_output=True)
+                await asyncio.to_thread(subprocess.run, ["kill", "-9", str(pid)], capture_output=True)
             p_name = f"PID {pid}"
 
         _log_audit_rmm("kill_process", {"pid": pid, "process_name": p_name})
@@ -184,7 +185,7 @@ async def rmm_get_services():
                     continue
         else:
             # Fallback Linux / Service CLI
-            res = subprocess.run(["systemctl", "list-units", "--type=service", "--no-pager"], capture_output=True, text=True)
+            res = await asyncio.to_thread(subprocess.run, ["systemctl", "list-units", "--type=service", "--no-pager"], capture_output=True, text=True)
             for line in res.stdout.splitlines():
                 if ".service" in line:
                     parts = line.split()
@@ -221,7 +222,7 @@ async def rmm_control_service(request: Request):
         else:
             cmd = ["systemctl", action, sname]
 
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+        res = await asyncio.to_thread(subprocess.run, cmd, capture_output=True, text=True, timeout=15)
         _log_audit_rmm("service_control", {"service": sname, "action": action})
 
         return {

@@ -62,7 +62,7 @@ class RemoteRollbackRequest(BaseModel):
 
 
 @router.get("/status")
-async def cdp_global_status():
+def cdp_global_status():
     """
     Status CDP de todos os agentes: RPO atual, última captura de micro-journal,
     e status de bancos enterprise (Oracle RMAN, SAP HANA, IBM DB2).
@@ -113,7 +113,7 @@ async def cdp_global_status():
 
 
 @router.get("/databases")
-async def cdp_databases_status():
+def cdp_databases_status():
     """
     Status dos backups de bancos enterprise por agente.
     Agrupa os relatórios de backup por tipo (Oracle, HANA, DB2, PostgreSQL, MSSQL).

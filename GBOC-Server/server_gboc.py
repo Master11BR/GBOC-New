@@ -100,6 +100,13 @@ connection_pool = None
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# CPU amostrada em segundo plano: psutil.cpu_percent(interval=...) deixa de dormir dentro das rotas
+try:
+    from fast_metrics import install as _install_fast_metrics
+    _install_fast_metrics()
+except Exception as _fm_e:
+    logger.warning(f"Métricas rápidas de CPU indisponíveis: {_fm_e}")
+
 # Gerenciamento de conexões WebSocket
 class ConnectionManager:
     def __init__(self):
@@ -965,8 +972,14 @@ async def _gboc_asset_revalidate(request: Request, call_next):
     o navegador seguia com scripts antigos depois de uma atualização do GBOC."""
     r = await call_next(request)
     p = request.url.path.lower()
-    if p.endswith((".js", ".css", ".html")) or p in ("/", ""):
+    if p.endswith(".html") or p in ("/", ""):
         r.headers["Cache-Control"] = "no-cache"
+    elif p.endswith((".js", ".css")):
+        # Antes "no-cache": cada troca de tela revalidava ~20 arquivos (um pedido ao servidor por arquivo).
+        # 5 minutos em cache: navegação rápida; uma atualização do GBOC aparece em até 5 min (ou Ctrl+F5).
+        r.headers["Cache-Control"] = "private, max-age=300"
+    elif p.endswith((".woff2", ".woff", ".ttf", ".png", ".jpg", ".jpeg", ".svg", ".ico", ".webp", ".gif")):
+        r.headers["Cache-Control"] = "private, max-age=86400"
     return r
 
 @app.middleware("http")
@@ -1325,7 +1338,7 @@ async def server_auth_oauth_provider(provider: str):
     }
 
 @app.post("/api/v1/auth/setup")
-async def server_auth_setup(req: ServerSetupRequest):
+def server_auth_setup(req: ServerSetupRequest):
     conn = None
     try:
         conn = get_db()
@@ -1352,7 +1365,7 @@ async def server_auth_setup(req: ServerSetupRequest):
         release_db(conn)
 
 @app.post("/api/v1/auth/login")
-async def server_auth_login(req: ServerLoginRequest, request: Request, response: Response):
+def server_auth_login(req: ServerLoginRequest, request: Request, response: Response):
     conn = None
     ip = request.client.host if request.client else "unknown"
     uname = (req.username or "").strip()
@@ -1420,7 +1433,7 @@ async def server_auth_login(req: ServerLoginRequest, request: Request, response:
         release_db(conn)
 
 @app.post("/api/v1/auth/logout")
-async def server_auth_logout(request: Request, response: Response):
+def server_auth_logout(request: Request, response: Response):
     token = None
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
@@ -1910,6 +1923,12 @@ async def handle_full_data_sync(agent_id: str, data: Dict) -> Dict:
         if conn:
             release_db(conn)
 
+def _run_full_sync(agent_id: str, data: Dict) -> Dict:
+    """Executa a sincronização completa numa thread própria: as etapas fazem consultas síncronas ao banco
+    e, rodando no event loop, travavam todas as outras requisições (login, telas) enquanto um agente sincronizava."""
+    return asyncio.run(handle_full_data_sync(agent_id, data))
+
+
 # handle_realtime_alert, get_agent_full_data, get_agent_repositories e get_agent_tasks
 # estão definidos uma única vez na seção "HANDLERS PARA COMUNICAÇÃO EM TEMPO REAL" (abaixo).
 # As cópias antigas que existiam aqui eram sobrescritas pelas definições posteriores (código morto).
@@ -1955,7 +1974,7 @@ async def handle_websocket_message(agent_id: str, message: Dict, websocket: WebS
     if msg_type == "full_sync":
         # Sincronização completa de dados
         data = message.get("data", {})
-        result = await handle_full_data_sync(agent_id, data)
+        result = await asyncio.to_thread(_run_full_sync, agent_id, data)
         await websocket.send_text(json.dumps({"status": result.get("status", "error"), "type": "full_sync", "message": result.get("message", "")}))
 
     elif msg_type == "heartbeat":
@@ -1996,7 +2015,7 @@ async def handle_websocket_message(agent_id: str, message: Dict, websocket: WebS
 async def full_data_sync(data: AgentFullData):
     """Recebe sincronização completa de dados do agente"""
     payload = data.model_dump() if hasattr(data, 'model_dump') else data.dict()
-    return await handle_full_data_sync(data.agent_id, payload)
+    return await asyncio.to_thread(_run_full_sync, data.agent_id, payload)
 
 @app.post("/api/v1/agents/manual-sync")
 async def manual_sync_request(data: ManualSyncRequest):
@@ -2143,7 +2162,7 @@ def _require_server_auth(request: Request):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @app.post("/api/v1/backups/report")
-async def report_backup(data: BackupReport):
+def report_backup(data: BackupReport):
     conn = None
     try:
         conn = get_db(); cur = conn.cursor()
@@ -2182,7 +2201,7 @@ async def report_backup(data: BackupReport):
         release_db(conn)
 
 @app.post("/api/v1/sync/tasks")
-async def sync_tasks(data: TaskSyncData):
+def sync_tasks(data: TaskSyncData):
     conn = None
     try:
         conn = get_db(); cur = conn.cursor()
@@ -2309,7 +2328,7 @@ async def get_version():
 
 
 @app.get("/api/v1/agents/{agent_id}/details")
-async def get_agent_details(agent_id: str):
+def get_agent_details(agent_id: str):
     """Retorna dados completos de um agente: info, métricas, tasks, repos, backups recentes, uptime."""
     conn = None
     try:
@@ -2487,7 +2506,7 @@ class StatisticsSyncData(BaseModel):
     statistics: List[Dict[str, Any]]
 
 @app.post("/api/v1/sync/statistics")
-async def sync_statistics(data: StatisticsSyncData):
+def sync_statistics(data: StatisticsSyncData):
     """Recebe estatísticas de backup sincronizadas de um agente"""
     conn = None
     try:
@@ -2522,7 +2541,7 @@ async def sync_statistics(data: StatisticsSyncData):
 # =====================================================================
 
 @app.get("/api/v1/analytics/history")
-async def get_analytics_history(range: str = '7d'):
+def get_analytics_history(range: str = '7d'):
     """Histórico de backups — usa agent_task_executions (dados reais sincronizados)"""
     conn = None
     try:
@@ -2581,7 +2600,7 @@ async def get_analytics_history(range: str = '7d'):
 
 
 @app.get("/api/v1/analytics/comprehensive")
-async def get_comprehensive_analytics():
+def get_comprehensive_analytics():
     """Analytics completo: KPIs, tendências, previsão, diagnóstico preemptivo"""
     conn = None
     try:
@@ -3035,7 +3054,7 @@ async def get_comprehensive_analytics():
         release_db(conn)
 
 @app.get("/api/v1/dashboard/stats")
-async def stats(request: Request):
+def stats(request: Request):
     conn = None
     try:
         user = _get_server_user_from_request(request)
@@ -3154,7 +3173,7 @@ async def stats(request: Request):
         release_db(conn)
 
 @app.get("/api/v1/agents")
-async def list_agents(request: Request):
+def list_agents(request: Request):
     conn = None
     try:
         user = _get_server_user_from_request(request)
@@ -3174,7 +3193,7 @@ async def list_agents(request: Request):
         release_db(conn)
 
 @app.get("/api/v1/backups/recent")
-async def recent_backups(request: Request, limit: int = 20):
+def recent_backups(request: Request, limit: int = 20):
     conn = None
     try:
         user = _get_server_user_from_request(request)
@@ -3263,7 +3282,7 @@ async def recent_backups(request: Request, limit: int = 20):
         release_db(conn)
 
 @app.get("/api/v1/events/recent")
-async def get_events(limit: int = 20):
+def get_events(limit: int = 20):
     conn = None
     try:
         conn = get_db(); cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -3602,7 +3621,7 @@ async def server_ransomware_overview():
 
 
 @app.get("/api/v1/server/compliance/overview")
-async def server_compliance_overview():
+def server_compliance_overview():
     """Aggregated compliance status across all agents"""
     conn = None
     try:
@@ -3688,7 +3707,7 @@ async def server_compliance_overview():
         if 'cur' in locals() and cur: cur.close()
         release_db(conn)
 @app.get("/api/v1/server/alerts/overview")
-async def server_alerts_overview(severity: Optional[str] = None):
+def server_alerts_overview(severity: Optional[str] = None):
     """Aggregated alerts from system_events across all agents"""
     conn = None
     try:
@@ -3749,7 +3768,7 @@ async def server_alerts_overview(severity: Optional[str] = None):
 
 
 @app.get("/api/v1/server/replication/overview")
-async def server_replication_overview():
+def server_replication_overview():
     """Aggregated replication status across all agents"""
     conn = None
     try:
@@ -3779,7 +3798,7 @@ async def server_replication_overview():
 
 
 @app.get("/api/v1/auth/users")
-async def list_server_users():
+def list_server_users():
     """List all server dashboard users"""
     conn = None
     try:
@@ -3810,7 +3829,7 @@ async def list_server_users():
 
 
 @app.delete("/api/v1/auth/users/{user_id}")
-async def delete_server_user(user_id: int, request: Request):
+def delete_server_user(user_id: int, request: Request):
     """Delete a server dashboard user"""
     conn = None
     try:
@@ -3849,7 +3868,7 @@ class _ChangePwReq(BaseModel):
 
 
 @app.post("/api/v1/auth/users")
-async def create_server_user(req: _UserCreateReq, request: Request):
+def create_server_user(req: _UserCreateReq, request: Request):
     """Create a new server dashboard user"""
     if len(req.password) < 4:
         raise HTTPException(400, "Senha deve ter pelo menos 4 caracteres")
@@ -3882,7 +3901,7 @@ async def create_server_user(req: _UserCreateReq, request: Request):
 
 
 @app.put("/api/v1/auth/users/{user_id}")
-async def update_server_user(user_id: int, req: _UserUpdateReq, request: Request):
+def update_server_user(user_id: int, req: _UserUpdateReq, request: Request):
     """Reset password or update display_name/role for a server user"""
     conn = None
     try:
@@ -3917,7 +3936,7 @@ async def update_server_user(user_id: int, req: _UserUpdateReq, request: Request
 
 
 @app.post("/api/v1/auth/change-password")
-async def change_own_password(req: _ChangePwReq, request: Request):
+def change_own_password(req: _ChangePwReq, request: Request):
     """Allow authenticated user to change their own password"""
     me = _get_server_user_from_request(request)
     if not me:
@@ -3962,7 +3981,7 @@ async def change_own_password(req: _ChangePwReq, request: Request):
 
 
 @app.get("/api/v1/auth/users/audit")
-async def get_auth_audit(limit: int = 50, request: Request = None):
+def get_auth_audit(limit: int = 50, request: Request = None):
     """Get authentication audit log"""
     conn = None
     try:
@@ -3994,7 +4013,7 @@ async def get_auth_audit(limit: int = 50, request: Request = None):
 # ══════════════════════════════════════════════════════════════════
 
 @app.get("/api/v1/server/settings")
-async def get_all_server_settings():
+def get_all_server_settings():
     """Get all server settings grouped by category."""
     conn = None
     try:
@@ -4037,7 +4056,7 @@ async def get_all_server_settings():
 
 
 @app.get("/api/v1/server/settings/{category}")
-async def get_category_server_settings(category: str):
+def get_category_server_settings(category: str):
     """Get settings for a specific category."""
     conn = None
     try:
@@ -4128,7 +4147,7 @@ async def bulk_update_server_settings(request: Request):
 
 
 @app.post("/api/v1/server/settings/reset")
-async def reset_server_settings():
+def reset_server_settings():
     """Reset all server settings to defaults."""
     conn = None
     try:
@@ -4146,7 +4165,7 @@ async def reset_server_settings():
 
 
 @app.post("/api/v1/server/settings/export")
-async def export_server_settings():
+def export_server_settings():
     """Export all settings as JSON."""
     conn = None
     try:
@@ -4200,7 +4219,7 @@ async def import_server_settings(request: Request):
 # ── Relatórios Consolidados ───────────────────────────────────────────────────
 
 @app.get("/api/v1/reports/consolidated")
-async def get_consolidated_report(request: Request, days: int = 30):
+def get_consolidated_report(request: Request, days: int = 30):
     """
     Relatório consolidado de todos os agentes: resumo por agente, totais globais,
     top falhas, volume de dados, taxa de sucesso e tendência nos últimos N dias.
@@ -4307,7 +4326,7 @@ async def get_consolidated_report(request: Request, days: int = 30):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @app.get("/api/v1/server/info")
-async def get_server_info():
+def get_server_info():
     """Get comprehensive server information."""
     import platform
     conn = None

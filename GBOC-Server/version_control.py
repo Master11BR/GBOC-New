@@ -29,18 +29,35 @@ PRERELEASE = "stable"
 
 _GIT_INFO_CACHE: Optional[Dict[str, Any]] = None
 _GIT_INFO_CACHE_TIME: float = 0.0
-_GIT_INFO_TTL: float = 60.0  # 60s cache elimina overhead de 300ms de subprocessos git
+_GIT_INFO_TTL: float = 600.0  # renovado em segundo plano a cada 10 min
 
 _BUILD_META_CACHE: Optional[Dict[str, Any]] = None
 _BUILD_META_CACHE_TIME: float = 0.0
 _BUILD_META_TTL: float = 30.0
 
+_GIT_REFRESHING = False
+
+
 def _get_git_info() -> Dict[str, Any]:
-    """Obtém informações em tempo real do repositório Git com cache TTL."""
-    global _GIT_INFO_CACHE, _GIT_INFO_CACHE_TIME
+    """Informações do Git sem travar quem chama.
+
+    Antes: a cada 60 s a primeira requisição (o cabeçalho de toda tela chama /api/system/info) executava
+    4 comandos git dentro do servidor — no Windows, segundos com o servidor inteiro parado.
+    Agora: a primeira leitura usa os valores padrão e o git roda numa thread; depois o valor fica em cache
+    e é renovado em segundo plano (sem esperar)."""
+    global _GIT_REFRESHING
     now = time.time()
-    if _GIT_INFO_CACHE is not None and (now - _GIT_INFO_CACHE_TIME) < _GIT_INFO_TTL:
-        return _GIT_INFO_CACHE
+    if _GIT_INFO_CACHE is None or (now - _GIT_INFO_CACHE_TIME) >= _GIT_INFO_TTL:
+        if not _GIT_REFRESHING:
+            _GIT_REFRESHING = True
+            import threading as _th
+            _th.Thread(target=_refresh_git_info, name="gboc-git-info", daemon=True).start()
+    return _GIT_INFO_CACHE or {"commit": "a8f2e91", "commit_count": "1", "branch": "main", "is_dirty": False}
+
+
+def _refresh_git_info() -> Dict[str, Any]:
+    global _GIT_INFO_CACHE, _GIT_INFO_CACHE_TIME, _GIT_REFRESHING
+    now = time.time()
 
     info = {
         "commit": "a8f2e91",
@@ -77,6 +94,7 @@ def _get_git_info() -> Dict[str, Any]:
 
     _GIT_INFO_CACHE = info
     _GIT_INFO_CACHE_TIME = now
+    _GIT_REFRESHING = False
     return info
 
 def _load_or_create_build_meta() -> Dict[str, Any]:

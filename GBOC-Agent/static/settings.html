@@ -372,6 +372,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                             <label>Chave de Pareamento</label>
                             <input type="password" id="server-key" class="form-control" placeholder="gboc_pk_... (deixe vazio para manter a atual)" autocomplete="off">
                             <small class="text-muted">Copie no GBOC Server em Configurações Gerais &gt; Pareamento de Agentes. Sem ela o Server recusa heartbeat, sincronização e comandos RMM.</small>
+                            <div id="server-key-status" style="margin-top:6px;font-size:12.5px;"></div>
                         </div>
 
                         <div class="setting-item">
@@ -837,7 +838,8 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                     alert('Falha ao configurar servidor: ' + (result.message || result.error || ('HTTP ' + response.status)));
                 } else {
                     document.getElementById('server-key').value = '';
-                    alert(result.message || 'Configurado com sucesso');
+                    alert((result.message || 'Configurado com sucesso') + ' — chave validada pelo Server e salva no agente.');
+                    refreshServerKeyStatus();
                 }
             } catch (e) {
                 alert('Erro ao configurar servidor: ' + e.message);
@@ -1701,7 +1703,27 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         }
 
         // Pré-preenche a URL do Servidor Central e indica se a chave de pareamento está configurada
+        async function refreshServerKeyStatus() {
+            const box = document.getElementById('server-key-status');
+            try {
+                const d = await (await fetch('/api/server/status')).json();
+                const s = d.server || {};
+                if (!box) return s;
+                const esc = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+                const auth = {ok: ['#48bb78', 'reconhecida pelo Server'], rejected: ['#f56565', 'RECUSADA pelo Server (401) — copie a chave atual no Server e salve aqui'],
+                              unknown: ['#ecc94b', 'aguardando o próximo heartbeat para confirmar']}[s.server_auth || 'unknown'];
+                box.innerHTML = s.paired
+                    ? `<span style="color:${auth[0]}">●</span> Chave salva: <code>${esc(s.key_hint)}</code> — ${auth[1]}`
+                      + (s.server_auth_at ? ` <span class="text-muted">(${esc(String(s.server_auth_at).replace('T', ' ').slice(0, 19))})</span>` : '')
+                      + `<br><span class="text-muted">Arquivo: ${esc(s.config_file)} · processo ${esc(s.pid)}</span>`
+                    : '<span style="color:#f56565">●</span> Nenhuma chave de pareamento salva neste agente.';
+                return s;
+            } catch (e) { return {}; }
+        }
+        setInterval(() => { if (document.getElementById('server-key-status')) refreshServerKeyStatus(); }, 30000);
+
         document.addEventListener('DOMContentLoaded', async function() {
+            refreshServerKeyStatus();
             try {
                 const r = await fetch('/api/server/status');
                 if (!r.ok) return;

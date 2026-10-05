@@ -282,15 +282,23 @@ def get_current_user(request: Request) -> Optional[Dict]:
     return _validate_token(token)
 
 
+_AUTH_ENABLED_CACHE = {"ok": False, "ts": 0.0}
+
+
 def is_auth_enabled() -> bool:
+    # Chamado em TODA requisição pelo middleware: o "sim" fica em cache por 60 s (antes: 1 consulta por pedido).
+    import time as _t
+    if _AUTH_ENABLED_CACHE["ok"] and _t.monotonic() - _AUTH_ENABLED_CACHE["ts"] < 60:
+        return True
     try:
         from shared_core import get_shared_core
         core = get_shared_core()
         with core.get_db_connection() as conn:
             cur = conn.cursor()
-            cur.execute("SELECT COUNT(*) FROM auth_users")
-            count = cur.fetchone()[0]
-            return count > 0
+            cur.execute("SELECT EXISTS (SELECT 1 FROM auth_users)")
+            ok = bool(cur.fetchone()[0])
+        _AUTH_ENABLED_CACHE.update(ok=ok, ts=_t.monotonic())
+        return ok
     except Exception:
         return False
 
@@ -420,7 +428,7 @@ class UpdateRoleRequest(BaseModel):
 # ============================================================================
 
 @_core_router.get("/status")
-async def auth_status(request: Request):
+def auth_status(request: Request):
     _ensure_auth_tables()
     enabled = is_auth_enabled()
     user = get_current_user(request)
@@ -459,7 +467,7 @@ async def auth_status(request: Request):
 
 
 @_core_router.post("/login")
-async def login(req: LoginRequest, request: Request):
+def login(req: LoginRequest, request: Request):
     client_ip = request.client.host if request.client else "unknown"
     _check_rate_limit(client_ip)
 
@@ -543,7 +551,7 @@ async def login(req: LoginRequest, request: Request):
 
 
 @_core_router.post("/setup")
-async def auth_setup(req: RegisterRequest, request: Request):
+def auth_setup(req: RegisterRequest, request: Request):
     """Criação da primeira conta de administrador (primeiro acesso)"""
     client_ip = request.client.host if request.client else "unknown"
     _check_rate_limit(client_ip)
@@ -585,7 +593,7 @@ async def auth_setup(req: RegisterRequest, request: Request):
 
 
 @_core_router.post("/logout")
-async def logout(request: Request):
+def logout(request: Request):
     token = request.cookies.get('gboc_token') or request.cookies.get('gboc_server_token')
     if not token:
         auth_header = request.headers.get('Authorization', '')
@@ -610,7 +618,7 @@ async def logout(request: Request):
 
 
 @_core_router.post("/change-password")
-async def change_password(req: ChangePasswordRequest, request: Request):
+def change_password(req: ChangePasswordRequest, request: Request):
     user = get_current_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="Não autenticado")
@@ -668,7 +676,7 @@ async def list_available_permissions():
 
 
 @_core_router.get("/roles")
-async def list_roles(request: Request):
+def list_roles(request: Request):
     """Lista todos os níveis de acesso (nativos do sistema e customizados) com contagem de usuários."""
     _ensure_auth_tables()
     try:
@@ -708,7 +716,7 @@ async def list_roles(request: Request):
 
 
 @_core_router.post("/roles")
-async def create_role(req: CreateRoleRequest, request: Request):
+def create_role(req: CreateRoleRequest, request: Request):
     """Cria um novo Nível de Acesso Customizado com permissões personalizadas."""
     caller = get_current_user(request)
     if not caller:
@@ -754,7 +762,7 @@ async def create_role(req: CreateRoleRequest, request: Request):
 
 
 @_core_router.put("/roles/{role_id}")
-async def update_role(role_id: int, req: UpdateRoleRequest, request: Request):
+def update_role(role_id: int, req: UpdateRoleRequest, request: Request):
     """Atualiza as propriedades e permissões de um Nível de Acesso."""
     caller = get_current_user(request)
     if not caller:
@@ -806,7 +814,7 @@ async def update_role(role_id: int, req: UpdateRoleRequest, request: Request):
 
 
 @_core_router.delete("/roles/{role_id}")
-async def delete_role(role_id: int, request: Request):
+def delete_role(role_id: int, request: Request):
     """Remove um Nível de Acesso customizado (impede remoção de níveis do sistema ou em uso)."""
     caller = get_current_user(request)
     if not caller:
@@ -850,7 +858,7 @@ async def delete_role(role_id: int, request: Request):
 # ============================================================================
 
 @_core_router.get("/users")
-async def list_users(request: Request):
+def list_users(request: Request):
     """Lista todos os usuários cadastrados juntamente com o nome de exibição do seu Nível de Acesso."""
     user = get_current_user(request)
     if not user:
@@ -900,7 +908,7 @@ async def list_users(request: Request):
 
 
 @_core_router.post("/users")
-async def create_user(req: CreateUserRequest, request: Request):
+def create_user(req: CreateUserRequest, request: Request):
     """Cria um novo usuário com nível de acesso configurado."""
     caller = get_current_user(request)
     if not caller:
@@ -951,7 +959,7 @@ async def create_user(req: CreateUserRequest, request: Request):
 
 
 @_core_router.put("/users/{user_id}")
-async def update_user(user_id: int, req: UpdateUserRequest, request: Request):
+def update_user(user_id: int, req: UpdateUserRequest, request: Request):
     """Atualiza um usuário existente (nome, nível de acesso, status ativo/inativo, nova senha)."""
     caller = get_current_user(request)
     if not caller:
@@ -1008,7 +1016,7 @@ async def update_user(user_id: int, req: UpdateUserRequest, request: Request):
 
 
 @_core_router.delete("/users/{user_id}")
-async def delete_user(user_id: int, request: Request):
+def delete_user(user_id: int, request: Request):
     """Remove um usuário do sistema."""
     caller = get_current_user(request)
     if not caller:

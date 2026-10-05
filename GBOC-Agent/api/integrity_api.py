@@ -231,7 +231,7 @@ def _build_preemptive_diagnostic(repo: Dict, engine: str) -> Dict:
 
 
 @router.post("/check/{repository_id}")
-async def start_integrity_check(repository_id: int):
+def start_integrity_check(repository_id: int):
     """Inicia verificação de integridade de um repositório"""
     if repository_id in _running_checks and _running_checks[repository_id].get('status') == 'running':
         return {"status": "already_running", "message": "Verificação já em andamento para este repositório"}
@@ -296,7 +296,7 @@ async def get_integrity_check_status(repository_id: int):
 
 
 @router.get("/history")
-async def get_integrity_history():
+def get_integrity_history():
     """Obtém histórico de verificações de integridade"""
     core = _get_core()
     try:
@@ -355,7 +355,7 @@ async def get_integrity_history():
 
 
 @router.get("/history/{check_id}")
-async def get_integrity_history_detail(check_id: int):
+def get_integrity_history_detail(check_id: int):
     """Obtém detalhes completos de uma verificação (inclui raw_output)."""
     core = _get_core()
     try:

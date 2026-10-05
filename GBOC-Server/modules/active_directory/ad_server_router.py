@@ -21,7 +21,7 @@ router = APIRouter(prefix="/api/v1/active-directory", tags=["Central Active Dire
 
 
 @router.get("/summary")
-async def get_ad_central_summary():
+def get_ad_central_summary():
     """Retorna o resumo central de Controladores de Domínio e backups do Active Directory."""
     conn = None
     try:

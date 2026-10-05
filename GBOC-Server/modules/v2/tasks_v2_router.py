@@ -19,7 +19,7 @@ class BulkRunTasksRequest(BaseModel):
 
 @router.get("")
 @router.get("/")
-async def list_tasks_v2(
+def list_tasks_v2(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     status: Optional[str] = Query(None),

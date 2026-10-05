@@ -160,6 +160,13 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+# CPU amostrada em segundo plano: psutil.cpu_percent(interval=...) deixa de dormir dentro das rotas
+try:
+    from core.fast_metrics import install as _install_fast_metrics
+    _install_fast_metrics()
+except Exception as _fm_e:
+    logger.warning(f"Métricas rápidas de CPU indisponíveis: {_fm_e}")
+
 # Capturar exceções não tratadas no log (independente de como o processo foi iniciado)
 def _uncaught_exception_handler(exc_type, exc_value, exc_tb):
     if issubclass(exc_type, KeyboardInterrupt):
@@ -278,6 +285,13 @@ async def lifespan(app: FastAPI):
         _enroll_th.Thread(target=seed_loop, name="gboc-enroll", daemon=True).start()
     except Exception as e:
         logger.warning(f"[INSCRIÇÃO] Verificação do enroll.json indisponível: {e}")
+
+    # Retenção automática dos logs do agente (Logs > Retenção; 0 = manter tudo)
+    try:
+        from api.logs import start_retention_loop
+        start_retention_loop()
+    except Exception as e:
+        logger.warning(f"[LOGS] Retenção automática indisponível: {e}")
 
     # Inicializar cliente do servidor central
     try:
@@ -441,8 +455,14 @@ async def _gboc_asset_revalidate(request: Request, call_next):
     o navegador seguia com scripts antigos depois de uma atualização do GBOC."""
     r = await call_next(request)
     p = request.url.path.lower()
-    if p.endswith((".js", ".css", ".html")) or p in ("/", ""):
+    if p.endswith(".html") or p in ("/", ""):
         r.headers["Cache-Control"] = "no-cache"
+    elif p.endswith((".js", ".css")):
+        # Antes "no-cache": cada troca de tela revalidava ~20 arquivos (um pedido ao servidor por arquivo).
+        # 5 minutos em cache: navegação rápida; uma atualização do GBOC aparece em até 5 min (ou Ctrl+F5).
+        r.headers["Cache-Control"] = "private, max-age=300"
+    elif p.endswith((".woff2", ".woff", ".ttf", ".png", ".jpg", ".jpeg", ".svg", ".ico", ".webp", ".gif")):
+        r.headers["Cache-Control"] = "private, max-age=86400"
     return r
 
 @app.middleware("http")
@@ -742,6 +762,7 @@ except Exception as e:
 async def get_server_status():
     """Obtém status da conexão com servidor central"""
     try:
+        central_client.sync_runtime_config("consulta de status")   # reflete a chave gravada por outro processo
         status = central_client.get_connection_status()
         return {"status": "success", "server": status}
     except Exception as e:
@@ -762,11 +783,13 @@ async def configure_server(request: Request, server_url: Optional[str] = None, a
         if not isinstance(body, dict):
             body = {}
         server_url = (body.get("server_url") or server_url or "").strip()
+        if not (body.get("api_key") or api_key or "").strip():
+            central_client.sync_runtime_config("salvar sem nova chave")   # mantém a chave do ARQUIVO, não uma antiga em memória
         api_key = (body.get("api_key") or api_key or "").strip() or (central_client.api_key or "")
         tenant_id = body.get("tenant_id", tenant_id)
         if not server_url:
             return {"status": "error", "success": False, "message": "Informe a URL do Servidor Central"}
-        result = central_client.configure_server(server_url, api_key, tenant_id)
+        result = await asyncio.to_thread(central_client.configure_server, server_url, api_key, tenant_id)
         if result.get("success"):
             logger.info(f"✅ Servidor central configurado: {server_url} (tenant: {tenant_id})")
         result.setdefault("status", "success" if result.get("success") else "error")

@@ -55,3 +55,15 @@ def test_rejection_batching(monkeypatch):
     time.sleep(0.1)
     assert flushed and flushed[0][("ag1", "10.0.0.5")]["count"] == 1
     assert fl._rej_pending[("ag1", "10.0.0.5")]["count"] == 1
+
+
+def test_agent_logs_period_conditions():
+    from fastapi import HTTPException
+    from api.logs import _time_conditions
+    assert _time_conditions(0, None, None) == ([], [])                       # todo o período
+    c, p = _time_conditions(24, None, None)
+    assert c == ["timestamp >= %s"] and len(p) == 1
+    c, p = _time_conditions(24, "2026-09-01", "2026-09-30")                  # datas têm prioridade
+    assert c == ["timestamp >= %s", "timestamp < %s"] and p[1].startswith("2026-10-01")
+    with pytest.raises(HTTPException):
+        _time_conditions(0, "01/09/2026", None)

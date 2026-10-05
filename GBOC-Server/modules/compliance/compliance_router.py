@@ -76,7 +76,7 @@ def _get_server_host_compliance():
     }
 
 @router.get("/overview")
-async def get_compliance_overview():
+def get_compliance_overview():
     """Retorna relatório de conformidade e auditoria LGPD abrangendo o Ecossistema (Servidor + Agentes)."""
     ecosystem = []
     

@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/overview", tags=["overview"])
 
 @router.get("/")
-async def get_overview() -> Dict[str, Any]:
+def get_overview() -> Dict[str, Any]:
     request_start = time.perf_counter()
     try:
         # 1. Métricas de Sistema
