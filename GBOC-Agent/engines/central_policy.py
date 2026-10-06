@@ -111,7 +111,13 @@ def apply(policy: Dict[str, Any]) -> Dict[str, Any]:
     im = policy.get("immutability")
     if im and int(im.get("days") or 0) > 0:
         repo_ids = {t["repository_id"] for t in tasks if t.get("repository_id")}
-        for r in imm.overview():
+        flt = (policy.get("task_filter") or "").strip()
+        if flt and not repo_ids:
+            # Filtro de tarefas sem nenhuma tarefa correspondente: antes a imutabilidade era aplicada em TODOS os
+            # repositórios (bloqueio COMPLIANCE não pode ser desfeito). Agora nenhum repositório é alterado.
+            report["immutability"].append({"repository": "—", "status": "nenhuma tarefa corresponde ao filtro",
+                                           "summary": f"Nenhuma tarefa contém '{flt}': imutabilidade não aplicada"})
+        for r in ([] if flt and not repo_ids else imm.overview()):
             if repo_ids and r["id"] not in repo_ids:
                 continue
             mode = "object_lock" if "object_lock" in r["supported_modes"] else ("local_worm" if "local_worm" in r["supported_modes"] else None)

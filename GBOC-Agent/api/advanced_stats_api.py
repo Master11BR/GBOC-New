@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-GBOC 14.6.0 - API de Estatísticas Avançadas
+GBOC 14.8.1 - API de Estatísticas Avançadas
 Consulta diretamente o PostgreSQL via SharedCore
 """
 
 from fastapi import APIRouter, HTTPException
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import statistics as stats_module
 import psycopg2.extras
 import time
@@ -290,38 +290,65 @@ def get_trends(days: int = 30):
         _log_endpoint_perf("/api/advanced-stats/trends", request_start, f"days={days}")
 
 
+def _period_window(days: int = 7, date_from: Optional[str] = None, date_to: Optional[str] = None):
+    """(início, fim_exclusivo) do período pedido pelos gráficos. days=0 → todo o histórico."""
+    if date_from or date_to:
+        try:
+            start = datetime.strptime(date_from, "%Y-%m-%d") if date_from else datetime(1970, 1, 1)
+            end = (datetime.strptime(date_to, "%Y-%m-%d") + timedelta(days=1)) if date_to else datetime.now() + timedelta(days=1)
+        except ValueError:
+            raise HTTPException(400, "Datas no formato AAAA-MM-DD")
+        if start >= end:
+            raise HTTPException(400, "A data inicial deve ser anterior à final")
+        return start, end
+    if not days or days <= 0:
+        return datetime(1970, 1, 1), datetime.now() + timedelta(days=1)
+    return datetime.now() - timedelta(days=days), datetime.now() + timedelta(days=1)
+
+
+def _bucket(group: str, start: datetime, end: datetime) -> str:
+    if group in ("day", "week", "month"):
+        return group
+    span = (min(end, datetime.now()) - max(start, datetime(2000, 1, 1))).days
+    return "day" if span <= 62 else ("week" if span <= 370 else "month")
+
+
 @router.get("/trend")
-def get_trend(days: int = 7):
-    """Daily backup trend (success/failed per day) — used by Dashboard charts + heatmap."""
+def get_trend(days: int = 7, date_from: Optional[str] = None, date_to: Optional[str] = None, group: str = "day"):
+    """Tendência de backups (sucesso/falha) por dia, semana ou mês — gráficos do Dashboard e mapa de calor.
+    group=auto escolhe dia (até 2 meses), semana (até 1 ano) ou mês."""
     request_start = time.perf_counter()
+    start, end = _period_window(days, date_from, date_to)
+    bucket = _bucket(group, start, end)
     try:
         core = _get_core()
-        date_limit = (datetime.now() - timedelta(days=days)).isoformat()
         with core.get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("""
-                SELECT started_at::date AS day,
+            cursor.execute(f"""
+                SELECT date_trunc('{bucket}', started_at::timestamp)::date AS day,
                        COUNT(CASE WHEN status = 'completed' THEN 1 END) AS success,
-                       COUNT(CASE WHEN status = 'failed' THEN 1 END) AS failed
+                       COUNT(CASE WHEN status = 'failed' THEN 1 END) AS failed,
+                       COUNT(*) AS total
                 FROM task_executions
-                WHERE started_at >= %s
-                GROUP BY started_at::date
-                ORDER BY day
-            """, (date_limit,))
+                WHERE started_at >= %s AND started_at < %s
+                GROUP BY 1
+                ORDER BY 1
+            """, (start.isoformat(), end.isoformat()))
             rows = cursor.fetchall()
-        trend = [{"date": str(r[0]), "success": r[1], "failed": r[2]} for r in rows]
-        return {"trend": trend, "daily": trend, "days": days}
+        trend = [{"date": str(r[0]), "success": r[1], "failed": r[2], "total": r[3]} for r in rows]
+        return {"trend": trend, "daily": trend, "days": days, "group": bucket}
     except Exception as e:
         logger.warning(f"Trend fallback: {e}")
-        return {"trend": [], "daily": [], "days": days}
+        return {"trend": [], "daily": [], "days": days, "group": bucket}
     finally:
-        _log_endpoint_perf("/api/advanced-stats/trend", request_start, f"days={days}")
+        _log_endpoint_perf("/api/advanced-stats/trend", request_start, f"days={days} group={bucket}")
 
 
 @router.get("/distribution")
-def get_distribution():
-    """Task execution status distribution (for pie/doughnut chart)."""
+def get_distribution(days: int = 30, date_from: Optional[str] = None, date_to: Optional[str] = None):
+    """Distribuição por status das execuções no período (gráfico de rosca)."""
     request_start = time.perf_counter()
+    start, end = _period_window(days, date_from, date_to)
     try:
         core = _get_core()
         with core.get_db_connection() as conn:
@@ -329,12 +356,12 @@ def get_distribution():
             cursor.execute("""
                 SELECT status, COUNT(*) as count
                 FROM task_executions
-                WHERE started_at > CURRENT_TIMESTAMP - INTERVAL '30 days'
+                WHERE started_at >= %s AND started_at < %s
                 GROUP BY status
-            """)
+            """, (start.isoformat(), end.isoformat()))
             rows = cursor.fetchall()
         distribution = {r[0]: r[1] for r in rows} if rows else {}
-        return {"distribution": distribution, "status_distribution": distribution}
+        return {"distribution": distribution, "status_distribution": distribution, "days": days}
     except Exception as e:
         logger.warning(f"Distribution fallback: {e}")
         return {"distribution": {}, "status_distribution": {}}

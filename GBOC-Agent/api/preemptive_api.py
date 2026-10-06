@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 14.6.0 - API de Diagnóstico Preemptivo
+GBOC 14.8.1 - API de Diagnóstico Preemptivo
 Consulta PostgreSQL via SharedCore
 """
 
@@ -238,7 +238,7 @@ async def get_storage_forecast():
 
 
 @router.get("/sla-compliance")
-async def get_sla_compliance():
+async def get_sla_compliance(days: int = 30):
     """Calcula SLA compliance por tarefa — RPO, taxa de sucesso, última execução"""
     core = _get_core()
     try:
@@ -256,17 +256,17 @@ async def get_sla_compliance():
                        t.retention_days,
                        (SELECT COUNT(*) FROM task_executions te
                         WHERE te.task_id = t.id AND te.status IN ('completed', 'repaired')
-                        AND te.started_at >= NOW() - INTERVAL '30 days') as success_30d,
+                        AND te.started_at >= NOW() - make_interval(days => %(days)s)) as success_30d,
                        (SELECT COUNT(*) FROM task_executions te
                         WHERE te.task_id = t.id
-                        AND te.started_at >= NOW() - INTERVAL '30 days') as total_30d,
+                        AND te.started_at >= NOW() - make_interval(days => %(days)s)) as total_30d,
                        (SELECT MAX(te.started_at) FROM task_executions te
                         WHERE te.task_id = t.id AND te.status IN ('completed', 'repaired')) as last_success,
                        (SELECT MAX(te.started_at) FROM task_executions te
                         WHERE te.task_id = t.id AND te.status = 'failed') as last_failure
                 FROM tasks t WHERE t.enabled = true
                 ORDER BY t.name
-            """)
+            """, {"days": 36500 if days <= 0 else min(days, 3650)})
 
             tasks_sla = []
             for row in cursor.fetchall():
@@ -390,7 +390,7 @@ def get_tasks_at_risk():
 
 
 @router.get("/error-classification")
-def get_error_classification():
+def get_error_classification(days: int = 30):
     """Classifica e agrupa erros por tipo/padrão"""
     core = _get_core()
     try:
@@ -404,11 +404,11 @@ def get_error_classification():
                 FROM task_executions te
                 JOIN tasks t ON te.task_id = t.id
                 WHERE te.status = 'failed' AND te.error_message IS NOT NULL
-                AND te.started_at >= NOW() - INTERVAL '30 days'
+                AND te.started_at >= NOW() - make_interval(days => %s)
                 GROUP BY te.error_message, t.name, t.engine
                 ORDER BY count DESC
                 LIMIT 50
-            """)
+            """, (36500 if days <= 0 else min(days, 3650),))
 
             errors = []
             categories = {}

@@ -104,7 +104,7 @@ def collect_server_report_data(db_getter: Callable[[], tuple[Any, Any]], days: i
         "available": False, "error": "", "now": datetime.now(), "days": days,
         "agents": [], "executions": [], "tasks": [], "repositories": [], "storage_latest": [],
         "storage_series": [], "canaries": {}, "guardian": {}, "shield": {}, "local_protection": {},
-        "incidents": [], "rw_events": [], "integrity": {}, "audit": [], "offline_minutes": 60,
+        "incidents": [], "rw_events": [], "integrity": {}, "audit": [], "offline_minutes": 10,
     }
     conn, mgr = None, None
     try:

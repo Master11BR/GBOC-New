@@ -1,6 +1,6 @@
 <!--
 ==============================================================================
-GBOC System v14.6.0 Enterprise Edition
+GBOC System v14.8.1 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
@@ -184,6 +184,24 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                     <div class="form-group">
                         <label>Prefix (opcional - isolamento no bucket)</label>
                         <input type="text" id="prefix" placeholder="Ex: kopia/ ou backups/">
+                    </div>
+                </div>
+
+                <div class="form-row" id="perfFields" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px">
+                    <div class="form-group">
+                        <label>Compressão <span style="font-weight:400;color:var(--text-muted)">(todos os motores)</span></label>
+                        <select id="repoCompression">
+                            <option value="auto">Automática (recomendada)</option>
+                            <option value="fast">Rápida (menos CPU)</option>
+                            <option value="max">Máxima (menor tamanho, mais CPU)</option>
+                            <option value="none">Sem compressão</option>
+                        </select>
+                        <small style="color:var(--text-muted);font-size:.78em">Arquivos já compactados (zip, jpg, mp4, pst…) não são recompactados no motor nativo. No Kopia, "Automática" liga a compressão zstd (por padrão ele não compacta).</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Conexões paralelas</label>
+                        <input type="number" id="repoParallel" min="0" max="16" placeholder="Automático (4 na nuvem, 2 em disco)">
+                        <small style="color:var(--text-muted);font-size:.78em">Mais conexões = envio e restauração mais rápidos na nuvem. Com limite de banda ativo, o motor nativo usa 1.</small>
                     </div>
                 </div>
 
@@ -579,6 +597,9 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 data.endpoint = endpointEl ? endpointEl.value : '';
                 data.prefix = prefixEl ? prefixEl.value : '';
             }
+            data.compression = (document.getElementById('repoCompression') || {}).value || 'auto';
+            const _par = (document.getElementById('repoParallel') || {}).value;
+            if (_par) data.parallel_uploads = Math.max(1, Math.min(16, parseInt(_par, 10) || 0));
             return data;
         }
 
@@ -822,6 +843,11 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                     }
                 }
 
+                const _cmpEl = document.getElementById('repoCompression');
+                if (_cmpEl) _cmpEl.value = ['auto', 'fast', 'max', 'none'].includes(repo.compression) ? repo.compression : 'auto';
+                const _parEl = document.getElementById('repoParallel');
+                if (_parEl) _parEl.value = repo.parallel_uploads || '';
+
                 const cloudFields = document.getElementById('cloudFields');
                 if (repo.type !== 'local') {
                     if (cloudFields) cloudFields.style.display = 'block';
@@ -879,6 +905,9 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             if (type) data.type = type;
             if (password) data.motor_password = password;
             if (path) data.path = path;
+            data.compression = (document.getElementById('repoCompression') || {}).value || 'auto';
+            const _parU = (document.getElementById('repoParallel') || {}).value;
+            data.parallel_uploads = _parU ? Math.max(1, Math.min(16, parseInt(_parU, 10) || 0)) : null;
             
             // Campos cloud (enviar apenas valores realmente alterados)
             if (type !== 'local') {

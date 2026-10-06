@@ -1,6 +1,6 @@
 /*
 ==============================================================================
-GBOC System v14.6.0 Enterprise Edition
+GBOC System v14.8.1 Enterprise Edition
 Layout & Navigation Manager — Controls Dual Layout Engine (Vertical/Horizontal)
 and Color Themes across all resolutions (1024px, 720p HD, 1080p FHD, 4K UHD).
 Zero-Overflow & Smart Sidebar Presence Detection.
@@ -14,7 +14,7 @@ Zero-Overflow & Smart Sidebar Presence Detection.
     if (!window.GBOCModal && !document.getElementById('gboc-modal-script')) {
         const m = document.createElement('script');
         m.id = 'gboc-modal-script';
-        m.src = '/static/gboc-modal.js?v=14.6.0';
+        m.src = '/static/gboc-modal.js?v=14.8.1';
         if (document.head) {
             document.head.appendChild(m);
         } else {
@@ -150,9 +150,8 @@ Zero-Overflow & Smart Sidebar Presence Detection.
         const g1 = document.getElementById('glow-ambient-1');
         const g2 = document.getElementById('glow-ambient-2');
         const g3 = document.getElementById('glow-ambient-3');
-        if (g1) g1.style.backgroundColor = 'var(--ambient-glow-1)';
-        if (g2) g2.style.backgroundColor = 'var(--ambient-glow-2)';
-        if (g3) g3.style.backgroundColor = 'var(--ambient-glow-1)';
+        // Fundo usa gradientes do CSS (variáveis --ambient-glow-*): cor sólida aqui viraria um quadrado
+        [g1, g2, g3].forEach(g => { if (g) g.style.backgroundColor = ''; });
     }
 
     // ── Telas públicas (login / primeiro acesso): sem menu, topbar ou painel ──
@@ -242,14 +241,14 @@ Zero-Overflow & Smart Sidebar Presence Detection.
             if (!document.getElementById('gboc-topbar')) {
                 try {
                     if (!_topbarHtml) {
-                        _topbarHtml = window.__gbocTopbarMemoryCache || sessionStorage.getItem('gboc_topbar_html');
+                        _topbarHtml = window.__gbocTopbarMemoryCache || sessionStorage.getItem('gboc_topbar_html_v2');
                     }
                     if (!_topbarHtml) {
                         const r = await fetch(TOPBAR_URL);
                         if (r.ok) {
                             _topbarHtml = await r.text();
                             window.__gbocTopbarMemoryCache = _topbarHtml;
-                            try { sessionStorage.setItem('gboc_topbar_html', _topbarHtml); } catch(e) {}
+                            try { sessionStorage.setItem('gboc_topbar_html_v2', _topbarHtml); } catch(e) {}
                         }
                     }
                     if (_topbarHtml && !document.getElementById('gboc-topbar')) {
@@ -267,10 +266,94 @@ Zero-Overflow & Smart Sidebar Presence Detection.
             _setupToggleButtons();
             _checkFailedJobsBadge();
             _updateDynamicVersion();
+            if (window.GBOCStatus) window.GBOCStatus.start();
         } finally {
             _isInjectingTopbar = false;
         }
     }
+
+    // ── Indicador ÚNICO de status (topbar + espelhos na página) ──────────────
+    // Antes cada tela tinha o seu: o LED do topbar seguia a resposta da API, o subtítulo do painel seguia o
+    // WebSocket de atualização ao vivo, a Visão Geral ficava em "Verificando..." e duas peças usavam o mesmo
+    // id (#wsLabel) — uma escrevia "Offline" enquanto a outra mostrava "Conectado".
+    // Regra agora (Agente): verde = agente responde E Server central recebe os heartbeats; âmbar = agente ok mas
+    // sem Server (não configurado, chave recusada ou sem contato); vermelho = o próprio agente não responde
+    // (2 falhas seguidas). Server: verde = API responde. O WebSocket "ao vivo" só aparece na dica (tooltip).
+    window.GBOCStatus = window.GBOCStatus || (function () {
+        let fails = 0, last = 0, timer = null, live = null, state = null, busy = false;
+        const app = () => {
+            const tb = document.getElementById('gboc-topbar');
+            if (tb && tb.dataset.gbocApp) return tb.dataset.gbocApp;
+            return (/dashboard|portal/.test(location.pathname) || typeof window.switchTab === 'function') ? 'server' : 'agent';
+        };
+        const COLORS = { ok: 'var(--success, #48bb78)', warn: 'var(--warning, #ecc94b)', off: 'var(--danger, #f56565)' };
+        const withTimeout = (url, ms) => {
+            const c = new AbortController();
+            const t = setTimeout(() => c.abort(), ms);
+            return fetch(url, { signal: c.signal, cache: 'no-store' }).finally(() => clearTimeout(t));
+        };
+        function render(st) {
+            state = st;
+            const color = COLORS[st.level];
+            const tip = st.tip + (live === false ? ' · Atualização ao vivo: reconectando' : live === true ? ' · Atualização ao vivo: ativa' : '');
+            const dots = [document.getElementById('wsDot'), ...document.querySelectorAll('[data-gboc-status-dot]')];
+            const labels = [document.getElementById('wsLabel'), ...document.querySelectorAll('[data-gboc-status-label]')];
+            dots.forEach(d => { if (!d) return; d.style.background = color; d.style.boxShadow = `0 0 6px ${color}`;
+                d.className = d.className.replace(/\bws-dot (on|off|warn)\b/, '').trim() + ' ws-dot ' + (st.level === 'ok' ? 'on' : st.level === 'off' ? 'off' : 'warn'); });
+            labels.forEach(l => { if (!l) return; l.textContent = st.label; l.style.color = color; l.title = tip; });
+            const pill = document.getElementById('wsLabel') && document.getElementById('wsLabel').parentElement;
+            if (pill) { pill.title = tip; pill.style.background = st.level === 'ok' ? 'rgba(72,187,120,0.12)' : st.level === 'warn' ? 'rgba(236,201,75,0.12)' : 'rgba(245,101,101,0.12)';
+                        pill.style.borderColor = st.level === 'ok' ? 'rgba(72,187,120,0.2)' : st.level === 'warn' ? 'rgba(236,201,75,0.3)' : 'rgba(245,101,101,0.3)'; }
+            document.dispatchEvent(new CustomEvent('gboc:status', { detail: st }));
+        }
+        async function checkAgent() {
+            const r = await withTimeout('/api/system/info', 8000);
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            const info = await r.json();
+            const ver = String(info.raw_version || info.gboc_version || '').replace(/^v/i, '').split('-')[0];
+            if (ver) {
+                const av = document.getElementById('app-version'); if (av) av.textContent = 'v' + ver;
+                document.querySelectorAll('.serverVersionBadge, .agentVersionBadge, #versionBadge, #serverVersionBadge').forEach(el => { el.textContent = 'v' + ver; });
+            }
+            const v = ver ? 'v' + ver + ' • ' : '';
+            let srv = null;
+            try { const s = await withTimeout('/api/server/status', 8000); if (s.ok) srv = (await s.json()).server || null; } catch (e) { /* sem dado do Server */ }
+            if (!srv) return { level: 'ok', label: v + 'Online', tip: 'Agente respondendo (estado do Servidor Central indisponível)' };
+            // Agente ainda sem o campo "link" (serviço não reiniciado após a atualização): deduz do que já existe
+            const link = srv.link || (srv.websocket_connected || srv.server_auth === 'ok' ? { state: 'connected', detail: 'Servidor Central em comunicação' }
+                : !srv.paired ? { state: 'not_configured' } : srv.server_auth === 'rejected' ? { state: 'key_rejected' } : { state: 'starting' });
+            if (link.state === 'connected') return { level: 'ok', label: v + 'Online · Server conectado', tip: link.detail || 'Agente e Servidor Central em comunicação' };
+            const txt = { not_configured: 'Server não configurado', key_rejected: 'chave recusada pelo Server', no_contact: 'sem contato com o Server', starting: 'conectando ao Server' }[link.state] || 'Server desconectado';
+            return { level: link.state === 'starting' ? 'ok' : 'warn', label: v + 'Online · ' + txt, tip: link.detail || txt };
+        }
+        async function checkServer() {
+            const r = await withTimeout('/api/v1/version', 8000);
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return { level: 'ok', label: 'Online', tip: 'Servidor Central respondendo' };
+        }
+        async function refresh(force) {
+            if (busy || (!force && Date.now() - last < 5000)) return state;
+            busy = true; last = Date.now();
+            try {
+                const st = await (app() === 'server' ? checkServer() : checkAgent());
+                fails = 0; render(st);
+            } catch (e) {
+                fails += 1;
+                if (fails >= 2 || !state) render({ level: 'off', label: 'Offline', tip: (app() === 'server' ? 'O Servidor Central' : 'O agente') + ' não respondeu (' + (e.message || e) + ')' });
+            } finally { busy = false; }
+            return state;
+        }
+        return {
+            start() {
+                refresh(true);
+                if (!timer) timer = setInterval(() => { if (!document.hidden) refresh(); }, 15000);
+                document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+            },
+            refresh,
+            setLive(on) { live = !!on; if (state) render(state); },
+            get state() { return state; },
+        };
+    })();
 
     function _setupToggleButtons() {
         // O botão ☰ é tratado pelo GBOCNav (fim deste arquivo), que decide entre
@@ -400,37 +483,81 @@ Zero-Overflow & Smart Sidebar Presence Detection.
     // ── Inject System-Wide Ambient Animated Background ──────────────────────
     function _ensureAnimatedBackgroundLoaded() {
         if (document.getElementById('gboc-ambient-background')) return;
+        // Página com fundo próprio (login / primeiro acesso): não injeta um segundo fundo por cima
+        if (document.getElementById('glow-ambient-1')) return;
 
         const bg = document.createElement('div');
         bg.id = 'gboc-ambient-background';
         bg.className = 'gboc-ambient-background';
         bg.innerHTML = `
-            <div id="glow-ambient-1" class="glow-pulse" style="position:fixed;top:-130px;left:-130px;width:32rem;height:32rem;border-radius:9999px;filter:blur(130px);mix-blend-mode:screen;background-color:var(--ambient-glow-1,rgba(245,158,11,0.2));pointer-events:none;"></div>
-            <div id="glow-ambient-2" class="glow-pulse-delayed" style="position:fixed;top:50%;right:-130px;width:40rem;height:40rem;border-radius:9999px;filter:blur(160px);mix-blend-mode:screen;background-color:var(--ambient-glow-2,rgba(217,119,6,0.18));pointer-events:none;"></div>
-            <div id="glow-ambient-3" class="glow-pulse" style="position:fixed;bottom:-120px;left:25%;width:28rem;height:28rem;border-radius:9999px;filter:blur(140px);mix-blend-mode:screen;background-color:var(--ambient-glow-1,rgba(245,158,11,0.2));animation-delay:4s;pointer-events:none;"></div>
-            <svg viewBox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M0,50 C30,30 70,80 100,40" fill="none" stroke="url(#gboc-grad1)" stroke-width="0.22" class="path-animate-1" />
-                <path d="M0,60 C40,20 60,90 100,50" fill="none" stroke="url(#gboc-grad2)" stroke-width="0.16" class="path-animate-2" />
-                <path d="M-10,80 C30,90 80,20 110,30" fill="none" stroke="url(#gboc-grad1)" stroke-width="0.12" class="path-animate-3" />
-                <defs>
-                    <linearGradient id="gboc-grad1" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" style="stop-color: var(--curve-color-2, #d97706); stop-opacity: 0;" />
-                        <stop offset="50%" style="stop-color: var(--curve-color-1, #f59e0b); stop-opacity: 0.85;" />
-                        <stop offset="100%" style="stop-color: var(--curve-color-2, #d97706); stop-opacity: 0;" />
-                    </linearGradient>
-                    <linearGradient id="gboc-grad2" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" style="stop-color: var(--curve-color-1, #f59e0b); stop-opacity: 0;" />
-                        <stop offset="50%" style="stop-color: var(--curve-color-2, #d97706); stop-opacity: 0.7;" />
-                        <stop offset="100%" style="stop-color: var(--curve-color-1, #f59e0b); stop-opacity: 0;" />
-                    </linearGradient>
-                </defs>
-            </svg>
+            <div id="glow-ambient-1" class="gboc-aurora a1"></div>
+            <div id="glow-ambient-2" class="gboc-aurora a2"></div>
+            <div id="glow-ambient-3" class="gboc-aurora a3"></div>
+            <div class="gboc-ambient-lines">
+                <svg viewBox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M0,50 C30,30 70,80 100,40" fill="none" stroke="url(#gboc-grad1)" stroke-width="0.22" />
+                    <path d="M0,60 C40,20 60,90 100,50" fill="none" stroke="url(#gboc-grad2)" stroke-width="0.16" />
+                    <path d="M-10,80 C30,90 80,20 110,30" fill="none" stroke="url(#gboc-grad1)" stroke-width="0.12" />
+                    <defs>
+                        <linearGradient id="gboc-grad1" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" style="stop-color: var(--curve-color-2, #d97706); stop-opacity: 0;" />
+                            <stop offset="50%" style="stop-color: var(--curve-color-1, #f59e0b); stop-opacity: 0.85;" />
+                            <stop offset="100%" style="stop-color: var(--curve-color-2, #d97706); stop-opacity: 0;" />
+                        </linearGradient>
+                        <linearGradient id="gboc-grad2" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" style="stop-color: var(--curve-color-1, #f59e0b); stop-opacity: 0;" />
+                            <stop offset="50%" style="stop-color: var(--curve-color-2, #d97706); stop-opacity: 0.7;" />
+                            <stop offset="100%" style="stop-color: var(--curve-color-1, #f59e0b); stop-opacity: 0;" />
+                        </linearGradient>
+                    </defs>
+                </svg>
+            </div>
         `;
 
         if (document.body) {
             document.body.insertBefore(bg, document.body.firstChild);
         }
+        _applyBackgroundMotionMode();
     }
+
+    // ── Animação de fundo: automática (desliga sozinha em máquina lenta), ligada ou desligada ──
+    // localStorage 'gboc-bg-motion' = 'auto' (padrão) | 'on' | 'off'
+    function _applyBackgroundMotionMode() {
+        let mode = 'auto';
+        try { mode = localStorage.getItem('gboc-bg-motion') || 'auto'; } catch (e) { /* sem storage */ }
+        const root = document.documentElement;
+        if (mode === 'off') { root.classList.add('gboc-bg-static'); return; }
+        root.classList.remove('gboc-bg-static');
+        if (mode !== 'auto') return;
+        let slow = null;
+        try { slow = sessionStorage.getItem('gboc-bg-slow'); } catch (e) { /* */ }
+        if (slow === '1') { root.classList.add('gboc-bg-static'); return; }
+        if (slow === '0' || document.hidden || !window.requestAnimationFrame) return;
+        // Mede ~2 s de quadros após a carga: se o navegador não sustenta ~40 fps, congela o fundo
+        setTimeout(() => {
+            if (document.hidden) return;
+            const times = [];
+            let last = performance.now();
+            const start = last;
+            const tick = (now) => {
+                times.push(now - last); last = now;
+                if (now - start < 2000) { requestAnimationFrame(tick); return; }
+                times.sort((x, y) => x - y);
+                const p50 = times[Math.floor(times.length / 2)] || 0;
+                const isSlow = p50 > 24;
+                if (isSlow) root.classList.add('gboc-bg-static');
+                try { sessionStorage.setItem('gboc-bg-slow', isSlow ? '1' : '0'); } catch (e) { /* */ }
+            };
+            requestAnimationFrame(tick);
+        }, 2500);
+    }
+    window.GBOCBackgroundMotion = {
+        get: () => { try { return localStorage.getItem('gboc-bg-motion') || 'auto'; } catch (e) { return 'auto'; } },
+        set: (mode) => {
+            try { localStorage.setItem('gboc-bg-motion', mode); sessionStorage.removeItem('gboc-bg-slow'); } catch (e) { /* */ }
+            _applyBackgroundMotionMode();
+        },
+    };
 
     // ── Badge: check failed jobs ──────────────────────────────────────────────
     async function _checkFailedJobsBadge() {
@@ -527,6 +654,15 @@ Zero-Overflow & Smart Sidebar Presence Detection.
                 ${uiStylesHtml}
             </div>
 
+            <div class="lp-title">Animação de Fundo</div>
+            <div style="display:flex;gap:4px;flex-wrap:wrap">
+                ${[['auto', 'Automática'], ['on', 'Ligada'], ['off', 'Desligada']].map(([m, l]) => `
+                <button class="lp-layout-btn ${(window.GBOCBackgroundMotion ? window.GBOCBackgroundMotion.get() : 'auto') === m ? 'active' : ''}" data-bgmotion="${m}"
+                        onclick="window.GBOCBackgroundMotion.set('${m}');document.querySelectorAll('[data-bgmotion]').forEach(b=>b.classList.toggle('active',b.dataset.bgmotion==='${m}'))"
+                        style="font-size:0.76em;padding:6px 10px;flex:1"><span>${l}</span></button>`).join('')}
+            </div>
+            <div style="font-size:0.7em;color:var(--text-muted, #94a3b8);margin-top:4px">Automática: desliga sozinha se o computador não acompanhar.</div>
+
             <div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--border, rgba(255,255,255,0.1));font-size:0.73em;color:var(--text-muted, #94a3b8)">
                 <i class="fas fa-check-circle" style="color:var(--success, #10b981)"></i> Preferências salvas automaticamente.
             </div>
@@ -559,7 +695,18 @@ Zero-Overflow & Smart Sidebar Presence Detection.
     }
 
     // ── Inject stylesheets if not already present ─────────────────────────────
+    // Opções dos gráficos (período, formato, tabela, exportar) — vale para todo gráfico Chart.js do sistema
+    function _injectChartsScript() {
+        if (document.getElementById('gboc-charts-js') || window.GBOCCharts) return;
+        const sc = document.createElement('script');
+        sc.id = 'gboc-charts-js';
+        sc.src = '/static/gboc-charts.js?v=14.8.1-c3';
+        sc.defer = true;
+        document.head.appendChild(sc);
+    }
+
     function _injectStylesheets() {
+        _injectChartsScript();
         const needed = [
             { id: 'gboc-themes-css',  href: '/static/gboc-themes.css' },
             { id: 'gboc-layout-css',  href: '/static/gboc-layout.css' }

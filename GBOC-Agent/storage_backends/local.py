@@ -169,8 +169,9 @@ class LocalStorageBackend(StorageBackend):
             files = []
             for entry in target_path.rglob('*'):
                 if entry.is_file():
-                    # Retorna o caminho relativo ao diretório base
-                    files.append(str(entry.relative_to(self.base_path)))
+                    # Caminho relativo ao diretório base, sempre com "/" (no Windows str() usava "\\" e o motor
+                    # nativo não encontrava os manifestos: sem lista de snapshots e sem backup incremental)
+                    files.append(entry.relative_to(self.base_path).as_posix())
             return files
         except Exception as e:
             self.logger.error(f"Falha ao listar arquivos: {e}", exc_info=True)

@@ -94,7 +94,7 @@ def _fail(ip: str) -> None:
     _fails[ip].append(time.time())
 
 
-def _valid_token(token: str, consume: bool = False) -> Dict[str, Any]:
+def _valid_token(token: str, consume: bool = False, agent_id: Optional[str] = None) -> Dict[str, Any]:
     ensure_schema()
     if not token or not token.startswith(TOKEN_PREFIX):
         raise PermissionError("Token de instalação inválido")
@@ -107,7 +107,9 @@ def _valid_token(token: str, consume: bool = False) -> Dict[str, Any]:
     if t["expires_at"] < datetime.now():
         raise PermissionError("Token de instalação expirado")
     if t.get("max_uses") and int(t["uses"] or 0) >= int(t["max_uses"]):
-        raise PermissionError("Token de instalação já atingiu o limite de usos")
+        if not (agent_id and _db_exec("""SELECT 1 FROM agent_enrollments WHERE token_id=%s AND agent_id=%s
+                                          AND status='enrolled' LIMIT 1""", (t["id"], agent_id))):
+            raise PermissionError("Token de instalação já atingiu o limite de usos")
     return t
 
 
@@ -131,6 +133,10 @@ def bootstrap_script(server_url: str, token: str, skip_tls_check: bool = False) 
 #Requires -RunAsAdministrator
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
+# '#Requires' é ignorado quando o script chega por 'iwr | iex': confere aqui
+if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {{
+    throw 'Execute o PowerShell como Administrador (ou via GPO/Intune como SYSTEM) para instalar o GBOC Agent.'
+}}
 $Server = '{server_url}'
 $Token = '{token}'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -173,7 +179,7 @@ async def enroll(request: Request):
     if not agent_id:
         raise HTTPException(400, "agent_id obrigatório")
     try:
-        t = await asyncio.to_thread(_valid_token, token)
+        t = await asyncio.to_thread(_valid_token, token, False, agent_id)
     except PermissionError as e:
         _fail(ip)
         raise HTTPException(403, str(e))
@@ -189,18 +195,32 @@ async def enroll(request: Request):
         raise HTTPException(503, "Chave de pareamento não configurada no Server")
 
     def _register():
+        # Mesma máquina repetindo a inscrição com o mesmo token (script executado de novo, nova tentativa) não
+        # gasta outro uso. O consumo é atômico: duas máquinas ao mesmo tempo não passam do limite.
+        again = _db_exec("""SELECT 1 FROM agent_enrollments WHERE token_id=%s AND agent_id=%s AND status='enrolled' LIMIT 1""",
+                         (t["id"], agent_id))
+        if not again:
+            took = _db_exec("""UPDATE install_tokens SET uses = uses + 1, last_used_at = LOCALTIMESTAMP
+                               WHERE id=%s AND revoked_at IS NULL AND (COALESCE(max_uses,0) = 0 OR uses < max_uses)
+                               RETURNING id""", (t["id"],))
+            if not took:
+                raise PermissionError("Token de instalação já atingiu o limite de usos")
+        else:
+            _db_exec("UPDATE install_tokens SET last_used_at = LOCALTIMESTAMP WHERE id=%s", (t["id"],), False)
         _db_exec("""INSERT INTO agents (agent_id, hostname, ip_address, os_info, status, tenant_id, tenant_locked, last_heartbeat)
                     VALUES (%s, %s, %s, %s, 'offline', %s, %s, NULL)
                     ON CONFLICT (agent_id) DO UPDATE SET hostname=EXCLUDED.hostname,
                         tenant_id=COALESCE(EXCLUDED.tenant_id, agents.tenant_id),
                         tenant_locked=(EXCLUDED.tenant_id IS NOT NULL) OR agents.tenant_locked""",
                  (agent_id, hostname, f"{ip}:9200", str(b.get("os_info") or "")[:255], t.get("tenant_id"), bool(t.get("tenant_id"))), False)
-        _db_exec("UPDATE install_tokens SET uses = uses + 1, last_used_at = LOCALTIMESTAMP WHERE id=%s", (t["id"],), False)
         _db_exec("""INSERT INTO agent_enrollments (token_id, agent_id, hostname, ip_address, tenant_id, status, message)
                     VALUES (%s,%s,%s,%s,%s,'enrolled',NULL)""", (t["id"], agent_id, hostname, ip, t.get("tenant_id")), False)
         org = _db_exec("SELECT name FROM msp_organizations WHERE org_id=%s", (t.get("tenant_id"),)) if t.get("tenant_id") else []
         return org[0]["name"] if org else None
-    tenant_name = await asyncio.to_thread(_register)
+    try:
+        tenant_name = await asyncio.to_thread(_register)
+    except PermissionError as e:
+        raise HTTPException(403, str(e))
     return {"status": "success", "pairing_key": key, "tenant_id": t.get("tenant_id"), "tenant_name": tenant_name,
             "server_url": await asyncio.to_thread(_public_url, request)}
 
@@ -294,8 +314,20 @@ async def create_token(request: Request):
         VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING *""",
         (name, _hash(token), token[:10], tenant, datetime.now() + timedelta(days=days), max_uses, u.get("username") or "?"))
     url = await asyncio.to_thread(_public_url, request, public_url or None)
-    one_liner = (f"powershell -NoProfile -ExecutionPolicy Bypass -Command \"iwr -UseBasicParsing "
-                 f"'{url}/api/v1/enroll/script?token={token}' | iex\"")
+    self_signed = bool(b.get("self_signed"))
+    if self_signed:
+        # Certificado autoassinado: o PowerShell 5.1 recusa o 'iwr' antes mesmo de baixar o script.
+        # Sem '$' no comando: colado num PowerShell, o '$true' seria expandido pelo shell externo.
+        one_liner = (f"powershell -NoProfile -ExecutionPolicy Bypass -Command \"[Net.ServicePointManager]::SecurityProtocol="
+                     f"[Net.SecurityProtocolType]::Tls12; [Net.ServicePointManager]::ServerCertificateValidationCallback={{ 1 -eq 1 }}; "
+                     f"iwr -UseBasicParsing '{url}/api/v1/enroll/script?token={token}&insecure=1' | iex\"")
+    else:
+        one_liner = (f"powershell -NoProfile -ExecutionPolicy Bypass -Command \"iwr -UseBasicParsing "
+                     f"'{url}/api/v1/enroll/script?token={token}' | iex\"")
+    from urllib.parse import urlparse
+    host = (urlparse(url).hostname or "").lower()
+    warning = ("A URL do Server usa 'localhost' — as outras máquinas não conseguem acessá-la. Informe o nome ou IP "
+               "do Server na rede." if host in ("localhost", "127.0.0.1", "::1") else None)
     try:
         await asyncio.to_thread(_db_exec, "INSERT INTO server_auth_audit (user_id, username, action, ip_address, details) VALUES (%s,%s,%s,%s,%s)",
                                 (u.get("user_id") or u.get("id"), u.get("username"), "fleet.install_token.create",
@@ -303,7 +335,7 @@ async def create_token(request: Request):
     except Exception:
         pass
     return {"status": "success", "token": token, "record": _ser(rows[0]), "server_url": url, "one_liner": one_liner,
-            "script": bootstrap_script(url, token), "manual": f".\\install_agent.ps1 -ServerURL \"{url}\" -InstallToken \"{token}\" -Unattended"}
+            "script": bootstrap_script(url, token, self_signed), "warning": warning, "manual": f".\\install_agent.ps1 -ServerURL \"{url}\" -InstallToken \"{token}\" -Unattended"}
 
 
 @router.post("/api/v1/fleet/install-tokens/{token_id}/revoke")

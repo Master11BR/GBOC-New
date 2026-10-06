@@ -264,16 +264,20 @@
             <label style="font-size:.82em">Validade (dias)<input id="itf-days" type="number" min="1" max="365" value="7" class="form-control"></label>
             <label style="font-size:.82em">Limite de máquinas (0 = sem limite)<input id="itf-uses" type="number" min="0" value="0" class="form-control"></label>
             <label style="font-size:.82em;grid-column:1/-1">URL do Server acessada pelas máquinas<input id="itf-url" class="form-control" value="${esc(S.publicUrl || location.origin)}"></label>
+            <label style="font-size:.82em;grid-column:1/-1"><input type="checkbox" id="itf-ss" ${/^https:\/\/(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|[^./]+[:/])/i.test(S.publicUrl || location.origin) ? 'checked' : ''}> O Server usa certificado autoassinado (o comando aceita o certificado sem validar)</label>
             <div><button class="btn btn-primary" id="itf-go"><i class="fas fa-key"></i> Gerar token</button> <button class="btn" id="itf-cancel">Cancelar</button></div></div>`;
         f.querySelector('#itf-cancel').onclick = () => { f.style.display = 'none'; };
         f.querySelector('#itf-go').onclick = async () => {
+            const u = f.querySelector('#itf-url').value.trim();
+            if (/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])([:/]|$)/i.test(u) && !confirm('A URL usa "localhost": as outras máquinas não vão alcançar o Server. Gerar mesmo assim? (Use o nome ou IP do Server na rede.)')) return;
             try {
                 const d = await api('/api/v1/fleet/install-tokens', { method: 'POST', body: JSON.stringify({ name: f.querySelector('#itf-name').value, tenant_id: f.querySelector('#itf-tenant').value || null,
-                    expires_days: +f.querySelector('#itf-days').value, max_uses: +f.querySelector('#itf-uses').value, public_url: f.querySelector('#itf-url').value }) });
+                    expires_days: +f.querySelector('#itf-days').value, max_uses: +f.querySelector('#itf-uses').value, public_url: u, self_signed: f.querySelector('#itf-ss').checked }) });
                 f.style.display = 'none';
                 const r = document.getElementById('it-result');
                 r.innerHTML = `<div style="border:1px solid var(--success);border-radius:8px;padding:12px;margin-bottom:10px">
                     <b><i class="fas fa-circle-check" style="color:var(--success)"></i> Token criado — copie agora, ele não será mostrado de novo.</b>
+                    ${d.warning ? `<div style="margin-top:6px;color:var(--warning);font-size:.84em"><i class="fas fa-triangle-exclamation"></i> ${esc(d.warning)}</div>` : ''}
                     <div style="margin-top:8px;font-size:.82em">Comando único (PowerShell como Administrador, GPO de inicialização ou script do Intune):</div>
                     <textarea readonly class="form-control" style="width:100%;height:58px;font-family:monospace;font-size:.78em">${esc(d.one_liner)}</textarea>
                     <div style="font-size:.82em;margin-top:6px">Instalação manual a partir do pacote do Agent:</div>

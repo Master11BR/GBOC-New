@@ -1,6 +1,6 @@
 /*
 ==============================================================================
-GBOC System v14.6.0 Enterprise Edition
+GBOC System v14.8.1 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
@@ -770,6 +770,8 @@ window.gbocLogout = async function(){
  * Unifica o indicador de status de conexão do cabeçalho em todas as páginas do sistema
  */
 window.gbocSyncConnectionStatus = async function() {
+    // Indicador único (gboc-layout-manager.js): mesma regra em todas as telas
+    if (window.GBOCStatus) { return window.GBOCStatus.refresh(); }
     const dot = document.getElementById('wsDot');
     const label = document.getElementById('wsLabel');
 
@@ -777,9 +779,9 @@ window.gbocSyncConnectionStatus = async function() {
         const res = await fetch('/api/system/info');
         if (res.ok) {
             const info = await res.json();
-            const rawVer = info.raw_version || info.gboc_version || '14.6.0';
+            const rawVer = info.raw_version || info.gboc_version || '14.8.1';
             const cleanVer = String(rawVer).replace(/^v/i, '').split('-')[0];
-            const ver = cleanVer || '14.6.0';
+            const ver = cleanVer || '14.8.1';
 
             if (dot && label) {
                 dot.className = 'ws-dot on';

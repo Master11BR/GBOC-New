@@ -172,7 +172,7 @@ def _collect_server_operational_data(limit: int = 5) -> dict[str, Any]:
         cur.execute(
             """
             SELECT COUNT(*),
-                   COUNT(*) FILTER (WHERE last_heartbeat > LOCALTIMESTAMP - INTERVAL '60 minutes')
+                   COUNT(*) FILTER (WHERE last_heartbeat > gboc_agent_offline_cutoff())
             FROM agents
             """
         )
@@ -181,7 +181,7 @@ def _collect_server_operational_data(limit: int = 5) -> dict[str, Any]:
         cur.execute(
             """
             SELECT hostname, last_heartbeat FROM agents
-            WHERE last_heartbeat IS NULL OR last_heartbeat <= LOCALTIMESTAMP - INTERVAL '60 minutes'
+            WHERE last_heartbeat IS NULL OR last_heartbeat <= gboc_agent_offline_cutoff()
             ORDER BY last_heartbeat DESC NULLS LAST LIMIT %s
             """,
             (limit,),

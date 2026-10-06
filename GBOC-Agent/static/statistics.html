@@ -1,6 +1,6 @@
 <!--
 ==============================================================================
-GBOC System v14.6.0 Enterprise Edition
+GBOC System v14.8.1 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
@@ -10,7 +10,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GBOC Agent 14.6.0 - Estatísticas</title>
+    <title>GBOC Agent 14.8.1 - Estatísticas</title>
     
     <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
     <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.8.1">
@@ -152,6 +152,8 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             return statsCache.data && (Date.now() - statsCache.timestamp) < statsCache.ttl;
         }
 
+        document.addEventListener('gboc:charts-ready', () => { if (!window.__reg_executionsChart && window.loadStatistics) window.loadStatistics(); });
+
         window.loadStatistics = async function() {
             const period = document.getElementById('periodSelect').value;
 
@@ -172,27 +174,25 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 
                 updateSummary(summary);
 
-                // Carregar dados diários
+                // Gráficos: cada um com o seu período (barra do gráfico); o seletor da página ajusta todos
                 const days = period === 'day' ? 1 : period === 'week' ? 7 : period === 'month' ? 30 : 365;
-                const dailyRes = await fetch(`/api/statistics/daily?days=${days}`);
-                const daily = await dailyRes.json();
-                updateExecutionsChart(daily);
-
-                // Carregar throughput
-                const throughputRes = await fetch(`/api/statistics/throughput?days=${days}`);
-                const throughput = await throughputRes.json();
-                updateThroughputChart(throughput);
-
-                // Carregar comparação de engines
-                const enginesRes = await fetch(`/api/statistics/engines/comparison?period=${period}`);
-                const engines = await enginesRes.json();
-                updateEnginesChart(engines);
-                updateEnginesTable(engines);
-
-                // Carregar tendência de erros
-                const errorsRes = await fetch(`/api/statistics/errors/trend?days=${days}`);
-                const errors = await errorsRes.json();
-                updateErrorsChart(errors);
+                const C = window.GBOCCharts;
+                const loaders = {
+                    executionsChart: async (d) => updateExecutionsChart(await (await fetch(`/api/statistics/daily?days=${d}`)).json()),
+                    throughputChart: async (d) => updateThroughputChart(await (await fetch(`/api/statistics/throughput?days=${d}`)).json()),
+                    enginesChart: async (d) => { const e = await (await fetch(`/api/statistics/engines/comparison?days=${d}`)).json(); updateEnginesChart(e); updateEnginesTable(e); },
+                    errorsChart: async (d) => updateErrorsChart(await (await fetch(`/api/statistics/errors/trend?days=${d}`)).json()),
+                };
+                const pageChanged = window.__statsLastPeriod !== undefined && window.__statsLastPeriod !== period;
+                window.__statsLastPeriod = period;
+                await Promise.all(Object.entries(loaders).map(([id, fn]) => {
+                    if (C && !window['__reg_' + id]) {
+                        window['__reg_' + id] = true;
+                        C.bind(id, { periods: [1, 7, 30, 90, 365, 0], period: days, load: (st) => fn(st.period) });
+                    }
+                    if (C && pageChanged) C.set(id, { period: days });
+                    return fn(C ? C.days(id, days) : days);
+                }));
 
             } catch (error) {
                 console.error('Erro ao carregar estatísticas:', error);

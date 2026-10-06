@@ -28,6 +28,10 @@ from typing import Any, Dict, Optional
 logger = logging.getLogger("gboc_enrollment")
 
 
+class TokenRejected(RuntimeError):
+    """Token inválido/revogado/expirado/esgotado: tentar de novo não adianta."""
+
+
 def config_dir() -> Path:
     d = Path("C:/ProgramData/GBOC") if os.name == "nt" else Path.home() / ".gboc"
     d.mkdir(parents=True, exist_ok=True)
@@ -57,7 +61,11 @@ def request_enrollment(server_url: str, token: str, timeout: int = 30) -> Dict[s
     except ValueError:
         data = {}
     if r.status_code != 200:
-        raise RuntimeError(data.get("detail") or data.get("message") or f"Server respondeu HTTP {r.status_code}")
+        msg = data.get("detail") or data.get("message") or f"Server respondeu HTTP {r.status_code}"
+        msg = msg if isinstance(msg, str) else json.dumps(msg, ensure_ascii=False)
+        if r.status_code in (400, 403) and "token de instalação" in msg.lower():
+            raise TokenRejected(msg)
+        raise RuntimeError(msg)
     if not data.get("pairing_key"):
         raise RuntimeError("Resposta do Server sem chave de pareamento")
     return data
@@ -104,6 +112,18 @@ def process_seed_file() -> Optional[Dict[str, Any]]:
         f.with_name("enroll.done.json").write_text(json.dumps(seed, ensure_ascii=False, indent=2), encoding="utf-8")
         f.unlink()
         return res
+    except TokenRejected as e:
+        # Não fica tentando por 72 h com um token que o Server já recusou: arquiva e para
+        seed.pop("install_token", None)
+        seed.update(last_error=str(e)[:300], last_attempt=datetime.now().isoformat())
+        try:
+            f.with_name("enroll.failed.json").write_text(json.dumps(seed, ensure_ascii=False, indent=2), encoding="utf-8")
+            f.unlink()
+        except OSError:
+            pass
+        logger.error(f"[INSCRIÇÃO] Token recusado pelo Server ({e}). Gere um novo token no Server e execute o instalador "
+                     f"de novo, ou configure a chave em Configurações > Servidor Central.")
+        return None
     except Exception as e:
         seed["last_error"] = str(e)[:300]
         seed["last_attempt"] = datetime.now().isoformat()

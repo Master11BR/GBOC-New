@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-🔄 GBOC Agent 14.6.0 - API de Restauração REAL
+🔄 GBOC Agent 14.8.1 - API de Restauração REAL
 Gerencia restauração de arquivos de snapshots reais
 """
 
@@ -76,6 +76,33 @@ def get_snapshots(repo_id: str):
     except Exception as e:
         logger.error(f"❌ Erro ao listar snapshots: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Erro ao listar snapshots: {str(e)}")
+
+
+@router.get("/versions/{repo_id}")
+def get_file_versions(repo_id: int, path: str):
+    """Histórico de versões de um arquivo em todos os snapshots do repositório (restaurar uma versão = restaurar
+    o arquivo a partir do snapshot daquela versão)."""
+    from shared_core import get_shared_core
+    try:
+        return {"status": "success", **get_shared_core().restore_manager.file_versions(repo_id, path)}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Histórico de versões: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/verify/{repo_id}")
+def verify_repository(repo_id: int, read_data: bool = False):
+    """Verifica a integridade do repositório (blocos do motor nativo / restic check)."""
+    from shared_core import get_shared_core
+    try:
+        return {"status": "success", "result": get_shared_core().restore_manager.verify_repository(repo_id, read_data)}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Verificação do repositório: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/files/{repo_id}/{snapshot_id}")

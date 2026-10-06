@@ -1,5 +1,5 @@
 /**
- * GBOC Server v14.6.0 — Storage Module UI Script
+ * GBOC Server v14.8.1 — Storage Module UI Script
  */
 
 let serverStorageChartInstance = null;
@@ -83,7 +83,10 @@ async function loadServerStorageData() {
 
 async function loadServerStorageHistory() {
     try {
-        const res = await fetch(window.GBOC_API_BASE + '/api/v1/server/storage/history?days=30');
+        const C = window.GBOCCharts;
+        if (C && !window.__reg_srvStorage) { window.__reg_srvStorage = true; C.bind('server-storage-chart', { periods: [7, 30, 90, 365, 0], period: 30, load: () => loadServerStorageHistory() }); }
+        const days = C ? C.days('server-storage-chart', 30) : 30;
+        const res = await fetch(window.GBOC_API_BASE + '/api/v1/server/storage/history?days=' + days);
         if (!res.ok) return;
         const data = await res.json();
         if (data.status === 'success' && data.history) {

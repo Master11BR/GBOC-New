@@ -1,5 +1,5 @@
 /* ============================================================================
-   GBOC System v14.6.0 Enterprise — Dynamic UI Style & Illumination Engine (Modern UI Official)
+   GBOC System v14.8.1 Enterprise — Dynamic UI Style & Illumination Engine (Modern UI Official)
    Model: modern (DEFAULT / ACTIVE)
    ============================================================================ */
 
@@ -328,36 +328,27 @@
     --curve-color-2: #dc2626;
 }
 
-@keyframes pulseGlow {
-    0%, 100% { opacity: 0.35; transform: scale(1); }
-    50% { opacity: 0.65; transform: scale(1.08); }
+/* Fundo "aurora" leve: só transform/opacity (roda na GPU, fora da thread principal).
+   Antes: 3 círculos com filter:blur(130-160px) + mix-blend-mode + linhas SVG com stroke-dashoffset
+   — o navegador redesenhava a tela inteira a cada quadro (≈ metade dos FPS em máquinas modestas). */
+@keyframes gbocAuroraA {
+    0%   { transform: translate3d(-8%, -6%, 0) scale(1); }
+    50%  { transform: translate3d(10%, 8%, 0) scale(1.12); }
+    100% { transform: translate3d(2%, 14%, 0) scale(0.96); }
 }
-
-.glow-pulse {
-    animation: pulseGlow 8s ease-in-out infinite;
+@keyframes gbocAuroraB {
+    0%   { transform: translate3d(6%, 0, 0) scale(1.05); }
+    50%  { transform: translate3d(-12%, -10%, 0) scale(0.94); }
+    100% { transform: translate3d(-4%, 6%, 0) scale(1.1); }
 }
-
-.glow-pulse-delayed {
-    animation: pulseGlow 10s ease-in-out infinite;
-    animation-delay: 2.5s;
+@keyframes gbocAuroraC {
+    0%   { transform: translate3d(0, 8%, 0) scale(0.95); }
+    50%  { transform: translate3d(14%, -4%, 0) scale(1.08); }
+    100% { transform: translate3d(-10%, -8%, 0) scale(1); }
 }
-
-@keyframes drawLine {
-    0% { stroke-dashoffset: 240; }
-    100% { stroke-dashoffset: 0; }
-}
-
-.path-animate-1 {
-    stroke-dasharray: 240;
-    animation: drawLine 14s linear infinite alternate;
-}
-.path-animate-2 {
-    stroke-dasharray: 240;
-    animation: drawLine 18s linear infinite alternate-reverse;
-}
-.path-animate-3 {
-    stroke-dasharray: 240;
-    animation: drawLine 24s linear infinite alternate;
+@keyframes gbocLinesDrift {
+    0%   { transform: translate3d(-3%, 1.5%, 0); }
+    100% { transform: translate3d(3%, -1.5%, 0); }
 }
 
 .gboc-ambient-background {
@@ -366,14 +357,47 @@
     z-index: 0;
     pointer-events: none;
     overflow: hidden;
+    contain: strict;
     transition: opacity 0.4s ease;
 }
 
+.gboc-aurora {
+    position: absolute;
+    width: 75vmax;
+    height: 75vmax;
+    border-radius: 50%;
+    /* gradiente radial já "desfocado": dispensa filter: blur() */
+    background: radial-gradient(closest-side, var(--ambient-glow-1, rgba(245,158,11,0.2)) 0%, transparent 100%);
+    opacity: 0.95;
+    will-change: transform;
+    backface-visibility: hidden;
+}
+.gboc-aurora.a1 { top: -38vmax; left: -30vmax; animation: gbocAuroraA 34s ease-in-out infinite alternate; }
+.gboc-aurora.a2 { top: 10vh; right: -36vmax; width: 85vmax; height: 85vmax;
+                  background: radial-gradient(closest-side, var(--ambient-glow-2, rgba(217,119,6,0.18)) 0%, transparent 100%);
+                  animation: gbocAuroraB 42s ease-in-out infinite alternate; }
+.gboc-aurora.a3 { bottom: -44vmax; left: 12vw; width: 70vmax; height: 70vmax; opacity: 0.8;
+                  animation: gbocAuroraC 38s ease-in-out infinite alternate; }
+
+.gboc-ambient-lines {
+    position: absolute;
+    inset: -6% -8%;
+    opacity: 0.3;
+    will-change: transform;
+    animation: gbocLinesDrift 46s ease-in-out infinite alternate;
+}
+.gboc-ambient-lines svg,
 .gboc-ambient-background svg {
     position: absolute;
     width: 100%;
     height: 100%;
-    opacity: 0.45;
+}
+
+/* Sem animação: preferência do sistema "reduzir movimento", opção do usuário ou máquina lenta (auto) */
+html.gboc-bg-static .gboc-aurora,
+html.gboc-bg-static .gboc-ambient-lines { animation: none !important; will-change: auto; }
+@media (prefers-reduced-motion: reduce) {
+    .gboc-aurora, .gboc-ambient-lines { animation: none !important; will-change: auto; }
 }
 
 .main-content, .sidebar, aside, .topbar, header, nav, 

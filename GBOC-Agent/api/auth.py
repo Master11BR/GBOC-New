@@ -383,6 +383,7 @@ except Exception:
 class LoginRequest(BaseModel):
     username: str
     password: str
+    remember: bool = False          # "Lembrar credencial": sessão de 7 dias
 
 
 class RegisterRequest(BaseModel):
@@ -514,7 +515,10 @@ def login(req: LoginRequest, request: Request):
                 cur.execute("UPDATE auth_users SET last_login = %s WHERE id = %s", (now, user_id))
 
             token = _generate_token(user_id, db_username)
-            expires = datetime.now() + timedelta(hours=TOKEN_EXPIRY_HOURS)
+            session_hours = 24 * 7 if req.remember else TOKEN_EXPIRY_HOURS
+            expires = datetime.now() + timedelta(hours=session_hours)
+            if token in ACTIVE_TOKENS:
+                ACTIVE_TOKENS[token]['expires_at'] = expires
 
             cur.execute(
                 "INSERT INTO auth_sessions (user_id, token, ip_address, user_agent, expires_at) VALUES (%s, %s, %s, %s, %s)",
@@ -539,8 +543,8 @@ def login(req: LoginRequest, request: Request):
                 "role": role
             }
         })
-        resp.set_cookie(key="gboc_token", value=token, httponly=True, max_age=86400, samesite="lax")
-        resp.set_cookie(key="gboc_server_token", value=token, httponly=False, max_age=86400, samesite="lax")
+        resp.set_cookie(key="gboc_token", value=token, httponly=True, max_age=session_hours * 3600, samesite="lax")
+        resp.set_cookie(key="gboc_server_token", value=token, httponly=False, max_age=session_hours * 3600, samesite="lax")
         return resp
 
     except HTTPException:
