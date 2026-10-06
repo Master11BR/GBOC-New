@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 14.6.0 - API de Sistema Completo
+GBOC 14.8.1 - API de Sistema Completo
 Endpoint para diagnóstico completo do sistema
 """
 
@@ -30,9 +30,9 @@ async def get_system_version_info():
     except Exception:
         return {
             "status": "success",
-            "version": "14.6.0",
-            "raw_version": "14.6.0",
-            "gboc_version": "14.6.0",
+            "version": "14.8.1",
+            "raw_version": "14.8.1",
+            "gboc_version": "14.8.1",
             "app_name": "GBOC Agent Enterprise"
         }
 
@@ -67,19 +67,16 @@ async def scan_orphan_files():
         raise HTTPException(500, str(e))
 
 @router.post("/version/unify")
-async def unify_versions():
-    """Unifica versões do sistema para 14.6.0"""
+async def unify_versions(apply: bool = False):
+    """Audita versões divergentes da oficial (version.py) nos arquivos do produto; apply=true corrige."""
     try:
+        from starlette.concurrency import run_in_threadpool
         from utils.version_unifier import VersionUnifier
-        
-        unifier = VersionUnifier()
-        success = unifier.unify_versions()
-        
-        return {
-            "status": "success" if success else "error",
-            "updated_files": unifier.updated_files,
-            "failed_updates": unifier.failed_updates
-        }
+
+        unifier = VersionUnifier(apply=apply)
+        success = await run_in_threadpool(unifier.unify_versions)
+
+        return {"status": "success" if success else "error", **unifier.report()}
         
     except Exception as e:
         logger.error(f"Error unifying versions: {e}")

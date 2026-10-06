@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 14.6.0 - Reports API (Agent)
+GBOC 14.8.1 - Reports API (Agent)
 Generate, schedule, download and manage backup reports with 100% real system data.
 Supports HTML (print-to-PDF), CSV, JSON formats.
 """
@@ -82,7 +82,7 @@ def get_usd_to_brl_rate() -> float:
     try:
         req = urllib.request.Request(
             "https://economia.awesomeapi.com.br/json/last/USD-BRL",
-            headers={"User-Agent": "GBOC-System/14.6.0"}
+            headers={"User-Agent": "GBOC-System/14.8.1"}
         )
         with urllib.request.urlopen(req, timeout=3) as resp:
             if resp.status == 200:
@@ -506,6 +506,6 @@ async def get_system_version():
             "string": version_string()
         })
     except Exception:
-        return JSONResponse({"version": "14.6.0", "build": "stable", "edition": "Enterprise"})
+        return JSONResponse({"version": "14.8.1", "build": "stable", "edition": "Enterprise"})
 
 

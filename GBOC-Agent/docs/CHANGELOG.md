@@ -144,6 +144,13 @@
   O motivo aparece ao passar o mouse.
 - A queda momentânea da atualização ao vivo (WebSocket do navegador) não muda mais o status para "Desconectado": aparece só na dica.
 
+### 🏷️ Versão igual em todas as telas
+- Várias telas, scripts e respostas da API ainda mostravam versões antigas. Exemplos: títulos e cabeçalho do Agente com "14.6.0", rodapé do login com "v14.4", banners de iniciar/instalar, User-Agent e respostas reservas da API. Agora todos mostram a versão oficial do `version.py`.
+- O rodapé do login lê a versão do serviço em `/api/v1/version`.
+- `utils/version_unifier.py` foi refeito e a rota `POST /api/system/version/unify` volta a funcionar (antes dava erro: a classe chamada não existia). Por padrão só relata o que diverge; com `apply=true` (ou `--apply` na linha de comando) corrige, preservando a codificação e as quebras de linha. A versão mínima compatível e os marcos "a partir da 14.7.7+" não são alterados.
+- Teste automático `tests/test_version_consistency.py` falha se aparecer outra versão ou se Server e Agente divergirem.
+- Removidas as cópias antigas fora de uso `GBOC-Server/gboc_server1.py` e `gboc_server_com_erro.py`.
+
 ### 🔑 Correção: chave de pareamento do Agente "não salva / não reconhecida"
 - A chave era salva em C:\ProgramData\GBOC\central_config.json, mas um processo do Agente iniciado antes da troca continuava usando a chave antiga em memória: o Server respondia 401 (AGENT_KEY_INVALID) e recusava o WebSocket (403) indefinidamente. Agora o Agente relê o arquivo a cada 30 s e **aplica** a chave/URL nova (heartbeat, sincronização e WebSocket reconectam sozinhos); ao receber 401 relê o arquivo e tenta de novo na hora.
 - Salvar só a URL (chave em branco) mantém a chave gravada no arquivo — antes podia regravar a chave antiga da memória.

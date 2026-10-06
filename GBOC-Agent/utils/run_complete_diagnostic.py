@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 14.6.0 - Executar Diagnóstico Completo
+GBOC 14.8.1 - Executar Diagnóstico Completo
 Script para executar todos os diagnósticos e gerar relatórios
 """
 
@@ -20,11 +20,17 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+try:
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from version import GBOC_VERSION as TARGET_VERSION
+except Exception:
+    TARGET_VERSION = "14.8.1"
+
 def main():
     """Executa todos os diagnósticos"""
     
     print("\n" + "=" * 80)
-    print(" GBOC 14.6.0 - DIAGNÓSTICO COMPLETO DO SISTEMA")
+    print(f" GBOC {TARGET_VERSION} - DIAGNÓSTICO COMPLETO DO SISTEMA")
     print("=" * 80 + "\n")
     
     results = {
@@ -45,17 +51,14 @@ def main():
         results["diagnostics"]["system"] = {"error": str(e)}
     
     # 2. Unificação de versões
-    print("\n[2/4] Unificando versões para 14.6.0...")
+    print(f"\n[2/4] Conferindo versões (oficial {TARGET_VERSION})...")
     try:
         from version_unifier import VersionUnifier
         unifier = VersionUnifier()
         success = unifier.unify_versions()
-        results["diagnostics"]["version_unification"] = {
-            "success": success,
-            "updated_files": unifier.updated_files,
-            "failed_updates": unifier.failed_updates
-        }
-        print("✓ Unificação de versões concluída")
+        results["diagnostics"]["version_unification"] = {"success": success, **unifier.report()}
+        print(f"✓ Versões conferidas: {len(unifier.findings)} divergência(s) "
+              f"(corrija com: python utils/version_unifier.py --apply)")
     except Exception as e:
         print(f"✗ Erro na unificação de versões: {e}")
         results["diagnostics"]["version_unification"] = {"error": str(e)}
@@ -127,7 +130,7 @@ def main():
             total_issues += len(preempt.get("alerts", []))
             total_warnings += len(preempt.get("warnings", []))
     
-    print(f"\n✓ Sistema diagnosticado: GBOC 14.6.0")
+    print(f"\n✓ Sistema diagnosticado: GBOC {TARGET_VERSION}")
     print(f"✓ Issues críticos encontrados: {total_issues}")
     print(f"✓ Warnings encontrados: {total_warnings}")
     
@@ -139,7 +142,7 @@ def main():
     if "version_unification" in results["diagnostics"]:
         version = results["diagnostics"]["version_unification"]
         if isinstance(version, dict) and version.get("success"):
-            print(f"✓ Versões unificadas com sucesso")
+            print(f"✓ Versões conferidas ({version.get('divergences', 0)} divergência(s))")
     
     print("\n" + "=" * 80)
     

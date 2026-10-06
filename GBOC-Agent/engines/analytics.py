@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-📊 GBOC Agent 14.6.0 - BACKUP ANALYTICS & SUGGESTIONS
+📊 GBOC Agent 14.8.1 - BACKUP ANALYTICS & SUGGESTIONS
 Sistema de análise inteligente de backups com sugestões para o usuário
 """
 

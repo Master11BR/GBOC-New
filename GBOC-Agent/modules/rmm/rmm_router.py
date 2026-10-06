@@ -1,4 +1,4 @@
-# GBOC System v14.6.0 Enterprise Edition
+# GBOC System v14.8.1 Enterprise Edition
 # Module: Agent RMM Router & System Manager
 # Remote Terminal, Process & Services Management, Network Telemetry, and Agent Mirroring
 
@@ -281,8 +281,8 @@ async def rmm_system_info():
             },
             "disks": disks,
             "uptime_seconds": int(time.time() - psutil.boot_time()) if PSUTIL_AVAILABLE else 3600,
-            "gboc_version": getattr(sys.modules.get('version_control'), '__version__', '14.6.0'),
-            "agent_version": getattr(sys.modules.get('version_control'), '__version__', '14.6.0'),
+            "gboc_version": getattr(sys.modules.get('version_control'), '__version__', '14.8.1'),
+            "agent_version": getattr(sys.modules.get('version_control'), '__version__', '14.8.1'),
             "timestamp": datetime.now().isoformat()
         }
     except Exception as e:
@@ -351,7 +351,7 @@ async def rmm_get_agent_mirror():
                 "agent_id": socket.gethostname(),
                 "hostname": socket.gethostname(),
                 "ip_address": sys_info.get("ip_address"),
-                "agent_version": f"v{getattr(sys.modules.get('version_control'), '__version__', '14.6.0')} Enterprise",
+                "agent_version": f"v{getattr(sys.modules.get('version_control'), '__version__', '14.8.1')} Enterprise",
                 "system_telemetry": sys_info,
                 "repositories_count": repos_count,
                 "tasks_count": tasks_count,

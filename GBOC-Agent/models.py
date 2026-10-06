@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-📋 GBOC Agent 14.6.0 - MODELS
+📋 GBOC Agent 14.8.1 - MODELS
 Estrutura de dados e validação Pydantic
 ✅ CORRIGIDO: Modelos de repositório flexíveis para criação/edição
 """

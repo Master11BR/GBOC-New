@@ -1,5 +1,5 @@
 /**
- * GBOC System v14.6.0 Enterprise Edition
+ * GBOC System v14.8.1 Enterprise Edition
  * Widget: Hardware, CPU, Disks, Ambient Weather & S.M.A.R.T. Telemetry HUD (Agent)
  */
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-⚙️ GBOC Agent 14.6.0 - API SETTINGS
+⚙️ GBOC Agent 14.8.1 - API SETTINGS
 Responsável por: Rotas para configuração do sistema
 """
 

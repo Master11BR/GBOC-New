@@ -1,6 +1,6 @@
-# 📐 GBOC System v14.6.0 Enterprise — Diretrizes e Políticas de Arquitetura Modular
+# 📐 GBOC System v14.8.1 Enterprise — Diretrizes e Políticas de Arquitetura Modular
 
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.6.0 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.8.1 Enterprise. Todos os direitos reservados. -->
 
 Este documento estabelece as **Políticas de Arquitetura Obrigatórias** para o desenvolvimento e manutenção do **GBOC Server** e do **GBOC Agent**.
 

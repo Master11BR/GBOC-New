@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC Agent 14.6.0 - Sistema de Diagnóstico
+GBOC Agent 14.8.1 - Sistema de Diagnóstico
 Engine para diagnósticos completos do sistema
 """
 
@@ -25,7 +25,7 @@ class DiagnosticSystem:
             from version_control import __version__ as AGENT_VERSION
             self.version = AGENT_VERSION
         except Exception:
-            self.version = "14.6.0"
+            self.version = "14.8.1"
         self.initialized = False
         
         try:
