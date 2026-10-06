@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 14.6.0 - Ransomware Detection API
+GBOC 14.8.1 - Ransomware Detection API
 Endpoints for scanning, canary management, and threat status.
 """
 

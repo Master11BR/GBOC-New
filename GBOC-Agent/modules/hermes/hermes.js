@@ -1,5 +1,5 @@
 /* ============================================================================
-   GBOC System v14.6.0 Full Stable Enterprise Edition
+   GBOC System v14.8.1 Full Stable Enterprise Edition
    Module: Hermes Agent Local Controller (hermes.js)
    ============================================================================ */
 

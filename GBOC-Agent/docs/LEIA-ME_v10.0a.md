@@ -1,4 +1,4 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.6.0 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.8.1 Enterprise. Todos os direitos reservados. -->
 
 # 🎉 BEM-VINDO AO GBOC v14.6.0
 

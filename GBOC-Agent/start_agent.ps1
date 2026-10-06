@@ -1,17 +1,17 @@
 <#
 ==============================================================================
-GBOC System v14.6.0 Enterprise Edition
+GBOC System v14.8.1 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
 #>
 
 # ========================================
-# GBOC Agent 14.6.0 - Inicializacao
+# GBOC Agent 14.8.1 - Inicializacao
 # ========================================
 
 Write-Host "`n========================================" -ForegroundColor Cyan
-Write-Host "  GBOC Agent 14.6.0 - Iniciando..." -ForegroundColor Cyan
+Write-Host "  GBOC Agent 14.8.1 - Iniciando..." -ForegroundColor Cyan
 Write-Host "========================================`n" -ForegroundColor Cyan
 
 $PythonExe = $null
@@ -47,7 +47,7 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-Write-Host "[OK] Iniciando GBOC Agent 14.6.0..." -ForegroundColor Green
+Write-Host "[OK] Iniciando GBOC Agent 14.8.1..." -ForegroundColor Green
 Write-Host "Comando Python: $PythonExe $($PythonBaseArgs -join ' ')`n" -ForegroundColor Gray
 
 Write-Host "Servidor disponivel em:" -ForegroundColor Yellow

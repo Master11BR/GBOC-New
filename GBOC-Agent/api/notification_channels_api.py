@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 14.6.0 - Notification Channels API
+GBOC 14.8.1 - Notification Channels API
 CRUD for Slack, Teams, Discord, Telegram, custom webhooks.
 Test delivery, delivery history.
 """

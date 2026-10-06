@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-GBOC Agent 14.6.0 - SHARED CORE (Refactored)
+GBOC Agent 14.8.1 - SHARED CORE (Refactored)
 Arquitetura centralizada para inicialização de componentes
 """
 

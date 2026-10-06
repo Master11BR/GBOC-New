@@ -251,7 +251,7 @@ except ImportError as e:
 async def lifespan(app: FastAPI):
     """Gerenciamento do ciclo de vida da aplicação"""
     logger.info("=" * 50)
-    logger.info("[STARTUP] GBOC Agent 14.6.0 - Servidor Iniciado")
+    logger.info("[STARTUP] GBOC Agent 14.8.1 - Servidor Iniciado")
     logger.info(f"[DATA] {DATA_DIR}")
     logger.info(f"[LOGS] {LOGS_DIR}")
     
@@ -711,9 +711,9 @@ API_MODULES = [
     ("api.fs", "router"),
     ("api.tasks_ops", "router"),
     ("api.smtp", "router"),  # ✅ Configuração SMTP
-    ("api.advanced_stats_api", "router"),  # ✅ Estatísticas avançadas 14.6.0
-    ("api.preemptive_api", "router"),  # ✅ Diagnóstico preemptivo 14.6.0
-    ("api.system_api", "router"),  # ✅ Sistema completo 14.6.0
+    ("api.advanced_stats_api", "router"),  # ✅ Estatísticas avançadas 14.8.1
+    ("api.preemptive_api", "router"),  # ✅ Diagnóstico preemptivo 14.8.1
+    ("api.system_api", "router"),  # ✅ Sistema completo 14.8.1
     ("api.auth", "router"),  # ✅ Autenticação (/api/auth)
     ("api.auth", "router_v1"),  # ✅ Autenticação v1 (/api/v1/auth)
     ("api.export_api", "router"),  # ✅ Exportação de relatórios

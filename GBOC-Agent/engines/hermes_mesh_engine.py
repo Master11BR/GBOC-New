@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v14.6.0 Enterprise Edition
+# GBOC System v14.8.1 Enterprise Edition
 # Module: Hermes Mesh Engine — P2P LAN Discovery & Block Cache
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================

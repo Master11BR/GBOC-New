@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 14.6.0 - Sistema de Diagnóstico Completo
+GBOC 14.8.1 - Sistema de Diagnóstico Completo
 Diagnóstico unificado de servidor e agente com correção automática
 """
 
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 try:
     from version_control import __version__ as VERSION
 except Exception:
-    VERSION = "14.6.0"
+    VERSION = "14.8.1"
 
 class SystemDiagnostic:
     """Diagnóstico completo do sistema GBOC"""

@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v14.6.0 Enterprise Edition
+# GBOC System v14.8.1 Enterprise Edition
 # Module: Flagship Reports Engine v2.0 (Server)
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # Propriedade Intelectual & Direitos Autorais Registrados.
@@ -764,7 +764,7 @@ def render_flagship_html(report_data: Dict[str, Any], is_print: bool = False) ->
     <aside class="report-actions-bar">
         <div class="info">
             <i class="fas fa-file-shield" style="color:#38bdf8;font-size:1.2em"></i>
-            <span>Visualizador Corporativo <strong>{report_data['report_id']}</strong> • v14.6.0</span>
+            <span>Visualizador Corporativo <strong>{report_data['report_id']}</strong> • v14.8.1</span>
         </div>
         <div class="action-btns">
             <button onclick="window.print()" class="btn-action"><i class="fas fa-print"></i> Imprimir / Gerar PDF (A4)</button>
@@ -891,7 +891,7 @@ def render_flagship_csv(report_data: Dict[str, Any]) -> str:
     """Exporta o relatório Flagship v2.0 em formato tabular CSV estruturado."""
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["GBOC System v14.6.0 Enterprise - Relatório Flagship Executivo"])
+    writer.writerow(["GBOC System v14.8.1 Enterprise - Relatório Flagship Executivo"])
     writer.writerow(["Código", report_data.get("report_id")])
     writer.writerow(["Nome", report_data.get("report_name")])
     writer.writerow(["Categoria", report_data.get("category")])

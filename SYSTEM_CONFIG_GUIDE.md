@@ -154,7 +154,7 @@ As configurações do servidor são gerenciadas pela API REST `/api/v1/server/se
 O `SharedCore` é o orquestrador nativo do Agente.
 
 ### Recursos Configuráveis:
-1. **Ransomware Shield v14.6.0**:
+1. **Ransomware Shield v14.8.1**:
    - Cria arquivos canário estratégicos (`.gboc_canary_repos`).
    - Bloqueia automaticamente processos suspeitos que tentem modificar canários em massa.
 2. **Duplicati Native Engine**:
