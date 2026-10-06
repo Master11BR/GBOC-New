@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC Agent 14.6.0 - Task Manager
+GBOC Agent 14.8.1 - Task Manager
 [OK] Usa motor_password para repositórios locais e cloud_password para nuvem
 """
 
@@ -18,6 +18,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional, List
 import psycopg2.extras
 import re
+import socket
 from logging.handlers import RotatingFileHandler
 
 class SafeRotatingFileHandler(RotatingFileHandler):
@@ -52,6 +53,17 @@ from engines.auto_verify_engine import AutoVerifyEngine
 from native_engine.engine import GBOCNativeEngine
 
 logger = logging.getLogger(__name__)
+
+
+def _unlock_expired_before_prune(task: Dict) -> None:
+    """Repositório local imutável: libera arquivos que já passaram do bloqueio antes da limpeza da retenção."""
+    try:
+        from engines import immutability as _imm
+        repo = _imm._repo_row(task.get('repository_id'))
+        if _imm.get_policy(repo)["mode"] == "local_worm":
+            _imm.unlock_expired(repo)
+    except Exception as e:
+        logger.debug(f"[RETENÇÃO] liberação de arquivos vencidos: {e}")
 
 
 class TaskManager:
@@ -911,6 +923,13 @@ class TaskManager:
                     files_processed=files_count,
                     bytes_processed=bytes_count
                 )
+                # o monitor grava os contadores dele ao concluir: sem isso arquivos/bytes ficavam 0 nos motores
+                # que não informam progresso (nativo, Kopia)
+                try:
+                    self.monitor.update_progress(task_id, files_processed=files_count, files_total=files_count,
+                                                 bytes_processed=bytes_count, bytes_total=bytes_count)
+                except Exception as _mon_err:
+                    logger.debug(f"Progresso final: {_mon_err}")
                 self.monitor.complete_backup(task_id, snapshot_id=snapshot_id)
                 logger.info(f"✅ Tarefa {task_name} concluída com sucesso")
 
@@ -983,7 +1002,9 @@ class TaskManager:
             except (json.JSONDecodeError, TypeError):
                 return {"success": False, "error": "Formato inválido para caminhos de origem"}
 
-            cmd = [restic, "backup", "--json"] + source_paths
+            from engines import engine_tuning as _tune
+            _ts = _tune.settings(task.get('repo_config'))
+            cmd = [restic, "backup", "--json"] + _tune.restic_args(_ts, repo_type) + source_paths
             _kib = self._upload_limit_kib(task)
             if _kib:
                 cmd[2:2] = ["--limit-upload", str(_kib)]
@@ -1034,6 +1055,7 @@ class TaskManager:
 
             if self._current_process.returncode == 0:
                 self._mark_repository_initialized(task.get('repository_id'))
+                stats['retention'] = self._restic_retention(restic, env, task, source_paths)
                 return {"success": True, **stats}
 
             stderr_output = (self._current_process.stderr.read() or '').strip()
@@ -1185,6 +1207,18 @@ class TaskManager:
             _kib = self._upload_limit_kib(task)
             if _kib:
                 cmd.append(f"--throttle-upload={_kib}KB")
+            try:
+                from engines import engine_tuning as _tune
+                cmd.extend(_tune.duplicati_args(_tune.settings(task.get('repo_config'))))
+            except Exception as _tn_err:
+                logger.debug(f"Duplicati ajustes: {_tn_err}")
+            try:
+                from engines import retention as _ret
+                _pol = _ret.policy_for(task)
+                if _pol['enabled']:
+                    cmd.append(_ret.duplicati_retention_arg(_pol))     # Duplicati apaga versões fora da política
+            except Exception as _ret_err:
+                logger.warning(f"[RETENÇÃO] Duplicati: {_ret_err}")
 
             self._current_process = subprocess.Popen(
                 cmd,
@@ -1328,7 +1362,31 @@ class TaskManager:
             except Exception as _thr_err:
                 logger.debug(f"Kopia throttle: {_thr_err}")
 
-            cmd = [kopia, 'snapshot', 'create', '--config-file', config_path] + source_paths
+            # Retenção da tarefa: política do Kopia nos caminhos (aplicada pelo próprio Kopia ao criar o snapshot)
+            try:
+                from engines import retention as _ret
+                _pol = _ret.policy_for(task)
+                if _pol['enabled']:
+                    _ps = subprocess.run([kopia, 'policy', 'set', '--config-file', config_path, *source_paths,
+                                          *_ret.kopia_policy_args(_pol)], env=env, capture_output=True, text=True, timeout=120)
+                    if _ps.returncode != 0:
+                        logger.warning(f"[RETENÇÃO] Kopia: política não aplicada: {(_ps.stderr or _ps.stdout or '').strip()[:300]}")
+                    else:
+                        logger.info(f"[RETENÇÃO] Kopia: {_pol['days']}d/{_pol['weekly']}s/{_pol['monthly']}m/{_pol['yearly']}a")
+            except Exception as _ret_err:
+                logger.warning(f"[RETENÇÃO] Kopia: {_ret_err}")
+
+            # Compressão (o Kopia não compacta por padrão) e envio paralelo, conforme o repositório
+            from engines import engine_tuning as _tune
+            _ts = _tune.settings(task.get('repo_config'))
+            try:
+                _pc = subprocess.run([kopia, 'policy', 'set', '--config-file', config_path, *source_paths,
+                                      *_tune.kopia_policy_args(_ts)], env=env, capture_output=True, text=True, timeout=120)
+                if _pc.returncode != 0:
+                    logger.warning(f"Kopia: compressão não aplicada: {(_pc.stderr or _pc.stdout or '').strip()[:200]}")
+            except Exception as _pc_err:
+                logger.debug(f"Kopia compressão: {_pc_err}")
+            cmd = [kopia, 'snapshot', 'create', '--config-file', config_path] + _tune.kopia_snapshot_args(_ts) + source_paths
 
             self._current_process = subprocess.Popen(
                 cmd,
@@ -1359,6 +1417,43 @@ class TaskManager:
             return {"success": True, "files": 0, "bytes": 0, "snapshot_id": snapshot_id}
 
         except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def _restic_retention(self, restic: str, env: Dict[str, str], task: Dict, source_paths: list) -> Dict[str, Any]:
+        """Aplica a retenção da tarefa (restic forget/prune) só nos snapshots desta tarefa (host + caminhos).
+        Falha aqui NÃO marca o backup como falho — fica registrada no log e no resultado."""
+        try:
+            from engines import retention as _ret
+            pol = _ret.policy_for(task)
+            if not pol['enabled']:
+                return {"skipped": "retenção desativada"}
+            _unlock_expired_before_prune(task)
+            host = socket.gethostname()
+            args = _ret.restic_forget_args(pol, host, source_paths)
+            args.remove('--prune')          # forget e prune separados: a saída --json do forget fica legível
+            locked = bool(pol.get('lock_days'))
+            r = subprocess.run([restic, *args, "--json"], env=env, capture_output=True, text=True, timeout=7200)
+            if r.returncode != 0:
+                err = (r.stderr or r.stdout or '').strip()[:500]
+                logger.warning(f"[RETENÇÃO] restic forget falhou: {err}")
+                return {"success": False, "error": err}
+            removed = 0
+            try:
+                for grp in json.loads(r.stdout or '[]') or []:
+                    removed += len(grp.get('remove') or [])
+            except (ValueError, TypeError, AttributeError):
+                pass
+            if removed:
+                # Repositório imutável: apaga só pacotes 100% sem uso (nunca regrava pacotes recentes, bloqueados)
+                pr = subprocess.run([restic, "prune", *(["--max-unused", "unlimited"] if locked else [])], env=env,
+                                    capture_output=True, text=True, timeout=7200)
+                if pr.returncode != 0:
+                    logger.warning(f"[RETENÇÃO] restic prune: {(pr.stderr or '').strip()[:300]}")
+            logger.info(f"[RETENÇÃO] restic: {removed} snapshot(s) antigos removidos "
+                        f"({pol['days']}d/{pol['weekly']}s/{pol['monthly']}m/{pol['yearly']}a)")
+            return {"success": True, "removed": removed}
+        except Exception as e:
+            logger.warning(f"[RETENÇÃO] restic: {e}")
             return {"success": False, "error": str(e)}
 
     @staticmethod
@@ -1420,11 +1515,41 @@ class TaskManager:
             _kib = self._upload_limit_kib(task)
             if _kib:
                 backend.upload_limit_bps = _kib * 1024       # usado no upload em nuvem (CloudStorageBackend)
-            engine = GBOCNativeEngine({'source_paths': source_paths}, backend)
+            # Formato 4: blocos deduplicados + compressão + várias conexões (uma por thread na nuvem).
+            # Com limite de banda ativo usa 1 conexão (o limite é por conexão).
+            try:
+                _rc4 = json.loads(task.get('repo_config') or '{}') if isinstance(task.get('repo_config'), str) else (task.get('repo_config') or {})
+            except (ValueError, TypeError):
+                _rc4 = {}
+            from engines import engine_tuning as _tune
+            _ts = _tune.settings(_rc4)
+            _codec, _level = _tune.native_codec(_ts)
+            _is_cloud = str(repo_cfg.get('type') or 'local').lower() != 'local'
+            _workers = 1 if _kib else (_ts['parallel'] or (4 if _is_cloud else 2))
+            if _is_cloud and _workers > 1:
+                def _factory(_cfg=dict(repo_cfg)):
+                    be = RepositoryManager(self.core)._create_backend_from_config(dict(_cfg))
+                    if _cfg.get('object_lock'):
+                        be.config['object_lock'] = True
+                    return be
+            else:
+                _factory = (lambda: backend)
+            engine = GBOCNativeEngine({'source_paths': source_paths, 'compression_v4': _codec,
+                                       'compression_level': _level},
+                                      backend, backend_factory=_factory, workers=_workers)
             result = engine.run_backup()
 
             if result.get('success'):
                 self._mark_repository_initialized(task.get('repository_id'))
+                try:
+                    from engines import retention as _ret
+                    _pol = _ret.policy_for(task)
+                    if _pol['enabled']:
+                        _unlock_expired_before_prune(task)
+                        result['retention'] = _ret.prune_native(engine, _pol, source_paths)
+                        logger.info(f"[RETENÇÃO] GBOC Native: {result['retention']}")
+                except Exception as _ret_err:
+                    logger.warning(f"[RETENÇÃO] GBOC Native: limpeza não concluída: {_ret_err}")
 
             return result
         except Exception as e:

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC Agent 14.6.0 - Repository Manager
+GBOC Agent 14.8.1 - Repository Manager
 Refatorado para usar backends de armazenamento modulares.
 """
 
@@ -73,6 +73,9 @@ class RepositoryManager:
             'region': data.get('region'),
             'endpoint': data.get('endpoint'),
             'prefix': data.get('prefix'),
+            # desempenho (todos os motores): compressão e conexões paralelas — ver engines/engine_tuning.py
+            'compression': data.get('compression'),
+            'parallel_uploads': data.get('parallel_uploads'),
         }
         if repo_type in ('s3', 'wasabi'):
             ak = data.get('aws_access_key') or data.get('access_key')
@@ -418,7 +421,7 @@ class RepositoryManager:
         config_data = json.loads(config_str) if isinstance(config_str, str) else config_str or {}
 
         # Atualizar metadados não-sensíveis
-        for key in ['bucket', 'region', 'endpoint', 'prefix']:
+        for key in ['bucket', 'region', 'endpoint', 'prefix', 'compression', 'parallel_uploads']:
             if key in data:
                 config_data[key] = data[key]
 

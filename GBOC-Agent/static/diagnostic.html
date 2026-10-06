@@ -1,6 +1,6 @@
 <!--
 ==============================================================================
-GBOC System v14.6.0 Enterprise Edition
+GBOC System v14.8.1 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
@@ -10,7 +10,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Diagnóstico - GBOC Agent 14.6.0</title>
+    <title>Diagnóstico - GBOC Agent 14.8.1</title>
     
     <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
     <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.8.1">
@@ -126,8 +126,8 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             <div>
                 <h1 class="page-title"><i class="fas fa-stethoscope"></i> Diagnóstico</h1>
                 <div class="page-subtitle">
-                    Sistema de Backup Centralizado • v14.6.0 
-                    <span style="margin-left:12px;"><span class="ws-dot on" id="wsDot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--success);margin-right:4px;"></span><span id="wsLabel" style="font-size:.85em;font-weight:600;color:var(--success)">Online (Conectado)</span></span>
+                    Sistema de Backup Centralizado • v14.8.1 
+                    <span style="margin-left:12px;"><span class="ws-dot" data-gboc-status-dot style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--text-muted);margin-right:4px;"></span><span data-gboc-status-label style="font-size:.85em;font-weight:600">Verificando…</span></span>
                 </div>
             </div>
             <div class="header-actions">
@@ -588,7 +588,7 @@ async function loadEngineTable(){
 /* ===== SLA TAB ===== */
 async function loadSla(){
     try{
-        const data=await api('/api/preemptive/sla-compliance');
+        const data=await api('/api/preemptive/sla-compliance?days='+_chartDays('slaRingChart',30,loadSla));
         if(!data)return;
         const s=data.summary;
         document.getElementById('slaCompliant').textContent=s.compliant||0;
@@ -627,7 +627,7 @@ async function loadSla(){
 /* ===== ERRORS TAB ===== */
 async function loadErrors(){
     try{
-        const data=await api('/api/preemptive/error-classification');
+        const data=await api('/api/preemptive/error-classification?days='+_chartDays('chartErrCategories',30,loadErrors,['chartErrPareto']));
         if(!data)return;
         const errs=data.errors||[];
         const cats=data.categories||{};
@@ -861,7 +861,7 @@ async function loadSystem(){
         document.getElementById('siHostname').textContent=s.hostname||'--';
         document.getElementById('siProcessor').textContent=(s.processor||'--').substring(0,30);
         document.getElementById('siPython').textContent=s.python_version||'--';
-        document.getElementById('siGboc').textContent=sys.gboc_version||'14.6.0';
+        document.getElementById('siGboc').textContent=sys.gboc_version||'14.8.1';
 
         document.getElementById('siCpuCount').textContent=r.cpu_count||'--';
         document.getElementById('siRamTotal').textContent=(r.memory_total_gb||0).toFixed(1)+' GB';
@@ -1110,11 +1110,37 @@ async function loadHealthRecentErrors(){
 /* ===== STATS TAB - CHARTS ===== */
 let chartDailyObj=null, chartThroughObj=null, chartEngObj=null, chartErrTrendObj=null;
 
-async function loadStatsCharts(){
+// Período por gráfico (barra de opções do gboc-charts.js). O seletor geral do topo ajusta todos os de estatística.
+function _chartDays(id, def, reload, alsoIds){
+    const C = window.GBOCCharts;
+    if (!C) return def;
+    if (!window['__reg_' + id]) {
+        window['__reg_' + id] = true;
+        C.bind(id, { periods:[1,7,30,90,365,0], period:def, load:() => reload() });
+        (alsoIds || []).forEach(o => {      // gráficos alimentados pela mesma consulta acompanham o período
+            window['__reg_' + o] = true;
+            C.bind(o, { periods:[1,7,30,90,365,0], period:def, load:(st) => { C.set(id, {period: st.period}); reload(); } });
+        });
+    }
+    const d = C.days(id, def);
+    (alsoIds || []).forEach(o => C.set(o, {period: d}));
+    return d;
+}
+let _statsLastDays = null;
+document.addEventListener('gboc:charts-ready', () => { if (!window.__reg_chartDailyExec) { loadStatsCharts(); loadSla(); loadErrors(); } });
+
+async function loadStatsCharts(only){
     try{
-        const days = currentStatsDays || 30;
+        const pageDays = currentStatsDays || 30;
+        const C = window.GBOCCharts;
+        const ids = ['chartDailyExec','chartThroughput','chartEngines','chartErrorsTrend'];
+        if (C && _statsLastDays !== null && _statsLastDays !== pageDays) ids.forEach(i => C.set(i, {period: pageDays}));
+        _statsLastDays = pageDays;
+        const dayOf = (id) => _chartDays(id, pageDays, () => loadStatsCharts(id));
+        const want = (id) => !only || only === id;
+        let days = dayOf('chartDailyExec');
         // 1. Daily executions chart
-        const daily=await api(`/api/statistics/daily?days=${days}`);
+        const daily=want('chartDailyExec')?await api(`/api/statistics/daily?days=${days}`):null;
         if(daily&&daily.chart_data){
             if(chartDailyObj)chartDailyObj.destroy();
             const ctx=document.getElementById('chartDailyExec').getContext('2d');
@@ -1124,7 +1150,8 @@ async function loadStatsCharts(){
         }
 
         // 2. Throughput chart
-        const tp=await api(`/api/statistics/throughput?days=${days}`);
+        days = dayOf('chartThroughput');
+        const tp=want('chartThroughput')?await api(`/api/statistics/throughput?days=${days}`):null;
         if(tp&&tp.chart_data){
             if(chartThroughObj)chartThroughObj.destroy();
             const ctx=document.getElementById('chartThroughput').getContext('2d');
@@ -1134,7 +1161,8 @@ async function loadStatsCharts(){
         }
 
         // 3. Engines comparison chart
-        const eng=await api('/api/statistics/engines/comparison?period=month');
+        days = dayOf('chartEngines');
+        const eng=want('chartEngines')?await api(`/api/statistics/engines/comparison?days=${days}`):null;
         if(eng&&eng.chart_data){
             if(chartEngObj)chartEngObj.destroy();
             const ctx=document.getElementById('chartEngines').getContext('2d');
@@ -1142,7 +1170,8 @@ async function loadStatsCharts(){
         }
 
         // 4. Errors trend chart
-        const et=await api(`/api/statistics/errors/trend?days=${days}`);
+        days = dayOf('chartErrorsTrend');
+        const et=want('chartErrorsTrend')?await api(`/api/statistics/errors/trend?days=${days}`):null;
         if(et&&et.chart_data){
             if(chartErrTrendObj)chartErrTrendObj.destroy();
             const ctx=document.getElementById('chartErrorsTrend').getContext('2d');

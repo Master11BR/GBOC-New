@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC Agent 14.6.0 - API OVERVIEW (STATUS DETALHADO)
+GBOC Agent 14.8.1 - API OVERVIEW (STATUS DETALHADO)
 Adiciona contagem de tarefas em execução vs paradas.
 """
 
@@ -108,6 +108,13 @@ def get_overview() -> Dict[str, Any]:
         # 4. Engines
         engines = _detect_engines_detailed()
 
+        # 5. Ligação com o Servidor Central (antes "Online" fixo no código)
+        try:
+            from core.server_client import central_client
+            server_link = central_client.link_state() if central_client else {"state": "not_configured", "connected": False}
+        except Exception as _sl_err:
+            server_link = {"state": "unknown", "connected": False, "detail": str(_sl_err)[:200]}
+
         elapsed_ms = round((time.perf_counter() - request_start) * 1000, 2)
         logger.info(f"[PERF] GET /api/overview concluído em {elapsed_ms} ms")
 
@@ -130,8 +137,9 @@ def get_overview() -> Dict[str, Any]:
             "network_info": {
                 "local_ip": local_ip,
                 "hostname": hostname,
-                "sync_status": "Online"
+                "sync_status": "Online" if server_link.get("connected") else "Offline"
             },
+            "server_sync": server_link,
             "engines_status": {
                 "installed": len([e for e in engines if e['detected']]),
                 "list": [e['name'] for e in engines if e['detected']]

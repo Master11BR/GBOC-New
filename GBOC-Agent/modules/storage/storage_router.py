@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""GBOC 14.6.0 - Storage Usage & Growth Monitor API Router (Módulo Estrito)"""
+"""GBOC 14.8.1 - Storage Usage & Growth Monitor API Router (Módulo Estrito)"""
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
@@ -18,7 +18,8 @@ async def get_current_usage():
 async def get_history(days: int = 30, repository_id: Optional[str] = None):
     """Retorna o histórico de crescimento de armazenamento (até 90 dias)."""
     from engines.storage_monitor import get_storage_history
-    history = get_storage_history(repository_id=repository_id, days=min(days, 90))
+    # 0 = todo o histórico guardado (filtro de período dos gráficos)
+    history = get_storage_history(repository_id=repository_id, days=36500 if days <= 0 else min(days, 3650))
     return JSONResponse({"status": "success", "history": history, "days": days})
 
 @router.get("/config")

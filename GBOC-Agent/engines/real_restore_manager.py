@@ -496,6 +496,10 @@ class RestoreManager:
 
         # Snapshots são os diretórios de primeiro nível (timestamps)
         snapshots_ids = sorted(list(set([f.split('/')[0] for f in all_files if '/' in f and f.split('/')[0].isdigit()])))
+        # Pastas mantidas só para a cadeia incremental (retenção) não são pontos de restauração
+        _chain_only = {f.split('/')[0] for f in all_files if f.endswith('/manifest.chain.json')} - \
+                      {f.split('/')[0] for f in all_files if f.endswith('/manifest.json')}
+        snapshots_ids = [s for s in snapshots_ids if s not in _chain_only]
 
         snapshots = []
         for snapshot_id in snapshots_ids:
@@ -1093,6 +1097,84 @@ class RestoreManager:
             logger.error(f"❌ Erro ao listar arquivos: {e}")
             raise
 
+    # ── Versionamento: histórico de um arquivo em todos os snapshots ──────────────────────────────
+    def file_versions(self, repository_id: int, path: str) -> Dict[str, Any]:
+        """Versões de um arquivo (mais recente primeiro): snapshot, data, tamanho e se mudou.
+        GBOC Native: pelos manifestos (com hash do conteúdo). restic: `restic find` (tamanho/data de modificação)."""
+        repo = self._load_repository(repository_id)
+        engine = repo.get('engine', 'restic')
+        want = '/' + str(path or '').replace('\\', '/').strip('/')
+        if engine == 'gboc_native':
+            from native_engine.engine import GBOCNativeEngine
+            eng = GBOCNativeEngine(task_config={'repository': repo}, storage_backend=self.core.repository_manager.get_backend(repo['id']))
+            return {"engine": engine, "path": want, "versions": eng.file_versions(want)}
+        if engine == 'restic':
+            restic = get_engine_path_or_raise('restic')
+            env = self._restic_env(repo)
+            base = want.rsplit('/', 1)[-1]
+            r = subprocess.run([restic, 'find', '--json', base], env=env, capture_output=True, text=True, timeout=600)
+            if r.returncode != 0:
+                raise RuntimeError((r.stderr or 'restic find falhou').strip()[:300])
+            snaps = {}
+            s = subprocess.run([restic, 'snapshots', '--json'], env=env, capture_output=True, text=True, timeout=300)
+            for sn in (json.loads(s.stdout or '[]') or []):
+                snaps[sn.get('id')] = sn.get('time')
+            norm = lambda p: '/' + str(p).replace('\\', '/').lstrip('/').lower()
+            out = []
+            for grp in json.loads(r.stdout or '[]') or []:
+                for m in grp.get('matches') or []:
+                    p = norm(m.get('path'))
+                    # caminhos do Windows no restic: /C/Dados/x.txt — aceita com ou sem a letra do disco
+                    if p == norm(want) or p.endswith(norm(want)) or norm(want).endswith(p):
+                        out.append({"snapshot_id": grp.get('snapshot', '')[:8], "full_id": grp.get('snapshot'),
+                                    "time": snaps.get(grp.get('snapshot')), "size": m.get('size'), "mtime": m.get('mtime'),
+                                    "path": m.get('path')})
+                        break
+            out.sort(key=lambda v: str(v.get('time') or ''))
+            last = None
+            for v in out:
+                key = (v.get('size'), str(v.get('mtime'))[:19])
+                v["changed"] = key != last
+                last = key
+            out.reverse()
+            return {"engine": engine, "path": want, "versions": out}
+        raise ValueError(f"Histórico de versões ainda não disponível para o motor {engine} — use a navegação por snapshot")
+
+    def verify_repository(self, repository_id: int, read_data: bool = False) -> Dict[str, Any]:
+        """Confere a integridade do repositório (nativo: blocos; restic: restic check)."""
+        repo = self._load_repository(repository_id)
+        engine = repo.get('engine', 'restic')
+        if engine == 'gboc_native':
+            from native_engine.engine import GBOCNativeEngine
+            eng = GBOCNativeEngine(task_config={'repository': repo}, storage_backend=self.core.repository_manager.get_backend(repo['id']))
+            return eng.verify(read_data=read_data)
+        if engine == 'restic':
+            restic = get_engine_path_or_raise('restic')
+            cmd = [restic, 'check'] + (['--read-data-subset=10%'] if read_data else [])
+            r = subprocess.run(cmd, env=self._restic_env(repo), capture_output=True, text=True, timeout=7200)
+            ok = r.returncode == 0
+            return {"success": ok, "read_data": read_data, "summary": "Íntegro (restic check)" if ok else "restic check encontrou problemas",
+                    "output": ((r.stdout or '') + (r.stderr or '')).strip()[-1500:]}
+        raise ValueError(f"Verificação não disponível para o motor {engine}")
+
+    def _restic_env(self, repo: Dict) -> Dict[str, str]:
+        env = os.environ.copy()
+        env['RESTIC_REPOSITORY'] = repo.get('path', '')
+        env['RESTIC_PASSWORD'] = self._get_password(repo)
+        repo_type = repo.get('type', 'local')
+        if repo_type == 'b2':
+            env['RESTIC_REPOSITORY'] = f"b2:{repo['path']}"
+            env['B2_ACCOUNT_ID'] = repo.get('b2_account_id', '')
+            env['B2_ACCOUNT_KEY'] = repo.get('b2_account_key', '')
+        elif repo_type in ('s3', 'wasabi'):
+            env['AWS_ACCESS_KEY_ID'] = repo.get('aws_access_key', '')
+            env['AWS_SECRET_ACCESS_KEY'] = repo.get('aws_secret_key', '')
+            if repo_type == 'wasabi':
+                env['RESTIC_REPOSITORY'] = f"s3:{self._get_wasabi_endpoint(repo)}/{repo['path']}"
+            else:
+                env['RESTIC_REPOSITORY'] = f"s3:s3.amazonaws.com/{repo['path']}"
+        return env
+
     def _list_native_files(self, repo: Dict, snapshot_id: str, path: str) -> List[Dict]:
         """Lista arquivos de um snapshot para o motor GBOC Native."""
         logger.info(f"Listando arquivos nativos para snapshot '{snapshot_id}'")
@@ -1406,8 +1488,12 @@ class RestoreManager:
         from native_engine.engine import GBOCNativeEngine
 
         backend = self.core.repository_manager.get_backend(repo['id'])
-        # Configuração estrutural nativa contendo os detalhes do repositório real
-        engine = GBOCNativeEngine(task_config={'repository': repo}, storage_backend=backend)
+        # Formato 4: download paralelo (uma conexão por thread na nuvem; 2 em disco local)
+        _cloud = str(repo.get('type') or 'local').lower() != 'local'
+        _rm = self.core.repository_manager
+        _factory = (lambda: _rm.get_backend(repo['id'])) if _cloud else (lambda: backend)
+        engine = GBOCNativeEngine(task_config={'repository': repo}, storage_backend=backend,
+                                  backend_factory=_factory, workers=4 if _cloud else 2)
 
         # O restore do motor nativo pode não precisar da lista de 'files' se ele restaura o snapshot inteiro
         restore_config = {

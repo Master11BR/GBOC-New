@@ -1,6 +1,6 @@
 <!--
 ==============================================================================
-GBOC System v14.6.0 Enterprise Edition
+GBOC System v14.8.1 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
@@ -14,7 +14,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GBOC Agent 14.6.0 - Dashboard</title>
+    <title>GBOC Agent 14.8.1 - Dashboard</title>
     
     <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
     <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.8.1">
@@ -105,7 +105,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     <div id="gboc-splash" style="position:fixed;inset:0;z-index:9999;background:var(--bg-main,#0f172a);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .5s">
         <div style="text-align:center">
             <i class="fas fa-shield-alt" style="font-size:3.5em;color:#4299e1;margin-bottom:16px;animation:pulse 1.5s ease-in-out infinite"></i>
-            <h1 style="font-size:1.6em;font-weight:700;color:#e2e8f0;margin:0 0 8px">GBOC Agent 14.6.0</h1>
+            <h1 style="font-size:1.6em;font-weight:700;color:#e2e8f0;margin:0 0 8px">GBOC Agent 14.8.1</h1>
             <p style="color:#718096;font-size:.9em;margin:0 0 24px">Inicializando sistema de backup...</p>
             <div style="width:200px;height:4px;background:rgba(255,255,255,.1);border-radius:4px;overflow:hidden;margin:0 auto">
                 <div id="splash-bar" style="width:0%;height:100%;background:linear-gradient(90deg,#4299e1,#48bb78);border-radius:4px;transition:width .3s"></div>
@@ -152,8 +152,8 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 <div>
                     <div class="breadcrumb"><a href="/">GBOC</a> / Dashboard</div>
                     <h1 class="page-title">Dashboard</h1>
-                    <div class="page-subtitle">Sistema de Backup Centralizado • <span id="app-version">14.6.0</span>
-                        <span style="margin-left:12px;"><span class="ws-dot off" id="wsDot"></span><span id="wsLabel" style="font-size:.8em;">Offline</span></span>
+                    <div class="page-subtitle">Sistema de Backup Centralizado • <span id="app-version">14.8.1</span>
+                        <span style="margin-left:12px;"><span class="ws-dot" data-gboc-status-dot style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;background:var(--text-muted)"></span><span data-gboc-status-label style="font-size:.8em;">Verificando…</span></span>
                     </div>
                 </div>
                 <div class="header-actions" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -218,11 +218,11 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 <!-- Charts Row -->
                 <div class="dash-grid">
                     <div class="panel">
-                        <div class="panel-hdr"><h3><i class="fas fa-chart-area" style="color:var(--primary)"></i> Tendência de Backup (7d)</h3></div>
+                        <div class="panel-hdr"><h3><i class="fas fa-chart-area" style="color:var(--primary)"></i> <span id="chartTrendTitle">Tendência de Backup · 7 dias</span></h3></div>
                         <div class="panel-body"><canvas id="chartTrend" height="220"></canvas></div>
                     </div>
                     <div class="panel">
-                        <div class="panel-hdr"><h3><i class="fas fa-chart-pie" style="color:var(--success)"></i> Status das Execuções</h3></div>
+                        <div class="panel-hdr"><h3><i class="fas fa-chart-pie" style="color:var(--success)"></i> <span id="chartStatusTitle">Status das Execuções</span></h3></div>
                         <div class="panel-body"><canvas id="chartStatus" height="220"></canvas></div>
                     </div>
                 </div>
@@ -248,10 +248,10 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 <!-- System Footer -->
                 <div class="sys-footer">
                     <div class="sys-item"><i class="fab fa-windows"></i><div><strong>Plataforma</strong><span id="sysPlatform">...</span></div></div>
-                    <div class="sys-item"><i class="fas fa-code-branch"></i><div><strong>Versão</strong><span id="sysVersion">14.6.0</span></div></div>
+                    <div class="sys-item"><i class="fas fa-code-branch"></i><div><strong>Versão</strong><span id="sysVersion">14.8.1</span></div></div>
                     <div class="sys-item"><i class="fas fa-globe"></i><div><strong>Servidor</strong><span id="sysHost">-</span></div></div>
                     <div class="sys-item"><i class="fas fa-clock"></i><div><strong>Uptime</strong><span id="sysUptime">...</span></div></div>
-                    <div class="sys-item"><i class="fas fa-wifi"></i><div><strong>WebSocket</strong><span id="sysWS">-</span></div></div>
+                    <div class="sys-item"><i class="fas fa-wifi"></i><div><strong>Atualização ao vivo</strong><span id="sysWS">-</span></div></div>
                 </div>
             </div>
         </main>
@@ -340,15 +340,32 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         } catch(e) { console.error('Dashboard error:', e); }
     }
 
-    async function loadCharts() {
+    // Período/agrupamento/formato pela barra de opções do gráfico (gboc-charts.js); preferências salvas por gráfico
+    const PERIOD_TXT = {1:'24 h',7:'7 dias',30:'30 dias',90:'90 dias',365:'1 ano',0:'todo o período'};
+    function chartQuery(id, def) {
+        if (window.GBOCCharts) return GBOCCharts.query(id);
+        return def;
+    }
+    function setChartTitle(id, base, st) {
+        const h = document.getElementById(id + 'Title');
+        if (!h) return;
+        const per = st && st.from ? `${st.from.split('-').reverse().join('/')} a ${st.to.split('-').reverse().join('/')}` : (PERIOD_TXT[st && st.period] || '');
+        h.textContent = per ? `${base} · ${per}` : base;
+    }
+
+    async function loadTrendChart() {
         try {
-            // Trend chart
-            const tres = await fetch('/api/advanced-stats/trend?days=7');
+            const st = window.GBOCCharts ? GBOCCharts.state('chartTrend') : {period: 7};
+            const tres = await fetch('/api/advanced-stats/trend?' + chartQuery('chartTrend', 'days=7&group=day'));
             if(tres.ok) {
                 const td = await tres.json();
-                const labels = (td.trend || td.daily || []).map(r => r.date || r.day);
-                const okData = (td.trend || td.daily || []).map(r => r.success || r.completed || 0);
-                const failData = (td.trend || td.daily || []).map(r => r.failed || 0);
+                const rows = td.trend || td.daily || [];
+                const grp = td.group || 'day';
+                const fmt = (d) => { const [y, m, dd] = String(d).split('-'); return grp === 'month' ? `${m}/${y}` : `${dd}/${m}`; };
+                const labels = rows.map(r => fmt(r.date || r.day));
+                const okData = rows.map(r => r.success || r.completed || 0);
+                const failData = rows.map(r => r.failed || 0);
+                setChartTitle('chartTrend', 'Tendência de Backup', st);
 
                 if(chartTrend) chartTrend.destroy();
                 chartTrend = new Chart(document.getElementById('chartTrend'), {
@@ -356,33 +373,48 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                     data: {
                         labels,
                         datasets: [
-                            { label:'Sucesso', data:okData, borderColor:'#48bb78', backgroundColor:'rgba(72,187,120,.1)', fill:true, tension:.4 },
-                            { label:'Falha', data:failData, borderColor:'#f56565', backgroundColor:'rgba(245,101,101,.1)', fill:true, tension:.4 }
+                            { label:'Sucesso', data:okData, borderColor:'#1baf7a', backgroundColor:'rgba(27,175,122,.15)', fill:true },
+                            { label:'Falha', data:failData, borderColor:'#e34948', backgroundColor:'rgba(227,73,72,.15)', fill:true }
                         ]
                     },
-                    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{labels:{color:'#a0aec0'}}}, scales:{x:{ticks:{color:'#a0aec0'},grid:{color:'rgba(74,85,104,.3)'}},y:{ticks:{color:'#a0aec0'},grid:{color:'rgba(74,85,104,.3)'}}} }
+                    options: { responsive:true, maintainAspectRatio:false, scales:{ y:{ beginAtZero:true, ticks:{ precision:0 } } } }
                 });
             }
         } catch(e) { console.warn('Trend chart error:', e); }
+    }
 
+    async function loadStatusChart() {
         try {
-            // Status pie
-            const sres = await fetch('/api/advanced-stats/distribution');
+            const st = window.GBOCCharts ? GBOCCharts.state('chartStatus') : {period: 30};
+            const sres = await fetch('/api/advanced-stats/distribution?' + chartQuery('chartStatus', 'days=30'));
             if(sres.ok) {
                 const sd = await sres.json();
                 const dist = sd.distribution || sd.status_distribution || sd;
-                const labels = Object.keys(dist);
-                const values = Object.values(dist);
-                const colors = labels.map(l => l === 'completed' ? '#48bb78' : l === 'failed' ? '#f56565' : l === 'running' ? '#4299e1' : '#a0aec0');
+                const NAMES = { completed:'Concluído', failed:'Falha', running:'Executando', interrupted:'Interrompido', repaired:'Reparado', pending:'Pendente', cancelled:'Cancelado', stopped:'Parado' };
+                const COLORS = { completed:'#1baf7a', failed:'#e34948', running:'#2a78d6', interrupted:'#eda100', repaired:'#4a3aa7', pending:'#94a3b8' };
+                const keys = Object.keys(dist).sort((a, b) => dist[b] - dist[a]);
+                setChartTitle('chartStatus', 'Status das Execuções', st);
 
                 if(chartStatus) chartStatus.destroy();
                 chartStatus = new Chart(document.getElementById('chartStatus'), {
                     type: 'doughnut',
-                    data: { labels, datasets: [{ data:values, backgroundColor:colors, borderWidth:0 }] },
-                    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{labels:{color:'#a0aec0'}}} }
+                    data: { labels: keys.map(k => NAMES[k] || k), datasets: [{ data: keys.map(k => dist[k]), backgroundColor: keys.map(k => COLORS[k] || '#94a3b8') }] },
+                    options: { responsive:true, maintainAspectRatio:false, cutout:'62%', plugins:{ legend:{ position:'right' } } }
                 });
             }
         } catch(e) { console.warn('Status chart error:', e); }
+    }
+
+    // gboc-charts.js carregou depois do primeiro desenho: registra as opções e redesenha no período salvo
+    document.addEventListener('gboc:charts-ready', () => { if (!window.__gbocDashChartsReg) loadCharts(); });
+
+    async function loadCharts() {
+        if (window.GBOCCharts && !window.__gbocDashChartsReg) {
+            window.__gbocDashChartsReg = true;
+            GBOCCharts.options('chartTrend', { periods:[7,30,90,365,0], period:7, groups:['auto','day','week','month'], group:'auto', custom:true, onChange: loadTrendChart });
+            GBOCCharts.options('chartStatus', { periods:[1,7,30,90,365,0], period:30, custom:true, onChange: loadStatusChart });
+        }
+        await Promise.all([loadTrendChart(), loadStatusChart()]);
     }
 
     async function loadHeatmapData() {
@@ -416,16 +448,17 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     // ── WebSocket Integration ──────────────────────
     function setupWebSocket() {
         if(!window.gbocWS) return;
-        const dot = document.getElementById('wsDot');
-        const label = document.getElementById('wsLabel');
+        // O status do sistema é o indicador único (GBOCStatus); aqui só a atualização ao vivo do painel.
         const sysWS = document.getElementById('sysWS');
-
         gbocWS.on('connected', () => {
-            dot.className = 'ws-dot on'; label.textContent = 'Conectado'; if(sysWS) sysWS.textContent = 'Conectado';
+            if(sysWS) sysWS.textContent = 'Ativa'; if(window.GBOCStatus) GBOCStatus.setLive(true);
         });
         gbocWS.on('disconnected', () => {
-            dot.className = 'ws-dot off'; label.textContent = 'Offline'; if(sysWS) sysWS.textContent = 'Offline';
+            if(sysWS) sysWS.textContent = 'Reconectando…'; if(window.GBOCStatus) GBOCStatus.setLive(false);
         });
+        // Já conectado antes destes handlers (cache): reflete o estado atual
+        if (gbocWS._connected) { if(sysWS) sysWS.textContent = 'Ativa'; if(window.GBOCStatus) GBOCStatus.setLive(true); }
+        else if (sysWS) sysWS.textContent = 'Conectando…';
         gbocWS.on('backup_started', (data) => {
             showToast(`🚀 Backup iniciado: ${data.task_name}`, 'info');
             loadOverview();
@@ -782,7 +815,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             const rep = await r.json();
             outArea.innerHTML = `
                 <h4 style="color:var(--primary);margin-bottom:8px"><i class="fas fa-file-alt"></i> ${rep.title}</h4>
-                <p style="font-size:0.85em;color:var(--text-muted);margin-bottom:12px">Gerado em: ${new Date(rep.generated_at).toLocaleString()} | Agente Node 14.6.0</p>
+                <p style="font-size:0.85em;color:var(--text-muted);margin-bottom:12px">Gerado em: ${new Date(rep.generated_at).toLocaleString()} | Agente Node 14.8.1</p>
                 <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:8px;margin-bottom:12px">
                     ${rep.metrics.map(m => `
                         <div style="background:var(--bg-card);padding:10px;border-radius:6px;border:1px solid var(--border)">

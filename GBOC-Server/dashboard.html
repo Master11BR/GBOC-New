@@ -52,7 +52,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     <script src="/static/gboc-modal.js?v=14.8.1"></script>
 <link rel="stylesheet" href="/static/gboc-hardware-hud.css?v=14.8.1">
     <script src="/static/vendor/chart.umd.min.js"></script>
-    <script src="/modules/storage/storage.js?v=14.6.0"></script>
+    <script src="/modules/storage/storage.js?v=14.8.1"></script>
     <script src="/modules/job_alert/job_alert.js?v=14.8.1"></script>
     <script src="/static/ai_assistant.js?v=14.8.1"></script>
     <script src="/static/gboc-hardware-hud.js?v=14.8.1"></script>
@@ -361,14 +361,8 @@ function gbocToggleSidebarCollapse(){
             <div class="chart-panel">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
                     <h3 style="margin:0"><i class="fas fa-activity" style="color:var(--primary);margin-right:8px"></i> Trafego & Performance</h3>
-                    <div class="period-btns">
-                        <button class="period-btn" onclick="loadChart('24h',this)">24H</button>
-                        <button class="period-btn active" onclick="loadChart('7d',this)">7D</button>
-                        <button class="period-btn" onclick="loadChart('30d',this)">30D</button>
-                        <button class="period-btn" onclick="loadChart('1y',this)">1A</button>
-                    </div>
                 </div>
-                <canvas id="main-chart" style="max-height:300px"></canvas>
+                <div style="position:relative;height:300px"><canvas id="main-chart"></canvas></div>
             </div>
 
             <div class="panel">
@@ -751,11 +745,11 @@ function gbocToggleSidebarCollapse(){
             <!-- Gráficos de Tendência -->
             <div class="charts-row" style="margin-bottom:20px">
                 <div class="chart-panel">
-                    <h3 style="margin:0 0 16px"><i class="fas fa-chart-area" style="color:var(--primary);margin-right:8px"></i> Timeline de Execuções (14 dias)</h3>
+                    <h3 style="margin:0 0 16px"><i class="fas fa-chart-area" style="color:var(--primary);margin-right:8px"></i> <span id="chart-timeline-title">Execuções · 14 dias</span></h3>
                     <canvas id="chart-timeline"></canvas>
                 </div>
                 <div class="chart-panel">
-                    <h3 style="margin:0 0 16px"><i class="fas fa-chart-line" style="color:var(--warning);margin-right:8px"></i> Logs por Hora (24h)</h3>
+                    <h3 style="margin:0 0 16px"><i class="fas fa-chart-line" style="color:var(--warning);margin-right:8px"></i> <span id="chart-logs-title">Logs por nível · 24 h</span></h3>
                     <canvas id="chart-logs"></canvas>
                 </div>
             </div>
@@ -763,7 +757,7 @@ function gbocToggleSidebarCollapse(){
             <!-- Métricas de Sistema + Previsões -->
             <div class="charts-row" style="margin-bottom:20px">
                 <div class="chart-panel">
-                    <h3 style="margin:0 0 16px"><i class="fas fa-microchip" style="color:var(--success);margin-right:8px"></i> Recursos do Sistema (Histórico)</h3>
+                    <h3 style="margin:0 0 16px"><i class="fas fa-microchip" style="color:var(--success);margin-right:8px"></i> <span id="chart-system-title">Recursos do Sistema · 7 dias</span></h3>
                     <canvas id="chart-system"></canvas>
                 </div>
                 <div class="chart-panel">
@@ -2029,6 +2023,8 @@ function gbocToggleSidebarCollapse(){
             try{
                 // Indicador de conexão: usa o LED do topbar (#wsDot/#wsLabel) ou o legado (#conn-dot)
                 window._gbocSetConn = window._gbocSetConn || function(online){
+                    // Indicador único: o WebSocket só informa a atualização ao vivo (dica), não derruba o status
+                    if(window.GBOCStatus){ GBOCStatus.setLive(online); return; }
                     const dot=document.getElementById('wsDot')||document.getElementById('conn-dot');
                     const txt=document.getElementById('wsLabel')||document.getElementById('conn-text');
                     if(dot) dot.style.background = online ? 'var(--success)' : 'var(--danger)';
@@ -2110,31 +2106,99 @@ function gbocToggleSidebarCollapse(){
             }catch(e){console.error('loadAll:',e)}
         }
 
+        // Tráfego & Performance: período, agrupamento, métrica e formato pela barra do gráfico (gboc-charts.js).
+        // Antes: 3 medidas em 2 eixos (GB, MB/s e quantidade de erros) — escalas diferentes no mesmo desenho.
+        // Agora uma métrica por vez, cada uma com o seu eixo.
+        const MAIN_METRICS=[
+            {id:'volume',label:'Volume (GB)',key:'volume_gb',color:'#2a78d6',unit:' GB'},
+            {id:'speed',label:'Velocidade (MB/s)',key:'speed_mbps',color:'#1baf7a',unit:' MB/s'},
+            {id:'jobs',label:'Execuções (sucesso × falha)',key:null,color:'#1baf7a',unit:''},
+            {id:'errors',label:'Falhas',key:'errors',color:'#e34948',unit:''}
+        ];
         async function loadChart(range, btn){
-            if(btn){document.querySelectorAll('.period-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active')}
+            if(window.GBOCCharts && !window.__mainChartReg){
+                window.__mainChartReg=true;
+                GBOCCharts.options('main-chart',{periods:[1,7,30,90,365,0],period:7,groups:['auto','hour','day','week','month'],group:'auto',
+                    metrics:MAIN_METRICS.map(m=>({id:m.id,label:m.label})),metric:'volume',custom:true,onChange:()=>loadChart()});
+            }
             try{
-                const r=await fetch(`${API}/analytics/history?range=${range}`);
+                const st=window.GBOCCharts?GBOCCharts.state('main-chart'):{};
+                const q=window.GBOCCharts?GBOCCharts.query('main-chart'):`range=${range||'7d'}`;
+                const r=await fetch(`${API}/analytics/history?${q}`);
                 if(!r.ok)return;
                 const d=await r.json();
+                const m=MAIN_METRICS.find(x=>x.id===(st.metric||'volume'))||MAIN_METRICS[0];
                 const ctx=document.getElementById('main-chart').getContext('2d');
                 if(mainChart)mainChart.destroy();
-                const grad=ctx.createLinearGradient(0,0,0,300);
-                grad.addColorStop(0,'rgba(66,153,225,.4)');grad.addColorStop(1,'rgba(66,153,225,0)');
+                const datasets = m.id==='jobs'
+                    ? [{label:'Sucesso',data:d.success||[],borderColor:'#1baf7a',backgroundColor:'rgba(27,175,122,.18)',fill:true},
+                       {label:'Falha',data:d.errors||[],borderColor:'#e34948',backgroundColor:'rgba(227,73,72,.18)',fill:true}]
+                    : [{label:m.label,data:d[m.key]||[],borderColor:m.color,backgroundColor:m.color+'2e',fill:true}];
                 mainChart=new Chart(ctx,{
-                    type:'line',
-                    data:{labels:d.labels,datasets:[
-                        {label:'Volume (GB)',data:d.volume_gb,borderColor:'#4299e1',backgroundColor:grad,borderWidth:2,pointRadius:0,fill:true,tension:.4,yAxisID:'y'},
-                        {label:'Velocidade (MB/s)',data:d.speed_mbps,borderColor:'#48bb78',borderWidth:2,borderDash:[5,5],pointRadius:0,tension:.4,yAxisID:'y1'},
-                        {label:'Erros',data:d.errors,type:'bar',backgroundColor:'#f56565',yAxisID:'y'}
-                    ]},
-                    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
-                        plugins:{legend:{position:'top',labels:{color:'#8892a6'}}},
-                        scales:{x:{grid:{display:false},ticks:{color:'#8892a6'}},y:{position:'left',grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#4299e1'}},y1:{position:'right',grid:{display:false},ticks:{color:'#48bb78'}}}}
+                    type: m.id==='errors' ? 'bar' : 'line',
+                    data:{labels:d.labels,datasets},
+                    options:{responsive:true,maintainAspectRatio:false,
+                        plugins:{legend:{display:datasets.length>1,position:'top'},
+                                 tooltip:{callbacks:{label:(c)=>`${c.dataset.label}: ${Number(c.parsed.y||0).toLocaleString('pt-BR',{maximumFractionDigits:2})}${m.unit}`}}},
+                        scales:{x:{grid:{display:false}},y:{beginAtZero:true,ticks:{precision:m.id==='jobs'||m.id==='errors'?0:undefined}}}}
                 });
             }catch(e){console.error('Chart:',e)}
         }
+        document.addEventListener('gboc:charts-ready',()=>{ if(!window.__mainChartReg && document.getElementById('main-chart')) loadChart(); });
 
         let chartTimeline=null,chartLogs=null,chartSystem=null,chartPrediction=null;
+        const _AN_PER_TXT={1:'24 h',7:'7 dias',14:'14 dias',30:'30 dias',90:'90 dias',365:'1 ano',0:'todo o período'};
+        function _anTitle(id,base){const el=document.getElementById(id+'-title');if(!el)return;const st=window.GBOCCharts?GBOCCharts.state(id):{};
+            const per=st.from?`${st.from.split('-').reverse().join('/')} a ${st.to.split('-').reverse().join('/')}`:(_AN_PER_TXT[st.period]??'');el.textContent=per!==''?`${base} · ${per}`:base;}
+        const _anDraw={
+            timeline(tl){
+                const cv=document.getElementById('chart-timeline'); if(!cv)return;
+                if(chartTimeline)chartTimeline.destroy();
+                chartTimeline=new Chart(cv.getContext('2d'),{type:'bar',data:{labels:tl.labels||[],datasets:[
+                    {label:'Sucesso',data:tl.success||[],backgroundColor:'#1baf7a'},
+                    {label:'Falha',data:tl.failed||[],backgroundColor:'#e34948'},
+                    {label:'Interrompido',data:tl.interrupted||[],backgroundColor:'#eda100'}
+                ]},options:{...chartOpts('Execuções',true),scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true,ticks:{precision:0}}}}});
+                _anTitle('chart-timeline','Execuções');
+            },
+            logs(lt){
+                const cv=document.getElementById('chart-logs'); if(!cv)return;
+                if(chartLogs)chartLogs.destroy();
+                chartLogs=new Chart(cv.getContext('2d'),{type:'line',data:{labels:lt.labels||[],datasets:[
+                    {label:'Erros',data:lt.errors||[],borderColor:'#e34948',backgroundColor:'rgba(227,73,72,.15)',fill:true},
+                    {label:'Avisos',data:lt.warnings||[],borderColor:'#eda100'},
+                    {label:'Info',data:lt.info||[],borderColor:'#2a78d6'}
+                ]},options:{...chartOpts('Logs'),scales:{y:{beginAtZero:true,ticks:{precision:0}}}}});
+                _anTitle('chart-logs','Logs por nível');
+            },
+            system(sm){
+                const cv=document.getElementById('chart-system'); if(!cv)return;
+                if(chartSystem)chartSystem.destroy();
+                chartSystem=new Chart(cv.getContext('2d'),{type:'line',data:{labels:sm.labels||[],datasets:[
+                    {label:'CPU %',data:sm.cpu||[],borderColor:'#2a78d6'},
+                    {label:'RAM %',data:sm.ram||[],borderColor:'#1baf7a'},
+                    {label:'Disco %',data:sm.disk||[],borderColor:'#eb6834'}
+                ]},options:{...chartOpts('%'),scales:{y:{min:0,max:100}}}});
+                _anTitle('chart-system','Recursos do Sistema · média dos agentes');
+            }
+        };
+        async function _anLoadSeries(kind,id){
+            try{
+                const q=window.GBOCCharts?GBOCCharts.query(id):'';
+                const r=await fetch(`${API}/analytics/series?kind=${kind}&${q}`);
+                if(r.ok) _anDraw[kind](await r.json());
+            }catch(e){console.warn('Série',kind,e);}
+        }
+        function _anBindPeriods(){
+            const C=window.GBOCCharts; if(!C)return;
+            [['timeline','chart-timeline',14],['logs','chart-logs',1],['system','chart-system',7]].forEach(([kind,id,def])=>{
+                if(!window['__reg_'+id]){
+                    window['__reg_'+id]=true;
+                    const st=C.bind(id,{periods:[1,7,14,30,90,365,0],period:def,groups:['auto','hour','day','week','month'],group:'auto',custom:true,load:()=>_anLoadSeries(kind,id)});
+                    if(st.period!==def||st.group!=='auto') _anLoadSeries(kind,id);   // período salvo diferente do padrão
+                }
+            });
+        }
 
         async function loadAnalytics(){
             try{
@@ -2185,41 +2249,10 @@ function gbocToggleSidebarCollapse(){
                 document.getElementById('an-fail-trend').innerHTML=trendBadge(tr.failure_rate, `${tr.recent_fail_rate||0}% → antes ${tr.previous_fail_rate||0}%`);
                 document.getElementById('an-dur-trend').innerHTML=trendBadge(tr.duration, `${tr.recent_duration||0}s → antes ${tr.previous_duration||0}s`);
 
-                // ── Chart: Timeline de Execuções ──
-                const tl=d.timeline||{};
-                if(tl.labels?.length){
-                    const ctx=document.getElementById('chart-timeline').getContext('2d');
-                    if(chartTimeline)chartTimeline.destroy();
-                    chartTimeline=new Chart(ctx,{type:'bar',data:{labels:tl.labels,datasets:[
-                        {label:'Sucesso',data:tl.success,backgroundColor:'rgba(72,187,120,.7)',borderRadius:4},
-                        {label:'Falha',data:tl.failed,backgroundColor:'rgba(245,101,101,.7)',borderRadius:4},
-                        {label:'Interrompido',data:tl.interrupted,backgroundColor:'rgba(237,137,54,.5)',borderRadius:4}
-                    ]},options:chartOpts('Execuções',true)});
-                }
-
-                // ── Chart: Logs por Hora ──
-                const lt=d.log_timeline||{};
-                if(lt.labels?.length){
-                    const ctx=document.getElementById('chart-logs').getContext('2d');
-                    if(chartLogs)chartLogs.destroy();
-                    chartLogs=new Chart(ctx,{type:'line',data:{labels:lt.labels,datasets:[
-                        {label:'Erros',data:lt.errors,borderColor:'#f56565',backgroundColor:'rgba(245,101,101,.1)',fill:true,tension:.3,pointRadius:2},
-                        {label:'Avisos',data:lt.warnings,borderColor:'#ed8936',borderDash:[4,4],tension:.3,pointRadius:0},
-                        {label:'Info',data:lt.info,borderColor:'#4299e1',borderDash:[2,2],tension:.3,pointRadius:0}
-                    ]},options:chartOpts('Logs')});
-                }
-
-                // ── Chart: Métricas de Sistema ──
-                const sm=d.system_metrics||{};
-                if(sm.labels?.length){
-                    const ctx=document.getElementById('chart-system').getContext('2d');
-                    if(chartSystem)chartSystem.destroy();
-                    chartSystem=new Chart(ctx,{type:'line',data:{labels:sm.labels,datasets:[
-                        {label:'CPU %',data:sm.cpu,borderColor:'#f56565',borderWidth:2,tension:.3,pointRadius:1,fill:false},
-                        {label:'RAM %',data:sm.ram,borderColor:'#4299e1',borderWidth:2,tension:.3,pointRadius:1,fill:false},
-                        {label:'Disco %',data:sm.disk,borderColor:'#ed8936',borderWidth:2,tension:.3,pointRadius:1,fill:false}
-                    ]},options:{...chartOpts('%'),scales:{...chartOpts('%').scales,y:{...chartOpts('%').scales?.y,min:0,max:100}}}});
-                }
+                // ── Gráficos com período próprio (barra do gráfico → /analytics/series) ──
+                _anDraw.timeline(d.timeline||{}); _anDraw.logs(d.log_timeline||{}); _anDraw.system(d.system_metrics||{});
+                _anBindPeriods();
+                const sm=d.system_daily||d.system_metrics||{};
 
                 // ── Chart: Previsão de Disco ──
                 const pred=d.predictions||{};
@@ -2236,8 +2269,8 @@ function gbocToggleSidebarCollapse(){
                     if(sm.disk?.length && dp.future_values?.length){
                         const ctx=document.getElementById('chart-prediction').getContext('2d');
                         if(chartPrediction)chartPrediction.destroy();
-                        const histLabels=sm.labels.slice(-10);
-                        const histData=sm.disk.slice(-10);
+                        const histLabels=sm.labels.slice(-14);
+                        const histData=sm.disk.slice(-14);
                         const futLabels=dp.future_values.map((_,i)=>`+${i+1}d`);
                         const allLabels=[...histLabels,...futLabels];
                         const realData=[...histData,...new Array(futLabels.length).fill(null)];
@@ -3503,6 +3536,18 @@ function gbocToggleSidebarCollapse(){
                             }
                         }
                     });
+                    // Período do gráfico do agente (padrão 24 h): médias por hora/dia vindas de /analytics/series
+                    if(window.GBOCCharts){
+                        window.__agentDetailId=agentId;
+                        const reload=async()=>{try{const q=GBOCCharts.query('agent-detail-chart');
+                            const rr=await fetch(`${API}/analytics/series?kind=system&agent_id=${encodeURIComponent(window.__agentDetailId)}&${q}`);
+                            if(!rr.ok)return; const sm=await rr.json(); const c=Chart.getChart(document.getElementById('agent-detail-chart')); if(!c)return;
+                            c.data.labels=sm.labels; c.data.datasets[0].data=sm.cpu; c.data.datasets[1].data=sm.ram; c.data.datasets[2].data=sm.disk; c.update();}catch(e){}};
+                        if(!window.__reg_agentDetail){window.__reg_agentDetail=true;
+                            GBOCCharts.bind('agent-detail-chart',{periods:[1,7,30,90,365,0],period:1,groups:['auto','hour','day','week'],group:'auto',custom:true,load:reload});}
+                        const st=GBOCCharts.state('agent-detail-chart');
+                        if(st.from||(st.period!==undefined&&st.period!==1)||(st.group&&st.group!=='auto')) reload();
+                    }
                 }
 
             }catch(e){

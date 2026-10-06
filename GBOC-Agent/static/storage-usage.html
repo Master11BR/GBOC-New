@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GBOC Agent 14.6.0 - Uso e Crescimento de Armazenamento</title>
+    <title>GBOC Agent 14.8.1 - Uso e Crescimento de Armazenamento</title>
     
     <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
     <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.8.1">
@@ -262,9 +262,14 @@ async function loadUsage() {
     }
 }
 
+document.addEventListener('gboc:charts-ready', () => { if (!window.__reg_growth && typeof loadHistory === 'function') loadHistory(); });
+
 async function loadHistory() {
     const repoId = document.getElementById('history-repo-filter').value;
-    const url = repoId ? `${API}/history?days=30&repository_id=${encodeURIComponent(repoId)}` : `${API}/history?days=30`;
+    const C = window.GBOCCharts;
+    if (C && !window.__reg_growth) { window.__reg_growth = true; C.bind('growth-chart', { periods:[1,7,30,90,365,0], period:30, load:() => loadHistory() }); }
+    const days = C ? C.days('growth-chart', 30) : 30;
+    const url = repoId ? `${API}/history?days=${days}&repository_id=${encodeURIComponent(repoId)}` : `${API}/history?days=${days}`;
     try {
         const r = await fetch(url);
         const d = await r.json();

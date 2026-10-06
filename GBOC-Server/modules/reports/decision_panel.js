@@ -37,7 +37,7 @@
             <div style="display:flex;gap:6px;align-items:center">
                 <span id="dp-updated" style="font-size:.78em;color:var(--text-muted)"></span>
                 <div class="period-btns">
-                    ${[7, 14, 30, 90].map(d => `<button class="period-btn ${d === days ? 'active' : ''}" data-days="${d}">${d}D</button>`).join('')}
+                    ${[7, 14, 30, 90, 180, 365].map(d => `<button class="period-btn ${d === days ? 'active' : ''}" data-days="${d}">${d === 365 ? '1A' : d === 180 ? '6M' : d + 'D'}</button>`).join('')}
                 </div>
             </div>
         </div>

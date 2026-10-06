@@ -13,15 +13,29 @@
 - Uploads do motor nativo em buckets com Object Lock passam a enviar Content-MD5 (inclusive em multipart), exigido pelo S3.
 - **WORM local** para repositórios em disco: arquivos ficam somente leitura até o fim da retenção (no Windows também com ACL de negação de exclusão); o agente recusa apagar arquivos ou o repositório enquanto houver retenção.
 - REP-11 ganhou a tabela “Backup imutável por repositório”, com indicador e recomendações.
+- **Revisão:** criar bucket com Object Lock usa a região do endpoint (ex.: `s3.eu-central-2.wasabisys.com`); antes o Wasabi recusava fora de us-east-1. Bucket já existente ou com nome em uso gera mensagem clara; se o bucket não existir, "Aplicar" oferece criá-lo já com Object Lock.
+- **Revisão:** ao aplicar a retenção, o bucket recebe uma regra de ciclo de vida que apaga versões antigas `dias + 1` após deixarem de ser atuais, marcadores de exclusão órfãos e uploads incompletos. Sem ela, o que o motor apaga continuava cobrando espaço para sempre depois do bloqueio. As regras já existentes no bucket são mantidas; se o provedor não aceitar, a tela avisa. A verificação mostra se a regra existe.
+
+### ♻️ Retenção das tarefas passa a ser aplicada (antes só era gravada)
+- Nenhum motor apagava backups antigos: a retenção da tarefa (e a das políticas centrais) não tinha efeito e o armazenamento só crescia.
+- **restic:** após cada backup com sucesso, `forget` só dos snapshots desta tarefa (mesmo host e caminhos) + `prune`. Outras tarefas do mesmo repositório não são tocadas.
+- **Kopia:** política de retenção nos caminhos antes do snapshot. **Duplicati (linha de comando):** `--retention-policy` no próprio backup.
+- **GBOC Native:** remove snapshots fora da política preservando a cadeia incremental — arquivos inalterados que snapshots mantidos ainda usam não são apagados (o snapshot antigo vira só-cadeia e sai da lista de restauração).
+- Com backup imutável, o período mantido nunca é menor que o da imutabilidade e a limpeza não tenta regravar arquivos bloqueados.
+- Correção: em repositórios locais no Windows, o motor nativo não encontrava os manifestos (caminhos com `\`), o que impedia listar snapshots e o backup incremental.
 
 ### 🚀 Implantação em massa de agentes
 - **Tokens de instalação** no Server (organização, validade, limite de usos, revogação), com comando de uma linha para GPO/RMM.
 - `install_agent.ps1 -ServerURL -InstallToken -Unattended` instala sem perguntas e registra o agente já vinculado à organização (sem troca manual de chave). Se o Server estiver inacessível, o agente tenta de novo a cada 5 min por até 72 h.
 - O agente registrado por token fica **travado na organização** (o heartbeat não altera o tenant).
+- **Revisão:** a mesma máquina repetindo a inscrição com o mesmo token não gasta outro uso, e o limite de usos é respeitado mesmo com várias máquinas ao mesmo tempo.
+- **Revisão:** opção "certificado autoassinado" ao gerar o token: o comando de uma linha passa a funcionar com o Server em HTTPS autoassinado (antes o PowerShell recusava o download). Também há aviso quando a URL usa `localhost`, que outras máquinas não alcançam.
+- **Revisão:** o script avisa se não estiver como Administrador. Um token revogado, expirado ou esgotado faz o agente parar de tentar (o `enroll.json` vira `enroll.failed.json`) em vez de repetir por 72 h.
 
 ### 🧭 Políticas centrais com detecção de desvio
 - Nova tela **Políticas e Implantação**: alcance (todos / organização / agentes), prioridade, filtro de tarefas, agendamento, retenção, novas tentativas, janela de manutenção, banda e imutabilidade.
 - Aplicação em lote nos agentes e coluna de **Conformidade** comparando o que cada agente informa com a política (versão, janelas, banda, agendamento, retenção, imutabilidade), com botão Reaplicar.
+- **Revisão:** com um filtro de tarefas que não corresponde a nenhuma tarefa do agente, a imutabilidade da política era aplicada em **todos** os repositórios (um bloqueio COMPLIANCE não pode ser desfeito). Agora nenhum repositório é alterado, e a conformidade segue a mesma regra.
 
 ### 🤖 Otimização e Resiliência da IA Local (Ollama & Multi-Provedores)
 - **Eliminação de Timeout no Ollama CPU com Modelos 8B+ (ex: Llama 3)**:
@@ -73,6 +87,62 @@
 - A versão exibida no cabeçalho (/api/system/info, chamada em toda tela) executava comandos git a cada chamada; agora é lida em segundo plano e fica em cache por 10 minutos.
 - A medição de CPU deixou de "dormir" de 0,5 a 1,5 s dentro das requisições: uma thread mede a CPU a cada segundo e as telas recebem o último valor na hora (GBOC_FAST_METRICS=0 desativa).
 - Comandos do RMM (processos, serviços, executar), status da proteção contra ransomware e CBT rodam fora do laço principal: não travam mais as outras telas enquanto executam.
+
+### 🌌 Nova animação de fundo (fluida e leve)
+- O fundo antigo (3 círculos com desfoque de 130–160 px, mistura de cores e linhas SVG redesenhadas a cada quadro) obrigava o navegador a redesenhar a tela inteira o tempo todo. Com o processador limitado (teste 4× mais lento), o painel caía de 60 para 35 quadros por segundo e a tela de login para 24.
+- O novo fundo "aurora" usa gradientes que já vêm suaves, sem desfoque, e só movimento de posição e escala, que roda na placa de vídeo, fora da thread da página. No mesmo teste ficou em 60 qps no painel e 50 no login, sem travar quando a página carrega gráficos.
+- Em Personalizar Interface > Animação de Fundo há três opções: **Automática** (padrão; desliga sozinha se o computador não sustentar cerca de 40 qps), **Ligada** ou **Desligada**. A preferência "reduzir movimento" do Windows também é respeitada.
+
+### 📊 Gráficos com opções (Agente e Server)
+- Todos os gráficos ganharam uma barra de opções, e a escolha fica salva por gráfico:
+  - **Formato:** linha, área, barras ou barras empilhadas; para gráficos de rosca, rosca, pizza ou barras.
+  - **Tabela de dados**, para ler os valores sem depender das cores.
+  - **Exportar** em CSV (abre no Excel) ou PNG.
+  - **Expandir** em tela cheia (Esc fecha).
+- **Período real**, consultado na API:
+  - **Dashboard do Agente:** "Tendência de Backup" com 7 dias, 30 dias, 90 dias, 1 ano, tudo ou datas personalizadas, e agrupamento automático, por dia, semana ou mês. "Status das Execuções" também tem período (antes ficava fixo em 30 dias).
+  - **Server, "Tráfego & Performance":** 24 h a 1 ano, tudo ou datas personalizadas, agrupamento e **métrica**: volume, velocidade, execuções (sucesso × falha) ou falhas. Antes eram três medidas em dois eixos no mesmo desenho, com escalas diferentes que confundiam a leitura. Agora é uma métrica por vez.
+- Estilo único, que acompanha o tema claro e escuro: linhas finas, barras arredondadas, grade discreta, dica com todos os valores do ponto, legenda com marcador cheio e números no formato brasileiro (35.000 / 1,5).
+
+- **Período em todos os gráficos:** Estatísticas, Diagnóstico (SLA, erros), Uso de Armazenamento e comparação de motores no Agente; Análise (linha do tempo, logs, sistema), detalhe do agente, Armazenamento e Painel de Decisão (7 a 365 dias) no Server. O seletor da página muda todos os gráficos dela; cada gráfico também aceita o próprio período. A previsão de capacidade usa sempre a série diária dos últimos 30 dias.
+
+### 📦 Backup nativo v4: compressão, deduplicação, versões e verificação
+- Novo formato do **GBOC Native**: os arquivos viram blocos de 4 MiB identificados pelo conteúdo. Um bloco repetido (mesmo arquivo em outra pasta ou tarefa, trecho que não mudou de um arquivo grande) é enviado **uma vez só**.
+- Cada bloco é **compactado** (zstd com o pacote `zstandard`; sem ele, zlib). Arquivos já compactados (zip, jpg, mp4, pdf, docx, pst…) são guardados como estão, sem gastar CPU.
+- **Incremental rápido:** arquivo com o mesmo tamanho e data de modificação do backup anterior não é relido. Se um arquivo grande muda só no fim, só o último bloco sobe.
+- **Envio e download em paralelo** em repositórios na nuvem (padrão 4 conexões; 1 quando há limite de banda).
+- A restauração confere o hash de cada bloco e do arquivo e devolve a data de modificação original. O assistente de restauração passa a respeitar "tudo" (`*`), o filtro de arquivos e a opção "não sobrescrever".
+- **Restauração → "Versões de um arquivo":** lista em quais backups o arquivo mudou e restaura qualquer versão. **"Verificar integridade":** confere se todos os blocos existem e, opcionalmente, relê e valida o conteúdo. Funciona também com restic.
+- A retenção apaga os blocos que nenhum backup mantido usa (o espaço é liberado de fato). A imutabilidade bloqueia também os blocos reaproveitados pelos backups recentes.
+- **Compatibilidade:** backups antigos continuam restauráveis. O formato novo vale para backups feitos a partir de agora; o primeiro backup de cada tarefa envia tudo uma vez no formato novo. `GBOC_NATIVE_FORMAT=3` volta ao formato anterior.
+
+### ⚙️ Compressão e conexões por repositório (todos os motores)
+- Repositórios ganharam **Compressão** (automática, máxima, rápida, nenhuma) e **Conexões paralelas** (1 a 16):
+  - **restic:** `--compression` e `-o s3.connections` / `b2.connections`;
+  - **Kopia:** passa a compactar (antes não compactava nada): zstd-fastest no automático/rápido, zstd-better-compression no máximo; `--parallel`;
+  - **Duplicati:** `--zip-compression-level` e `--asynchronous-concurrent-upload-limit`.
+- Correção: arquivos e bytes processados apareciam como 0 no histórico das execuções do motor nativo.
+
+### 🐢 Correção: lentidão grave dos logs no Server
+- **`POST /api/v1/sync/logs` levava até 18 minutos por envio.** A verificação de duplicados (o agente reenvia as últimas 24 h) usava `IS NOT DISTINCT FROM`, que impede o uso de índice: a tabela inteira de logs era lida para cada linha recebida. Os envios se acumulavam e ocupavam as conexões do banco. Agora a comparação usa o índice (agente + horário): com 2 milhões de logs, um envio de 1.200 linhas leva cerca de 60 ms. Também há limite de 50 s por envio e remoção de repetidos dentro do próprio lote.
+- **`GET /api/v1/logs/stats?hours=0` levava mais de 2 minutos.** Cada linha era classificada (erro/aviso/sucesso/info) por comparações de texto na mensagem, em toda a tabela. A classificação passa a ser gravada na nova coluna `agent_logs.kind`, no recebimento. As linhas antigas são classificadas em segundo plano, em lotes, sem travar a tabela. As contagens são reaproveitadas por 30 s. Com 2 milhões de logs: de cerca de 11 s para 1,8 s na primeira consulta e milissegundos nas seguintes. O filtro por tipo da lista usa a mesma coluna.
+- A remoção de logs duplicados (Retenção → manutenção) deixou de ser quadrática.
+
+### 🔐 "Lembrar credencial" passa a funcionar de verdade
+- Antes só o nome de usuário era guardado, e a sessão terminava em 24 h ou a cada reinício do Server. Por isso parecia que a opção não fazia nada.
+- Com a opção marcada:
+  - a sessão vale **7 dias** e sobrevive aos reinícios do serviço;
+  - o usuário e a senha vão para o **cofre de senhas do próprio navegador**, que os preenche na próxima vez. O GBOC nunca grava a senha.
+- Sem a opção, tudo continua como antes: 24 h e novo login após reiniciar o Server.
+
+### 🚦 Status do sistema igual em todas as telas
+- **Server:** cada tela tinha uma regra própria de agente online. A coluna de status nunca voltava a "offline" quando o agente parava (o painel contava como online máquinas paradas havia dias), outras telas usavam "heartbeat na última hora" fixo no código e a verificação de saúde comparava UTC com horário local. Agora há uma regra única: **online = heartbeat dentro de "Tempo para considerar agente offline"** (Configurações; padrão 10 min, antes 60). Uma rotina a cada 30 s mantém a coluna de status de acordo, e todas as contagens, listas, relatórios e o assistente usam a mesma regra.
+- **Agente:** havia dois indicadores com o mesmo identificador na página (um mostrava "Offline" enquanto o outro mostrava "Conectado"), a Visão Geral ficava em "Verificando..." e a API devolvia "Online" fixo. Agora o topbar e os espelhos na página mostram o mesmo estado:
+  - **verde:** agente respondendo e Servidor Central recebendo os heartbeats;
+  - **âmbar:** Server não configurado, chave recusada ou sem contato;
+  - **vermelho:** o agente não respondeu duas vezes seguidas.
+  O motivo aparece ao passar o mouse.
+- A queda momentânea da atualização ao vivo (WebSocket do navegador) não muda mais o status para "Desconectado": aparece só na dica.
 
 ### 🔑 Correção: chave de pareamento do Agente "não salva / não reconhecida"
 - A chave era salva em C:\ProgramData\GBOC\central_config.json, mas um processo do Agente iniciado antes da troca continuava usando a chave antiga em memória: o Server respondia 401 (AGENT_KEY_INVALID) e recusava o WebSocket (403) indefinidamente. Agora o Agente relê o arquivo a cada 30 s e **aplica** a chave/URL nova (heartbeat, sincronização e WebSocket reconectam sozinhos); ao receber 401 relê o arquivo e tenta de novo na hora.

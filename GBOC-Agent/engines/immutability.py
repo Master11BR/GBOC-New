@@ -192,6 +192,7 @@ def check_object_lock(repo: Dict[str, Any]) -> Dict[str, Any]:
                              "locked": bool(until and until > datetime.now(timezone.utc))}
     except ClientError as e:
         out["sample_error"] = str(e)
+    out["lifecycle"] = lifecycle_status(s3, bucket)
     dr = out["default_retention"] or {}
     want = pol["days"]
     out["protected"] = bool(out["object_lock_enabled"] and dr and (not want or (dr.get("days") or 0) >= want))
@@ -207,6 +208,9 @@ def check_object_lock(repo: Dict[str, Any]) -> Dict[str, Any]:
                           "(gravado antes da configuração ou não aceito pelo motor). Faça um backup e verifique novamente.")
     else:
         out["summary"] = f"Protegido: retenção {dr.get('mode')} de {dr.get('days')} dia(s) em todos os novos objetos."
+        if not out["lifecycle"]:
+            out["summary"] += (" Atenção: sem regra de limpeza de versões antigas — após o bloqueio, o que o motor apagar "
+                               "continua ocupando espaço. Clique em 'Aplicar retenção' para criar a regra.")
     return out
 
 
@@ -227,18 +231,80 @@ def apply_object_lock(repo: Dict[str, Any]) -> Dict[str, Any]:
                                "(Wasabi exige na criação; na AWS também é possível habilitar com versionamento ativo) "
                                f"e aponte o repositório para ele. Detalhe: {code}")
         raise RuntimeError(f"Falha ao aplicar a retenção: {code} {e}")
-    return check_object_lock(repo)
+    lc = ensure_cleanup_lifecycle(s3, bucket, pol["days"])
+    out = check_object_lock(repo)
+    out["lifecycle"] = lc
+    return out
+
+
+_LC_RULE_ID = "gboc-imutavel-limpeza"
+
+
+def ensure_cleanup_lifecycle(s3, bucket: str, days: int) -> Dict[str, Any]:
+    """Regra de ciclo de vida que limpa o que o Object Lock deixa para trás.
+
+    Com Object Lock o bucket é versionado: quando o motor apaga um arquivo (ex.: restic prune), o S3 só cria um
+    "marcador de exclusão" e a versão antiga fica guardada — bloqueada durante a retenção e, depois, PARA SEMPRE
+    (cobrança contínua). A regra remove versões antigas `days + 1` dias após deixarem de ser atuais (nunca antes do
+    fim do bloqueio), marcadores de exclusão órfãos e uploads incompletos. As demais regras do bucket são mantidas."""
+    from botocore.exceptions import ClientError
+    rule = {"ID": _LC_RULE_ID, "Status": "Enabled", "Filter": {"Prefix": ""},
+            "NoncurrentVersionExpiration": {"NoncurrentDays": int(days) + 1},
+            "AbortIncompleteMultipartUpload": {"DaysAfterInitiation": 7}}
+    marker_rule = {"ID": _LC_RULE_ID + "-marcadores", "Status": "Enabled", "Filter": {"Prefix": ""},
+                   "Expiration": {"ExpiredObjectDeleteMarker": True}}
+    try:
+        try:
+            rules = s3.get_bucket_lifecycle_configuration(Bucket=bucket).get("Rules") or []
+        except ClientError as e:
+            if e.response.get("Error", {}).get("Code") != "NoSuchLifecycleConfiguration":
+                raise
+            rules = []
+        rules = [r for r in rules if not str(r.get("ID", "")).startswith(_LC_RULE_ID)] + [rule, marker_rule]
+        s3.put_bucket_lifecycle_configuration(Bucket=bucket, LifecycleConfiguration={"Rules": rules})
+        return {"applied": True, "noncurrent_days": int(days) + 1}
+    except ClientError as e:
+        code = e.response.get("Error", {}).get("Code", "")
+        logger.warning(f"[IMUTÁVEL] Regra de limpeza (ciclo de vida) não aplicada em {bucket}: {code}")
+        return {"applied": False, "error": f"{code}: o provedor não aceitou a regra de ciclo de vida. Versões antigas "
+                                           f"continuarão ocupando espaço após o fim do bloqueio — configure a "
+                                           f"expiração de versões não atuais no painel do provedor."}
+
+
+def lifecycle_status(s3, bucket: str) -> Optional[Dict[str, Any]]:
+    from botocore.exceptions import ClientError
+    try:
+        rules = s3.get_bucket_lifecycle_configuration(Bucket=bucket).get("Rules") or []
+    except ClientError:
+        return None
+    for r in rules:
+        nve = r.get("NoncurrentVersionExpiration") or {}
+        if r.get("Status") == "Enabled" and nve.get("NoncurrentDays"):
+            return {"rule": r.get("ID"), "noncurrent_days": nve["NoncurrentDays"]}
+    return None
 
 
 def create_locked_bucket(repo: Dict[str, Any]) -> Dict[str, Any]:
     """Cria o bucket do repositório já com Object Lock (útil para novos repositórios)."""
     s3 = _s3(repo)
     bucket, _ = _bucket_prefix(repo)
-    region = repo["config"].get("region") or "us-east-1"
+    from botocore.exceptions import ClientError
+    # Região do endpoint (Wasabi s3.<região>.wasabisys.com) — antes só a região digitada era usada e o Wasabi
+    # recusava a criação fora de us-east-1 (IllegalLocationConstraintException).
+    region = resolve_region(repo["config"])
     kw: Dict[str, Any] = {"Bucket": bucket, "ObjectLockEnabledForBucket": True}
-    if region != "us-east-1" and repo["type"] == "s3":
+    if region != "us-east-1":
         kw["CreateBucketConfiguration"] = {"LocationConstraint": region}
-    s3.create_bucket(**kw)
+    try:
+        s3.create_bucket(**kw)
+    except ClientError as e:
+        code = e.response.get("Error", {}).get("Code", "")
+        if code == "BucketAlreadyOwnedByYou":
+            raise RuntimeError(f"O bucket '{bucket}' já existe na sua conta. Object Lock só pode ser ligado na criação "
+                               f"(Wasabi): use 'Aplicar retenção' se ele já tiver Object Lock, ou informe um bucket novo.")
+        if code == "BucketAlreadyExists":
+            raise RuntimeError(f"O nome de bucket '{bucket}' já está em uso por outra conta — escolha outro nome.")
+        raise RuntimeError(f"Falha ao criar o bucket com Object Lock: {code} {e}")
     return apply_object_lock(repo)
 
 
@@ -251,7 +317,11 @@ def _local_targets(repo: Dict[str, Any]) -> List[str]:
     if repo["engine"] == "restic":
         d = os.path.join(base, "data")          # packs do restic nunca são reescritos (só removidos por prune)
         return [d] if os.path.isdir(d) else []
-    return [os.path.join(base, d) for d in os.listdir(base) if d.isdigit() and os.path.isdir(os.path.join(base, d))]
+    out = [os.path.join(base, d) for d in os.listdir(base) if d.isdigit() and os.path.isdir(os.path.join(base, d))]
+    objs = os.path.join(base, "objects")          # motor nativo v4: blocos deduplicados (nunca reescritos)
+    if os.path.isdir(objs):
+        out.append(objs)
+    return out
 
 
 def _iter_files(paths: List[str]):
@@ -285,10 +355,11 @@ def lock_local(repo: Dict[str, Any], max_age_days: Optional[int] = None) -> Dict
     days = pol["days"] or 0
     now = datetime.now()
     locked = already = 0
+    in_use = _objects_in_recent_snapshots(repo, days) if days else set()
     for f in _iter_files(_local_targets(repo)):
         try:
             age = (now - datetime.fromtimestamp(os.path.getmtime(f))).days
-            if days and age >= days:
+            if days and age >= days and os.path.basename(f) not in in_use:
                 continue
             if _is_ro(f):
                 already += 1
@@ -300,9 +371,31 @@ def lock_local(repo: Dict[str, Any], max_age_days: Optional[int] = None) -> Dict
     acl = 0
     if os.name == "nt":
         for t in _local_targets(repo):
-            if repo["engine"] != "restic":          # pastas de snapshot do motor nativo são imutáveis por completo
+            if repo["engine"] != "restic" and os.path.basename(t) != "objects":          # pastas de snapshot do motor nativo são imutáveis por completo
                 acl += 1 if _win_deny_delete(t, True) else 0
     return {"locked_now": locked, "already_locked": already, "acl_folders": acl}
+
+
+def _objects_in_recent_snapshots(repo: Dict[str, Any], days: int) -> set:
+    """Motor nativo v4 deduplica: um bloco gravado há muito tempo pode fazer parte de um backup de ontem.
+    Esses blocos não podem ser liberados enquanto algum snapshot dentro do período de bloqueio os usar."""
+    base = repo.get("path") or ""
+    out: set = set()
+    if not base or not os.path.isdir(os.path.join(base, "objects")):
+        return out
+    limit = datetime.now() - timedelta(days=days)
+    for d in os.listdir(base):
+        if not d.isdigit():
+            continue
+        try:
+            if datetime.strptime(d[:14], "%Y%m%d%H%M%S") < limit:
+                continue
+            with open(os.path.join(base, d, "manifest.json"), encoding="utf-8") as f:
+                for e in (json.load(f).get("entries") or []):
+                    out.update(e.get("chunks") or [])
+        except (OSError, ValueError):
+            continue
+    return out
 
 
 def unlock_expired(repo: Dict[str, Any]) -> Dict[str, Any]:
@@ -312,8 +405,11 @@ def unlock_expired(repo: Dict[str, Any]) -> Dict[str, Any]:
         return {"unlocked": 0}
     now = datetime.now()
     n = 0
+    in_use = _objects_in_recent_snapshots(repo, pol["days"])
     for f in _iter_files(_local_targets(repo)):
         try:
+            if os.path.basename(f) in in_use:
+                continue        # bloco antigo, mas usado por um snapshot ainda dentro do bloqueio: continua protegido
             if (now - datetime.fromtimestamp(os.path.getmtime(f))).days >= pol["days"] and _is_ro(f):
                 os.chmod(f, stat.S_IREAD | stat.S_IWRITE)
                 n += 1

@@ -14,6 +14,8 @@
 
 import asyncio
 import logging
+import threading
+import time
 from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, Query, Request
@@ -75,18 +77,92 @@ def _group_sql(group: str) -> str:
     return "(" + " OR ".join(parts) + ")"
 
 
+def kind_case(alias: str = "al") -> str:
+    """Classificação e/w/s/i de uma linha (prioridade do dashboard: erro > aviso > sucesso > info)."""
+    sql = (f"CASE WHEN {_group_sql('error')} THEN 'e' WHEN {_group_sql('warning')} THEN 'w' "
+           f"WHEN {_group_sql('success')} THEN 's' ELSE 'i' END")
+    return sql.replace("al.", f"{alias}.")
+
+
+# Coluna agent_logs.kind guarda essa classificação (gravada no envio dos agentes e preenchida em segundo plano
+# para as linhas antigas). Antes, cada contagem/filtro por tipo comparava a mensagem de TODAS as linhas com
+# ILIKE — com milhões de logs, /logs/stats?hours=0 levava minutos. Linha sem kind cai na classificação direta.
+KIND_EXPR = f"COALESCE(al.kind, {kind_case('al')})"
+
+
 def _type_condition(t: str) -> Optional[str]:
     t = (t or "").strip().lower()
-    if t == "error":
-        return _group_sql("error")
-    # Prioridade igual à do dashboard: erro > aviso > sucesso > info
-    if t == "warning":
-        return f"({_group_sql('warning')} AND NOT {_group_sql('error')})"
-    if t == "success":
-        return f"({_group_sql('success')} AND NOT {_group_sql('error')} AND NOT {_group_sql('warning')})"
-    if t == "info":
-        return f"(NOT {_group_sql('error')} AND NOT {_group_sql('warning')} AND NOT {_group_sql('success')})"
-    return None
+    code = {"error": "e", "warning": "w", "success": "s", "info": "i"}.get(t)
+    return f"{KIND_EXPR} = '{code}'" if code else None
+
+
+_kind_ready = False
+_kind_lock = threading.Lock()
+
+
+def ensure_kind_column(conn) -> bool:
+    """ADD COLUMN sem default é instantâneo (PostgreSQL ≥ 11). lock_timeout evita travar com a tabela em uso."""
+    global _kind_ready
+    if _kind_ready:
+        return True
+    cur = conn.cursor()
+    try:
+        cur.execute("SET LOCAL lock_timeout = '3s'")
+        cur.execute("ALTER TABLE agent_logs ADD COLUMN IF NOT EXISTS kind CHAR(1)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_agent_logs_kind_pending ON agent_logs (id) WHERE kind IS NULL")
+        conn.commit()
+        _kind_ready = True
+    except Exception as e:
+        conn.rollback()
+        logger.warning(f"[LOGS] Coluna de classificação indisponível por enquanto: {e}")
+    finally:
+        cur.close()
+    return _kind_ready
+
+
+def _kind_backfill_loop(batch: int = 5000) -> None:
+    """Classifica as linhas sem kind em lotes curtos (não bloqueia a tabela); depois verifica a cada minuto."""
+    import time as _t
+    upd = (f"UPDATE agent_logs al SET kind = {kind_case('al')} WHERE al.id IN "
+           f"(SELECT id FROM agent_logs WHERE kind IS NULL LIMIT {int(batch)})").replace("%%", "%")
+    total = 0
+    while True:
+        conn = None
+        n = 0
+        try:
+            conn = get_db()
+            if conn is not None and ensure_kind_column(conn):
+                cur = conn.cursor()
+                cur.execute("SET LOCAL statement_timeout = '60s'")
+                cur.execute(upd)
+                n = cur.rowcount or 0
+                conn.commit()
+                cur.close()
+                total += n
+        except Exception as e:
+            try:
+                conn and conn.rollback()
+            except Exception:
+                pass
+            logger.debug(f"[LOGS] Classificação em segundo plano adiada: {e}")
+        finally:
+            if conn is not None:
+                release_db(conn)
+        if n >= batch:
+            _t.sleep(0.2)
+            continue
+        if total:
+            logger.info(f"[LOGS] {total} log(s) classificados (coluna kind)")
+            total = 0
+        _t.sleep(60)
+
+
+def start_kind_backfill() -> None:
+    with _kind_lock:
+        if getattr(start_kind_backfill, "_started", False):
+            return
+        start_kind_backfill._started = True
+    threading.Thread(target=_kind_backfill_loop, name="gboc-logs-kind", daemon=True).start()
 
 
 SERVER_AGENT = "__server__"          # filtro "Servidor central" (logs do próprio servidor: agent_id NULL)
@@ -199,32 +275,44 @@ def _query_logs(where: str, params: List[Any], limit: int, offset: int = 0) -> L
 
 def _query_stats(agent_id: Optional[str], hours: int, start=None, end=None, tenant_id=None,
                  search=None, source=None) -> Dict[str, Any]:
+    # O painel pede as mesmas contagens a cada atualização: resultado reaproveitado por alguns segundos
+    key = (agent_id, hours, start, end, tenant_id, search, source)
+    hit = _STATS_CACHE.get(key)
+    if hit and time.monotonic() - hit[0] < _STATS_TTL:
+        return dict(hit[1])
     conn = get_db()
     if conn is None:
         raise RuntimeError("Banco de dados não disponível")
     try:
         cur = conn.cursor()
         where, params = _build_where(None, search, source, agent_id, None, hours, start, end, tenant_id)
-        # Cada linha é classificada uma única vez (antes: 4 filtros com as mesmas comparações repetidas)
+        kind = KIND_EXPR if ensure_kind_column(conn) else kind_case("al")
+        # Cada linha é classificada uma única vez; com a coluna kind preenchida não há ILIKE por linha
         cur.execute(f"""
             SELECT COUNT(*),
                    COUNT(*) FILTER (WHERE t = 'e'), COUNT(*) FILTER (WHERE t = 'w'),
                    COUNT(*) FILTER (WHERE t = 's'), COUNT(*) FILTER (WHERE t = 'i'),
                    COUNT(DISTINCT agent_id), MIN(timestamp), MAX(timestamp),
                    COUNT(*) FILTER (WHERE agent_id IS NULL)
-            FROM (SELECT al.agent_id, al.timestamp,
-                         CASE WHEN {_group_sql('error')} THEN 'e' WHEN {_group_sql('warning')} THEN 'w'
-                              WHEN {_group_sql('success')} THEN 's' ELSE 'i' END AS t
+            FROM (SELECT al.agent_id, al.timestamp, {kind} AS t
                   FROM agent_logs al {where}) x
         """, params)
         r = cur.fetchone()
         cur.close()
         iso = lambda v: v.isoformat() if hasattr(v, "isoformat") else v
-        return {"total": r[0], "errors": r[1], "warnings": r[2], "success": r[3], "info": r[4],
-                "agents_with_logs": r[5], "oldest": iso(r[6]), "newest": iso(r[7]), "server_logs": r[8],
-                "hours": hours, "start": start, "end": end}
+        out = {"total": r[0], "errors": r[1], "warnings": r[2], "success": r[3], "info": r[4],
+               "agents_with_logs": r[5], "oldest": iso(r[6]), "newest": iso(r[7]), "server_logs": r[8],
+               "hours": hours, "start": start, "end": end}
+        if len(_STATS_CACHE) > 200:
+            _STATS_CACHE.clear()
+        _STATS_CACHE[key] = (time.monotonic(), out)
+        return dict(out)
     finally:
         release_db(conn)
+
+
+_STATS_CACHE: Dict[tuple, Tuple[float, Dict[str, Any]]] = {}
+_STATS_TTL = 30.0
 
 
 @router.get("")

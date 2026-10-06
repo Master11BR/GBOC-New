@@ -1,17 +1,17 @@
 /*
 ==============================================================================
-GBOC System v14.6.0 Enterprise Edition
+GBOC System v14.8.1 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
 */
 /**
- * GBOC v14.6.0 - WebSocket Client
+ * GBOC v14.8.1 - WebSocket Client
  * Auto-reconnecting WebSocket with event dispatching.
  */
 class GBOCWebSocket {
     constructor(options = {}) {
-        this.url = options.url || `ws://${location.host}/ws`;
+        this.url = options.url || `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;  // em HTTPS o navegador bloqueia ws://
         this.reconnectDelay = options.reconnectDelay || 3000;
         this.maxReconnect = options.maxReconnect || 50;
         this.ws = null;

@@ -908,6 +908,7 @@ def _get_server_user_from_request(request: Request) -> Optional[Dict]:
 class ServerLoginRequest(BaseModel):
     username: str
     password: str
+    remember: bool = False          # "Lembrar credencial": sessão de 7 dias que sobrevive a reinícios
 
 class ServerSetupRequest(BaseModel):
     username: str
@@ -931,12 +932,20 @@ async def lifespan(app: FastAPI):
         try:
             conn = get_db()
             cur = conn.cursor()
-            cur.execute("DELETE FROM server_auth_tokens")
+            # Sessões com "Lembrar credencial" sobrevivem ao reinício (até expirar); as demais pedem login de novo
+            cur.execute("ALTER TABLE server_auth_tokens ADD COLUMN IF NOT EXISTS remember BOOLEAN DEFAULT FALSE")
+            cur.execute("DELETE FROM server_auth_tokens WHERE NOT COALESCE(remember, FALSE) OR expires_at < LOCALTIMESTAMP")
             conn.commit()
             cur.close()
             release_db(conn)
         except Exception:
             pass
+    # Regra única de agente online/offline (todas as telas e contadores usam a mesma)
+    try:
+        from modules.agents.agent_presence import start as _start_presence
+        _start_presence()
+    except Exception as _pr_e:
+        logger.warning(f"Rotina de presença dos agentes não iniciada: {_pr_e}")
     # Pré-carregar informações de versão e assets estáticos para warm-up imediato
     try:
         get_version_info()
@@ -955,6 +964,12 @@ async def lifespan(app: FastAPI):
             __import__(_mod, fromlist=["start_scheduler"]).start_scheduler()
         except Exception as _sc_e:
             logger.warning(f"Agendador de {_what} não iniciado: {_sc_e}")
+    # Classificação dos logs (coluna agent_logs.kind) — deixa /logs/stats e o filtro por tipo rápidos
+    try:
+        from modules.logs.logs_router import start_kind_backfill as _start_kind_backfill
+        _start_kind_backfill()
+    except Exception as _kb_e:
+        logger.warning(f"Classificação de logs em segundo plano não iniciada: {_kb_e}")
     if os.getenv("GBOC_AUTO_RETENTION", "1") != "0":
         threading.Thread(target=_retention_scheduler_loop, name="gboc-retention", daemon=True).start()
     yield
@@ -1404,10 +1419,12 @@ def server_auth_login(req: ServerLoginRequest, request: Request, response: Respo
                 pass
 
         token = _generate_token()
-        expires = _dt.now(timezone.utc) + timedelta(hours=24)
+        session_hours = 24 * 7 if req.remember else 24
+        expires = _dt.now(timezone.utc) + timedelta(hours=session_hours)
+        cur.execute("ALTER TABLE server_auth_tokens ADD COLUMN IF NOT EXISTS remember BOOLEAN DEFAULT FALSE")
         cur.execute(
-            "INSERT INTO server_auth_tokens (user_id, token, expires_at) VALUES (%s, %s, %s)",
-            (user_id, token, expires)
+            "INSERT INTO server_auth_tokens (user_id, token, expires_at, remember) VALUES (%s, %s, %s, %s)",
+            (user_id, token, expires, bool(req.remember))
         )
         cur.execute("UPDATE server_auth_users SET last_login = LOCALTIMESTAMP WHERE id = %s", (user_id,))
         cur.execute(
@@ -1416,8 +1433,8 @@ def server_auth_login(req: ServerLoginRequest, request: Request, response: Respo
         )
         conn.commit()
         cur.close()
-        response.set_cookie("gboc_server_token", token, httponly=False, max_age=86400, path="/")
-        response.set_cookie("gboc_token", token, httponly=False, max_age=86400, path="/")
+        response.set_cookie("gboc_server_token", token, httponly=False, max_age=session_hours * 3600, path="/")
+        response.set_cookie("gboc_token", token, httponly=False, max_age=session_hours * 3600, path="/")
         return {
             "status": "success",
             "token": token,
@@ -2256,18 +2273,32 @@ async def sync_logs(data: LogSyncData):
                      l.get('details'), l.get('timestamp')) for l in (data.logs or [])]
             if not rows:
                 return {"received": 0, "inserted": 0}
-            execute_values(cur, """
-                INSERT INTO agent_logs (agent_id, level, source, message, details, timestamp)
-                SELECT v.agent_id, v.level, v.source, v.message, v.details, v.ts::timestamp
-                FROM (VALUES %s) AS v(agent_id, level, source, message, details, ts)
-                WHERE NOT EXISTS (
-                    SELECT 1 FROM agent_logs l
-                    WHERE l.agent_id = v.agent_id
-                      AND l.timestamp IS NOT DISTINCT FROM v.ts::timestamp
-                      AND l.message IS NOT DISTINCT FROM v.message
-                )
-            """, rows, page_size=500)
-            inserted = cur.rowcount
+            # Igualdade simples (agent_id, timestamp) usa o índice idx_agent_logs_agent_ts; o antigo
+            # "IS NOT DISTINCT FROM" não usava índice e lia a tabela inteira para CADA linha recebida —
+            # com milhões de logs cada envio levava minutos e os envios se acumulavam no servidor.
+            # DISTINCT ON descarta repetidos dentro do próprio lote; kind já grava a classificação.
+            try:
+                from modules.logs.logs_router import ensure_kind_column, kind_case
+                with_kind = ensure_kind_column(conn)
+            except Exception:
+                with_kind = False
+            kind_col, kind_val = (", kind", ", " + kind_case("v")) if with_kind else ("", "")
+            cur.execute("SET LOCAL statement_timeout = '50s'")
+            inserted = 0
+            for i in range(0, len(rows), 500):
+                execute_values(cur, f"""
+                    INSERT INTO agent_logs (agent_id, level, source, message, details, timestamp{kind_col})
+                    SELECT v.agent_id, v.level, v.source, v.message, v.details, v.ts{kind_val}
+                    FROM (SELECT DISTINCT ON (x.ts, x.message) x.agent_id, x.level, x.source, x.message, x.details,
+                                 COALESCE(x.ts::timestamp, LOCALTIMESTAMP) AS ts
+                          FROM (VALUES %s) AS x(agent_id, level, source, message, details, ts)) v
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM agent_logs l
+                        WHERE l.agent_id = v.agent_id AND l.timestamp = v.ts
+                          AND (l.message = v.message OR (l.message IS NULL AND v.message IS NULL))
+                    )
+                """, rows[i:i + 500], page_size=500)
+                inserted += max(cur.rowcount, 0)
             conn.commit()
             cur.close()
             return {"received": len(rows), "inserted": max(inserted, 0)}
@@ -2338,7 +2369,7 @@ def get_agent_details(agent_id: str):
         # Info do agente
         cur.execute("""
             SELECT *,
-                CASE WHEN last_heartbeat > (LOCALTIMESTAMP - INTERVAL '60 minutes') THEN 'online' ELSE 'offline' END as current_status,
+                CASE WHEN last_heartbeat > gboc_agent_offline_cutoff() THEN 'online' ELSE 'offline' END as current_status,
                 EXTRACT(EPOCH FROM (LOCALTIMESTAMP - COALESCE(registered_at, last_heartbeat))) as uptime_seconds,
                 EXTRACT(EPOCH FROM (LOCALTIMESTAMP - last_heartbeat)) as last_seen_seconds
             FROM agents WHERE agent_id = %s
@@ -2541,20 +2572,37 @@ def sync_statistics(data: StatisticsSyncData):
 # =====================================================================
 
 @app.get("/api/v1/analytics/history")
-def get_analytics_history(range: str = '7d'):
-    """Histórico de backups — usa agent_task_executions (dados reais sincronizados)"""
+def get_analytics_history(range: str = '7d', days: Optional[int] = None, date_from: Optional[str] = None,
+                          date_to: Optional[str] = None, group: str = 'auto', agent_id: Optional[str] = None):
+    """Histórico de backups — usa agent_task_executions (dados reais sincronizados).
+    Período: range (24h/7d/30d/90d/1y/all) ou days (0 = tudo) ou date_from/date_to (AAAA-MM-DD).
+    group: auto | hour | day | week | month."""
     conn = None
     try:
         conn = get_db(); cur = conn.cursor(cursor_factory=RealDictCursor)
-
-        if range == '24h':
-            interval, trunc, fmt = "INTERVAL '24 hours'", 'hour', 'HH24:00'
-        elif range == '30d':
-            interval, trunc, fmt = "INTERVAL '30 days'", 'day', 'DD/MM'
-        elif range == '1y':
-            interval, trunc, fmt = "INTERVAL '1 year'", 'month', 'MM/YYYY'
+        from datetime import datetime as _hdt, timedelta as _htd
+        now = _hdt.now()
+        if date_from or date_to:
+            try:
+                start = _hdt.strptime(date_from, "%Y-%m-%d") if date_from else _hdt(2000, 1, 1)
+                end = (_hdt.strptime(date_to, "%Y-%m-%d") + _htd(days=1)) if date_to else now + _htd(days=1)
+            except ValueError:
+                raise HTTPException(400, "Datas no formato AAAA-MM-DD")
         else:
-            interval, trunc, fmt = "INTERVAL '7 days'", 'day', 'DD/MM'
+            if days is None:
+                days = {'24h': 1, '7d': 7, '30d': 30, '90d': 90, '1y': 365, 'all': 0}.get(range, 7)
+            start = now - _htd(days=days) if days and days > 0 else _hdt(2000, 1, 1)
+            end = now + _htd(minutes=1)
+        if start >= end:
+            raise HTTPException(400, "A data inicial deve ser anterior à final")
+        span_days = (min(end, now) - start).total_seconds() / 86400
+        if group not in ('hour', 'day', 'week', 'month'):
+            group = 'hour' if span_days <= 2 else 'day' if span_days <= 62 else 'week' if span_days <= 370 else 'month'
+        trunc = group
+        fmt = {'hour': 'DD/MM HH24:00', 'day': 'DD/MM', 'week': 'DD/MM', 'month': 'MM/YYYY'}[group]
+        if span_days > 370 and group in ('day', 'week'):
+            fmt = 'DD/MM/YY'
+        agent_sql = " AND agent_id = %(agent)s" if agent_id else ""
 
         # Buscar de agent_task_executions (dados reais) + backup_reports como fallback
         query = f"""
@@ -2563,11 +2611,11 @@ def get_analytics_history(range: str = '7d'):
                        COALESCE(bytes_processed, 0) as total_bytes,
                        COALESCE(duration_seconds, 0) as duration_seconds
                 FROM agent_task_executions
-                WHERE started_at IS NOT NULL AND started_at >= (LOCALTIMESTAMP - {interval})
+                WHERE started_at IS NOT NULL AND started_at >= %(start)s AND started_at < %(end)s{agent_sql}
                 UNION ALL
                 SELECT start_time, status, COALESCE(total_bytes, 0), COALESCE(duration_seconds, 0)
                 FROM backup_reports
-                WHERE start_time IS NOT NULL AND start_time >= (LOCALTIMESTAMP - {interval})
+                WHERE start_time IS NOT NULL AND start_time >= %(start)s AND start_time < %(end)s{agent_sql}
             )
             SELECT 
                 to_char(date_trunc('{trunc}', start_time), '{fmt}') as period,
@@ -2583,10 +2631,11 @@ def get_analytics_history(range: str = '7d'):
             GROUP BY date_trunc('{trunc}', start_time), to_char(date_trunc('{trunc}', start_time), '{fmt}')
             ORDER BY date_trunc('{trunc}', start_time) ASC
         """
-        cur.execute(query)
+        cur.execute(query, {"start": start, "end": end, "agent": agent_id})
         results = cur.fetchall()
 
         return {
+            "group": group,
             "labels": [r['period'] for r in results],
             "volume_gb": [round(float(r['total_gb']), 4) for r in results],
             "speed_mbps": [round(float(r['avg_speed_mbps']), 2) for r in results],
@@ -2596,6 +2645,75 @@ def get_analytics_history(range: str = '7d'):
         }
     finally:
         if 'cur' in locals() and cur: cur.close()
+        release_db(conn)
+
+
+def _analytics_series(cur, kind: str, start, end, group: str = 'auto', agent_id: Optional[str] = None) -> Dict[str, Any]:
+    """Séries dos gráficos de Analytics por período: timeline (execuções), logs (por nível), system (CPU/RAM/Disco)."""
+    span = max((min(end, _dt.now()) - start).total_seconds() / 86400, 0.01)
+    if group not in ('hour', 'day', 'week', 'month'):
+        group = 'hour' if span <= (7.01 if kind in ('system', 'logs') else 3) else 'day' if span <= 92 else 'week' if span <= 370 else 'month'
+    fmt = {'hour': '%d/%m %H:00', 'day': '%d/%m', 'week': '%d/%m', 'month': '%m/%Y'}[group]
+    if span > 370 and group in ('day', 'week'):
+        fmt = '%d/%m/%y'
+    p = {"start": start, "end": end, "agent": agent_id}
+    ag = " AND agent_id = %(agent)s" if agent_id else ""
+    if kind == 'timeline':
+        cur.execute(f"""SELECT date_trunc('{group}', started_at) AS b,
+                   COUNT(*) FILTER (WHERE status = 'failed') AS failed,
+                   COUNT(*) FILTER (WHERE status IN ('completed','success')) AS success,
+                   COUNT(*) FILTER (WHERE status = 'interrupted') AS interrupted
+            FROM agent_task_executions WHERE started_at >= %(start)s AND started_at < %(end)s{ag}
+            GROUP BY 1 ORDER BY 1""", p)
+        rows = cur.fetchall()
+        return {'group': group, 'labels': [r['b'].strftime(fmt) for r in rows], 'success': [r['success'] for r in rows],
+                'failed': [r['failed'] for r in rows], 'interrupted': [r['interrupted'] for r in rows]}
+    if kind == 'logs':
+        cur.execute(f"""SELECT date_trunc('{group}', timestamp) AS b,
+                   COUNT(*) FILTER (WHERE level = 'ERROR') AS errors,
+                   COUNT(*) FILTER (WHERE level = 'WARNING') AS warnings,
+                   COUNT(*) FILTER (WHERE level = 'INFO') AS info
+            FROM agent_logs WHERE timestamp >= %(start)s AND timestamp < %(end)s{ag}
+            GROUP BY 1 ORDER BY 1""", p)
+        rows = cur.fetchall()
+        hfmt = '%H:00' if group == 'hour' and span <= 1.01 else fmt
+        return {'group': group, 'labels': [r['b'].strftime(hfmt) for r in rows], 'errors': [r['errors'] for r in rows],
+                'warnings': [r['warnings'] for r in rows], 'info': [r['info'] for r in rows]}
+    if kind == 'system':
+        cur.execute(f"""SELECT date_trunc('{group}', timestamp) AS b, AVG(cpu_usage) AS cpu, AVG(ram_usage) AS ram,
+                   AVG(disk_usage) AS disk
+            FROM agent_metrics WHERE timestamp >= %(start)s AND timestamp < %(end)s{ag}
+            GROUP BY 1 ORDER BY 1""", p)
+        rows = cur.fetchall()
+        return {'group': group, 'labels': [r['b'].strftime(fmt) for r in rows],
+                'cpu': [round(float(r['cpu'] or 0), 1) for r in rows], 'ram': [round(float(r['ram'] or 0), 1) for r in rows],
+                'disk': [round(float(r['disk'] or 0), 1) for r in rows]}
+    raise HTTPException(400, "kind deve ser timeline, logs ou system")
+
+
+@app.get("/api/v1/analytics/series")
+def get_analytics_series(kind: str, days: Optional[int] = None, date_from: Optional[str] = None, date_to: Optional[str] = None,
+                         group: str = 'auto', agent_id: Optional[str] = None):
+    """Uma série dos gráficos de Analytics no período pedido (days: 0 = tudo; ou date_from/date_to AAAA-MM-DD)."""
+    from datetime import datetime as _sdt, timedelta as _std
+    now = _sdt.now()
+    try:
+        if date_from or date_to:
+            start = _sdt.strptime(date_from, "%Y-%m-%d") if date_from else _sdt(2000, 1, 1)
+            end = (_sdt.strptime(date_to, "%Y-%m-%d") + _std(days=1)) if date_to else now + _std(days=1)
+        else:
+            d = {'timeline': 14, 'logs': 1, 'system': 7}.get(kind, 7) if days is None else days
+            start = now - _std(days=d) if d and d > 0 else _sdt(2000, 1, 1)
+            end = now + _std(minutes=1)
+    except ValueError:
+        raise HTTPException(400, "Datas no formato AAAA-MM-DD")
+    if start >= end:
+        raise HTTPException(400, "A data inicial deve ser anterior à final")
+    conn = None
+    try:
+        conn = get_db(); cur = conn.cursor(cursor_factory=RealDictCursor)
+        return _analytics_series(cur, kind, start, end, group, agent_id)
+    finally:
         release_db(conn)
 
 
@@ -2609,7 +2727,7 @@ def get_comprehensive_analytics():
         # ── 1. KPIs Globais ──
         cur.execute("""
             SELECT COUNT(*) as total,
-                   COUNT(*) FILTER (WHERE last_heartbeat > LOCALTIMESTAMP - INTERVAL '60 minutes') as online
+                   COUNT(*) FILTER (WHERE last_heartbeat > gboc_agent_offline_cutoff()) as online
             FROM agents
         """)
         agents = cur.fetchone()
@@ -2682,25 +2800,17 @@ def get_comprehensive_analytics():
         fail_trend = 'improving' if r_fail_rate < p_fail_rate else ('degrading' if r_fail_rate > p_fail_rate + 5 else 'stable')
 
         # ── 3. Métricas de Sistema (CPU/RAM/Disco) ──
-        cur.execute("""
-            SELECT agent_id, cpu_usage, ram_usage, disk_usage, timestamp
-            FROM agent_metrics
-            ORDER BY timestamp ASC
-        """)
-        metrics_raw = cur.fetchall()
-
-        system_metrics = {
-            'labels': [r['timestamp'].strftime('%d/%m %H:%M') if r['timestamp'] else '' for r in metrics_raw],
-            'cpu': [float(r['cpu_usage'] or 0) for r in metrics_raw],
-            'ram': [float(r['ram_usage'] or 0) for r in metrics_raw],
-            'disk': [float(r['disk_usage'] or 0) for r in metrics_raw]
-        }
+        # Antes: lia TODA a tabela agent_metrics a cada abertura (milhares de pontos, lento e ilegível).
+        # Agora: gráfico = médias por hora dos últimos 7 dias; previsão = médias diárias de 30 dias.
+        from datetime import datetime as _adt, timedelta as _atd
+        system_metrics = _analytics_series(cur, 'system', _adt.now() - _atd(days=7), _adt.now() + _atd(minutes=1), 'hour')
+        _sys_daily = _analytics_series(cur, 'system', _adt.now() - _atd(days=30), _adt.now() + _atd(minutes=1), 'day')
 
         # ── 4. Previsão Estatística (Regressão Linear simples) ──
         predictions = {}
 
-        # Prever tendência de disco
-        disk_vals = system_metrics['disk']
+        # Prever tendência de disco (1 ponto = 1 dia)
+        disk_vals = _sys_daily['disk']
         if len(disk_vals) >= 3:
             n = len(disk_vals)
             x_mean = (n - 1) / 2.0
@@ -2710,8 +2820,8 @@ def get_comprehensive_analytics():
             slope = num / den if den > 0 else 0
             intercept = y_mean - slope * x_mean
 
-            # Prever próximos 7 dias (assumindo ~5 pontos por dia)
-            future_points = 35
+            # Prever próximos 7 dias (1 ponto por dia)
+            future_points = 7
             future_vals = [round(max(0, min(100, slope * (n + i) + intercept)), 1) for i in range(future_points)]
             days_to_80 = None
             if slope > 0:
@@ -2719,19 +2829,19 @@ def get_comprehensive_analytics():
                 current = disk_vals[-1]
                 if current < target:
                     points_to_80 = (target - intercept) / slope - n if slope > 0 else 999
-                    days_to_80 = max(0, round(points_to_80 / 5, 1))  # ~5 metrics/dia
+                    days_to_80 = max(0, round(points_to_80, 1))
 
             predictions['disk'] = {
                 'trend': 'up' if slope > 0.01 else ('down' if slope < -0.01 else 'stable'),
-                'slope_per_day': round(slope * 5, 2),
+                'slope_per_day': round(slope, 2),
                 'current': round(disk_vals[-1], 1) if disk_vals else 0,
                 'predicted_7d': round(future_vals[-1], 1) if future_vals else 0,
                 'days_to_critical': days_to_80,
-                'future_values': future_vals[::5]  # 1 ponto por dia
+                'future_values': future_vals
             }
 
         # Prever tendência de RAM
-        ram_vals = system_metrics['ram']
+        ram_vals = _sys_daily['ram']
         if len(ram_vals) >= 3:
             n = len(ram_vals)
             x_mean = (n - 1) / 2.0
@@ -2741,9 +2851,9 @@ def get_comprehensive_analytics():
             slope = num / den if den > 0 else 0
             predictions['ram'] = {
                 'trend': 'up' if slope > 0.05 else ('down' if slope < -0.05 else 'stable'),
-                'slope_per_day': round(slope * 5, 2),
+                'slope_per_day': round(slope, 2),
                 'current': round(ram_vals[-1], 1) if ram_vals else 0,
-                'predicted_7d': round(max(0, min(100, slope * (n + 35) + (y_mean - slope * x_mean))), 1)
+                'predicted_7d': round(max(0, min(100, slope * (n + 7) + (y_mean - slope * x_mean))), 1)
             }
 
         # Prever tendência de falhas
@@ -3028,6 +3138,7 @@ def get_comprehensive_analytics():
                 'recent_fail_rate': round(r_fail_rate, 1), 'previous_fail_rate': round(p_fail_rate, 1)
             },
             'system_metrics': system_metrics,
+            'system_daily': _sys_daily,
             'predictions': predictions,
             'diagnostics': diagnostics[:15],
             'alerts': alerts,
@@ -3065,7 +3176,7 @@ def stats(request: Request):
             # Filtro por tenant_id
             cur.execute("""
                 SELECT COUNT(*) as total, 
-                       COUNT(*) FILTER (WHERE last_heartbeat > (LOCALTIMESTAMP - INTERVAL '60 minutes')) as online 
+                       COUNT(*) FILTER (WHERE last_heartbeat > gboc_agent_offline_cutoff()) as online 
                 FROM agents 
                 WHERE tenant_id = %s
             """, (tenant_id,))
@@ -3116,7 +3227,7 @@ def stats(request: Request):
             alerts = cur.fetchone()
         else:
             # Sem filtro (Global Admin)
-            cur.execute("SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE last_heartbeat > (LOCALTIMESTAMP - INTERVAL '60 minutes')) as online FROM agents")
+            cur.execute("SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE last_heartbeat > gboc_agent_offline_cutoff()) as online FROM agents")
             agt = cur.fetchone()
             
             cur.execute("""
@@ -3180,9 +3291,9 @@ def list_agents(request: Request):
         tenant_id = user.get('tenant_id') if user else None
         conn = get_db(); cur = conn.cursor(cursor_factory=RealDictCursor)
         if tenant_id:
-            cur.execute("""SELECT *, CASE WHEN last_heartbeat > (LOCALTIMESTAMP - INTERVAL '60 minutes') THEN 'online' ELSE 'offline' END as current_status FROM agents WHERE tenant_id = %s ORDER BY hostname""", (tenant_id,))
+            cur.execute("""SELECT *, CASE WHEN last_heartbeat > gboc_agent_offline_cutoff() THEN 'online' ELSE 'offline' END as current_status FROM agents WHERE tenant_id = %s ORDER BY hostname""", (tenant_id,))
         else:
-            cur.execute("""SELECT *, CASE WHEN last_heartbeat > (LOCALTIMESTAMP - INTERVAL '60 minutes') THEN 'online' ELSE 'offline' END as current_status FROM agents ORDER BY hostname""")
+            cur.execute("""SELECT *, CASE WHEN last_heartbeat > gboc_agent_offline_cutoff() THEN 'online' ELSE 'offline' END as current_status FROM agents ORDER BY hostname""")
         res = cur.fetchall()
         for r in res:
             try: r['available_tools'] = json.loads(r['available_tools'])
@@ -4335,7 +4446,7 @@ def get_server_info():
 
         cur.execute("SELECT COUNT(*) as total FROM agents")
         total_agents = cur.fetchone()['total']
-        cur.execute("SELECT COUNT(*) as online FROM agents WHERE last_heartbeat > (LOCALTIMESTAMP - INTERVAL '60 minutes')")
+        cur.execute("SELECT COUNT(*) as online FROM agents WHERE last_heartbeat > gboc_agent_offline_cutoff()")
         online_agents = cur.fetchone()['online']
         cur.execute("SELECT COUNT(*) as total FROM backup_reports")
         total_reports = cur.fetchone()['total']
@@ -4451,12 +4562,13 @@ def _run_retention_cleanup(remove_duplicates: bool = True) -> Dict[str, Any]:
         cur = conn.cursor()
         if remove_duplicates:
             # Remove cópias geradas pelo reenvio de 24h das versões anteriores (mantém a mais antiga)
+            # Janela por (agente, horário, mensagem) — NULLs contam como iguais, como antes; o self-join com
+            # IS NOT DISTINCT FROM não usava hash/índice e ficava quadrático em tabelas grandes
             cur.execute("""
-                DELETE FROM agent_logs a USING agent_logs b
-                WHERE a.id > b.id
-                  AND a.agent_id IS NOT DISTINCT FROM b.agent_id
-                  AND a.timestamp IS NOT DISTINCT FROM b.timestamp
-                  AND a.message IS NOT DISTINCT FROM b.message
+                DELETE FROM agent_logs WHERE id IN (
+                    SELECT id FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY agent_id, timestamp, message ORDER BY id) AS rn
+                                    FROM agent_logs) d
+                    WHERE d.rn > 1)
             """)
             deleted['agent_logs_duplicates'] = cur.rowcount
         cur.execute("DELETE FROM server_auth_tokens WHERE expires_at < LOCALTIMESTAMP")

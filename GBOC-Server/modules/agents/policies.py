@@ -217,7 +217,8 @@ def compliance() -> Dict[str, Any]:
                 flt0 = (p.get("task_filter") or "").lower()
                 repo_ids = {t.get("repository_id") for t in tasks.get(aid, []) if t.get("repository_id")
                             and (not flt0 or flt0 in str(t.get("name") or "").lower())}
-                scope = [r for r in (op.get("immutability") or []) if not repo_ids or r.get("repo_id") in repo_ids]
+                scope = [r for r in (op.get("immutability") or [])
+                         if (not repo_ids and not flt0) or r.get("repo_id") in repo_ids]
                 bad = [r for r in scope if r.get("supported_modes") and len(r["supported_modes"]) > 1
                        and (r.get("mode") == "off" or int(r.get("days") or 0) < s["immutability"]["days"])]
                 if bad:

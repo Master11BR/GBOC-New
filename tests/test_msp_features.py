@@ -81,6 +81,29 @@ def test_object_lock_with_moto():
                       ContentMD5=base64.b64encode(hashlib.md5(b"x").digest()).decode())
         res = imm.check_object_lock(repo)
         assert res["protected"] and res["sample"]["locked"] and res["sample"]["mode"] == "COMPLIANCE"
+        assert res["lifecycle"] == {"rule": "gboc-imutavel-limpeza", "noncurrent_days": 31}
+
+
+def test_object_lock_region_and_lifecycle_merge():
+    moto = pytest.importorskip("moto")
+    import boto3
+    with moto.mock_aws():
+        repo = {"id": 2, "name": "UE", "type": "s3", "path": "bkp-ue", "engine": "restic",
+                "config": {"access_key": "AK", "secret_key": "SK", "region": "eu-central-1",
+                           "immutability": {"mode": "object_lock", "days": 10, "lock_mode": "GOVERNANCE"}}}
+        res = imm.create_locked_bucket(repo)                      # fora de us-east-1 → LocationConstraint
+        assert res["object_lock_enabled"] and res["lifecycle"]["applied"]
+        s3 = boto3.client("s3", region_name="eu-central-1", aws_access_key_id="AK", aws_secret_access_key="SK")
+        assert s3.get_bucket_location(Bucket="bkp-ue")["LocationConstraint"] == "eu-central-1"
+        rules = s3.get_bucket_lifecycle_configuration(Bucket="bkp-ue")["Rules"]
+        s3.put_bucket_lifecycle_configuration(Bucket="bkp-ue", LifecycleConfiguration={"Rules": rules + [
+            {"ID": "regra-do-cliente", "Status": "Enabled", "Filter": {"Prefix": "tmp/"}, "Expiration": {"Days": 3}}]})
+        imm.apply_object_lock(repo)                               # reaplicar mantém regras de terceiros, sem duplicar
+        ids = sorted(r["ID"] for r in s3.get_bucket_lifecycle_configuration(Bucket="bkp-ue")["Rules"])
+        assert ids == ["gboc-imutavel-limpeza", "gboc-imutavel-limpeza-marcadores", "regra-do-cliente"]
+        with pytest.raises(RuntimeError, match="já existe"):
+            imm.create_locked_bucket(repo)
+    assert imm.resolve_region({"endpoint": "https://s3.eu-central-2.wasabisys.com"}) == "eu-central-2"
 
 
 # ───────── políticas ─────────

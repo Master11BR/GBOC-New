@@ -1,6 +1,6 @@
 <!--
 ==============================================================================
-GBOC System v14.6.0 Enterprise Edition
+GBOC System v14.8.1 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
@@ -10,7 +10,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GBOC Agent 14.6.0 - API Overview</title>
+    <title>GBOC Agent 14.8.1 - API Overview</title>
     
     <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
     <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.8.1">
@@ -140,7 +140,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 </div>
                 <div class="stat-card" style="border-left-color: var(--text-muted);">
                     <div class="stat-header"><h3>Versão GBOC</h3></div>
-                    <div class="stat-value" style="font-size:1.1em">14.6.0</div>
+                    <div class="stat-value" style="font-size:1.1em">14.8.1</div>
                 </div>
                 <div class="stat-card" style="border-left-color: #38bdf8; cursor:pointer;" onclick="if(typeof toggleHardwareHUD==='function')toggleHardwareHUD();" title="Clique para abrir Telemetria & S.M.A.R.T.">
                     <div class="stat-header"><h3>Telemetria</h3><i class="fas fa-microchip" style="color:#38bdf8"></i></div>
@@ -212,11 +212,13 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                     document.getElementById('ip-val').innerText = data.network_info.local_ip;
                     document.getElementById('host-val').innerText = data.network_info.hostname;
                     const statusEl = document.getElementById('status-srv');
-                    if(data.server_sync && (data.server_sync.connected || data.server_sync.status === 'Online')) {
-                        statusEl.innerHTML = '<span class="badge badge-success">Online</span>';
-                    } else {
-                        statusEl.innerHTML = '<span class="badge badge-warning">Verificando...</span>';
-                    }
+                    // Mesmo estado do indicador do topbar (ligação real Agente → Servidor Central)
+                    const sl = data.server_sync || {};
+                    const map = { connected: ['badge-success', 'Conectado'], starting: ['badge-info', 'Conectando…'],
+                                  not_configured: ['badge-warning', 'Não configurado'], key_rejected: ['badge-error', 'Chave recusada'],
+                                  no_contact: ['badge-error', 'Sem contato'] };
+                    const [cls, txt] = map[sl.state] || ['badge-warning', 'Indisponível'];
+                    statusEl.innerHTML = `<span class="badge ${cls}" title="${String(sl.detail || '').replace(/"/g, '&quot;')}">${txt}</span>`;
                 }
 
                 // 3. BACKUP

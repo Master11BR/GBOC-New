@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC Server v14.6.0 — Storage Usage & Growth Monitor APIRouter
+GBOC Server v14.8.1 — Storage Usage & Growth Monitor APIRouter
 Módulo estrito para gerenciamento de armazenamento centralizado.
 """
 
@@ -120,7 +120,7 @@ async def get_storage_overview():
 @router.get("/history")
 def get_storage_history(days: int = 30):
     """Retorna histórico real de crescimento de dados coletado pelo sistema."""
-    days_limit = min(days, 90)
+    days_limit = 36500 if days <= 0 else min(days, 3650)      # 0 = todo o histórico (filtro de período dos gráficos)
     history = []
     conn = None
     try:

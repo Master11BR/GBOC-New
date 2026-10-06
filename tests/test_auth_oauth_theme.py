@@ -33,10 +33,9 @@ def test_server_login_html_contains_v7_elements():
     content = login_path.read_text(encoding="utf-8")
 
     # Verifica elementos do modelo V7 anexado
-    assert "glow-pulse" in content
-    assert "path-animate-1" in content
-    assert "path-animate-2" in content
-    assert "path-animate-3" in content
+    # Fundo "aurora" leve (só transform/opacity; sem blur/redesenho a cada quadro)
+    assert "gboc-aurora" in content and "gbocAuroraA" in content and "gboc-ambient-lines" in content
+    assert "blur-[130px]" not in content and "drawLine" not in content
     assert "perspective-1000" in content
     assert "card-wrapper" in content
 
@@ -54,8 +53,7 @@ def test_agent_login_html_parity():
     agent_login_path = BASE_DIR / "GBOC-Agent" / "static" / "login.html"
     content = agent_login_path.read_text(encoding="utf-8")
 
-    assert "glow-pulse" in content
-    assert "path-animate-1" in content
+    assert "gboc-aurora" in content and "gboc-ambient-lines" in content
     assert "switchForm" in content
     assert "setIllumination" in content
     assert "btn-oauth-google" in content
@@ -65,9 +63,9 @@ def test_system_wide_animated_background():
     # Verifica estilos globais no themes.css
     themes_css = (BASE_DIR / "GBOC-Server" / "gboc-themes.css").read_text(encoding="utf-8")
     assert "gboc-ambient-background" in themes_css
-    assert "pulseGlow" in themes_css
-    assert "drawLine" in themes_css
-    assert "path-animate-1" in themes_css
+    assert "gbocAuroraA" in themes_css and "gbocLinesDrift" in themes_css
+    assert "gboc-bg-static" in themes_css and "prefers-reduced-motion" in themes_css
+    assert "drawLine" not in themes_css            # stroke-dashoffset redesenhava a tela a cada quadro
 
     # Verifica injeção do background no layout manager (Server e Agent)
     server_lm = (BASE_DIR / "GBOC-Server" / "gboc-layout-manager.js").read_text(encoding="utf-8")

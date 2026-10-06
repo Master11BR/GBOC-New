@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-🌐 GBOC Agent 14.6.0 - CENTRAL SERVER CLIENT
+🌐 GBOC Agent 14.8.1 - CENTRAL SERVER CLIENT
 Cliente para comunicação com servidor GBOC central
 """
 
@@ -88,6 +88,7 @@ class CentralServerClient:
 
         # Situação da chave junto ao Server (exibida em Configurações > Servidor Central)
         self.server_auth = "unknown"          # ok | rejected | unknown
+        self._started_at = datetime.now()
         self.server_auth_at = None
         self._ws_reconnect = threading.Event()  # pede reconexão do WebSocket (chave/URL alteradas)
 
@@ -1019,6 +1020,7 @@ class CentralServerClient:
 
             if response.status_code == 200:
                 self.last_heartbeat = datetime.now()
+                self._hb_fail_at = None
                 self.server_auth, self.server_auth_at = "ok", self.last_heartbeat.isoformat()
                 logger.debug("💓 Heartbeat enviado com sucesso")
             elif response.status_code == 401:
@@ -1036,13 +1038,17 @@ class CentralServerClient:
                                f"(PID {os.getpid()}, arquivo {config_manager.config_file}). Copie a chave atual em "
                                f"Server > Configurações Gerais > Pareamento de Agentes e salve em Agente > Configurações > Servidor Central.")
             else:
+                self._hb_fail_at = datetime.now()
                 logger.warning(f"⚠️ Heartbeat retornou: {response.status_code} - {response.text}")
 
         except requests.exceptions.ConnectionError:
+            self._hb_fail_at = datetime.now()
             logger.error(f"❌ Erro de conexão com servidor central: {self.server_url}")
         except requests.exceptions.Timeout:
+            self._hb_fail_at = datetime.now()
             logger.error(f"⏰ Timeout ao conectar com servidor central")
         except Exception as e:
+            self._hb_fail_at = datetime.now()
             logger.error(f"❌ Erro no heartbeat: {e}")
     
     def _collect_full_agent_info(self) -> Dict[str, Any]:
@@ -1574,6 +1580,16 @@ class CentralServerClient:
         # Fallback para o IP da LAN local se desconectado da internet pública
         return self._get_local_ip()
 
+    def link_state(self) -> Dict[str, Any]:
+        """Estado ÚNICO da ligação Agente → Servidor Central (usado no topbar e na Visão Geral)."""
+        from core.link_state import compute_link_state
+        return compute_link_state(server_url=self.server_url, api_key=self.api_key, server_auth=self.server_auth,
+                                  last_heartbeat=self.last_heartbeat, hb_fail_at=getattr(self, "_hb_fail_at", None),
+                                  websocket_connected=self.websocket_connected,
+                                  started_at=getattr(self, "_started_at", None),
+                                  heartbeat_minutes=config_manager.get_heartbeat_interval(),
+                                  key_label=key_hint(self.api_key))
+
     def get_connection_status(self) -> Dict[str, Any]:
         """Obtém status da conexão com servidor"""
         return {
@@ -1584,6 +1600,7 @@ class CentralServerClient:
             "server_auth_at": self.server_auth_at,
             "config_file": str(config_manager.config_file),
             "pid": os.getpid(),
+            "link": self.link_state(),
             "server_url": self.server_url,
             "agent_id": self.agent_id,
             "is_registered": self.is_registered,

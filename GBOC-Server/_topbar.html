@@ -4,7 +4,7 @@ GBOC System v14.8.1 Full Stable Enterprise Edition — Servidor Central
 Horizontal Topbar Navigation — injected by gboc-layout-manager.js
 ==============================================================================
 -->
-<header class="gboc-topbar" id="gboc-topbar">
+<header class="gboc-topbar" id="gboc-topbar" data-gboc-app="server">
     <button class="vheader-toggle" id="gboc-vheader-toggle" title="Expandir / Recolher Menu Lateral" aria-label="Menu">
         <i class="fas fa-bars"></i>
     </button>
@@ -135,7 +135,7 @@ Horizontal Topbar Navigation — injected by gboc-layout-manager.js
         <!-- Connection Status (LED + Tooltip) -->
         <div style="display:flex;align-items:center;gap:4px;font-size:0.75em;margin-right:4px;padding:2px 6px;border-radius:12px;background:rgba(72,187,120,0.12);border:1px solid rgba(72,187,120,0.2)" title="Status do Servidor: Server Online (Guardian)">
             <span id="wsDot" style="width:6px;height:6px;border-radius:50%;background:var(--success);display:inline-block;box-shadow:0 0 6px var(--success)"></span>
-            <span id="wsLabel" style="color:var(--success);font-weight:600;font-size:0.9em">Online</span>
+            <span id="wsLabel" style="color:var(--success);font-weight:600;font-size:0.9em">Verificando…</span>
         </div>
 
         <!-- 1. Tema (Moon/Sun) -->

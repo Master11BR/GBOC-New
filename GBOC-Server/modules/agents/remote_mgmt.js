@@ -442,7 +442,14 @@
                     if (!confirm(v.mode === 'object_lock' ? `Aplicar retenção ${v.lock_mode} de ${v.days} dias ao bucket? Os novos backups NÃO poderão ser apagados antes do prazo.` : `Proteger os arquivos de backup dos últimos ${v.days} dias (somente leitura)?`)) return;
                     try { await api(`api/agent-ops/repositories/${id}/immutability`, { method: 'PUT', body: JSON.stringify(v) });
                         const d = await api(`api/agent-ops/repositories/${id}/immutability/apply`, { method: 'POST', body: '{}' });
-                        toast(d.result.summary || 'Aplicado', d.result.protected ? 'success' : 'warning'); tabOperation(); } catch (e) { toast(e.message, 'error'); }
+                        const lc = d.result.lifecycle && d.result.lifecycle.applied === false ? ' ' + d.result.lifecycle.error : '';
+                        toast((d.result.summary || 'Aplicado') + lc, d.result.protected && !lc ? 'success' : 'warning'); tabOperation(); } catch (e) {
+                        // Bucket ainda não existe: oferece criá-lo já com Object Lock (só é possível na criação no Wasabi)
+                        if (v.mode === 'object_lock' && /NoSuchBucket/i.test(e.message) && confirm('O bucket do repositório não existe. Criar agora com Object Lock e a retenção definida?')) {
+                            try { const d = await api(`api/agent-ops/repositories/${id}/immutability/apply`, { method: 'POST', body: JSON.stringify({ create_bucket: true }) });
+                                toast(d.result.summary || 'Bucket criado com Object Lock', d.result.protected ? 'success' : 'warning'); tabOperation(); } catch (e2) { toast(e2.message, 'error'); }
+                        } else toast(e.message, 'error');
+                    }
                 };
             });
         } catch (e) { fail(e); }

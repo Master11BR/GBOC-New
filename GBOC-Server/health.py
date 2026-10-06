@@ -34,11 +34,8 @@ class HealthCheckManager:
             agent_count = cur.fetchone()[0]
 
             # Contar agentes online
-            cutoff_time = datetime.now(timezone.utc) - timedelta(minutes=AGENT_OFFLINE_THRESHOLD_MINUTES)
-            cur.execute(
-                "SELECT COUNT(*) FROM agents WHERE last_heartbeat > %s",
-                (cutoff_time,)
-            )
+            # Mesma regra das telas (antes comparava UTC com horário local: errava em 3 h)
+            cur.execute("SELECT COUNT(*) FROM agents WHERE last_heartbeat > gboc_agent_offline_cutoff()")
             online_count = cur.fetchone()[0]
 
             cur.close()

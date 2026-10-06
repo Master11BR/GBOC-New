@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """GBOC Agent - API Statistics"""
+from typing import Optional
 from fastapi import APIRouter, Query
 import logging
 from datetime import datetime, timedelta
@@ -110,7 +111,7 @@ def get_daily_statistics(days: int = Query(30, description="Número de dias a co
     try:
         from shared_core import get_shared_core
         core = get_shared_core()
-        days = min(days, 365)
+        days = 36500 if days <= 0 else min(days, 3650)      # 0 = todo o período (filtro dos gráficos)
 
         with core.get_db_connection() as conn:
             cursor = conn.cursor()
@@ -148,7 +149,7 @@ def get_throughput_statistics(days: int = Query(30, description="Número de dias
     try:
         from shared_core import get_shared_core
         core = get_shared_core()
-        days = min(days, 365)
+        days = 36500 if days <= 0 else min(days, 3650)      # 0 = todo o período (filtro dos gráficos)
 
         with core.get_db_connection() as conn:
             cursor = conn.cursor()
@@ -182,14 +183,19 @@ def get_throughput_statistics(days: int = Query(30, description="Número de dias
         return {"status": "error", "message": str(e)}
 
 @router.get("/engines/comparison")
-def get_engines_comparison(period: str = Query("month", description="Período: day, week, month, year")):
+def get_engines_comparison(period: str = Query("month", description="Período: day, week, month, year"),
+                           days: Optional[int] = Query(None, description="Dias (0 = todo o período); tem prioridade sobre period")):
     """Retorna comparação de estatísticas entre diferentes engines"""
     try:
         from shared_core import get_shared_core
         core = get_shared_core()
 
         now = datetime.now()
-        if period == "day":
+        if days is not None:
+            period = "_days"
+        if period == "_days":
+            start_date = now - timedelta(days=days) if days and days > 0 else datetime(1970, 1, 1)
+        elif period == "day":
             start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
         elif period == "week":
             start_date = now - timedelta(days=7)
@@ -256,7 +262,7 @@ def get_errors_trend(days: int = Query(30, description="Número de dias a consid
     try:
         from shared_core import get_shared_core
         core = get_shared_core()
-        days = min(days, 365)
+        days = 36500 if days <= 0 else min(days, 3650)      # 0 = todo o período (filtro dos gráficos)
 
         with core.get_db_connection() as conn:
             cursor = conn.cursor()
