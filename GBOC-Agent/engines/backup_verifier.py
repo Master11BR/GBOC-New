@@ -29,10 +29,8 @@ class BackupVerifier:
         return conn
 
     def _get_password(self, repo: Dict[str, Any]) -> str:
-        """Obtém a senha correta baseada no tipo de repositório"""
-        if repo.get('type') == 'local':
-            return repo.get('motor_password', '')
-        return repo.get('cloud_password', '')
+        """Obtém a senha de criptografia do repositório (motor_password com fallback)"""
+        return str(repo.get('motor_password') or repo.get('encryption_password') or repo.get('cloud_password') or repo.get('password') or '')
 
     def run_diagnostics(self) -> Dict[str, Any]:
         """Executa o diagnóstico completo em todos os repositórios ativos"""

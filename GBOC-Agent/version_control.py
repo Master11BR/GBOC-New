@@ -154,11 +154,22 @@ def bump_version(part: str = "patch") -> str:
         PATCH = 0
     elif part == "patch":
         PATCH += 1
+    global _VERSION_INFO_CACHE
+    _VERSION_INFO_CACHE = None
     auto_increment_build()
     return f"{MAJOR}.{MINOR}.{PATCH}"
 
+_VERSION_INFO_CACHE: Optional[Dict[str, Any]] = None
+_VERSION_INFO_CACHE_TIME: float = 0.0
+_VERSION_INFO_TTL: float = 30.0
+
 def get_version_info() -> Dict[str, Any]:
-    """Retorna informações detalhadas e dinâmicas do versionamento semântico 2.0."""
+    """Retorna informações detalhadas e dinâmicas do versionamento semântico 2.0 (com cache de 30s)."""
+    global _VERSION_INFO_CACHE, _VERSION_INFO_CACHE_TIME
+    now = time.time()
+    if _VERSION_INFO_CACHE is not None and (now - _VERSION_INFO_CACHE_TIME) < _VERSION_INFO_TTL:
+        return dict(_VERSION_INFO_CACHE)
+
     git_info = _get_git_info()
     meta = _load_or_create_build_meta()
     
@@ -171,7 +182,7 @@ def get_version_info() -> Dict[str, Any]:
     raw_version = f"{MAJOR}.{MINOR}.{PATCH}"
     semver_str = f"{raw_version}-{PRERELEASE}+build.{build_date}.rev{rev_count}.b{build_num}.git.{git_sha}{dirty_tag}"
     
-    return {
+    res = {
         "raw_version": raw_version,
         "semver": semver_str,
         "major": MAJOR,
@@ -192,5 +203,8 @@ def get_version_info() -> Dict[str, Any]:
             "protocol_version": "2.1"
         }
     }
+    _VERSION_INFO_CACHE = res
+    _VERSION_INFO_CACHE_TIME = now
+    return dict(res)
 
 __version__ = f"{MAJOR}.{MINOR}.{PATCH}"

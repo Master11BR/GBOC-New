@@ -288,8 +288,7 @@ class EngineValidator:
         """Testa conexão Restic (versão simplificada)"""
         try:
             env = os.environ.copy()
-            repo_type = (repo_data.get('repo_type') or repo_data.get('type') or 'local').lower()
-            env['RESTIC_PASSWORD'] = repo_data.get('motor_password') if repo_type == 'local' else repo_data.get('cloud_password', '')
+            env['RESTIC_PASSWORD'] = str(repo_data.get('motor_password') or repo_data.get('encryption_password') or repo_data.get('cloud_password') or '')
 
             # Configurar repositório baseado no tipo
             if repo_data.get('type') == 'local':

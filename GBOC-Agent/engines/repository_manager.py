@@ -33,6 +33,17 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+_VALIDATE_ENGINES_CACHE: Optional[Dict[str, Dict[str, Any]]] = None
+_VALIDATE_ENGINES_CACHE_TIME: float = 0.0
+_VALIDATE_ENGINES_TTL: float = 60.0
+_ENGINE_VERSION_CACHE: Dict[str, Optional[str]] = {}
+
+def clear_engines_validation_cache():
+    global _VALIDATE_ENGINES_CACHE, _VALIDATE_ENGINES_CACHE_TIME, _ENGINE_VERSION_CACHE
+    _VALIDATE_ENGINES_CACHE = None
+    _VALIDATE_ENGINES_CACHE_TIME = 0.0
+    _ENGINE_VERSION_CACHE.clear()
+
 
 class RepositoryManager:
     def __init__(self, core):
@@ -134,37 +145,66 @@ class RepositoryManager:
                 logger.warning(f"[RM] Config JSON inválido para repositório: {e!r} | raw: {str(raw_config)[:100]}")
             except Exception as e:
                 logger.warning(f"[RM] Erro ao decodificar config JSON: {e!r}")
-            else:
-                if isinstance(config, dict) and config.get('secret_enc'):
-                    from engines import repo_secrets
-                    repo_secrets.inject(normalized, config)
-                normalized.pop('secret_enc', None)
+        # Injetar secret_enc se presente no config
+        if isinstance(config, dict) and config.get('secret_enc'):
+            from engines import repo_secrets
+            repo_secrets.inject(normalized, config)
+        normalized.pop('secret_enc', None)
 
-        # Uniformizar todos os campos de senha possíveis para evitar falha de recuperação
-        p = (
+        # 1. Separar e normalizar senha do motor (criptografia do repositório)
+        motor_p = (
             normalized.get('motor_password') or 
-            normalized.get('cloud_password') or 
             normalized.get('encryption_password') or 
             normalized.get('password') or 
             ''
         )
-        if p:
+        if motor_p:
             if not normalized.get('motor_password'):
-                normalized['motor_password'] = p
-            if not normalized.get('cloud_password'):
-                normalized['cloud_password'] = p
+                normalized['motor_password'] = motor_p
             if not normalized.get('encryption_password'):
-                normalized['encryption_password'] = p
+                normalized['encryption_password'] = motor_p
             if not normalized.get('password'):
-                normalized['password'] = p
+                normalized['password'] = motor_p
+
+        # 2. Separar e normalizar credenciais do provedor de nuvem (cloud secret / chave secreta)
+        cloud_p = (
+            normalized.get('cloud_password') or 
+            normalized.get('secret_key') or 
+            normalized.get('aws_secret_key') or 
+            normalized.get('b2_account_key') or 
+            normalized.get('azure_account_key') or 
+            ''
+        )
+        if cloud_p:
+            if not normalized.get('cloud_password'):
+                normalized['cloud_password'] = cloud_p
             if not normalized.get('secret_key'):
-                normalized['secret_key'] = p
+                normalized['secret_key'] = cloud_p
             if not normalized.get('aws_secret_key'):
-                normalized['aws_secret_key'] = p
+                normalized['aws_secret_key'] = cloud_p
             if not normalized.get('b2_account_key'):
-                normalized['b2_account_key'] = p
+                normalized['b2_account_key'] = cloud_p
             if not normalized.get('azure_account_key'):
-                normalized['azure_account_key'] = p
+                normalized['azure_account_key'] = cloud_p
+
+        # 3. Fallback legado: se um repositório cloud tiver apenas uma das senhas informada,
+        # permitir compatibilidade com instalações antigas
+        repo_type_hint = str(normalized.get('type') or '').lower()
+        if repo_type_hint != 'local':
+            if not cloud_p and motor_p:
+                normalized['cloud_password'] = motor_p
+                if not normalized.get('secret_key'):
+                    normalized['secret_key'] = motor_p
+                if not normalized.get('aws_secret_key'):
+                    normalized['aws_secret_key'] = motor_p
+                if not normalized.get('b2_account_key'):
+                    normalized['b2_account_key'] = motor_p
+                if not normalized.get('azure_account_key'):
+                    normalized['azure_account_key'] = motor_p
+            elif not motor_p and cloud_p:
+                normalized['motor_password'] = cloud_p
+                normalized['encryption_password'] = cloud_p
+                normalized['password'] = cloud_p
 
         # Uniformizar chave de acesso para provedores de nuvem
         ak = (
@@ -356,6 +396,18 @@ class RepositoryManager:
             logger.error(f"Falha ao pré-validar backend para o novo repositório '{name}': {e}")
             raise
 
+        # Obter senha da nuvem se fornecida separadamente
+        cloud_pwd = str(
+            data.get('cloud_password') or 
+            data.get('secret_key') or 
+            data.get('aws_secret_key') or 
+            data.get('b2_account_key') or 
+            data.get('azure_account_key') or 
+            (pwd if repo_type == 'local' else '')
+        ).strip()
+        if not cloud_pwd:
+            cloud_pwd = pwd
+
         # Insere no banco
         now = datetime.now().isoformat()
         try:
@@ -373,7 +425,7 @@ class RepositoryManager:
                     """
                     values = (
                         name, repo_type, engine, path, pwd,
-                        pwd,  # cloud_password = motor_password (mesma senha de criptografia)
+                        cloud_pwd,
                         config_json,
                         initial_status, 1 if initial_initialized else 0,
                         now, now
@@ -389,7 +441,7 @@ class RepositoryManager:
                     """
                     values = (
                         name, repo_type, engine, path, pwd,
-                        pwd,
+                        cloud_pwd,
                         config_json,
                         initial_status, initial_initialized,
                         now, now
@@ -443,8 +495,12 @@ class RepositoryManager:
         new_secret = repo_secrets.secret_from_data(data)
         if new_secret:
             config_data['secret_enc'] = repo_secrets.encrypt(new_secret)
+            if 'cloud_password' not in data:
+                data['cloud_password'] = new_secret
         elif any(data.get(f) == '' for f in repo_secrets.SECRET_FIELDS):
             config_data.pop('secret_enc', None)
+            if 'cloud_password' not in data:
+                data['cloud_password'] = ''
 
         # RM08: Remover senhas e secret keys em texto plano do config JSON
         for secret_key in ['secret_key', 'aws_secret_key', 'b2_account_key', 'azure_account_key', 'motor_password']:
@@ -1379,9 +1435,14 @@ class RepositoryManager:
             }
         }
 
-    def validate_engines(self) -> Dict[str, Dict[str, Any]]:
-        """Valida todos os motores de backup conhecidos e retorna status detalhado."""
-        from engines.engine_paths import detect_all_engines, get_engine_path
+    def validate_engines(self, force: bool = False) -> Dict[str, Dict[str, Any]]:
+        """Valida todos os motores de backup conhecidos e retorna status detalhado com cache em memória."""
+        global _VALIDATE_ENGINES_CACHE, _VALIDATE_ENGINES_CACHE_TIME, _ENGINE_VERSION_CACHE
+        now = time.time()
+        if not force and _VALIDATE_ENGINES_CACHE is not None and (now - _VALIDATE_ENGINES_CACHE_TIME) < _VALIDATE_ENGINES_TTL:
+            return _VALIDATE_ENGINES_CACHE
+
+        from engines.engine_paths import detect_all_engines
         results = {}
         for info in detect_all_engines():
             name = info["name"]
@@ -1392,18 +1453,28 @@ class RepositoryManager:
 
             if installed and path:
                 try:
-                    out = subprocess.run(
-                        [path, "version"],
-                        capture_output=True, text=True, timeout=10
-                    )
-                    if out.returncode == 0:
-                        raw = out.stdout.strip()
-                        m = re.search(r'(\d+\.\d+[\.\d]*)', raw)
-                        version = m.group(1) if m else raw[:40]
-                    else:
-                        version = None
+                    mtime = os.path.getmtime(path)
                 except Exception:
-                    pass
+                    mtime = 0
+                vkey = f"{path}:{mtime}"
+                if vkey in _ENGINE_VERSION_CACHE:
+                    version = _ENGINE_VERSION_CACHE[vkey]
+                else:
+                    try:
+                        cmd = [path, "--version"] if name == "kopia" else [path, "version"]
+                        out = subprocess.run(
+                            cmd,
+                            capture_output=True, text=True, timeout=3
+                        )
+                        if out.returncode == 0:
+                            raw = out.stdout.strip()
+                            m = re.search(r'(\d+\.\d+[\.\d]*)', raw)
+                            version = m.group(1) if m else raw[:40]
+                        else:
+                            version = None
+                    except Exception:
+                        version = None
+                    _ENGINE_VERSION_CACHE[vkey] = version
 
             results[name] = {
                 "name": name.capitalize(),
@@ -1424,6 +1495,8 @@ class RepositoryManager:
             "path": None,
             "error": None,
         }
+        _VALIDATE_ENGINES_CACHE = results
+        _VALIDATE_ENGINES_CACHE_TIME = now
         return results
 
     def validate_engine(self, engine_name: str) -> Dict[str, Any]:

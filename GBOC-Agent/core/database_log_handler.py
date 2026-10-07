@@ -58,6 +58,7 @@ class DatabaseLogHandler(logging.Handler):
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 """)
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_system_logs_timestamp ON system_logs (timestamp DESC)")
                 cursor.close()
         except Exception as e:
             sys.stderr.write(f"Erro ao criar tabela system_logs: {e}\n")

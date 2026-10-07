@@ -97,28 +97,38 @@ def _deep_merge(base: Dict, override: Dict):
 
 # ─── DB Helpers ────────────────────────────────────────────────────────────────
 
+_ALERT_TABLES_ENSURED = False
+
 def ensure_alert_tables():
-    core = _get_core()
-    with core.get_db_connection() as conn:
-        cur = conn.cursor()
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS job_failure_log (
-                id SERIAL PRIMARY KEY,
-                task_id TEXT NOT NULL,
-                task_name TEXT,
-                execution_id TEXT,
-                failure_reason TEXT,
-                retry_count INTEGER DEFAULT 0,
-                max_retries INTEGER DEFAULT 3,
-                status TEXT DEFAULT 'failed',
-                alert_sent BOOLEAN DEFAULT FALSE,
-                escalated BOOLEAN DEFAULT FALSE,
-                first_failed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-                last_retried_at TIMESTAMPTZ,
-                resolved_at TIMESTAMPTZ
-            );
-        """)
-        conn.commit()
+    global _ALERT_TABLES_ENSURED
+    if _ALERT_TABLES_ENSURED:
+        return
+    try:
+        core = _get_core()
+        with core.get_db_connection() as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS job_failure_log (
+                    id SERIAL PRIMARY KEY,
+                    task_id TEXT NOT NULL,
+                    task_name TEXT,
+                    execution_id TEXT,
+                    failure_reason TEXT,
+                    retry_count INTEGER DEFAULT 0,
+                    max_retries INTEGER DEFAULT 3,
+                    status TEXT DEFAULT 'failed',
+                    alert_sent BOOLEAN DEFAULT FALSE,
+                    escalated BOOLEAN DEFAULT FALSE,
+                    first_failed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                    last_retried_at TIMESTAMPTZ,
+                    resolved_at TIMESTAMPTZ
+                );
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_job_failure_log_task_status ON job_failure_log (task_id, status);")
+            conn.commit()
+            _ALERT_TABLES_ENSURED = True
+    except Exception:
+        pass
 
 def record_job_failure(task_id: str, task_name: str, execution_id: str, reason: str) -> Dict[str, Any]:
     """Registra falha de job e retorna o registro criado."""

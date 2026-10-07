@@ -40,6 +40,49 @@ def test_secret_is_persisted_encrypted_and_restored():
     assert "secret_enc" not in rm._build_config_data({"path": "/x", "secret_key": "y"}, "local")
 
 
+def test_different_motor_and_cloud_passwords():
+    """Quando motor_password e cloud_password são diferentes e ambas salvas no banco."""
+    rm = _rm()
+    norm = rm._normalize_repository_config({
+        "type": "wasabi",
+        "motor_password": "MotorEncryptionPass1",
+        "cloud_password": "CloudSecretKeyReal2",
+        "config": json.dumps({"bucket": "bkt-test", "region": "us-east-1"})
+    })
+    # Senha do motor deve permanecer a de criptografia do repositório
+    assert norm["motor_password"] == "MotorEncryptionPass1"
+    assert norm["encryption_password"] == "MotorEncryptionPass1"
+    # Senha da nuvem deve ser a chave secreta de conexão
+    assert norm["cloud_password"] == "CloudSecretKeyReal2"
+    assert norm["secret_key"] == "CloudSecretKeyReal2"
+    assert norm["aws_secret_key"] == "CloudSecretKeyReal2"
+
+    # Verificar has_secret do repo_secrets
+    assert repo_secrets.has_secret({}, cloud_password="CloudSecretKeyReal2") is True
+
+    # Verificar repo_inspect.stored
+    from engines import repo_inspect
+    fake_row = {
+        "id": 42, "name": "Repo Wasabi", "type": "wasabi", "path": "bkt-test", "engine": "restic",
+        "status": "ready", "enabled": True, "initialized": True, "created_at": None, "updated_at": None,
+        "config": {"bucket": "bkt-test", "aws_access_key": "AKTEST123"},
+        "has_pwd": True, "motor_password": "MotorEncryptionPass1", "cloud_password": "CloudSecretKeyReal2"
+    }
+    # Testar stored com _raw_row monkeypatched
+    orig_raw_row = repo_inspect._raw_row
+    orig_rows = repo_inspect._rows
+    try:
+        repo_inspect._raw_row = lambda repo_id: fake_row
+        repo_inspect._rows = lambda sql, params: []
+        st = repo_inspect.stored(42)
+        assert st["connection"]["secret_saved"] is True
+        assert st["connection"]["secret"] == "salva (banco de dados)"
+        assert st["connection"]["encryption_password"] == "definida"
+    finally:
+        repo_inspect._raw_row = orig_raw_row
+        repo_inspect._rows = orig_rows
+
+
 def test_api_never_returns_secret_enc():
     from api.repositories import _strip_secret_enc
     d = {"config": json.dumps({"bucket": "b", "secret_enc": repo_secrets.encrypt("x")}), "secret_enc": "t"}

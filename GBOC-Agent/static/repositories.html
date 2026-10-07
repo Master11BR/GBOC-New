@@ -872,7 +872,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                     }
 
                     if (secretKeyEl) {
-                        const secretKeyValue = repo.secret_key || repo.aws_secret_key || repo.b2_account_key || '';
+                        const secretKeyValue = repo.secret_key || repo.aws_secret_key || repo.b2_account_key || repo.cloud_password || '';
                         secretKeyEl.value = (showSensitive && secretKeyValue && secretKeyValue !== '********') ? secretKeyValue : '';
                         if (showSensitive && secretKeyEl.value) secretKeyEl.style.backgroundColor = '#2d5016';
                     }

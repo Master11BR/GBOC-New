@@ -91,6 +91,9 @@ def secret_from_data(data: Dict[str, Any]) -> Optional[str]:
         v = data.get(f)
         if v is not None and str(v) != "" and str(v) != MASK:
             return str(v)
+    v = data.get("cloud_password")
+    if v is not None and str(v) != "" and str(v) != MASK:
+        return str(v)
     return None
 
 
@@ -101,17 +104,21 @@ def secret_from_config(config: Optional[Dict[str, Any]]) -> str:
     return decrypt(config.get("secret_enc")) or ""
 
 
-def has_secret(config: Optional[Dict[str, Any]]) -> bool:
+def has_secret(config: Optional[Dict[str, Any]], cloud_password: Optional[str] = None) -> bool:
+    if cloud_password and str(cloud_password).strip() and str(cloud_password).strip() != MASK:
+        return True
     return isinstance(config, dict) and bool(config.get("secret_enc"))
 
 
 def inject(target: Dict[str, Any], config: Optional[Dict[str, Any]]) -> None:
-    """Preenche os campos de chave secreta ausentes em target a partir do config criptografado."""
-    if not has_secret(config):
-        return
-    sec = secret_from_config(config)
+    """Preenche os campos de chave secreta ausentes em target a partir do config criptografado ou cloud_password."""
+    sec = secret_from_config(config) if has_secret(config) else ""
+    if not sec and target.get("cloud_password") and str(target.get("cloud_password")).strip() != MASK:
+        sec = str(target.get("cloud_password")).strip()
     if not sec:
         return
     for f in SECRET_FIELDS:
         if not target.get(f):
             target[f] = sec
+    if not target.get("cloud_password"):
+        target["cloud_password"] = sec

@@ -496,6 +496,16 @@ def run_auto_migrations(conn):
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log (action);")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_log_user ON audit_log (username);")
 
+            # Essential performance indexes (prevents full-table scans on system_logs, task_executions, alerts)
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_system_logs_timestamp ON system_logs (timestamp DESC);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_system_logs_level ON system_logs (level);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_system_logs_source ON system_logs (source);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_task_executions_started_at ON task_executions (started_at DESC);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_task_executions_task_id ON task_executions (task_id);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_task_executions_status ON task_executions (status);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_alerts_timestamp ON alerts (timestamp DESC);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_alerts_resolved ON alerts (resolved);")
+
             # Engine & Module Tables
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS auto_heal_logs (
@@ -711,27 +721,31 @@ def run_auto_migrations(conn):
             # integrity_checks FK -> repositories: garantir ON DELETE CASCADE
             try:
                 cursor.execute("""
-                    SELECT tc.constraint_name
-                    FROM information_schema.table_constraints tc
+                    SELECT rc.delete_rule, tc.constraint_name
+                    FROM information_schema.referential_constraints rc
+                    JOIN information_schema.table_constraints tc
+                      ON rc.constraint_name = tc.constraint_name
                     JOIN information_schema.key_column_usage kcu
                       ON tc.constraint_name = kcu.constraint_name
                     WHERE tc.table_name = 'integrity_checks'
-                      AND tc.constraint_type = 'FOREIGN KEY'
                       AND kcu.column_name = 'repository_id'
                     LIMIT 1
                 """)
                 row = cursor.fetchone()
-                if row and row[0]:
-                    fk_name = row[0]
-                    cursor.execute(f"ALTER TABLE integrity_checks DROP CONSTRAINT IF EXISTS {fk_name}")
-                cursor.execute("""
-                    ALTER TABLE integrity_checks
-                    ADD CONSTRAINT integrity_checks_repository_id_fkey
-                    FOREIGN KEY (repository_id)
-                    REFERENCES repositories(id)
-                    ON DELETE CASCADE
-                """)
-                logging.info("✅ integrity_checks FK ajustada para ON DELETE CASCADE")
+                if row and row[0] == 'CASCADE':
+                    logging.info("👍 'integrity_checks' FK already ON DELETE CASCADE.")
+                else:
+                    if row and row[1]:
+                        fk_name = row[1]
+                        cursor.execute(f"ALTER TABLE integrity_checks DROP CONSTRAINT IF EXISTS {fk_name}")
+                    cursor.execute("""
+                        ALTER TABLE integrity_checks
+                        ADD CONSTRAINT integrity_checks_repository_id_fkey
+                        FOREIGN KEY (repository_id)
+                        REFERENCES repositories(id)
+                        ON DELETE CASCADE
+                    """)
+                    logging.info("✅ integrity_checks FK ajustada para ON DELETE CASCADE")
             except Exception as e:
                 # tabela pode não existir ainda em algumas instalações
                 logging.info(f"ℹ️ Migração FK integrity_checks ignorada: {e}")
