@@ -135,14 +135,11 @@ class RestoreManager:
 
     def _get_password(self, repo: Dict[str, Any]) -> str:
         """
-        Obtém a senha correta baseada no tipo de repositório:
-        - LOCAL: motor_password
-        - CLOUD: cloud_password
+        Obtém a senha de criptografia do motor:
+        - Prioriza motor_password (senha de criptografia do repositório tanto local quanto cloud).
+        - Fallback para cloud_password (repositórios legados).
         """
-        repo_type = (repo.get('repo_type') or repo.get('type') or 'local').lower()
-        if repo_type == 'local':
-            return repo.get('motor_password', '')
-        return repo.get('cloud_password', '')
+        return str(repo.get('motor_password') or repo.get('encryption_password') or repo.get('cloud_password') or repo.get('password') or '')
 
     def _get_kopia_config_dir(self, repo: Dict, operation: str) -> tuple[str, bool]:
         """

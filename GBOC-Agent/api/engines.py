@@ -177,6 +177,7 @@ async def get_engine_health() -> Dict[str, Any]:
     Retorna status de saúde geral dos motores (endpoint simples para dashboards)
     """
     try:
+        import asyncio
         from shared_core import get_shared_core
         core = get_shared_core()
 
@@ -187,7 +188,7 @@ async def get_engine_health() -> Dict[str, Any]:
                 'healthy': False
             }
 
-        results = core.repository_manager.validate_engines()
+        results = await asyncio.to_thread(core.repository_manager.validate_engines)
 
         healthy_count = sum(1 for status in results.values() if status.get('available', False))
         total_count = len(results)
@@ -234,8 +235,11 @@ async def get_engine_status() -> Dict[str, Any]:
 async def rescan_engines() -> Dict[str, Any]:
     """Força rescan completo dos motores e atualiza cache persistente."""
     try:
+        import asyncio
         from engines.engine_paths import rescan_all_engines
-        engines = rescan_all_engines()
+        from engines.repository_manager import clear_engines_validation_cache
+        clear_engines_validation_cache()
+        engines = await asyncio.to_thread(rescan_all_engines)
         return {
             "status": "success",
             "engines": engines,

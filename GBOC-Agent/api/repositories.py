@@ -206,7 +206,7 @@ def create_repository(repo: RepositoryCreateRequest, background_tasks: Backgroun
             'type': repo.get_type(),
             'engine': repo.engine,
             'motor_password': repo.motor_password,
-            'cloud_password': repo.motor_password,  # coluna legada — mantém motor_password
+            'cloud_password': repo.cloud_password or repo.secret_key or (repo.motor_password if repo.get_type() == 'local' else None),
             'bucket': repo.bucket or repo.path,
             'region': repo.region,
             'endpoint': repo.endpoint,

@@ -11,7 +11,6 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/system", tags=["System Management"])
 
-@router.get("/info")
 @router.get("/version")
 async def get_system_version_info():
     """Retorna a versão oficial dinâmica e dados de versão do Agente GBOC."""
@@ -119,8 +118,8 @@ async def get_system_info():
             "resources": {
                 "cpu_count": cpu_logical,
                 "cpu_physical": cpu_physical,
-                "cpu_percent": psutil.cpu_percent(interval=1),
-                "cpu_per_core": psutil.cpu_percent(interval=0.5, percpu=True),
+                "cpu_percent": psutil.cpu_percent(interval=None),
+                "cpu_per_core": psutil.cpu_percent(interval=None, percpu=True),
                 "memory_total_gb": round(psutil.virtual_memory().total / (1024**3), 2),
                 "memory_used_gb": round(psutil.virtual_memory().used / (1024**3), 2),
                 "memory_available_gb": round(psutil.virtual_memory().available / (1024**3), 2),

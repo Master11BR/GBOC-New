@@ -1561,7 +1561,13 @@ class CentralServerClient:
         return "192.168.1.100"
 
     def _get_public_ip(self) -> str:
-        """Obtém o IP público REAL da máquina na internet."""
+        """Obtém o IP público REAL da máquina na internet (com cache de 15 minutos)."""
+        now = time.time()
+        cached_ip = getattr(self, "_public_ip_cache", None)
+        cached_time = getattr(self, "_public_ip_cache_time", 0.0)
+        if cached_ip and (now - cached_time) < 900.0:
+            return cached_ip
+
         services = [
             "https://api.ipify.org",
             "https://ifconfig.me/ip",
@@ -1570,15 +1576,20 @@ class CentralServerClient:
         ]
         for url in services:
             try:
-                res = requests.get(url, timeout=4)
+                res = requests.get(url, timeout=3)
                 if res.status_code == 200 and res.text.strip():
                     ip = res.text.strip()
                     if ip and not ip.startswith("127."):
+                        self._public_ip_cache = ip
+                        self._public_ip_cache_time = now
                         return ip
             except Exception:
                 continue
         # Fallback para o IP da LAN local se desconectado da internet pública
-        return self._get_local_ip()
+        fallback = self._get_local_ip()
+        self._public_ip_cache = fallback
+        self._public_ip_cache_time = now
+        return fallback
 
     def link_state(self) -> Dict[str, Any]:
         """Estado ÚNICO da ligação Agente → Servidor Central (usado no topbar e na Visão Geral)."""

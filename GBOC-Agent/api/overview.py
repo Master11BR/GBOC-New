@@ -29,12 +29,28 @@ except ImportError:
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/overview", tags=["overview"])
 
+_LOCAL_IP_CACHE = {"ip": "127.0.0.1", "ts": 0.0}
+
+def _get_cached_local_ip() -> str:
+    now = time.monotonic()
+    if now - _LOCAL_IP_CACHE["ts"] < 60.0:
+        return _LOCAL_IP_CACHE["ip"]
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+    except Exception:
+        ip = "127.0.0.1"
+    _LOCAL_IP_CACHE.update(ip=ip, ts=now)
+    return ip
+
 @router.get("/")
 def get_overview() -> Dict[str, Any]:
     request_start = time.perf_counter()
     try:
-        # 1. Métricas de Sistema
-        cpu_percent = psutil.cpu_percent(interval=0.1)
+        # 1. Métricas de Sistema (sem intervalo bloqueante, consumindo amostrador de background)
+        cpu_percent = psutil.cpu_percent(interval=None)
         memory = psutil.virtual_memory()
         
         try:
@@ -45,65 +61,46 @@ def get_overview() -> Dict[str, Any]:
         boot_time = datetime.fromtimestamp(psutil.boot_time())
         uptime_seconds = (datetime.now() - boot_time).total_seconds()
         
-        # 2. Rede
+        # 2. Rede (com cache)
         hostname = socket.gethostname()
-        try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(("8.8.8.8", 80))
-            local_ip = s.getsockname()[0]
-            s.close()
-        except:
-            local_ip = "127.0.0.1"
+        local_ip = _get_cached_local_ip()
 
-        # 3. Banco (AGORA COM CONTAGEM DE STATUS)
+        # 3. Banco (Consulta única agregada para máxima performance)
         repo_count = 0
         task_count = 0
-        running_tasks = 0 # Nova variável
+        running_tasks = 0
         total_backups = 0
+        total_data_gb = 0
+        backup_health_score = None
         
         if get_shared_core:
             try:
                 core = get_shared_core()
                 with core.get_db_connection() as conn:
                     cur = conn.cursor()
-                    cur.execute("SELECT COUNT(*) FROM repositories")
-                    repo_count = cur.fetchone()[0]
-                    cur.execute("SELECT COUNT(*) FROM tasks WHERE enabled = true")
-                    task_count = cur.fetchone()[0]
-                    # Conta tarefas rodando
-                    cur.execute("SELECT COUNT(*) FROM tasks WHERE status='running'")
-                    running_tasks = cur.fetchone()[0]
-                    try:
-                        cur.execute("SELECT COUNT(*) FROM task_executions")
-                        total_backups = cur.fetchone()[0]
-                    except: pass
-            except Exception as db_err:
-                logger.warning(f"Erro ao consultar banco: {db_err}")
-
-        total_data_gb = 0
-        backup_health_score = None
-        if get_shared_core:
-            try:
-                core = get_shared_core()
-                with core.get_db_connection() as conn:
-                    cur = conn.cursor()
-                    cur.execute("SELECT COALESCE(SUM(bytes_processed), 0) FROM task_executions WHERE status = 'completed'")
-                    total_bytes = cur.fetchone()[0]
-                    total_data_gb = round(total_bytes / (1024**3), 2) if total_bytes else 0
-
-                    # Score rápido de backup (últimos 7 dias), evitando cálculo pesado.
                     cur.execute("""
-                        SELECT COUNT(*) AS total,
-                               COUNT(*) FILTER (WHERE status IN ('completed','success')) AS ok
-                        FROM task_executions
-                        WHERE started_at >= CURRENT_TIMESTAMP - INTERVAL '7 days'
+                        SELECT 
+                            (SELECT COUNT(*) FROM repositories) AS repo_count,
+                            (SELECT COUNT(*) FROM tasks WHERE enabled = true) AS task_count,
+                            (SELECT COUNT(*) FROM tasks WHERE status = 'running') AS running_tasks,
+                            (SELECT COUNT(*) FROM task_executions) AS total_backups,
+                            (SELECT COALESCE(SUM(bytes_processed), 0) FROM task_executions WHERE status = 'completed') AS total_bytes,
+                            (SELECT COUNT(*) FROM task_executions WHERE started_at >= CURRENT_TIMESTAMP - INTERVAL '7 days') AS total_7d,
+                            (SELECT COUNT(*) FROM task_executions WHERE started_at >= CURRENT_TIMESTAMP - INTERVAL '7 days' AND status IN ('completed', 'success')) AS ok_7d
                     """)
                     row = cur.fetchone()
-                    total_7d = row[0] if row else 0
-                    ok_7d = row[1] if row else 0
-                    backup_health_score = round((ok_7d / total_7d) * 100) if total_7d else 100
-            except Exception:
-                pass
+                    if row:
+                        repo_count = row[0] or 0
+                        task_count = row[1] or 0
+                        running_tasks = row[2] or 0
+                        total_backups = row[3] or 0
+                        total_bytes = row[4] or 0
+                        total_7d = row[5] or 0
+                        ok_7d = row[6] or 0
+                        total_data_gb = round(total_bytes / (1024**3), 2) if total_bytes else 0
+                        backup_health_score = round((ok_7d / total_7d) * 100) if total_7d else 100
+            except Exception as db_err:
+                logger.warning(f"Erro ao consultar banco no overview: {db_err}")
 
         # 4. Engines
         engines = _detect_engines_detailed()

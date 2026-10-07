@@ -56,7 +56,9 @@ def _raw_row(repo_id: Any) -> Dict[str, Any]:
     with _core().get_db_connection() as conn:
         cur = conn.cursor()
         cur.execute("""SELECT id, name, type, path, engine, status, enabled, initialized, created_at, updated_at,
-                              config, COALESCE(motor_password, '') <> '' AS has_pwd
+                              config, COALESCE(motor_password, '') <> '' AS has_pwd,
+                              COALESCE(motor_password, '') AS motor_password,
+                              COALESCE(cloud_password, '') AS cloud_password
                        FROM repositories WHERE CAST(id AS TEXT) = %s""", (str(repo_id),))
         r = cur.fetchone()
         cur.close()
@@ -66,9 +68,28 @@ def _raw_row(repo_id: Any) -> Dict[str, Any]:
         cfg = json.loads(r[10]) if isinstance(r[10], str) and r[10] else (r[10] or {})
     except ValueError:
         cfg = {}
+    if not isinstance(cfg, dict):
+        cfg = {}
+
+    motor_pwd = str(r[12] or "").strip()
+    cloud_pwd = str(r[13] or "").strip()
+    has_pwd = bool(r[11] or motor_pwd)
+
+    # Injetar credenciais no cfg se presentes no banco de dados e ausentes em cfg
+    if cloud_pwd:
+        if not cfg.get("aws_secret_key"):
+            cfg["aws_secret_key"] = cloud_pwd
+        if not cfg.get("secret_key"):
+            cfg["secret_key"] = cloud_pwd
+        if not cfg.get("b2_account_key"):
+            cfg["b2_account_key"] = cloud_pwd
+        if not cfg.get("azure_account_key"):
+            cfg["azure_account_key"] = cloud_pwd
+
     return {"id": r[0], "name": r[1], "type": (r[2] or "local").lower(), "path": r[3] or "", "engine": (r[4] or "restic").lower(),
             "status": r[5], "enabled": r[6], "initialized": r[7], "created_at": _iso(r[8]), "updated_at": _iso(r[9]),
-            "config": cfg if isinstance(cfg, dict) else {}, "has_pwd": bool(r[11])}
+            "config": cfg, "has_pwd": has_pwd,
+            "motor_password": motor_pwd, "cloud_password": cloud_pwd}
 
 
 def _rows(sql: str, params: tuple) -> List[Dict[str, Any]]:
@@ -121,15 +142,22 @@ def stored(repo_id: Any) -> Dict[str, Any]:
     eff = _effective(repo)
     access = cfg.get("aws_access_key") or cfg.get("access_key") or cfg.get("b2_account_id") or cfg.get("azure_account_name") \
         or cfg.get("gcs_project_id")
+    has_secret = repo_secrets.has_secret(cfg) or bool(repo.get("cloud_password"))
+    if repo_secrets.has_secret(cfg):
+        secret_desc = "salva (criptografada)"
+    elif repo.get("cloud_password"):
+        secret_desc = "salva (banco de dados)"
+    else:
+        secret_desc = "NÃO salva — informe a chave secreta em Editar"
+
     out: Dict[str, Any] = {
         "general": {"id": repo["id"], "name": repo["name"], "engine": repo["engine"], "type": t,
                     "provider": PROVIDERS.get(t, t), "status": repo["status"], "enabled": repo["enabled"],
                     "initialized": repo["initialized"], "created_at": repo["created_at"], "updated_at": repo["updated_at"]},
         "connection": {"path": repo["path"] if t == "local" else None, **({} if t == "local" else eff),
                        "access_key": _mask(access) if t != "local" else None,
-                       "secret": None if t == "local" else ("salva (criptografada)" if repo_secrets.has_secret(cfg) else
-                                                            "NÃO salva — o agente usa a senha do motor no lugar; informe a chave secreta em Editar"),
-                       "secret_saved": repo_secrets.has_secret(cfg) if t != "local" else None,
+                       "secret": None if t == "local" else secret_desc,
+                       "secret_saved": has_secret if t != "local" else None,
                        "encryption_password": "definida" if repo["has_pwd"] else "não definida"},
         "engine": _engine_target(repo, eff),
         "immutability": immutability.get_policy(repo),
@@ -348,7 +376,8 @@ def live(repo_id: Any) -> Dict[str, Any]:
     t = repo["type"]
     if t == "local":
         return {"error": "Repositório local — não há configurações de nuvem"}
-    if not repo_secrets.has_secret(repo["config"]):
+    has_sec = repo_secrets.has_secret(repo["config"]) or bool(repo.get("cloud_password"))
+    if not has_sec:
         return {"error": "A chave secreta do provedor não está salva neste repositório. Informe-a em Editar e consulte novamente.",
                 "secret_missing": True}
     started = datetime.now()

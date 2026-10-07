@@ -118,14 +118,11 @@ class TaskManager:
 
     def _get_password(self, repo: Dict[str, Any]) -> Optional[str]:
         """
-        Obtém a senha correta baseada no tipo de repositório:
-        - LOCAL: motor_password
-        - CLOUD: cloud_password
+        Obtém a senha correta de criptografia do motor:
+        - Prioriza motor_password (senha de criptografia do repositório tanto para local quanto para cloud).
+        - Fallback para cloud_password (repositórios legados onde apenas ela estava preenchida).
         """
-        repo_type = (repo.get('repo_type') or repo.get('type') or 'local').lower()
-        if repo_type == 'local':
-            return repo.get('motor_password')
-        return repo.get('cloud_password')
+        return repo.get('motor_password') or repo.get('encryption_password') or repo.get('cloud_password') or repo.get('password')
 
     def _resolve_region(self, data: Dict[str, Any]) -> str:
         """Resolve a região real: usa config, ou extrai do endpoint, ou default."""
@@ -855,16 +852,18 @@ class TaskManager:
                 try:
                     config = json.loads(task['repo_config']) if isinstance(task['repo_config'], str) else task['repo_config']
                     task['aws_access_key'] = config.get('aws_access_key') or config.get('access_key', '')
-                    task['aws_secret_key'] = config.get('aws_secret_key') or config.get('secret_key', '')
+                    task['aws_secret_key'] = config.get('aws_secret_key') or config.get('secret_key', '') or task.get('cloud_password', '')
                     task['b2_account_id'] = config.get('b2_account_id') or config.get('access_key', '')
-                    task['b2_account_key'] = config.get('b2_account_key') or config.get('secret_key', '')
+                    task['b2_account_key'] = config.get('b2_account_key') or config.get('secret_key', '') or task.get('cloud_password', '')
                     if config.get('secret_enc'):
                         from engines import repo_secrets
                         _sec = repo_secrets.secret_from_config(config)
                         if _sec:
-                            task['aws_secret_key'] = task['aws_secret_key'] or _sec
-                            task['b2_account_key'] = task['b2_account_key'] or _sec
-                            task.setdefault('azure_account_key', _sec)
+                            task['aws_secret_key'] = _sec
+                            task['b2_account_key'] = _sec
+                            task['azure_account_key'] = _sec
+                    if not task.get('azure_account_key') and task.get('cloud_password'):
+                        task['azure_account_key'] = task['cloud_password']
                     task['endpoint'] = config.get('endpoint', '')
                     task['region'] = config.get('region', '')
                     task['prefix'] = config.get('prefix', '')

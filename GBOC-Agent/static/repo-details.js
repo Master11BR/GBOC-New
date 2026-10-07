@@ -82,7 +82,7 @@
                 ['Bucket / contêiner', dash(c.bucket)], ['Prefixo', dash(c.prefix)],
                 ['Região', dash(c.region) + (c.region && !c.region_informed ? ' <small>(deduzida)</small>' : '')],
                 ['Endpoint', dash(c.endpoint)], ['Chave de acesso', dash(c.access_key)],
-                ['Chave secreta', c.secret_saved ? chip('salva (criptografada)', 'ok') : chip('não salva', 'bad')],
+                ['Chave secreta', c.secret_saved ? chip(c.secret || 'salva', 'ok') : chip('não salva', 'bad')],
                 ['Senha de criptografia', c.encryption_password === 'definida' ? chip('definida', 'ok') : chip('não definida', 'bad')]
             ])));
         } else {

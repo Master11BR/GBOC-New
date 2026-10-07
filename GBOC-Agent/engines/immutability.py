@@ -40,7 +40,7 @@ def _core():
 def _repo_row(repo_id: Any) -> Dict[str, Any]:
     with _core().get_db_connection() as conn:
         cur = conn.cursor()
-        cur.execute("SELECT id, name, type, path, engine, config FROM repositories WHERE CAST(id AS TEXT) = %s", (str(repo_id),))
+        cur.execute("SELECT id, name, type, path, engine, config, COALESCE(cloud_password, '') FROM repositories WHERE CAST(id AS TEXT) = %s", (str(repo_id),))
         r = cur.fetchone()
         cur.close()
     if not r:
@@ -50,7 +50,15 @@ def _repo_row(repo_id: Any) -> Dict[str, Any]:
         cfg = json.loads(r[5]) if isinstance(r[5], str) and r[5] else (r[5] or {})
     except ValueError:
         cfg = {}
-    return {"id": r[0], "name": r[1], "type": (r[2] or "local").lower(), "path": r[3] or "", "engine": (r[4] or "").lower(), "config": cfg}
+    if not isinstance(cfg, dict):
+        cfg = {}
+    cloud_pwd = str(r[6] or "").strip()
+    if cloud_pwd:
+        if not cfg.get("aws_secret_key"):
+            cfg["aws_secret_key"] = cloud_pwd
+        if not cfg.get("secret_key"):
+            cfg["secret_key"] = cloud_pwd
+    return {"id": r[0], "name": r[1], "type": (r[2] or "local").lower(), "path": r[3] or "", "engine": (r[4] or "").lower(), "config": cfg, "cloud_password": cloud_pwd}
 
 
 def get_policy(repo: Dict[str, Any]) -> Dict[str, Any]:
@@ -127,11 +135,13 @@ def _s3(repo: Dict[str, Any]):
     import boto3
     from botocore.config import Config
     cfg = repo["config"]
-    ak = cfg.get("aws_access_key") or cfg.get("access_key")
+    ak = cfg.get("aws_access_key") or cfg.get("access_key") or repo.get("access_key")
     sk = cfg.get("aws_secret_key") or cfg.get("secret_key")
     if not sk:
         from engines import repo_secrets
         sk = repo_secrets.secret_from_config(cfg)
+    if not sk and repo.get("cloud_password"):
+        sk = repo.get("cloud_password")
     if not ak or not sk:
         raise ValueError("Credenciais do bucket não configuradas no repositório")
     region = resolve_region(cfg)

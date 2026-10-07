@@ -303,8 +303,14 @@ def is_auth_enabled() -> bool:
         return False
 
 
+_AUTH_TABLES_ENSURED = False
+
+
 def _ensure_auth_tables():
     """Cria tabelas de usuários, sessões e níveis de acesso (roles & permissions)."""
+    global _AUTH_TABLES_ENSURED
+    if _AUTH_TABLES_ENSURED:
+        return
     try:
         from shared_core import get_shared_core
         core = get_shared_core()
@@ -364,6 +370,7 @@ def _ensure_auth_tables():
                 """, (rname, dname, desc, perms, is_sys))
 
             conn.commit()
+            _AUTH_TABLES_ENSURED = True
             logger.info("[OK] Auth tables and 5-Level Roles hierarchy ready")
     except Exception as e:
         logger.error(f"Error creating auth tables: {e}")
