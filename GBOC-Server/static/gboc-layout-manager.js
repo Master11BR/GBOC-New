@@ -55,7 +55,7 @@ Zero-Overflow & Smart Sidebar Presence Detection.
     const LS_UI_MODEL = 'gboc-ui-model';      // Always 'modern'
     const LS_LAYOUT   = 'gboc-layout';        // 'vertical' | 'horizontal'
     const LS_COLOR    = 'gboc-color-theme';   // 'dark' | 'light' | 'purple' | 'ocean'
-    const LS_UI_STYLE = 'gboc-ui-style';     // 'minimal' | 'neumorphism' | 'claymorphism' | 'fluent'
+    const LS_UI_STYLE = 'gboc-ui-style';     // 'minimal' | 'neumorphism' | ... | 'fernly' | 'fernly-cyberpunk' | 'fernly-fluid'
     const LS_COLLAPSED = 'gboc-sidebar-collapsed';
     const TOPBAR_URL  = '/static/_topbar.html';
 
@@ -83,7 +83,10 @@ Zero-Overflow & Smart Sidebar Presence Detection.
         { id: 'nexus-widgets',    label: 'Cartões Modulares (Nexus)', icon: '📐' },
         { id: 'nexus-glass',      label: 'Glassmorphism Técnico',   icon: '💎' },
         { id: 'command-sentinel', label: 'Command Center Sentinel', icon: '🛰️' },
-        { id: 'cyber-3d',         label: 'Cyber 3D Glass (Animado)', icon: '🌌' }
+        { id: 'cyber-3d',         label: 'Cyber 3D Glass (Animado)', icon: '🌌' },
+        { id: 'fernly',           label: 'Fernly Original (Antigravity)', icon: '🌿' },
+        { id: 'fernly-cyberpunk', label: 'Fernly Cyberpunk (Antigravity)', icon: '🌃' },
+        { id: 'fernly-fluid',     label: 'Fernly Fluid (Antigravity)',     icon: '🫧' }
     ];
 
     // ── State ─────────────────────────────────────────────────────────────────
@@ -121,7 +124,25 @@ Zero-Overflow & Smart Sidebar Presence Detection.
     }
 
     // ── Apply UI Component Style to <html> ───────────────────────────────────
+    // Motor Antigravity + grafismos Fernly: só é baixado quando um estilo Fernly é usado
+    function _ensureFernlyRuntime(style) {
+        if (!String(style || '').startsWith('fernly')) return;
+        if (window.GBOCAntigravity || document.getElementById('gboc-fernly-js')) return;
+        const sc = document.createElement('script');
+        sc.id = 'gboc-fernly-js';
+        sc.src = '/static/gboc-fernly.js?v=14.8.1';
+        sc.defer = true;
+        (document.head || document.documentElement).appendChild(sc);
+    }
+
+    // Páginas que trocam data-ui-style diretamente (ex.: ui-style-selector.html)
+    if (window.MutationObserver) {
+        new MutationObserver(() => _ensureFernlyRuntime(document.documentElement.getAttribute('data-ui-style')))
+            .observe(document.documentElement, { attributes: true, attributeFilter: ['data-ui-style'] });
+    }
+
     function _applyUiStyle(style) {
+        _ensureFernlyRuntime(style);
         document.documentElement.setAttribute('data-ui-style', style);
         _currentUiStyle = style;
         localStorage.setItem(LS_UI_STYLE, style);
@@ -709,7 +730,8 @@ Zero-Overflow & Smart Sidebar Presence Detection.
         _injectChartsScript();
         const needed = [
             { id: 'gboc-themes-css',  href: '/static/gboc-themes.css' },
-            { id: 'gboc-layout-css',  href: '/static/gboc-layout.css' }
+            { id: 'gboc-layout-css',  href: '/static/gboc-layout.css' },
+            { id: 'gboc-fernly-css',  href: '/static/gboc-fernly.css?v=14.8.1' }
         ];
         needed.forEach(({ id, href }) => {
             if (!document.getElementById(id)) {

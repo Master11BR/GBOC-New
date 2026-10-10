@@ -278,7 +278,7 @@
 
             <!-- UX/UI Component Style Selector -->
             <div class="control-group" style="grid-column: span 2;">
-                <h3><i class="fas fa-cubes"></i> 2. Formato de Componentes UX/UI (8 Estilos Oficiais)</h3>
+                <h3><i class="fas fa-cubes"></i> 2. Formato de Componentes UX/UI (11 Estilos Oficiais)</h3>
                 <div class="btn-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
                     <button class="selector-btn active" id="btn-style-minimal" onclick="setUiFormat('minimal')">
                         <i class="fas fa-square"></i> 1. SaaS Minimal
@@ -303,6 +303,15 @@
                     </button>
                     <button class="selector-btn" id="btn-style-cyber-3d" onclick="setUiFormat('cyber-3d')">
                         <i class="fas fa-wand-magic-sparkles" style="color:var(--primary-color)"></i> 8. Cyber 3D Glass (Animado)
+                    </button>
+                    <button class="selector-btn" id="btn-style-fernly" onclick="setUiFormat('fernly')">
+                        <i class="fas fa-leaf" style="color:var(--primary-color)"></i> 9. Fernly Original
+                    </button>
+                    <button class="selector-btn" id="btn-style-fernly-cyberpunk" onclick="setUiFormat('fernly-cyberpunk')">
+                        <i class="fas fa-bolt" style="color:var(--primary-color)"></i> 10. Fernly Cyberpunk
+                    </button>
+                    <button class="selector-btn" id="btn-style-fernly-fluid" onclick="setUiFormat('fernly-fluid')">
+                        <i class="fas fa-water" style="color:var(--primary-color)"></i> 11. Fernly Fluid
                     </button>
                 </div>
             </div>
@@ -417,7 +426,7 @@
             const currentStyle = document.documentElement.getAttribute('data-ui-style') || 'minimal';
             const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
 
-            ['minimal', 'neumorphism', 'claymorphism', 'fluent', 'nexus-widgets', 'nexus-glass', 'command-sentinel', 'cyber-3d'].forEach(s => {
+            ['minimal', 'neumorphism', 'claymorphism', 'fluent', 'nexus-widgets', 'nexus-glass', 'command-sentinel', 'cyber-3d', 'fernly', 'fernly-cyberpunk', 'fernly-fluid'].forEach(s => {
                 const btn = document.getElementById(`btn-style-${s}`);
                 if (btn) btn.classList.toggle('active', s === currentStyle);
             });

@@ -86,7 +86,7 @@ async def get_system_ui_config_v2(request: Request):
         "DEFAULT_THEME": "dark",
         "AVAILABLE_THEMES": ["dark", "light", "amber", "purple", "ocean", "red"],
         "DEFAULT_UI_STYLE": "minimal",
-        "AVAILABLE_UI_STYLES": ["minimal", "neumorphism", "claymorphism", "fluent", "nexus-widgets", "nexus-glass", "command-sentinel", "cyber-3d"]
+        "AVAILABLE_UI_STYLES": ["minimal", "neumorphism", "claymorphism", "fluent", "nexus-widgets", "nexus-glass", "command-sentinel", "cyber-3d", "fernly", "fernly-cyberpunk", "fernly-fluid"]
     }
     elapsed = (time.perf_counter() - t0) * 1000
     return build_v2_response(data=ui_data, execution_time_ms=elapsed)
