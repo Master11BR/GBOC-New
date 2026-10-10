@@ -1165,7 +1165,7 @@ async def get_ui_config_endpoint():
         "DEFAULT_THEME": "dark",
         "AVAILABLE_THEMES": ["dark", "light", "amber", "purple", "ocean", "red"],
         "DEFAULT_UI_STYLE": "minimal",
-        "AVAILABLE_UI_STYLES": ["minimal", "neumorphism", "claymorphism", "fluent", "nexus-widgets", "nexus-glass", "command-sentinel", "cyber-3d"]
+        "AVAILABLE_UI_STYLES": ["minimal", "neumorphism", "claymorphism", "fluent", "nexus-widgets", "nexus-glass", "command-sentinel", "cyber-3d", "fernly", "fernly-cyberpunk", "fernly-fluid"]
     }
 
 @app.post("/api/v1/system/shutdown", tags=["System"])

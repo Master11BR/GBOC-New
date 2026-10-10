@@ -1,0 +1,283 @@
+/* ============================================================================
+   GBOC System v14.8.1 Enterprise — Fernly Motion & Graphics (estilo de componentes)
+   Efeitos, animações e grafismos Fernly aplicados à interface EXISTENTE do GBOC.
+
+   data-ui-style:
+     fernly            -> Original  (formas Fernly, flutuação zen muito sutil)
+     fernly-cyberpunk  -> Cyberpunk (neon; física rápida e magnética)
+     fernly-fluid      -> Fluid     (glassmorphism; física ultra-lenta, quase espacial)
+
+   Original e Fluid NÃO trocam as cores: herdam o tema de iluminação escolhido
+   (dark, light, amber, purple, ocean, red). Só o Cyberpunk traz paleta própria.
+
+   Carregamento: depois de gboc-themes.css (injetado por gboc-layout-manager.js).
+   Os parâmetros --ag-* são lidos por gboc-fernly.js (motor Antigravity).
+   Tudo escopado em [data-ui-style^="fernly"]: os demais estilos não mudam.
+   ============================================================================ */
+
+/* ── 1. TOKENS COMUNS ────────────────────────────────────────────────────── */
+[data-ui-style^="fernly"] {
+    --fy-radius-xl:    26px;
+    --fy-radius-lg:    20px;
+    --fy-radius-md:    14px;
+    --fy-radius-pill:  999px;
+
+    --fy-ease:         cubic-bezier(0.22, 1, 0.36, 1);
+    --fy-ease-spring:  cubic-bezier(0.34, 1.56, 0.64, 1);
+    --fy-dur:          0.45s;
+
+    /* Grafismo hatched — derivado da cor primária do tema ativo */
+    --fy-hatch-ink:    color-mix(in srgb, var(--primary-color, #6366f1) 26%, transparent);
+    --fy-hatch-gap:    7px;
+    --fy-hatch-band:   6px;
+    --fy-hatch:        repeating-linear-gradient(-45deg, var(--fy-hatch-ink) 0 2px, transparent 2px var(--fy-hatch-gap));
+    --fy-hatch-light:  repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.30) 0 2px, transparent 2px 7px);
+    --fy-accent:       var(--success-color, #10b981);
+
+    /* Contrato do motor Antigravity (px, s, deg) */
+    --ag-enabled:      1;
+    --ag-float-amp:    2.5px;
+    --ag-float-period: 7s;
+    --ag-tilt:         4deg;
+    --ag-lift:         6px;
+    --ag-scale:        1.01;
+    --ag-stiffness:    120;
+    --ag-damping:      18;
+    --ag-impulse:      60;
+    --ag-magnet:       0;
+    --ag-hatch-charts: 1;      /* barras dos gráficos Chart.js com hachura */
+}
+
+/* ── 2. ORIGINAL ─────────────────────────────────────────────────────────── */
+[data-ui-style="fernly"] {
+    --card-radius:          var(--fy-radius-lg);
+    --btn-radius:           var(--fy-radius-pill);
+    --input-radius:         var(--fy-radius-md);
+    --card-bg:              var(--bg-card);
+    --card-border:          1px solid var(--border-color);
+    --card-shadow:          0 1px 2px rgba(0, 0, 0, 0.05), 0 10px 28px -14px rgba(0, 0, 0, 0.35);
+    --card-shadow-hover:    0 2px 4px rgba(0, 0, 0, 0.06), 0 24px 48px -20px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--primary-glow);
+    --card-backdrop:        none;
+    --btn-shadow:           0 1px 2px rgba(0, 0, 0, 0.10);
+    --input-bg:             var(--bg-input);
+    --input-border:         1px solid var(--border-color);
+    --input-shadow:         none;
+    --btn-transform-hover:  translateY(-1px);
+    --btn-transform-active: translateY(0) scale(0.98);
+}
+
+/* ── 3. CYBERPUNK — paleta neon própria, física rápida e magnética ───────── */
+/* !important: tokens.css declara os temas de cor com !important; este estilo
+   é o único Fernly que substitui a paleta, então precisa vencer. */
+[data-ui-style="fernly-cyberpunk"] {
+    --bg-main:          #07060d !important;
+    --bg-card:          rgba(18, 14, 32, 0.88) !important;
+    --bg-input:         #0d0a18 !important;
+    --sidebar-bg:       #07060d !important;
+    --topbar-bg:        #0b0915 !important;
+    --text-primary:     #f2eeff !important;
+    --text-secondary:   #b9b0d9 !important;
+    --text-muted:       #7a7299 !important;
+    --border-color:     rgba(255, 43, 214, 0.28) !important;
+    --primary-color:    #ff2bd6 !important;
+    --primary-hover:    #e01bbb !important;
+    --primary-glow:     rgba(255, 43, 214, 0.45) !important;
+    --primary:          #ff2bd6 !important;
+    --border:           rgba(255, 43, 214, 0.28) !important;
+    --text:             #f2eeff !important;
+    --bg-dark:          #07060d !important;
+    --card-hover:       #0d0a18 !important;
+    --accent-gradient:  linear-gradient(135deg, #ff2bd6 0%, #00f0ff 100%) !important;
+    --ambient-glow-1:   rgba(255, 43, 214, 0.18) !important;
+    --ambient-glow-2:   rgba(0, 240, 255, 0.14) !important;
+    --curve-color-1:    #ff2bd6 !important;
+    --curve-color-2:    #00f0ff !important;
+
+    --fy-accent:        #00f0ff;
+    --fy-hatch-ink:     rgba(0, 240, 255, 0.35);
+    --fy-hatch-gap:     6px;
+    --fy-hatch-band:    4px;
+    --fy-hatch-light:   repeating-linear-gradient(-45deg, rgba(0, 240, 255, 0.55) 0 2px, transparent 2px 6px);
+
+    --card-radius:          16px;
+    --btn-radius:           10px;
+    --input-radius:         10px;
+    --card-bg:              var(--bg-card);
+    --card-border:          1px solid var(--border-color);
+    --card-shadow:          0 0 0 1px rgba(0, 240, 255, 0.06), 0 12px 32px -14px rgba(255, 43, 214, 0.45);
+    --card-shadow-hover:    0 0 0 1px rgba(0, 240, 255, 0.40), 0 0 28px rgba(255, 43, 214, 0.45), 0 22px 48px -16px rgba(0, 240, 255, 0.35);
+    --card-backdrop:        blur(10px) saturate(160%);
+    --btn-shadow:           0 0 16px rgba(255, 43, 214, 0.45);
+    --input-bg:             var(--bg-input);
+    --input-border:         1px solid rgba(0, 240, 255, 0.28);
+    --input-shadow:         inset 0 0 12px rgba(0, 240, 255, 0.06);
+    --btn-transform-hover:  translateY(-2px);
+    --btn-transform-active: translateY(0) scale(0.97);
+
+    --ag-float-amp:    3.5px;
+    --ag-float-period: 3.2s;
+    --ag-tilt:         9deg;
+    --ag-lift:         10px;
+    --ag-scale:        1.03;
+    --ag-stiffness:    340;
+    --ag-damping:      22;
+    --ag-impulse:      220;
+    --ag-magnet:       0.06;
+}
+
+/* ── 4. FLUID — vidro sobre as cores do tema, física ultra-lenta ─────────── */
+[data-ui-style="fernly-fluid"] {
+    --fy-hatch-ink:     color-mix(in srgb, var(--text-primary, #fff) 14%, transparent);
+    --fy-hatch-gap:     9px;
+    --fy-hatch-band:    5px;
+    --fy-aurora:        radial-gradient(60vmax 50vmax at 12% 8%, color-mix(in srgb, var(--primary-color) 26%, transparent), transparent 60%),
+                        radial-gradient(55vmax 45vmax at 88% 22%, color-mix(in srgb, var(--info-color, #06b6d4) 20%, transparent), transparent 62%),
+                        radial-gradient(70vmax 50vmax at 50% 110%, color-mix(in srgb, var(--success-color, #10b981) 22%, transparent), transparent 60%);
+
+    --card-radius:          var(--fy-radius-xl);
+    --btn-radius:           var(--fy-radius-pill);
+    --input-radius:         var(--fy-radius-md);
+    --card-bg:              color-mix(in srgb, var(--bg-card) 55%, transparent);
+    --card-border:          1px solid color-mix(in srgb, var(--text-primary) 14%, transparent);
+    --card-shadow:          inset 0 1px 0 rgba(255, 255, 255, 0.10), 0 24px 48px -24px rgba(0, 0, 0, 0.50);
+    --card-shadow-hover:    inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 36px 72px -28px rgba(0, 0, 0, 0.60), 0 0 40px var(--primary-glow);
+    --card-backdrop:        blur(22px) saturate(170%);
+    --btn-shadow:           0 8px 24px -10px var(--primary-glow);
+    --input-bg:             color-mix(in srgb, var(--bg-input) 60%, transparent);
+    --input-border:         1px solid color-mix(in srgb, var(--text-primary) 14%, transparent);
+    --input-shadow:         none;
+    --btn-transform-hover:  translateY(-1px);
+    --btn-transform-active: translateY(0) scale(0.99);
+
+    --ag-float-amp:    7px;
+    --ag-float-period: 16s;
+    --ag-tilt:         6deg;
+    --ag-lift:         14px;
+    --ag-scale:        1.015;
+    --ag-stiffness:    28;
+    --ag-damping:      9;
+    --ag-impulse:      40;
+    --ag-magnet:       0.015;
+}
+
+/* ── 5. FUNDO ────────────────────────────────────────────────────────────── */
+[data-ui-style="fernly-fluid"] body {
+    background-image: var(--fy-aurora) !important;
+    background-attachment: fixed !important;
+}
+
+[data-ui-style="fernly-cyberpunk"] body {
+    background-image:
+        linear-gradient(rgba(255, 43, 214, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 240, 255, 0.04) 1px, transparent 1px) !important;
+    background-size: 44px 44px !important;
+}
+
+/* ── 6. CARDS: faixa hatched + transições fluidas ───────────────────────── */
+/* O transform fica fora da transition: o motor Antigravity anima por mola. */
+[data-ui-style^="fernly"] :is(.card, .panel, .stat-card, .kpi-card, .dashboard-card, .data-card,
+    .quick-action-card, .widget, .theme-showcase-card, .gboc-card, .card-panel, .chart-panel) {
+    background: var(--fy-hatch) top left / 100% var(--fy-hatch-band) no-repeat, var(--card-bg) !important;
+    border-radius: var(--card-radius) !important;   /* vence o 12px fixo de gboc-layout.css */
+    transition: background-color var(--fy-dur) var(--fy-ease),
+                border-color var(--fy-dur) var(--fy-ease),
+                box-shadow var(--fy-dur) var(--fy-ease),
+                border-radius var(--fy-dur) var(--fy-ease) !important;
+}
+
+[data-ui-style^="fernly"] .ag-body {
+    transform-origin: 50% 60%;
+    backface-visibility: hidden;
+}
+
+[data-ui-style^="fernly"] .ag-body.ag-hover {
+    box-shadow: var(--card-shadow-hover, var(--card-shadow)) !important;
+}
+
+[data-ui-style="fernly-cyberpunk"] .ag-body.ag-hover {
+    border-color: rgba(0, 240, 255, 0.55) !important;
+}
+
+/* Entrada escalonada (usa a propriedade translate, independente do transform
+   do motor; o atraso de cada card é definido por gboc-fernly.js) */
+@keyframes fy-rise {
+    from { opacity: 0; translate: 0 14px; }
+    to   { opacity: 1; translate: 0 0; }
+}
+[data-ui-style^="fernly"] .ag-enter {
+    animation: fy-rise 0.7s var(--fy-ease) both;
+    animation-delay: var(--ag-enter-delay, 0ms);
+}
+
+/* ── 7. BARRAS DE PROGRESSO / USO: hachura animada ───────────────────────── */
+/* Mantém a cor de status e o brilho (::after) existentes; a hachura entra em ::before. */
+[data-ui-style^="fernly"] :is(.progress-fill, .progress-bar, .progress-fluid-bar, .usage-bar-fill, .disk-bar-fill) {
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--fy-radius-pill) !important;
+    transition: width 0.8s var(--fy-ease) !important;
+}
+
+[data-ui-style^="fernly"] :is(.progress-fill, .progress-bar, .progress-fluid-bar, .usage-bar-fill, .disk-bar-fill)::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: var(--fy-hatch-light);
+    background-size: 20px 20px;
+    animation: fy-hatch-slide 1.4s linear infinite;
+    pointer-events: none;
+}
+
+@keyframes fy-hatch-slide {
+    to { background-position: 20px 0; }
+}
+
+[data-ui-style="fernly-fluid"] :is(.progress-fill, .progress-bar, .progress-fluid-bar, .usage-bar-fill, .disk-bar-fill)::before {
+    animation-duration: 4s;
+}
+
+[data-ui-style="fernly-cyberpunk"] :is(.progress-fill, .progress-bar, .progress-fluid-bar, .usage-bar-fill, .disk-bar-fill) {
+    box-shadow: 0 0 12px var(--primary-glow);
+}
+
+/* ── 8. NAVEGAÇÃO E CONTROLES ────────────────────────────────────────────── */
+[data-ui-style^="fernly"] :is(.btn:not(.btn-link), button.btn, .theme-showcase-btn) {
+    transition: transform 0.35s var(--fy-ease-spring), box-shadow var(--fy-dur) var(--fy-ease),
+                background-color var(--fy-dur) var(--fy-ease), border-radius var(--fy-dur) var(--fy-ease) !important;
+}
+
+[data-ui-style^="fernly"] .sidebar .nav-link {
+    border-radius: var(--fy-radius-md) !important;
+    transition: background-color 0.3s var(--fy-ease), color 0.3s var(--fy-ease), translate 0.35s var(--fy-ease-spring) !important;
+}
+
+[data-ui-style^="fernly"] .sidebar .nav-link:hover {
+    translate: 3px 0;
+}
+
+[data-ui-style^="fernly"] .sidebar .nav-link.active,
+[data-ui-style^="fernly"] .sidebar .nav-link.in-focus {
+    background: var(--fy-hatch), color-mix(in srgb, var(--primary-color) 14%, transparent) !important;
+}
+
+[data-ui-style="fernly-cyberpunk"] .sidebar .nav-link.active {
+    box-shadow: inset 2px 0 0 var(--fy-accent), 0 0 18px rgba(255, 43, 214, 0.25) !important;
+}
+
+/* ── 9. UTILITÁRIOS (opt-in em qualquer página) ──────────────────────────── */
+.fy-hatched { background-image: var(--fy-hatch); }
+
+/* ── 10. ACESSIBILIDADE ──────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+    [data-ui-style^="fernly"] {
+        --ag-float-amp: 0px;
+        --ag-tilt:      0deg;
+        --ag-impulse:   0;
+        --ag-magnet:    0;
+        --fy-dur:       0.01s;
+    }
+    [data-ui-style^="fernly"] .ag-enter,
+    [data-ui-style^="fernly"] :is(.progress-fill, .progress-bar, .progress-fluid-bar, .usage-bar-fill, .disk-bar-fill)::before {
+        animation: none;
+    }
+}
