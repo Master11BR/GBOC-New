@@ -812,6 +812,61 @@ Zero-Overflow & Smart Sidebar Presence Detection.
         _bootstrap();
     }
 
+    // ── Sessão: token atual (Server usa gboc_server_token; Agent usa gboc_token) ──
+    function _gbocAuthHeaders(extra) {
+        const h = Object.assign({}, extra || {});
+        let tk = '';
+        try { tk = localStorage.getItem('gboc_server_token') || localStorage.getItem('gboc_token') || ''; } catch (e) { /* */ }
+        if (!tk) {
+            const m = document.cookie.match(/(?:^|;\s*)(?:gboc_server_token|gboc_token)=([^;]+)/);
+            if (m) tk = decodeURIComponent(m[1]);
+        }
+        if (tk) h['Authorization'] = 'Bearer ' + tk;
+        return h;
+    }
+    window.gbocAuthHeaders = window.gbocAuthHeaders || _gbocAuthHeaders;
+
+    // ── Logout global (Server + Agent) ────────────────────────────────────────
+    // O item "Sair do Sistema" da topbar chama gbocLogout(). No Server essa função
+    // não existia: o clique só ia para /login.html e o token continuava válido.
+    // Páginas que já definem a sua (sidebar.js do Agent) continuam usando a delas.
+    async function _gbocLogout() {
+        let ok;
+        if (typeof window.gbocConfirm === 'function') {
+            ok = await window.gbocConfirm('Deseja realmente sair do sistema?', {
+                title: 'Encerrar Sessão', icon: 'fas fa-right-from-bracket', type: 'warning', confirmText: 'Sair do Sistema'
+            });
+        } else if (window.GBOCModal && typeof window.GBOCModal.confirm === 'function') {
+            ok = await window.GBOCModal.confirm({
+                title: 'Encerrar Sessão', message: 'Deseja realmente sair do sistema?', type: 'warning',
+                icon: 'fas fa-right-from-bracket', confirmText: 'Sair do Sistema', cancelText: 'Cancelar'
+            });
+        } else {
+            ok = window.confirm('Deseja realmente sair do sistema?');
+        }
+        if (!ok) return;
+
+        const headers = _gbocAuthHeaders();
+        const apiBase = (window.GBOC_API_BASE || '').replace(/\/+$/, '');
+        const urls = [...new Set([apiBase + '/api/v1/auth/logout', '/api/v1/auth/logout'])];
+        for (const url of urls) {
+            try {
+                const r = await fetch(url, { method: 'POST', headers, credentials: 'include' });
+                if (r.ok) break;
+            } catch (e) { /* tenta o próximo; a limpeza local acontece de qualquer forma */ }
+        }
+
+        ['gboc_token', 'gboc_server_token', 'gboc_user', 'gboc_server_user'].forEach(k => {
+            try { localStorage.removeItem(k); } catch (e) { /* */ }
+        });
+        ['gboc_token', 'gboc_server_token'].forEach(c => {
+            document.cookie = c + '=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+        });
+        window.location.replace('/login.html');
+    }
+    if (typeof window.gbocLogout !== 'function') window.gbocLogout = _gbocLogout;
+    window.gbocLogoutGlobal = _gbocLogout;
+
     // ── Global Shutdown Handler ───────────────────────────────────────────────
     window.gbocConfirmShutdown = async function (target) {
         if (!target) {
@@ -879,14 +934,19 @@ Zero-Overflow & Smart Sidebar Presence Detection.
         ];
 
         let reqSent = false;
-        for (const ep of endpoints) {
+        let denied = 0;          // 401/403: o processo NÃO foi desligado
+        for (const ep of [...new Set(endpoints)]) {
             try {
                 const resp = await fetch(ep, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: _gbocAuthHeaders({ 'Content-Type': 'application/json' }),
                     credentials: 'include'
                 });
-                if (resp.ok || resp.status === 200 || resp.status === 401 || resp.status === 403) {
+                if (resp.status === 401 || resp.status === 403) {
+                    denied = resp.status;
+                    break;
+                }
+                if (resp.ok) {
                     reqSent = true;
                     break;
                 }
@@ -899,6 +959,19 @@ Zero-Overflow & Smart Sidebar Presence Detection.
 
         const msgEl = document.getElementById('gboc-shutdown-msg');
         const spinnerEl = document.getElementById('gboc-shutdown-spinner');
+        if (!reqSent) {
+            const why = denied === 401
+                ? 'Sua sessão expirou. Entre novamente e repita a operação.'
+                : denied === 403
+                    ? 'Permissão negada: o desligamento exige um administrador autenticado ou acesso a partir da própria máquina.'
+                    : `Não foi possível contatar o ${entityName}. Verifique se ele está em execução.`;
+            if (msgEl) { msgEl.innerHTML = `<strong>${entityName} NÃO foi desligado.</strong><br>${why}`; msgEl.style.color = '#fca5a5'; }
+            if (spinnerEl) {
+                spinnerEl.innerHTML = '<button type="button" style="margin-top:6px;padding:8px 18px;border-radius:8px;border:1px solid #475569;background:#1e293b;color:#e2e8f0;cursor:pointer">Fechar</button>';
+                spinnerEl.querySelector('button').addEventListener('click', () => overlay.remove());
+            }
+            return;
+        }
         if (msgEl) {
             msgEl.innerHTML = `<strong>${entityName} foi desligado com sucesso.</strong><br>O processo foi finalizado. Você já pode fechar esta aba com segurança.`;
             msgEl.style.color = '#34d399';
