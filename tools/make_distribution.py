@@ -37,7 +37,15 @@ IGNORE_PATTERNS = shutil.ignore_patterns(
     "*license_private*.pem",
     "*_private_key.pem",
     # chave local que criptografa as credenciais de nuvem dos repositórios (cada agente gera a sua)
-    ".repo_secrets.key"
+    ".repo_secrets.key",
+    # estado de execução da máquina de desenvolvimento: bancos locais das tarefas
+    # Duplicati (listas de arquivos dos backups), fila do Hermes e journals SQLite
+    "duplicati_dbs",
+    "hermes_queue.db*",
+    "*.sqlite-shm",
+    "*.sqlite-wal",
+    "*.db-shm",
+    "*.db-wal"
 )
 
 def create_unified_requirements(server_req_path: Path, agent_req_path: Path, output_path: Path):
