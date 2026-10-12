@@ -245,7 +245,11 @@ def import_config(config_data: Dict, dry_run: bool = True) -> Dict[str, Any]:
 
     if not dry_run:
         core = _get_core()
-        conn = core.get_db_connection().__enter__()
+        # Guardar o gerenciador de contexto: é ele que devolve a conexão ao pool no final.
+        # Antes chamava-se conn.__exit__ (da conexão psycopg2), que não devolve nada — a conexão ficava
+        # presa nesta thread e o pool perdia uma conexão a cada importação.
+        _conn_cm = core.get_db_connection()
+        conn = _conn_cm.__enter__()
         cur = conn.cursor()
 
     try:
@@ -307,14 +311,14 @@ def import_config(config_data: Dict, dry_run: bool = True) -> Dict[str, Any]:
 
         if not dry_run:
             conn.commit()
-            conn.__exit__(None, None, None)
+            _conn_cm.__exit__(None, None, None)
 
     except Exception as e:
         report['errors'].append(str(e))
         if not dry_run:
             try:
                 conn.rollback()
-                conn.__exit__(None, None, None)
+                _conn_cm.__exit__(None, None, None)
             except Exception:
                 pass
 

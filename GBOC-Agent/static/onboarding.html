@@ -211,8 +211,10 @@ const SYSTEMS_TO_CHECK = [
 ];
 
 document.addEventListener('DOMContentLoaded', () => {
+    // data-theme só aceita dark/light (âmbar, púrpura, oceano e vermelho são base escura) — mesma regra do layout manager.
+    // Antes gravava o nome da cor (ex.: "red") e as regras [data-theme="dark"] deixavam de valer.
     const saved = localStorage.getItem('gboc-theme') || 'dark';
-    document.documentElement.setAttribute('data-theme', saved);
+    document.documentElement.setAttribute('data-theme', saved === 'light' ? 'light' : 'dark');
     runSystemCheck();
 });
 

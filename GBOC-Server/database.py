@@ -16,7 +16,9 @@ class DatabaseManager:
     """Gerenciador de conexões e operações com banco de dados"""
 
     def __init__(self):
-        self.pool: Optional[pool.SimpleConnectionPool] = None
+        # ThreadedConnectionPool: o pool é usado por várias threads (rotas síncronas, to_thread, agendadores);
+        # SimpleConnectionPool não é seguro entre threads.
+        self.pool: Optional[pool.ThreadedConnectionPool] = None
 
     def initialize(self) -> bool:
         """
@@ -27,7 +29,7 @@ class DatabaseManager:
         """
         try:
             logger.info("Inicializando pool PostgreSQL...")
-            self.pool = psycopg2.pool.SimpleConnectionPool(
+            self.pool = psycopg2.pool.ThreadedConnectionPool(
                 minconn=DB_POOL_MIN_CONN,
                 maxconn=DB_POOL_MAX_CONN,
                 **DB_CONFIG
@@ -68,6 +70,13 @@ class DatabaseManager:
         """
         if self.pool and conn:
             try:
+                if conn.closed:
+                    self.pool.putconn(conn, close=True)
+                    return
+                # Conexão devolvida com transação aberta (ex.: SELECT sem commit) ficava "idle in transaction"
+                # segurando locks e bloqueando ALTER/CREATE INDEX de outras sessões.
+                if conn.status != psycopg2.extensions.STATUS_READY:
+                    conn.rollback()
                 self.pool.putconn(conn)
             except Exception as e:
                 logger.error(f"Erro ao devolver conexão ao pool: {e}")

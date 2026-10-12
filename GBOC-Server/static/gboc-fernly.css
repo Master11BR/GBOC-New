@@ -264,6 +264,21 @@
     box-shadow: inset 2px 0 0 var(--fy-accent), 0 0 18px rgba(255, 43, 214, 0.25) !important;
 }
 
+/* Cyberpunk mantém a paleta neon escura mesmo com o tema claro; os ajustes de diálogo do tema claro (style.css,
+   fundo #fff fixo) deixavam o texto neon claro sobre branco. */
+[data-ui-style="fernly-cyberpunk"] .gboc-dialog-card {
+    background: #120e20 !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+}
+[data-ui-style="fernly-cyberpunk"] .gboc-dialog-body { color: var(--text-secondary) !important; }
+[data-ui-style="fernly-cyberpunk"] :is(.gboc-dialog-details, .gboc-dialog-input, .gboc-dialog-btn-cancel) {
+    background: var(--bg-input) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+}
+[data-ui-style="fernly-cyberpunk"] .gboc-dialog-actions { background: rgba(0, 0, 0, 0.25) !important; }
+
 /* ── 9. UTILITÁRIOS (opt-in em qualquer página) ──────────────────────────── */
 .fy-hatched { background-image: var(--fy-hatch); }
 

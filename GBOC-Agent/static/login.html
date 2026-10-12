@@ -255,6 +255,13 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             -webkit-box-shadow: 0 0 0 30px #f1f5f9 inset !important;
             -webkit-text-fill-color: #0f172a !important;
         }
+    /* Tema claro: a etiqueta usa text-zinc-300 fixo (texto quase branco sobre fundo claro) */
+    /* "Lembrar credencial": o CSS do projeto não tem a utilidade peer-checked, então o ✓ nunca aparecia —
+       a caixa era marcada sem retorno visual e um segundo clique a desmarcava. */
+    #remember-me:checked + i { opacity: 1 !important; }
+    label:has(#remember-me:checked) > div { border-color: #f59e0b !important; background: rgba(245, 158, 11, 0.15) !important; }
+    #remember-me:focus-visible { outline: 2px solid #f59e0b; outline-offset: 2px; }
+    [data-theme="light"] #brand-edition-tag { color: #475569 !important; border-color: rgba(15,23,42,0.15) !important; background: rgba(15,23,42,0.04) !important; }
     </style>
     </head>
 <body class="min-h-screen flex flex-col justify-between text-white relative overflow-x-hidden selection:bg-amber-500 selection:text-black">
