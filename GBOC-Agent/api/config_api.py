@@ -77,7 +77,7 @@ async def export_config_download(include_sensitive: bool = False):
 # ─── Import ───────────────────────────────────────────────────────
 
 @router.post("/import")
-async def import_config(body: ImportRequest):
+def import_config(body: ImportRequest):
     """Import a configuration from JSON data.
     Use dry_run=true to preview changes without applying them."""
     from engines.config_manager import import_config as _import

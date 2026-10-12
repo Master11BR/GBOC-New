@@ -656,7 +656,7 @@ async def _check_backup_tools() -> Dict[str, Dict[str, Any]]:
     
     return results
 
-async def _check_backup_tools_detailed() -> Dict[str, Dict[str, Any]]:
+def _check_backup_tools_detailed_sync() -> Dict[str, Dict[str, Any]]:
     """Verificação detalhada de ferramentas"""
     tools_to_check = {
         "restic": {"command": "restic", "version_arg": "version"},
@@ -708,6 +708,11 @@ async def _check_backup_tools_detailed() -> Dict[str, Dict[str, Any]]:
             }
     
     return results
+
+
+async def _check_backup_tools_detailed(*args, **kwargs):
+    """Roda _check_backup_tools_detailed_sync numa thread: o trabalho síncrono (banco/subprocess) não trava o event loop."""
+    return await asyncio.to_thread(_check_backup_tools_detailed_sync, *args, **kwargs)
 
 async def _get_disk_analysis() -> Dict[str, Any]:
     """Análise detalhada de discos"""
@@ -768,7 +773,7 @@ async def _get_process_info() -> Dict[str, Any]:
     except Exception as e:
         return {"error": str(e)}
 
-async def _get_repository_summary(core) -> Dict[str, Any]:
+def _get_repository_summary_sync(core) -> Dict[str, Any]:
     """Resumo dos repositórios"""
     try:
         with core.get_db_connection() as conn:
@@ -792,7 +797,12 @@ async def _get_repository_summary(core) -> Dict[str, Any]:
         return {"error": str(e)}
 
 
-async def _get_recent_error_count(core) -> int:
+async def _get_repository_summary(*args, **kwargs):
+    """Roda _get_repository_summary_sync numa thread: o trabalho síncrono (banco/subprocess) não trava o event loop."""
+    return await asyncio.to_thread(_get_repository_summary_sync, *args, **kwargs)
+
+
+def _get_recent_error_count_sync(core) -> int:
     """Conta erros recentes em logs/eventos."""
     try:
         with core.get_db_connection() as conn:
@@ -810,7 +820,12 @@ async def _get_recent_error_count(core) -> int:
         return 0
 
 
-async def _save_diagnostic(core, result: Dict[str, Any], category: str):
+async def _get_recent_error_count(*args, **kwargs):
+    """Roda _get_recent_error_count_sync numa thread: o trabalho síncrono (banco/subprocess) não trava o event loop."""
+    return await asyncio.to_thread(_get_recent_error_count_sync, *args, **kwargs)
+
+
+def _save_diagnostic_sync(core, result: Dict[str, Any], category: str):
     """Persistência best-effort do diagnóstico."""
     try:
         with core.get_db_connection() as conn:
@@ -854,6 +869,11 @@ async def _save_diagnostic(core, result: Dict[str, Any], category: str):
             conn.commit()
     except Exception as e:
         logger.debug(f"Falha ao salvar diagnóstico ({category}): {e}")
+
+
+async def _save_diagnostic(*args, **kwargs):
+    """Roda _save_diagnostic_sync numa thread: o trabalho síncrono (banco/subprocess) não trava o event loop."""
+    return await asyncio.to_thread(_save_diagnostic_sync, *args, **kwargs)
 
 
 def _calculate_health_score(system_metrics: Dict[str, Any], backup_tools: Dict[str, Any]) -> float:
@@ -907,7 +927,7 @@ async def _analyze_repositories(core) -> Dict[str, Any]:
     return await _get_repository_summary(core)
 
 
-async def _analyze_tasks(core) -> Dict[str, Any]:
+def _analyze_tasks_sync(core) -> Dict[str, Any]:
     """Análise de tarefas e taxa de sucesso."""
     try:
         with core.get_db_connection() as conn:
@@ -933,6 +953,11 @@ async def _analyze_tasks(core) -> Dict[str, Any]:
             }
     except Exception as e:
         return {"error": str(e), "total": 0, "scheduled": 0, "total_runs": 0, "total_successes": 0, "success_rate": 0.0}
+
+
+async def _analyze_tasks(*args, **kwargs):
+    """Roda _analyze_tasks_sync numa thread: o trabalho síncrono (banco/subprocess) não trava o event loop."""
+    return await asyncio.to_thread(_analyze_tasks_sync, *args, **kwargs)
 
 
 async def _security_analysis() -> Dict[str, Any]:

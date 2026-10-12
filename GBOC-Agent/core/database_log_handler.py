@@ -6,6 +6,7 @@ Usa conexão DEDICADA (não do pool) para evitar conflito com transações abort
 """
 
 import logging
+import queue
 import sys
 import threading
 import time
@@ -44,7 +45,12 @@ class DatabaseLogHandler(logging.Handler):
         self._conn = None
         self._lock = threading.Lock()
         self._pause_until = 0.0   # após falha (lock/timeout), pausa a gravação no banco por alguns segundos
+        # Quem loga só enfileira; uma thread grava em lote. Antes cada linha de log fazia um INSERT síncrono
+        # na thread de quem logou — inclusive dentro de rotas async, segurando o event loop do Agente.
+        self._queue: "queue.Queue" = queue.Queue(maxsize=5000)
+        self._dropped = 0
         self._ensure_table()
+        threading.Thread(target=self._writer, name="gboc-db-log-writer", daemon=True).start()
 
     # ------------------------------------------------------------------ #
     def _get_conn(self):
@@ -91,31 +97,63 @@ class DatabaseLogHandler(logging.Handler):
             _guard.active = False
 
     def _emit(self, record):
-        if time.monotonic() < self._pause_until:   # console/arquivo continuam recebendo o log
-            return
+        try:
+            timestamp = datetime.fromtimestamp(record.created).isoformat()
+            message = self.format(record)
+            details = None
+            if hasattr(record, 'details'):
+                details = str(record.details)
+            elif record.exc_info:
+                details = self.formatter.formatException(record.exc_info) if self.formatter else str(record.exc_info)
+            self._queue.put_nowait((timestamp, record.levelname, record.name, message, details))
+        except queue.Full:
+            self._dropped += 1      # banco parado por muito tempo: descarta (console/arquivo continuam com o log)
+        except Exception:
+            pass
+
+    def _writer(self):
+        """Thread única que grava os logs enfileirados em lote."""
+        pending = []
+        while True:
+            try:
+                pending.append(self._queue.get(timeout=2) if not pending else self._queue.get_nowait())
+                while len(pending) < 500:
+                    pending.append(self._queue.get_nowait())
+            except queue.Empty:
+                pass
+            if not pending:
+                continue
+            wait = self._pause_until - time.monotonic()
+            if wait > 0:                       # falha recente: espera a pausa e grava o que acumulou
+                time.sleep(wait)
+            _guard.active = True
+            try:
+                if self._write_batch(pending):
+                    pending = []
+                elif len(pending) > 5000:      # banco fora por muito tempo: mantém só os mais recentes
+                    self._dropped += len(pending) - 5000
+                    pending = pending[-5000:]
+            finally:
+                _guard.active = False
+
+    def _write_batch(self, rows):
         with self._lock:
             try:
                 conn = self._get_conn()
                 if conn is None:
-                    return
-
-                timestamp = datetime.fromtimestamp(record.created).isoformat()
-                level = record.levelname
-                source = record.name
-                message = self.format(record)
-
-                details = None
-                if hasattr(record, 'details'):
-                    details = str(record.details)
-                elif record.exc_info:
-                    details = self.formatter.formatException(record.exc_info) if self.formatter else str(record.exc_info)
-
+                    self._pause_until = time.monotonic() + 15
+                    return False
+                if self._dropped:
+                    rows.append((datetime.now().isoformat(), 'WARNING', 'gboc.db_log',
+                                 f"{self._dropped} registro(s) de log descartado(s): banco indisponível", None))
+                    self._dropped = 0
                 cur = conn.cursor()
-                cur.execute("""
+                cur.executemany("""
                     INSERT INTO system_logs (timestamp, level, source, message, details)
                     VALUES (%s, %s, %s, %s, %s)
-                """, (timestamp, level, source, message, details))
+                """, rows)
                 cur.close()
+                return True
 
             except Exception as e:
                 # Conexão corrompida → fechar para recriar na próxima chamada
@@ -126,7 +164,8 @@ class DatabaseLogHandler(logging.Handler):
                     pass
                 self._conn = None
                 self._pause_until = time.monotonic() + 15
-                _raw_stderr(f"Erro ao gravar log no banco (pausado por 15 s): {e}\n")
+                _raw_stderr(f"Erro ao gravar log no banco (nova tentativa em 15 s): {e}\n")
+                return False
 
     def close(self):
         """Fecha handler e conexão dedicada"""

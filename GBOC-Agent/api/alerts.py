@@ -4,6 +4,7 @@
 Responsável por: Rotas para sistema de alertas e notificações
 """
 
+import asyncio
 from fastapi import APIRouter, HTTPException, Request
 from typing import Dict, Any, List
 import json
@@ -17,7 +18,7 @@ logger = logging.getLogger("API-Alerts")
 router = APIRouter(prefix="/api/alerts", tags=["alerts"])
 
 @router.get("/")
-async def list_alerts(
+def list_alerts(
     severity: str = None, 
     resolved: bool = None, 
     limit: int = 50
@@ -64,7 +65,7 @@ async def list_alerts(
                 alerts.append(alert)
             
             # Estatísticas
-            stats = await _get_alert_statistics(core)
+            stats = _get_alert_statistics_sync(core)
             
             return {
                 "alerts": alerts,
@@ -331,11 +332,11 @@ async def bulk_alert_action(request: Request) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/statistics/summary")
-async def get_alert_summary() -> Dict[str, Any]:
+def get_alert_summary() -> Dict[str, Any]:
     """Resumo estatístico dos alertas"""
     try:
         core = get_shared_core()
-        stats = await _get_alert_statistics(core)
+        stats = _get_alert_statistics_sync(core)
         
         # Alertas recentes (últimas 24h)
         cutoff_24h = (datetime.now() - timedelta(days=1)).isoformat()
@@ -494,7 +495,7 @@ def create_test_alerts() -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 
 # Funções auxiliares
-async def _get_alert_statistics(core) -> Dict[str, Any]:
+def _get_alert_statistics_sync(core) -> Dict[str, Any]:
     """Estatísticas dos alertas"""
     try:
         with core.get_db_connection() as conn:
@@ -561,6 +562,11 @@ async def _get_alert_statistics(core) -> Dict[str, Any]:
             "resolution_rate": 0,
             "error": str(e)
         }
+
+
+async def _get_alert_statistics(*args, **kwargs):
+    """Roda _get_alert_statistics_sync numa thread: o trabalho síncrono (banco/subprocess) não trava o event loop."""
+    return await asyncio.to_thread(_get_alert_statistics_sync, *args, **kwargs)
 
 async def _process_alert_notifications(core, alert: Dict[str, Any]):
     """Processa notificações para o alerta"""

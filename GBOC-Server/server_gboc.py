@@ -93,7 +93,8 @@ DB_CONFIG = {
     'database': os.getenv('POSTGRES_DB', 'gboc'),
     'user': os.getenv('POSTGRES_USER', 'postgres'),
     'password': os.getenv('POSTGRES_PASSWORD', 'Stoms2025+'),
-    'options': '-c timezone=America/Sao_Paulo'
+    # lock_timeout: nenhuma consulta espera lock para sempre (transação esquecida aberta) — erro em 30 s em vez de travar
+    'options': f"-c timezone=America/Sao_Paulo -c lock_timeout={int(os.getenv('GBOC_DB_LOCK_TIMEOUT_MS', 30000))}"
 }
 
 connection_pool = None
@@ -216,16 +217,19 @@ def get_db():
             conn.set_client_encoding('UTF8')
         return conn
     except psycopg2.pool.PoolError:
-        # Pool esgotado, tentar recriar
-        logger.warning("Pool esgotado, recriando...")
-        try:
-            connection_pool.closeall()
-        except Exception:
-            pass
-        connection_pool = psycopg2.pool.ThreadedConnectionPool(minconn=2, maxconn=30, **DB_CONFIG)
-        conn = connection_pool.getconn()
-        conn.set_client_encoding('UTF8')
-        return conn
+        # Pool esgotado: aguarda uma conexão ser devolvida. NÃO recria o pool — closeall() fechava as conexões
+        # que outras requisições estavam usando naquele momento e todas falhavam juntas.
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            time.sleep(0.1)
+            try:
+                conn = connection_pool.getconn()
+                conn.set_client_encoding('UTF8')
+                return conn
+            except psycopg2.pool.PoolError:
+                continue
+        logger.warning("Pool PostgreSQL esgotado por 5 s (30 conexões em uso) — requisição recusada")
+        raise HTTPException(503, "DB Ocupado")
     except Exception:
         raise HTTPException(503, "DB Ocupado")
 
@@ -691,6 +695,7 @@ def init_database():
 def log_event(conn, event_type, message, hostname=None):
     try:
         cur = conn.cursor()
+        cur.execute("SAVEPOINT gboc_sp_log_event")
         cur.execute('''
             INSERT INTO system_events (event_type, message, agent_hostname, created_at)
             VALUES (%s, %s, %s, LOCALTIMESTAMP)
@@ -698,6 +703,10 @@ def log_event(conn, event_type, message, hostname=None):
         conn.commit()
         cur.close()
     except Exception as e:
+        try:  # desfaz só esta etapa: sem isto a transação ficava abortada e o commit final descartava todas as etapas
+            conn.cursor().execute("ROLLBACK TO SAVEPOINT gboc_sp_log_event")
+        except Exception:
+            pass
         logger.error(f"Erro ao logar evento: {e}")
 
 # ===========================
@@ -1113,7 +1122,10 @@ except Exception as _e:
 @app.get("/static/gboc-layout-manager.js", include_in_schema=False)
 @app.get("/gboc-layout-manager.js", include_in_schema=False)
 async def get_layout_manager():
-    return FileResponse(os.path.join(os.path.dirname(__file__), "gboc-layout-manager.js"), media_type="application/javascript")
+    # Mesma ordem das demais rotas estáticas: static/ (sincronizada por tools/sync_css.py) primeiro, raiz como reserva.
+    # Antes servia só a cópia da raiz, que o sync não atualiza — correções do layout manager não chegavam ao Server.
+    found = _find_asset("gboc-layout-manager.js") or os.path.join(os.path.dirname(__file__), "gboc-layout-manager.js")
+    return FileResponse(found, media_type="application/javascript")
 
 @app.get("/static/ai_assistant.js", include_in_schema=False)
 @app.get("/ai_assistant.js", include_in_schema=False)
@@ -1513,7 +1525,7 @@ async def register(data: AgentRegister):
 # WEBSOCKET ENDPOINTS
 # ===========================
 
-async def handle_realtime_heartbeat(agent_id: str, data: Dict) -> Dict:
+def _handle_realtime_heartbeat_sync(agent_id: str, data: Dict) -> Dict:
     """Processa heartbeat em tempo real"""
     if not isinstance(data, dict):
         logger.error(f"Dados de heartbeat inválidos do agente {agent_id}: {data}")
@@ -1543,6 +1555,11 @@ async def handle_realtime_heartbeat(agent_id: str, data: Dict) -> Dict:
     except Exception as e:
         logger.error(f"Erro no heartbeat em tempo real do agente {agent_id}: {e}")
         return {"status": "error", "message": str(e)}
+
+
+async def handle_realtime_heartbeat(*args, **kwargs):
+    """Roda _handle_realtime_heartbeat_sync numa thread: o trabalho síncrono (banco/subprocess) não trava o event loop."""
+    return await asyncio.to_thread(_handle_realtime_heartbeat_sync, *args, **kwargs)
 
 @app.websocket("/ws/agents/{agent_id}")
 async def websocket_endpoint(websocket: WebSocket, agent_id: str):
@@ -1692,6 +1709,7 @@ async def save_agent_historical_data(conn, agent_id: str, data: Dict):
     """Salva dados históricos do agente"""
     try:
         cur = conn.cursor()
+        cur.execute("SAVEPOINT gboc_sp_save_agent_historical_data")
         cur.execute('''
             INSERT INTO agent_metrics (agent_id, cpu_usage, ram_usage, disk_usage, timestamp)
             VALUES (%s, %s, %s, %s, LOCALTIMESTAMP)
@@ -1702,12 +1720,17 @@ async def save_agent_historical_data(conn, agent_id: str, data: Dict):
             data.get('disk_usage')
         ))
     except Exception as e:
+        try:  # desfaz só esta etapa: sem isto a transação ficava abortada e o commit final descartava todas as etapas
+            conn.cursor().execute("ROLLBACK TO SAVEPOINT gboc_sp_save_agent_historical_data")
+        except Exception:
+            pass
         logger.warning(f"Erro ao salvar métricas históricas: {e}")
 
 async def sync_repositories(conn, agent_id: str, repositories: List[Dict]):
     """Sincroniza repositórios do agente"""
     try:
         cur = conn.cursor()
+        cur.execute("SAVEPOINT gboc_sp_sync_repositories")
         for repo in repositories:
             cur.execute('''
                 INSERT INTO agent_repositories
@@ -1726,12 +1749,17 @@ async def sync_repositories(conn, agent_id: str, repositories: List[Dict]):
         conn.commit()
         logger.info(f"✅ {len(repositories)} repositórios sincronizados para agente {agent_id}")
     except Exception as e:
+        try:  # desfaz só esta etapa: sem isto a transação ficava abortada e o commit final descartava todas as etapas
+            conn.cursor().execute("ROLLBACK TO SAVEPOINT gboc_sp_sync_repositories")
+        except Exception:
+            pass
         logger.warning(f"Erro ao sincronizar repositórios: {e}")
 
 async def sync_agent_tasks(conn, agent_id: str, tasks: List[Dict]):
     """Sincroniza tarefas do agente."""
     try:
         cur = conn.cursor()
+        cur.execute("SAVEPOINT gboc_sp_sync_agent_tasks")
         for task in tasks:
             task_id = task.get('id')
             if task_id is None:
@@ -1764,12 +1792,17 @@ async def sync_agent_tasks(conn, agent_id: str, tasks: List[Dict]):
         conn.commit()
         logger.info(f"✅ {len(tasks)} tarefas sincronizadas para agente {agent_id}")
     except Exception as e:
+        try:  # desfaz só esta etapa: sem isto a transação ficava abortada e o commit final descartava todas as etapas
+            conn.cursor().execute("ROLLBACK TO SAVEPOINT gboc_sp_sync_agent_tasks")
+        except Exception:
+            pass
         logger.warning(f"Erro ao sincronizar tarefas: {e}")
 
 async def sync_task_executions(conn, agent_id: str, executions: List[Dict]):
     """Sincroniza execuções de tarefas do agente"""
     try:
         cur = conn.cursor()
+        cur.execute("SAVEPOINT gboc_sp_sync_task_executions")
         for ex in executions:
             cur.execute('''
                 INSERT INTO agent_task_executions 
@@ -1791,12 +1824,17 @@ async def sync_task_executions(conn, agent_id: str, executions: List[Dict]):
         conn.commit()
         logger.info(f"✅ {len(executions)} execuções sincronizadas para agente {agent_id}")
     except Exception as e:
+        try:  # desfaz só esta etapa: sem isto a transação ficava abortada e o commit final descartava todas as etapas
+            conn.cursor().execute("ROLLBACK TO SAVEPOINT gboc_sp_sync_task_executions")
+        except Exception:
+            pass
         logger.warning(f"Erro ao sincronizar execuções: {e}")
 
 async def sync_system_events(conn, agent_id: str, events: List[Dict]):
     """Sincroniza eventos do sistema do agente"""
     try:
         cur = conn.cursor()
+        cur.execute("SAVEPOINT gboc_sp_sync_system_events")
         for event in events:
             cur.execute('''
                 INSERT INTO system_events (event_type, message, agent_hostname, created_at)
@@ -1809,6 +1847,10 @@ async def sync_system_events(conn, agent_id: str, events: List[Dict]):
                 event.get('timestamp', _dt.now(timezone.utc).isoformat())
             ))
     except Exception as e:
+        try:  # desfaz só esta etapa: sem isto a transação ficava abortada e o commit final descartava todas as etapas
+            conn.cursor().execute("ROLLBACK TO SAVEPOINT gboc_sp_sync_system_events")
+        except Exception:
+            pass
         logger.warning(f"Erro ao sincronizar eventos: {e}")
 
 async def sync_alerts(conn, agent_id: str, alerts: List[Dict]):
@@ -3624,7 +3666,7 @@ def _fetch_agent_rows(cur, table: str, agent_id: str, since_timestamp: Optional[
     return [dict(r) for r in cur.fetchall()]
 
 
-async def get_agent_full_data(agent_id: str, since_timestamp: Optional[str] = None) -> Dict:
+def _get_agent_full_data_sync(agent_id: str, since_timestamp: Optional[str] = None) -> Dict:
     """Obtém todos os dados sincronizados do agente (uma única conexão do pool)."""
     conn = None
     try:
@@ -3676,7 +3718,12 @@ async def get_agent_full_data(agent_id: str, since_timestamp: Optional[str] = No
             release_db(conn)
 
 
-async def get_agent_repositories(agent_id: str, since_timestamp: Optional[str] = None) -> List[Dict]:
+async def get_agent_full_data(*args, **kwargs):
+    """Roda _get_agent_full_data_sync numa thread: o trabalho síncrono (banco/subprocess) não trava o event loop."""
+    return await asyncio.to_thread(_get_agent_full_data_sync, *args, **kwargs)
+
+
+def _get_agent_repositories_sync(agent_id: str, since_timestamp: Optional[str] = None) -> List[Dict]:
     """Obtém repositórios sincronizados do agente."""
     conn = None
     try:
@@ -3695,7 +3742,12 @@ async def get_agent_repositories(agent_id: str, since_timestamp: Optional[str] =
             release_db(conn)
 
 
-async def get_agent_tasks(agent_id: str, since_timestamp: Optional[str] = None) -> List[Dict]:
+async def get_agent_repositories(*args, **kwargs):
+    """Roda _get_agent_repositories_sync numa thread: o trabalho síncrono (banco/subprocess) não trava o event loop."""
+    return await asyncio.to_thread(_get_agent_repositories_sync, *args, **kwargs)
+
+
+def _get_agent_tasks_sync(agent_id: str, since_timestamp: Optional[str] = None) -> List[Dict]:
     """Obtém tarefas sincronizadas do agente."""
     conn = None
     try:
@@ -3712,6 +3764,11 @@ async def get_agent_tasks(agent_id: str, since_timestamp: Optional[str] = None) 
     finally:
         if conn:
             release_db(conn)
+
+
+async def get_agent_tasks(*args, **kwargs):
+    """Roda _get_agent_tasks_sync numa thread: o trabalho síncrono (banco/subprocess) não trava o event loop."""
+    return await asyncio.to_thread(_get_agent_tasks_sync, *args, **kwargs)
 
 
 # ═══════════════════════════════════════════════════════════════

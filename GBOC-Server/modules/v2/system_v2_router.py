@@ -137,6 +137,7 @@ def get_system_health_v2(request: Request):
     db_status = "unknown"
     db_latency_ms = None
     
+    conn = None
     try:
         from server_gboc import get_db, release_db
         db_t0 = time.perf_counter()
@@ -147,12 +148,15 @@ def get_system_health_v2(request: Request):
             cur.fetchone()
             cur.close()
             release_db(conn)
+            conn = None
             db_latency_ms = round((time.perf_counter() - db_t0) * 1000, 2)
             db_status = "healthy"
         else:
             db_status = "unavailable"
     except Exception as e:
         db_status = f"error: {str(e)}"
+        if conn is not None:   # erro no meio da consulta: devolver a conexão ao pool
+            release_db(conn)
     
     health_data = {
         "status": "healthy" if db_status == "healthy" else "degraded",

@@ -9,7 +9,7 @@ logger = logging.getLogger("gboc_replication_module")
 router = APIRouter(prefix="/api/v1/server/replication", tags=["Replicacao Offsite"])
 
 @router.get("/overview")
-async def get_replication_overview():
+def get_replication_overview():
     """Retorna o status real da replicacao offsite e imutabilidade."""
     replicated_gb = 0.0
     replication_active = True
