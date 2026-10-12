@@ -8,6 +8,7 @@ Usa conexão DEDICADA (não do pool) para evitar conflito com transações abort
 import logging
 import sys
 import threading
+import time
 from datetime import datetime
 from typing import Optional
 
@@ -18,7 +19,22 @@ _DB_CONFIG = {
     'password': 'Stoms2025+',
     'host': 'localhost',
     'port': 5432,
+    # Log nunca pode travar o sistema: se system_logs estiver bloqueada (ex.: migração com
+    # CREATE INDEX na mesma inicialização), o INSERT desiste em 2 s em vez de esperar para sempre.
+    'options': '-c lock_timeout=2000 -c statement_timeout=5000',
+    'connect_timeout': 5,
 }
+
+_guard = threading.local()
+
+
+def _raw_stderr(msg: str) -> None:
+    """Escreve no stderr ORIGINAL. sys.stderr é redirecionado para o logger no agent_gboc.py;
+    usá-lo aqui reentraria em emit() com self._lock já preso (travamento na mesma thread)."""
+    try:
+        (sys.__stderr__ or sys.stdout).write(msg)
+    except Exception:
+        pass
 
 class DatabaseLogHandler(logging.Handler):
     """Handler que grava logs no banco de dados PostgreSQL usando conexão dedicada."""
@@ -27,6 +43,7 @@ class DatabaseLogHandler(logging.Handler):
         super().__init__(level)
         self._conn = None
         self._lock = threading.Lock()
+        self._pause_until = 0.0   # após falha (lock/timeout), pausa a gravação no banco por alguns segundos
         self._ensure_table()
 
     # ------------------------------------------------------------------ #
@@ -61,10 +78,21 @@ class DatabaseLogHandler(logging.Handler):
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_system_logs_timestamp ON system_logs (timestamp DESC)")
                 cursor.close()
         except Exception as e:
-            sys.stderr.write(f"Erro ao criar tabela system_logs: {e}\n")
+            _raw_stderr(f"Erro ao criar tabela system_logs: {e}\n")
 
     def emit(self, record):
         """Grava log no banco — uma única tentativa com conexão dedicada."""
+        if getattr(_guard, 'active', False):   # log gerado durante a própria gravação: não reentrar
+            return
+        _guard.active = True
+        try:
+            self._emit(record)
+        finally:
+            _guard.active = False
+
+    def _emit(self, record):
+        if time.monotonic() < self._pause_until:   # console/arquivo continuam recebendo o log
+            return
         with self._lock:
             try:
                 conn = self._get_conn()
@@ -97,7 +125,8 @@ class DatabaseLogHandler(logging.Handler):
                 except Exception:
                     pass
                 self._conn = None
-                sys.stderr.write(f"Erro ao gravar log no banco: {e}\n")
+                self._pause_until = time.monotonic() + 15
+                _raw_stderr(f"Erro ao gravar log no banco (pausado por 15 s): {e}\n")
 
     def close(self):
         """Fecha handler e conexão dedicada"""

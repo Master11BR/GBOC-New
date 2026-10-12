@@ -69,6 +69,7 @@
         }
 
         .control-group {
+            display: block; /* style.css global define .control-group como flex em linha (label + select); aqui é cartão */
             background: var(--card-bg);
             border-radius: var(--card-radius);
             border: var(--card-border);
@@ -233,6 +234,7 @@
 </head>
 <body class="layout-vertical">
 
+    <main class="main-content">
     <div class="showcase-container">
         <!-- Header -->
         <header class="showcase-header">
@@ -393,6 +395,7 @@
             </div>
         </section>
     </div>
+    </main>
 
     <!-- GBOC Layout Manager JS -->
     <script src="/static/gboc-layout-manager.js"></script>
