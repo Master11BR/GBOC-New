@@ -1160,9 +1160,14 @@ Zero-Overflow & Smart Sidebar Presence Detection.
         if (sb.__gbocNavReady) return;
         sb.__gbocNavReady = true;
 
-        if (!activeLink()) {
-            const match = findLinkForPage(sb);
-            if (match) match.classList.add('active', 'in-focus');
+        const match = findLinkForPage(sb);
+        const cur = activeLink();
+        // Página com link próprio no menu (href) vence o "active" fixo do HTML do sidebar
+        // (no Server, "Dashboard Central" vem marcado em _sidebar.html e prendia a seleção em qualquer página).
+        const pageOwnsLink = match && (navKey(match) || '').startsWith('href:');
+        if (match && (!cur || (pageOwnsLink && match !== cur))) {
+            sb.querySelectorAll('.nav-link.active, .nav-link.in-focus').forEach(l => l.classList.remove('active', 'in-focus'));
+            match.classList.add('active', 'in-focus');
         }
         const ag = syncActiveHeaders();
         const groups = sb.querySelectorAll('.nav-group');

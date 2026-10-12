@@ -1437,6 +1437,8 @@ body[class*="layout-"] :is(.tab-btn, .gboc-tab, .tab-button) {
 }
 body[class*="layout-"] :is(.tab-btn, .gboc-tab, .tab-button):hover { color: var(--text-primary); }
 body[class*="layout-"] :is(.tab-btn, .gboc-tab, .tab-button).active { color: var(--primary-color); border-bottom-color: var(--primary-color); }
+/* Aba que também é botão preenchido (.btn-primary): texto na cor de contraste, senão some (cor do texto = cor do fundo) */
+body[class*="layout-"] :is(.tab-btn, .gboc-tab, .tab-button).btn-primary { color: var(--on-primary); }
 
 /* ── 9.8 Cartões de indicadores ───────────────────────────────────────────── */
 body[class*="layout-"] :is(.kpi-value, .stat-card .val, .status-value) { font-weight: 700; line-height: 1.15; color: var(--text-primary); }
