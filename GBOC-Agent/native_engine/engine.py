@@ -492,10 +492,11 @@ class GBOCNativeEngine:
     def _source_key(self, sources: List[str]) -> List[str]:
         return sorted(str(p) for p in sources)
 
-    def _previous_v4(self, sources: List[str]) -> Dict[str, Dict[str, Any]]:
+    def _previous_v4(self, sources: List[str], names: Optional[List[str]] = None) -> Dict[str, Dict[str, Any]]:
         """Entradas do último snapshot DESTA tarefa (mesmos caminhos) para a detecção rápida."""
         want = self._source_key(sources)
-        names = [str(f).replace('\\', '/') for f in self.backend.list_files()]
+        if names is None:
+            names = [str(f).replace('\\', '/') for f in self.backend.list_files()]
         sids = sorted({f.split('/')[0] for f in names if f.endswith('/manifest.json')}, reverse=True)
         for sid in sids[:30]:
             m = self._load_manifest(sid)
@@ -516,13 +517,16 @@ class GBOCNativeEngine:
             if not source_paths:
                 return {"success": False, "error": "Nenhum caminho de origem definido"}
             snapshot_id = datetime.now().strftime('%Y%m%d%H%M%S')
-            existing = {str(f).replace('\\', '/').split('/')[0] for f in self.backend.list_files() if str(f).endswith('manifest.json')}
+            # Uma listagem só do repositório (antes eram três: snapshots, backup anterior e blocos existentes)
+            names = [str(f).replace('\\', '/') for f in self.backend.list_files()]
+            existing = {f.split('/')[0] for f in names if f.endswith('manifest.json')}
             if snapshot_id in existing:                       # dois backups no mesmo segundo
                 _time.sleep(1.1)
                 snapshot_id = datetime.now().strftime('%Y%m%d%H%M%S')
             self.logger.info(f"Backup nativo v4 - snapshot {snapshot_id} (compressão {self.codec}, {self.workers} conexão(ões))")
-            prev = self._previous_v4(source_paths)
+            prev = self._previous_v4(source_paths, names)
             store = self._store()
+            store.known(names)
             multi = len(source_paths) > 1
             entries: List[Dict[str, Any]] = []
             stats = {"files": 0, "bytes": 0, "new": 0, "unchanged": 0, "reused": 0, "chunks_new": 0, "errors": 0}
@@ -563,6 +567,8 @@ class GBOCNativeEngine:
                             self.logger.error(f"Erro ao processar {fpath}: {e}")
                             if isinstance(e, RuntimeError):
                                 raise
+                # último pacote + espera todos os envios + índice de pacotes; só então o manifesto
+                store.flush(pool)
             finally:
                 pool.shutdown(wait=True)
             stats["unchanged"] = stats["reused"]
@@ -571,6 +577,7 @@ class GBOCNativeEngine:
                 'compression': self.codec, 'chunk_size': store_v4.CHUNK_SIZE,
                 'files_total': stats["files"], 'files_new': stats["new"], 'files_unchanged': stats["unchanged"],
                 'bytes_total': stats["bytes"], 'bytes_uploaded': store.uploaded_bytes, 'chunks_uploaded': store.uploaded_objects,
+                'packs_uploaded': store.packs_uploaded,
                 'source_paths': source_paths, 'errors': stats["errors"], 'entries': entries,
             }
             self._upload_manifest(snapshot_id, manifest)
@@ -581,7 +588,8 @@ class GBOCNativeEngine:
                              f"({saved:.0f}% economizado por deduplicacao/compressao)")
             return {"success": True, "snapshot_id": snapshot_id, "files": stats["files"], "bytes": stats["bytes"],
                     "files_new": stats["new"], "files_unchanged": stats["unchanged"], "bytes_uploaded": store.uploaded_bytes,
-                    "objects_uploaded": store.uploaded_objects, "seconds": secs, "errors": stats["errors"]}
+                    "objects_uploaded": store.uploaded_objects, "packs_uploaded": store.packs_uploaded,
+                    "seconds": secs, "errors": stats["errors"]}
         except Exception as e:
             self.logger.error(f"Erro no backup nativo v4: {e}", exc_info=True)
             return {"success": False, "error": str(e)}
