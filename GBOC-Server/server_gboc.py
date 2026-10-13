@@ -906,12 +906,15 @@ def _validate_server_token(token: str) -> Optional[Dict]:
         release_db(conn)
 
 def _get_server_user_from_request(request: Request) -> Optional[Dict]:
+    """Header Bearer e depois o cookie do Servidor; o primeiro token válido vence (um header com token
+    de outro sistema não impede mais a sessão do cookie)."""
     auth_header = request.headers.get("Authorization", "")
-    if auth_header.startswith("Bearer "):
-        return _validate_server_token(auth_header[7:])
-    token = request.cookies.get("gboc_server_token")
-    if token:
-        return _validate_server_token(token)
+    candidates = [auth_header[7:].strip() if auth_header.startswith("Bearer ") else None,
+                  request.cookies.get("gboc_server_token")]
+    for token in dict.fromkeys(t for t in candidates if t):
+        user = _validate_server_token(token)
+        if user:
+            return user
     return None
 
 class ServerLoginRequest(BaseModel):
@@ -1321,8 +1324,9 @@ async def login_page():
 
 @app.get("/api/v1/auth/status")
 async def server_auth_status(request: Request):
-    enabled = _is_server_auth_enabled()
-    user = _get_server_user_from_request(request)
+    # Consultas ao banco fora do event loop
+    enabled = await asyncio.to_thread(_is_server_auth_enabled)
+    user = await asyncio.to_thread(_get_server_user_from_request, request)
     google_enabled = os.getenv("AUTH_GOOGLE_ENABLED", "false").lower() in ("true", "1", "yes")
     apple_enabled = os.getenv("AUTH_APPLE_ENABLED", "false").lower() in ("true", "1", "yes")
     return {
@@ -1364,17 +1368,26 @@ async def server_auth_oauth_provider(provider: str):
         "message": f"Provedor {name} pronto para autenticação."
     }
 
+SETUP_MIN_PASSWORD_LENGTH = 6   # mesmo mínimo exigido pela tela de primeiro acesso
+
 @app.post("/api/v1/auth/setup")
 def server_auth_setup(req: ServerSetupRequest):
+    username = (req.username or "").strip()
+    if not username or len(req.password or "") < SETUP_MIN_PASSWORD_LENGTH:
+        raise HTTPException(400, f"Usuário e senha (mínimo {SETUP_MIN_PASSWORD_LENGTH} caracteres) são obrigatórios.")
+    req.username = username
     conn = None
     try:
         conn = get_db()
         cur = conn.cursor()
+        # Trava até o commit: dois "Primeiro acesso" simultâneos não criam dois administradores.
+        cur.execute("LOCK TABLE server_auth_users IN SHARE ROW EXCLUSIVE MODE")
         cur.execute("SELECT COUNT(*) FROM server_auth_users")
         count = cur.fetchone()[0]
         if count > 0:
             cur.close()
-            raise HTTPException(400, "Já existem usuários cadastrados. Use /login.")
+            # Depois da instalação, contas só são criadas dentro do sistema (Usuários), por um administrador.
+            raise HTTPException(403, "Configuração inicial já concluída. Novas contas são criadas por um administrador dentro do sistema.")
         pw_hash = _hash_password(req.password)
         cur.execute(
             "INSERT INTO server_auth_users (username, password_hash, display_name, role) VALUES (%s, %s, %s, 'admin')",
@@ -1445,8 +1458,11 @@ def server_auth_login(req: ServerLoginRequest, request: Request, response: Respo
         )
         conn.commit()
         cur.close()
-        response.set_cookie("gboc_server_token", token, httponly=False, max_age=session_hours * 3600, path="/")
-        response.set_cookie("gboc_token", token, httponly=False, max_age=session_hours * 3600, path="/")
+        # Só o cookie do Servidor. gboc_token era compartilhado com o Agente no mesmo host (cookies não
+        # isolam porta) e o login de um derrubava a sessão do outro. Sem "Lembrar": cookie de sessão
+        # (sobrevive a fechar/reabrir a aba; expira ao fechar o navegador).
+        response.set_cookie("gboc_server_token", token, httponly=False, samesite="lax", path="/",
+                            max_age=session_hours * 3600 if req.remember else None)
         return {
             "status": "success",
             "token": token,

@@ -7,7 +7,7 @@ Token-based authentication with complete User CRUD, Role CRUD, custom levels, pe
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from typing import Optional, Dict, List, Any
+from typing import Optional, Dict, List, Any, Tuple
 import hashlib
 import secrets
 import logging
@@ -269,17 +269,38 @@ def _validate_token(token: str) -> Optional[Dict]:
     return info
 
 
+# Cookie de sessão exclusivo do Agente. Cookies NÃO são isolados por porta (RFC 6265): com Agente e
+# Servidor no mesmo host, o nome antigo compartilhado (gboc_token / gboc_server_token) era sobrescrito
+# pelo login do outro sistema e a sessão "caía" — o "Lembrar credencial" parecia não funcionar.
+SESSION_COOKIE = "gboc_agent_token"
+LEGACY_SESSION_COOKIES = ("gboc_token", "gboc_server_token")   # só leitura (sessões antigas)
+
+
+def _token_candidates(request: Request) -> List[str]:
+    """Tokens enviados na requisição, em ordem de prioridade, sem repetição."""
+    found: List[str] = []
+    auth_header = request.headers.get('Authorization', '')
+    raw = [request.cookies.get(SESSION_COOKIE),
+           auth_header[7:].strip() if auth_header.startswith('Bearer ') else None,
+           request.query_params.get('token')]
+    raw += [request.cookies.get(name) for name in LEGACY_SESSION_COOKIES]
+    for token in raw:
+        if token and token not in found:
+            found.append(token)
+    return found
+
+
+def _resolve_session(request: Request) -> Tuple[Optional[str], Optional[Dict]]:
+    """Primeiro token válido. Um token de outro sistema (cookie legado do Servidor) é ignorado."""
+    for token in _token_candidates(request):
+        user = _validate_token(token)
+        if user:
+            return token, user
+    return None, None
+
+
 def get_current_user(request: Request) -> Optional[Dict]:
-    token = request.cookies.get('gboc_token') or request.cookies.get('gboc_server_token')
-    if not token:
-        auth_header = request.headers.get('Authorization', '')
-        if auth_header.startswith('Bearer '):
-            token = auth_header[7:].strip()
-    if not token:
-        token = request.query_params.get('token')
-    if not token:
-        return None
-    return _validate_token(token)
+    return _resolve_session(request)[1]
 
 
 _AUTH_ENABLED_CACHE = {"ok": False, "ts": 0.0}
@@ -550,8 +571,9 @@ def login(req: LoginRequest, request: Request):
                 "role": role
             }
         })
-        resp.set_cookie(key="gboc_token", value=token, httponly=True, max_age=session_hours * 3600, samesite="lax")
-        resp.set_cookie(key="gboc_server_token", value=token, httponly=False, max_age=session_hours * 3600, samesite="lax")
+        # Sem "Lembrar": cookie de sessão (sobrevive a fechar/reabrir a aba; expira ao fechar o navegador).
+        resp.set_cookie(key=SESSION_COOKIE, value=token, httponly=True, samesite="lax", path="/",
+                        max_age=session_hours * 3600 if req.remember else None)
         return resp
 
     except HTTPException:
@@ -575,10 +597,13 @@ def auth_setup(req: RegisterRequest, request: Request):
         core = get_shared_core()
         with core.get_db_connection() as conn:
             cur = conn.cursor()
+            # Trava a tabela até o commit: dois "Primeiro acesso" simultâneos não criam dois administradores.
+            cur.execute("LOCK TABLE auth_users IN SHARE ROW EXCLUSIVE MODE")
             cur.execute("SELECT COUNT(*) FROM auth_users")
             count = cur.fetchone()[0]
             if count > 0:
-                raise HTTPException(status_code=400, detail="Já existem usuários cadastrados. Utilize o login.")
+                # Depois da instalação, contas só são criadas dentro do sistema (Usuários), por um administrador.
+                raise HTTPException(status_code=403, detail="Configuração inicial já concluída. Novas contas são criadas por um administrador dentro do sistema.")
 
             valid, pwd_errors = validate_password(req.password)
             if not valid:
@@ -605,11 +630,7 @@ def auth_setup(req: RegisterRequest, request: Request):
 
 @_core_router.post("/logout")
 def logout(request: Request):
-    token = request.cookies.get('gboc_token') or request.cookies.get('gboc_server_token')
-    if not token:
-        auth_header = request.headers.get('Authorization', '')
-        if auth_header.startswith('Bearer '):
-            token = auth_header[7:].strip()
+    token, _ = _resolve_session(request)
     if token and token in ACTIVE_TOKENS:
         del ACTIVE_TOKENS[token]
     if token:
@@ -623,8 +644,10 @@ def logout(request: Request):
         except Exception:
             pass
     resp = JSONResponse({"status": "success", "message": "Logout realizado"})
-    resp.delete_cookie("gboc_token")
-    resp.delete_cookie("gboc_server_token")
+    # Apaga só o cookie do Agente (e o legado gboc_token). gboc_server_token pertence ao Servidor no
+    # mesmo host: apagá-lo aqui derrubava a sessão do Servidor.
+    resp.delete_cookie(SESSION_COOKIE, path="/")
+    resp.delete_cookie("gboc_token", path="/")
     return resp
 
 

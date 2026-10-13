@@ -8,8 +8,8 @@ Agora:
   * objects/<aa>/<sha256>  — blocos de até 4 MiB identificados pelo hash do conteúdo. Um bloco igual (mesmo
     arquivo em outra pasta, outra tarefa, outro snapshot, trecho que não mudou de um arquivo grande) é enviado
     UMA vez só;
-  * cada bloco é compactado (zstd quando disponível, senão zlib) e guardado sem compactar quando não vale a pena
-    (arquivos já compactados: zip, jpg, mp4, pst…). 1º byte do objeto = codec (R=sem, Z=zlib, S=zstd);
+  * cada bloco é compactado (zstd quando disponível, senão zlib; LZMA2 opcional para arquivamento) e guardado sem
+    compactar quando não vale a pena (zip, jpg, mp4, pst…). 1º byte do objeto = codec (R=sem, Z=zlib, S=zstd, L=LZMA2);
   * detecção rápida: arquivo com mesmo tamanho e data de modificação do backup anterior não é relido;
   * envio e download em paralelo (várias conexões) quando o repositório permite;
   * restauração confere o hash de cada bloco e do arquivo inteiro e devolve a data de modificação original.
@@ -23,6 +23,7 @@ import logging
 import os
 import shutil
 import tempfile
+import lzma
 import threading
 import zlib
 from concurrent.futures import ThreadPoolExecutor
@@ -52,13 +53,16 @@ def object_name(h: str) -> str:
 
 
 def resolve_codec(name: Optional[str]) -> str:
-    """auto → zstd se instalado, senão zlib. Valores: zstd | zlib | none."""
+    """auto → zstd se instalado, senão zlib. Valores: zstd | zlib | lzma2 | none."""
     n = (name or "auto").lower()
     if n in ("none", "off", "store", "stored"):
         return "none"
     if n == "zstd":
         return "zstd" if _zstd else "zlib"
-    if n in ("zlib", "deflate", "lzma", "bzip2"):
+    # LZMA2 (mesmo algoritmo do 7-Zip/.xz; módulo lzma da biblioteca padrão). Antes "lzma" virava zlib sem aviso.
+    if n in ("lzma2", "lzma", "xz", "7z"):
+        return "lzma2"
+    if n in ("zlib", "deflate", "bzip2"):
         return "zlib"
     return "zstd" if _zstd else "zlib"
 
@@ -68,6 +72,12 @@ def compress(data: bytes, codec: str, level: Optional[int] = None) -> bytes:
         return b"R" + data
     if codec == "zstd" and _zstd:
         out = b"S" + _zstd.ZstdCompressor(level=level or 6).compress(data)
+    elif codec == "lzma2":
+        # .xz com filtro LZMA2. Preset limitado a 7: acima disso o dicionário passa de 16 MiB (inútil para blocos
+        # de 4 MiB) e cada thread chegaria a ~680 MiB de RAM no preset 9. CHECK_NONE: o bloco já é validado pelo SHA-256.
+        preset = max(0, min(int(level if level is not None else 6), 7))
+        out = b"L" + lzma.compress(data, format=lzma.FORMAT_XZ, check=lzma.CHECK_NONE,
+                                   filters=[{"id": lzma.FILTER_LZMA2, "preset": preset}])
     else:
         out = b"Z" + zlib.compress(data, min(int(level or 6), 9))
     # não compensou (já compactado): guarda como está
@@ -84,6 +94,8 @@ def decompress(blob: bytes) -> bytes:
         if not _zstd:
             raise RuntimeError("Este backup usa compressão zstd: instale o pacote Python 'zstandard' no agente")
         return _zstd.ZstdDecompressor().decompress(body)
+    if tag == b"L":
+        return lzma.decompress(body, format=lzma.FORMAT_XZ)
     raise ValueError("Objeto de backup com formato desconhecido")
 
 

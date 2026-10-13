@@ -33,8 +33,10 @@ class SecuritySentinel:
             return {"available": False, "status": "N/A", "detail": "Disponível apenas no Windows"}
 
         try:
-            cmd = "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"Get-MpComputerStatus | Select-Only RealTimeProtectionEnabled, AntivirusEnabled, SignatureVersion, FullScanRequired | ConvertTo-Json\""
-            res = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=15)
+            # Lista de argumentos (sem shell): não depende de aspas/nomes 8.3. "Select-Only" não existe — era Select-Object.
+            cmd = ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+                   "Get-MpComputerStatus | Select-Object RealTimeProtectionEnabled, AntivirusEnabled, SignatureVersion, FullScanRequired | ConvertTo-Json"]
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
             if res.returncode == 0 and res.stdout.strip():
                 data = json.loads(res.stdout)
                 return {
@@ -44,10 +46,12 @@ class SecuritySentinel:
                     "signature_version": data.get("SignatureVersion", "N/A"),
                     "full_scan_required": data.get("FullScanRequired", False)
                 }
-            return {"available": True, "realtime_protection": True, "antivirus_enabled": True, "detail": "Windows Defender Ativo"}
+            # Sem resposta válida: status desconhecido (antes devolvia "proteção ativa" sem ter consultado nada)
+            return {"available": False, "realtime_protection": None, "antivirus_enabled": None,
+                    "detail": (res.stderr or "Get-MpComputerStatus não retornou dados").strip()[:300]}
         except Exception as e:
             logger.warning(f"Erro ao consultar Windows Defender: {e}")
-            return {"available": True, "realtime_protection": True, "detail": str(e)}
+            return {"available": False, "realtime_protection": None, "detail": str(e)}
 
     def trigger_windows_defender_scan(self, scan_type: str = "Quick") -> dict:
         """Dispara varredura no Windows Defender (QuickScan ou FullScan)."""
@@ -55,9 +59,9 @@ class SecuritySentinel:
             return {"success": False, "message": "Disponível apenas no Windows"}
 
         try:
-            cmd_type = 1 if scan_type.lower() == "quick" else 2
-            cmd = f"powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"Start-MpScan -ScanType {scan_type}Scan\""
-            res = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=120)
+            scan_type = "Quick" if str(scan_type).lower() == "quick" else "Full"   # valor fixo: nada do pedido chega ao shell
+            cmd = ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", f"Start-MpScan -ScanType {scan_type}Scan"]
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
             return {
                 "success": res.returncode == 0,
                 "scan_type": scan_type,
@@ -69,8 +73,9 @@ class SecuritySentinel:
     def run_clamav_scan(self, target_path: str) -> dict:
         """Executa varredura via ClamAV (clamscan / clamdscan)."""
         try:
-            cmd = f"clamscan --no-summary {target_path}"
-            res = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=60)
+            # Lista de argumentos: caminho com espaço funciona mesmo sem nomes 8.3 (antes ia sem aspas para o shell)
+            cmd = ["clamscan", "--no-summary", str(target_path)]
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
             clean = (res.returncode == 0)
             infected = (res.returncode == 1)
             return {
@@ -81,7 +86,8 @@ class SecuritySentinel:
                 "output": res.stdout
             }
         except Exception as e:
-            return {"engine": "ClamAV", "clean": True, "infected": False, "detail": f"ClamAV CLI indisponível ({e})"}
+            # ClamAV ausente: resultado desconhecido (antes informava "limpo" sem ter varrido)
+            return {"engine": "ClamAV", "available": False, "clean": None, "infected": None, "detail": f"ClamAV CLI indisponível ({e})"}
 
     def scan_yara_rules(self, target_file: str) -> dict:
         """Varre arquivo com regras heurísticas YARA para detecção de malware/ransomware."""

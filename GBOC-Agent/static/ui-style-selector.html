@@ -402,17 +402,18 @@
     <script src="/static/gboc-modal.js"></script>
 
     <script>
+        // Usa o layout manager (mesmas chaves gboc-ui-style / gboc-color-theme das outras telas).
+        // Antes gravava em gboc_ui_style / gboc_color_theme, que ninguém lê: ao sair da tela a escolha se perdia.
         function setStyle(style) {
-            document.documentElement.setAttribute('data-ui-style', style);
-            localStorage.setItem('gboc_ui_style', style);
+            if (window.GBOCLayout && GBOCLayout.setUiStyle) GBOCLayout.setUiStyle(style);
+            else document.documentElement.setAttribute('data-ui-style', style);
             updateActiveButtons();
             updateInspectorTokens();
         }
 
         function setTheme(theme) {
-            document.documentElement.setAttribute('data-theme', theme);
-            document.documentElement.setAttribute('data-color-theme', theme);
-            localStorage.setItem('gboc_color_theme', theme);
+            if (window.GBOCLayout && GBOCLayout.setTheme) GBOCLayout.setTheme(theme);
+            else document.documentElement.setAttribute('data-color-theme', theme);
             updateActiveButtons();
             updateInspectorTokens();
         }
@@ -427,7 +428,8 @@
 
         function updateActiveButtons() {
             const currentStyle = document.documentElement.getAttribute('data-ui-style') || 'minimal';
-            const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+            // data-color-theme guarda a cor escolhida; data-theme é só dark/light (com Oceano marcava "Escuro")
+            const currentTheme = document.documentElement.getAttribute('data-color-theme') || document.documentElement.getAttribute('data-theme') || 'dark';
 
             ['minimal', 'neumorphism', 'claymorphism', 'fluent', 'nexus-widgets', 'nexus-glass', 'command-sentinel', 'cyber-3d', 'fernly', 'fernly-cyberpunk', 'fernly-fluid'].forEach(s => {
                 const btn = document.getElementById(`btn-style-${s}`);
@@ -461,11 +463,9 @@
             btn.style.opacity = '0.85';
             
             const currentStyle = document.documentElement.getAttribute('data-ui-style') || 'minimal';
-            const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
-            
-            localStorage.setItem('gboc_ui_style', currentStyle);
-            localStorage.setItem('gboc_color_theme', currentTheme);
-            localStorage.setItem('gboc_theme', currentTheme);
+            const currentTheme = document.documentElement.getAttribute('data-color-theme') || 'dark';
+            // Grava pelas chaves que o sistema lê (o layout manager já persistiu ao clicar; reforço aqui)
+            if (window.GBOCLayout) { GBOCLayout.setUiStyle(currentStyle); GBOCLayout.setTheme(currentTheme); }
 
             try {
                 await fetch('/api/v2/system/ui-config', {
