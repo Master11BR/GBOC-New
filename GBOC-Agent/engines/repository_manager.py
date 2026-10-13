@@ -151,6 +151,11 @@ class RepositoryManager:
             from engines import repo_secrets
             repo_secrets.inject(normalized, config)
         normalized.pop('secret_enc', None)
+        # Valor mascarado ("********") nunca é chave real: não pode virar a chave secreta na normalização
+        from engines.repo_secrets import MASK as _MASK
+        for _f in ('cloud_password', 'secret_key', 'aws_secret_key', 'b2_account_key', 'azure_account_key'):
+            if str(normalized.get(_f) or '').strip() == _MASK:
+                normalized.pop(_f, None)
 
         # 1. Separar e normalizar senha do motor (criptografia do repositório)
         motor_p = (
@@ -398,14 +403,9 @@ class RepositoryManager:
             raise
 
         # Obter senha da nuvem se fornecida separadamente
-        cloud_pwd = str(
-            data.get('cloud_password') or 
-            data.get('secret_key') or 
-            data.get('aws_secret_key') or 
-            data.get('b2_account_key') or 
-            data.get('azure_account_key') or 
-            (pwd if repo_type == 'local' else '')
-        ).strip()
+        # Mesma ordem usada para a cópia criptografada (secret_enc): coluna e cópia sempre com a mesma chave
+        from engines import repo_secrets as _rs
+        cloud_pwd = str(_rs.secret_from_data(data) or (pwd if repo_type == 'local' else '')).strip()
         if not cloud_pwd:
             cloud_pwd = pwd
 
@@ -496,8 +496,9 @@ class RepositoryManager:
         new_secret = repo_secrets.secret_from_data(data)
         if new_secret:
             config_data['secret_enc'] = repo_secrets.encrypt(new_secret)
-            if 'cloud_password' not in data:
-                data['cloud_password'] = new_secret
+            # cloud_password (coluna) e a cópia criptografada são a MESMA chave da nuvem: gravadas sempre juntas.
+            # Antes, com secret_key e cloud_password diferentes no formulário, cada lugar ficava com um valor.
+            data['cloud_password'] = new_secret
         elif any(data.get(f) == '' for f in repo_secrets.SECRET_FIELDS):
             config_data.pop('secret_enc', None)
             if 'cloud_password' not in data:

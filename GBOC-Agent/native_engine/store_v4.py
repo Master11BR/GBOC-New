@@ -130,8 +130,11 @@ def _backend_get(be, remote: str) -> bytes:
             pass
 
 
-def load_index(backend, names: Optional[Iterable[str]] = None) -> Tuple[Dict[str, Tuple[str, int, int]], Dict[str, Dict[str, Any]]]:
-    """Lê index/*.json. Retorna ({hash: (pacote, início, tamanho)}, {arquivo de índice: conteúdo})."""
+def load_index(backend, names: Optional[Iterable[str]] = None,
+               existing_packs: Optional[Set[str]] = None) -> Tuple[Dict[str, Tuple[str, int, int]], Dict[str, Dict[str, Any]]]:
+    """Lê index/*.json. Retorna ({hash: (pacote, início, tamanho)}, {arquivo de índice: conteúdo}).
+    existing_packs: só aceita localizações em pacotes que existem (um bloco reenviado depois de perder o pacote
+    aparece em dois índices: vale o pacote presente)."""
     if names is None:
         names = backend.list_files(sub_path=INDEX_DIR) or []
     files = sorted(n for n in (str(x).replace("\\", "/") for x in names) if n.startswith(INDEX_DIR + "/") and n.endswith(".json"))
@@ -141,6 +144,8 @@ def load_index(backend, names: Optional[Iterable[str]] = None) -> Tuple[Dict[str
         doc = json.loads(decompress(_backend_get(backend, name)).decode("utf-8"))
         docs[name] = doc
         for pid, entries in (doc.get("packs") or {}).items():
+            if existing_packs is not None and pid not in existing_packs:
+                continue
             for h, off, ln in entries:
                 located.setdefault(h, (pid, int(off), int(ln)))
     return located, docs
@@ -255,7 +260,16 @@ class ObjectStore:
             objs = [n for n in names if str(n).replace("\\", "/").startswith(OBJ_DIR + "/")] if names is not None \
                 else (self.backend.list_files(sub_path=OBJ_DIR) or [])
             known = {str(n).replace("\\", "/").rsplit("/", 1)[-1] for n in objs}
-            self._located, _docs = load_index(self.backend, names)
+            pack_names = [n for n in names if str(n).replace("\\", "/").startswith(PACK_DIR + "/")] if names is not None \
+                else (self.backend.list_files(sub_path=PACK_DIR) or [])
+            packs = {str(n).replace("\\", "/").rsplit("/", 1)[-1] for n in pack_names}
+            # Pacote citado no índice mas ausente no repositório: os blocos dele NÃO contam como existentes —
+            # o backup os envia de novo (em vez de deduplicar contra um bloco perdido) e a verificação acusa a falta.
+            self._located, docs = load_index(self.backend, names, existing_packs=packs)
+            lost = {pid for d in docs.values() for pid in (d.get("packs") or {}) if pid not in packs}
+            if lost:
+                logger.warning(f"{len(lost)} pacote(s) citado(s) no índice não existem no repositório: "
+                               "os blocos afetados serão reenviados no próximo backup")
             known.update(self._located)
             self._known = known
         return self._known

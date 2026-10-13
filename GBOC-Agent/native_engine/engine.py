@@ -548,7 +548,9 @@ class GBOCNativeEngine:
                             st = os.stat(fpath)
                             rel = prefix + os.path.relpath(fpath, base_dir).replace('\\', '/')
                             old = prev.get(rel)
-                            if old and old.get('size') == st.st_size and abs(float(old.get('mtime') or 0) - st.st_mtime) < 0.001:
+                            # inalterado e com todos os blocos presentes no repositório (senão relê e reenvia)
+                            if old and old.get('size') == st.st_size and abs(float(old.get('mtime') or 0) - st.st_mtime) < 0.001 \
+                                    and all(h in store.known() for h in (old.get('chunks') or [])):
                                 entry = dict(old)                   # inalterado: nem lê o arquivo
                                 stats["reused"] += 1
                             else:
@@ -661,7 +663,7 @@ class GBOCNativeEngine:
         store = self._store()
         snaps = [snapshot_id] if snapshot_id else [s['id'] for s in self.list_snapshots()]
         missing, corrupt, checked, legacy = [], [], set(), 0
-        known = store.known()
+        known = store.known()                        # blocos em pacote ausente já ficam fora (ver ObjectStore.known)
         for sid in snaps:
             m = self._load_manifest(sid) or {}
             if int(m.get('version') or 0) < 4:

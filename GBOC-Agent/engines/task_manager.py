@@ -1484,6 +1484,10 @@ class TaskManager:
                 if not os.path.exists(p):
                     return {"success": False, "error": f"Caminho inválido ou não encontrado: {p}"}
 
+            # Chave secreta do provedor: a já resolvida acima (secret_enc criptografado no config) tem prioridade.
+            # Antes a coluna repositories.cloud_password (pode estar desatualizada após editar a chave) virava
+            # 'secret_key' na normalização e o envio falhava com SignatureDoesNotMatch.
+            _cloud_secret = task.get('aws_secret_key') or task.get('b2_account_key') or task.get('cloud_password')
             repo_cfg = {
                 'id': task.get('repository_id'),
                 'type': task.get('repo_type', 'local'),
@@ -1491,7 +1495,8 @@ class TaskManager:
                 'bucket': task.get('repo_path', ''),
                 'engine': 'gboc_native',
                 'motor_password': task.get('motor_password'),
-                'cloud_password': task.get('cloud_password'),
+                'cloud_password': _cloud_secret,
+                'secret_key': _cloud_secret,
                 'aws_access_key': task.get('aws_access_key'),
                 'aws_secret_key': task.get('aws_secret_key'),
                 'b2_account_id': task.get('b2_account_id'),

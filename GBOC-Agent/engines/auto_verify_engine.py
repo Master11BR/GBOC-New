@@ -101,7 +101,12 @@ class AutoVerifyEngine:
             # 5. Gravação permanente do teste no banco de dados
             self._save_verification_result(repo_id, engine_type, status, elapsed, details, error_msg)
 
-        logger.info(f"✅ [SureRestore] Auto-verificação concluída para Tarefa {task_id}: Status={status} ({elapsed}s)")
+        if status == "passed":
+            logger.info(f"✅ [SureRestore] Auto-verificação concluída para Tarefa {task_id}: Status=passed ({elapsed}s)"
+                        f" — {details.get('summary') or ''}")
+        else:
+            logger.warning(f"❌ [SureRestore] Auto-verificação da Tarefa {task_id}: Status=failed ({elapsed}s)"
+                           f" — {error_msg or details.get('summary') or 'sem detalhe'}")
         return {
             "task_id": task_id,
             "execution_id": execution_id,
@@ -140,132 +145,76 @@ class AutoVerifyEngine:
             pass
         return None
 
-    def _verify_restic(self, task: Dict[str, Any], repo_id: Optional[int], sandbox_dir: str) -> Dict[str, Any]:
-        """Valida a integridade física real do repositório Restic."""
-        repo_path = self._get_repo_path(repo_id)
-        if not repo_path or not os.path.exists(repo_path):
-            return {
-                "success": False,
-                "engine": "restic",
-                "error": f"Caminho do repositório Restic inacessível: {repo_path}"
-            }
-        
-        # Verificar existência da estrutura do repositório restic (config, data, index, keys, snapshots)
-        config_file = os.path.join(repo_path, "config")
-        has_config = os.path.exists(config_file)
-        data_dir = os.path.join(repo_path, "data")
-        blocks_count = len(os.listdir(data_dir)) if os.path.exists(data_dir) else 0
+    # ── Verificações reais (as mesmas da tela Integridade) ─────────────────────────────────────────────────
+    # Antes cada motor só olhava repositories.path como pasta LOCAL: repositório em nuvem (bucket) sempre dava
+    # "inacessível" (failed em 0,0 s) e o nativo dava PASSED sem conferir nada.
 
-        return {
-            "success": has_config,
-            "engine": "restic",
-            "method": "real_filesystem_and_index_verification",
-            "repo_path": repo_path,
-            "verified_blocks": f"{blocks_count} blocos de dados verificados",
-            "sha256_check": "PASSED" if has_config else "FAILED_NO_CONFIG"
-        }
+    def _load_repo(self, repo_id: Optional[int]) -> Dict[str, Any]:
+        if not repo_id:
+            raise ValueError("Tarefa sem repositório associado")
+        with self.core.get_db_connection() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT id, name, path, motor_password, cloud_password, type, config FROM repositories WHERE id = %s",
+                        (repo_id,))
+            row = cur.fetchone()
+        if not row:
+            raise ValueError(f"Repositório {repo_id} não encontrado")
+        return {"id": row[0], "name": row[1], "path": row[2], "motor_password": row[3], "cloud_password": row[4],
+                "type": row[5], "config": row[6]}
+
+    def _integrity_check(self, engine: str, repo_id: Optional[int]) -> Dict[str, Any]:
+        from api import integrity_api as ia
+        checks = {"restic": ia._check_restic, "kopia": ia._check_kopia, "duplicati": ia._check_duplicati}
+        repo = ia._expand_repo_config(self._load_repo(repo_id))
+        r = checks[engine](repo)
+        return {"success": bool(r.get("success")), "engine": engine, "method": f"{engine}_integrity_check",
+                "summary": r.get("summary"), "output": (r.get("output") or "")[-1500:],
+                "error": None if r.get("success") else (r.get("summary") or "verificação falhou")}
+
+    def _verify_restic(self, task: Dict[str, Any], repo_id: Optional[int], sandbox_dir: str) -> Dict[str, Any]:
+        """restic check (estrutura, índices e snapshots), local ou nuvem."""
+        return self._integrity_check("restic", repo_id)
 
     def _verify_kopia(self, task: Dict[str, Any], repo_id: Optional[int], sandbox_dir: str) -> Dict[str, Any]:
-        """Valida a integridade física real do repositório Kopia."""
-        repo_path = self._get_repo_path(repo_id)
-        if not repo_path or not os.path.exists(repo_path):
-            return {
-                "success": False,
-                "engine": "kopia",
-                "error": f"Caminho do repositório Kopia inacessível: {repo_path}"
-            }
-
-        blobs_dir = os.path.join(repo_path, "p")
-        has_blobs = os.path.exists(repo_path) and len(os.listdir(repo_path)) > 0
-
-        return {
-            "success": has_blobs,
-            "engine": "kopia",
-            "method": "real_kopia_blob_and_manifest_check",
-            "repo_path": repo_path,
-            "verified_blocks": f"Diretório de blobs verificado ({len(os.listdir(repo_path))} objetos)",
-            "sha256_check": "PASSED" if has_blobs else "FAILED_EMPTY_REPO"
-        }
+        """kopia snapshot verify (amostra de arquivos), local ou nuvem."""
+        return self._integrity_check("kopia", repo_id)
 
     def _verify_duplicati(self, task: Dict[str, Any], repo_id: Optional[int], sandbox_dir: str) -> Dict[str, Any]:
-        """Valida a integridade física real dos volumes Duplicati (dblock/dlist/dindex)."""
-        repo_path = self._get_repo_path(repo_id)
-        if not repo_path or not os.path.exists(repo_path):
-            return {
-                "success": False,
-                "engine": "duplicati",
-                "error": f"Caminho de armazenamento do Duplicati inacessível: {repo_path}"
-            }
-
-        files = os.listdir(repo_path)
-        dblock_files = [f for f in files if "dblock" in f or "dlist" in f or "dindex" in f]
-
-        return {
-            "success": len(dblock_files) > 0,
-            "engine": "duplicati",
-            "method": "real_dblock_volume_audit",
-            "repo_path": repo_path,
-            "verified_blocks": f"{len(dblock_files)} volumes de dados identificados e validados",
-            "sha256_check": "PASSED" if dblock_files else "FAILED_NO_VOLUMES"
-        }
+        """Acesso ao repositório Duplicati e listagem dos backups."""
+        return self._integrity_check("duplicati", repo_id)
 
     def _verify_native(self, task: Dict[str, Any], repo_id: Optional[int], sandbox_dir: str) -> Dict[str, Any]:
-        """Valida a integridade física real do motor GBOC Native via hashes SHA-256 de blocos."""
-        import hashlib
-        repo_path = self._get_repo_path(repo_id)
-        if not repo_path or not os.path.exists(repo_path):
-            return {
-                "success": False,
-                "engine": "gboc_native",
-                "error": f"Caminho do repositório GBOC Native inacessível: {repo_path}"
-            }
-
-        # Calcular hash de arquivo real
-        hashes_calculated = 0
-        for root, _, files in os.walk(repo_path):
-            for f in files[:5]: # Auditar até 5 arquivos reais por verificação
-                fpath = os.path.join(root, f)
-                try:
-                    h = hashlib.sha256()
-                    with open(fpath, "rb") as fp:
-                        h.update(fp.read(65536))
-                    hashes_calculated += 1
-                except Exception:
-                    pass
-
-        return {
-            "success": True,
-            "engine": "gboc_native",
-            "method": "real_sha256_block_checksum",
-            "repo_path": repo_path,
-            "verified_blocks": f"{hashes_calculated} arquivos auditados com SHA-256 no disco",
-            "sha256_check": "PASSED"
-        }
+        """Motor nativo: confere se TODOS os blocos de todos os snapshots existem no repositório (local ou nuvem)."""
+        from native_engine.engine import GBOCNativeEngine
+        repos = getattr(self.core, "repository_manager", None)
+        if repos is None:
+            raise RuntimeError("RepositoryManager indisponível para a verificação do motor nativo")
+        if not repo_id:
+            raise ValueError("Tarefa sem repositório associado")
+        backend = repos.get_backend(int(repo_id))        # mesmas credenciais e região usadas na restauração
+        r = GBOCNativeEngine(task_config={}, storage_backend=backend).verify(read_data=False)
+        return {"success": bool(r.get("success")), "engine": "gboc_native", "method": "native_block_presence_check",
+                "summary": r.get("summary"), "snapshots": r.get("snapshots"), "chunks_checked": r.get("chunks_checked"),
+                "missing": (r.get("missing") or [])[:10],
+                "error": None if r.get("success") else r.get("summary")}
 
     def _verify_generic_manifest(self, task: Dict[str, Any], repo_id: Optional[int], sandbox_dir: str) -> Dict[str, Any]:
-        repo_path = self._get_repo_path(repo_id)
-        if not repo_path or not os.path.exists(repo_path):
-            return {
-                "success": False,
-                "engine": task.get("engine", "generic"),
-                "error": f"Caminho do repositório inacessível: {repo_path}"
-            }
-        return {
-            "success": True,
-            "engine": task.get("engine", "generic"),
-            "method": "real_structural_manifest_check",
-            "repo_path": repo_path,
-            "verified_blocks": f"Repositório em {repo_path} validado com sucesso",
-            "sha256_check": "PASSED"
-        }
+        return {"success": False, "engine": task.get("engine", "generic"), "method": "unsupported",
+                "error": f"Verificação automática não disponível para o motor {task.get('engine')}"}
 
     def _save_verification_result(self, repo_id: Optional[int], engine: str, status: str, duration: float, details: Dict[str, Any], error: Optional[str]):
         """Grava na tabela integrity_checks."""
         try:
             with self.core.get_db_connection() as conn:
+                try:
+                    from api.integrity_api import _ensure_integrity_table
+                    _ensure_integrity_table(conn)            # instalação nova: tabela ainda não criada
+                except Exception as e:
+                    logger.debug(f"[SureRestore] integrity_checks: {e}")
                 cur = conn.cursor()
                 now = datetime.now()
-                summary = f"SureRestore Auto-Verify: {status.upper()} ({details.get('method', 'check')}) in {duration}s"
+                summary = (f"SureRestore Auto-Verify: {status.upper()} ({details.get('method', 'check')}) in {duration}s"
+                           + (f" — {details.get('summary') or error}" if (details.get('summary') or error) else ""))
                 errors_cnt = 0 if status == "passed" else 1
                 cur.execute("""
                     INSERT INTO integrity_checks (repository_id, engine, status, started_at, finished_at, result_summary, errors_found, raw_output)
