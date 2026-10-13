@@ -1,6 +1,6 @@
 <!--
 ==============================================================================
-GBOC System Enterprise Edition - V7 Modern Login & Security Core
+GBOC System Enterprise Edition - Login & Security Core
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
@@ -10,7 +10,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GBOC Agent - Login Enterprise V7</title>
+    <title>GBOC Agente - Login</title>
     
     
     <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
@@ -203,16 +203,6 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             will-change: transform, opacity;
         }
 
-        /* Swatches de Iluminação na barra superior */
-        .theme-pill-btn {
-            transition: all 0.2s ease;
-        }
-        .theme-pill-btn:hover {
-            transform: scale(1.15);
-        }
-        .theme-pill-btn.active {
-            box-shadow: 0 0 0 2px #fff, 0 0 12px var(--primary-glow);
-        }
 
         /* Suporte a Light Mode nos textos e inputs */
         [data-color-theme="light"] .light-card-text {
@@ -295,41 +285,31 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         </div>
     </div>
 
-    <!-- Cabeçalho com Identidade GBOC, Seletor de Iluminação e Navegação -->
+    <!-- Cabeçalho: conexão | identificação do sistema e versão | navegação.
+         O tema não é alterável aqui: só depois do login (Configurações > Estilos e Temas). -->
     <header class="w-full p-6 flex flex-wrap justify-between items-center z-10 max-w-7xl mx-auto gap-4 relative">
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-3" id="conn-info" title="Estado da conexão com o serviço">
             <span class="relative flex h-2.5 w-2.5">
-                <span class="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style="background-color: var(--primary-color, #f59e0b);"></span>
-                <span class="relative inline-flex rounded-full h-2.5 w-2.5" style="background-color: var(--primary-color, #f59e0b);"></span>
+                <span id="conn-ping" class="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style="background-color: #a1a1aa;"></span>
+                <span id="conn-dot" class="relative inline-flex rounded-full h-2.5 w-2.5" style="background-color: #a1a1aa;"></span>
             </span>
-            <span id="app-badge-title" class="text-[11px] uppercase tracking-[0.25em] text-zinc-400 font-semibold light-card-muted">GBOC AGENT NODE</span>
+            <span id="app-badge-title" class="text-[11px] uppercase tracking-[0.2em] text-zinc-400 font-semibold light-card-muted">Verificando conexão…</span>
         </div>
 
         <div class="flex items-center gap-2 text-2xl font-black tracking-wider drop-shadow-md">
             <span class="bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 bg-clip-text text-transparent font-extrabold" id="brand-logo-text">GBOC</span>
-            <span class="text-xs font-bold px-2 py-0.5 rounded border border-white/10 bg-white/5 tracking-wider text-zinc-300" id="brand-edition-tag">V7 AGENT</span>
+            <span class="text-xs font-bold px-2 py-0.5 rounded border border-white/10 bg-white/5 tracking-wider text-zinc-300" id="brand-edition-tag">AGENTE</span>
+            <span class="text-[11px] font-semibold tracking-wider text-zinc-500 light-card-muted" id="brand-version"></span>
         </div>
 
         <div class="flex items-center gap-5 text-xs font-semibold tracking-wide">
-            <!-- Seletor Rápido de Iluminação / Padrão de Luz -->
-            <div class="flex items-center gap-1.5 p-1 rounded-full bg-zinc-900/60 border border-zinc-800/80 backdrop-blur-md" title="Padrão de Iluminação do Sistema">
-                <button type="button" onclick="setIllumination('amber')" class="theme-pill-btn w-5 h-5 rounded-full bg-gradient-to-tr from-amber-600 to-yellow-400 border border-white/20" title="Âmbar (Solaris Gold)"></button>
-                <button type="button" onclick="setIllumination('dark')" class="theme-pill-btn w-5 h-5 rounded-full bg-gradient-to-tr from-zinc-800 to-indigo-600 border border-white/20" title="Escuro (Carbon Graphite)"></button>
-                <button type="button" onclick="setIllumination('light')" class="theme-pill-btn w-5 h-5 rounded-full bg-gradient-to-tr from-slate-200 to-white border border-zinc-400" title="Claro (High Contrast)"></button>
-                <button type="button" onclick="setIllumination('purple')" class="theme-pill-btn w-5 h-5 rounded-full bg-gradient-to-tr from-purple-800 to-purple-500 border border-white/20" title="Púrpura (Royal Amethyst)"></button>
-                <button type="button" onclick="setIllumination('ocean')" class="theme-pill-btn w-5 h-5 rounded-full bg-gradient-to-tr from-teal-800 to-cyan-500 border border-white/20" title="Oceano (Abyssal Teal)"></button>
-                <button type="button" onclick="setIllumination('red')" class="theme-pill-btn w-5 h-5 rounded-full bg-gradient-to-tr from-red-800 to-red-500 border border-white/20" title="Vermelho (Sentinel Ruby)"></button>
-            </div>
-
-            <span class="text-zinc-700">|</span>
-
-            <!-- Abas de alternância de tela -->
             <button type="button" id="tab-login-btn" class="cursor-pointer transition-colors duration-300 font-bold flex items-center gap-1.5" style="color: var(--primary-color, #f59e0b);" onclick="switchForm('login')">
                 <i class="fa-solid fa-arrow-right-to-bracket text-[11px]"></i>
                 <span>ENTRAR</span>
             </button>
-            <span class="text-zinc-700">|</span>
-            <button type="button" id="tab-register-btn" class="cursor-pointer text-zinc-400 hover:text-yellow-400 transition-colors duration-300 font-semibold flex items-center gap-1.5 light-card-muted" onclick="switchForm('register')">
+            <!-- Primeiro acesso: só aparece enquanto não existe administrador (instalação nova) -->
+            <span id="tab-register-sep" class="text-zinc-700 hidden">|</span>
+            <button type="button" id="tab-register-btn" class="hidden cursor-pointer text-zinc-400 hover:text-yellow-400 transition-colors duration-300 font-semibold flex items-center gap-1.5 light-card-muted" onclick="switchForm('register')">
                 <i class="fa-solid fa-user-plus text-[11px]"></i>
                 <span id="tab-register-label">PRIMEIRO ACESSO</span>
             </button>
@@ -441,7 +421,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                     </button>
                 </div>
 
-                <p class="text-center text-[13px] text-zinc-500 mt-7 light-card-muted">
+                <p id="register-hint" class="hidden text-center text-[13px] text-zinc-500 mt-7 light-card-muted">
                     Não possui credenciais? <span onclick="switchForm('register')" class="font-bold cursor-pointer hover:underline transition-colors" style="color: var(--primary-color, #f59e0b);">Primeiro Acesso</span>
                 </p>
             </div>
@@ -549,36 +529,20 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             apple: { enabled: false }
         };
 
-        // ── 1. Integração com o Padrão de Iluminação do Sistema ──────────────
-        function setIllumination(theme) {
-            const validThemes = ['amber', 'dark', 'light', 'purple', 'ocean', 'red'];
-            if (!validThemes.includes(theme)) theme = 'amber';
-
+        // ── 1. Tema: apenas aplica o tema já escolhido dentro do sistema (sem seletor no login) ──
+        const VALID_THEMES = ['amber', 'dark', 'light', 'purple', 'ocean', 'red'];
+        function applySavedTheme() {
+            let theme = 'amber';
+            try { theme = localStorage.getItem('gboc-color-theme') || localStorage.getItem('gboc-theme') || 'amber'; } catch (e) { /* armazenamento bloqueado: tema padrão */ }
+            if (!VALID_THEMES.includes(theme)) theme = 'amber';
             document.documentElement.setAttribute('data-theme', theme);
             document.documentElement.setAttribute('data-color-theme', theme);
-            localStorage.setItem('gboc-color-theme', theme);
-            localStorage.setItem('gboc-theme', theme);
-
-            // Marca botão ativo no seletor
-            document.querySelectorAll('.theme-pill-btn').forEach(btn => {
-                const title = btn.getAttribute('title') || '';
-                const match = (theme === 'amber' && title.includes('Âmbar')) ||
-                              (theme === 'dark' && title.includes('Escuro')) ||
-                              (theme === 'light' && title.includes('Claro')) ||
-                              (theme === 'purple' && title.includes('Púrpura')) ||
-                              (theme === 'ocean' && title.includes('Oceano')) ||
-                              (theme === 'red' && title.includes('Vermelho'));
-                btn.classList.toggle('active', match);
-            });
-
-            // Sincroniza GBOCLayout se ativo
-            if (window.GBOCLayout && typeof window.GBOCLayout.setTheme === 'function') {
-                window.GBOCLayout.setTheme(theme);
-            }
         }
 
         // ── 2. Alternância de Formulário com Transição Suave e Perspectiva ──
         function switchForm(type) {
+            // Criação de conta pela tela de login só existe na instalação (nenhum administrador ainda).
+            if (type === 'register' && !isSetupMode) type = 'login';
             clearAlerts();
             const loginForm = document.getElementById('login-form');
             const registerForm = document.getElementById('register-form');
@@ -701,10 +665,22 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             }, 600);
         }
 
+        // Conexão: sistema, endereço e estado (online / indisponível)
+        const APP_LABEL = 'Agente';
+        function setConnectionState(online) {
+            const color = online ? '#10b981' : '#ef4444';
+            const dot = document.getElementById('conn-dot'), ping = document.getElementById('conn-ping');
+            if (dot) dot.style.backgroundColor = color;
+            if (ping) { ping.style.backgroundColor = color; ping.classList.toggle('animate-ping', online); }
+            const badge = document.getElementById('app-badge-title');
+            if (badge) badge.textContent = APP_LABEL + ' · ' + window.location.host + ' · ' + (online ? 'online' : 'indisponível');
+        }
+
         // ── 6. Verificação de Status Inicial e Provedores OAuth ────────────
         async function checkAuthStatus() {
             try {
-                const res = await fetch(API_BASE + '/status');
+                const res = await fetch(API_BASE + '/status', { credentials: 'same-origin' });
+                setConnectionState(res.ok);
                 if (!res.ok) return;
                 const data = await res.json();
 
@@ -738,10 +714,12 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                     isSetupMode = true;
                     document.getElementById('setup-banner').classList.remove('hidden');
                     document.getElementById('tab-register-label').textContent = 'CONFIGURAR AGORA';
+                    ['tab-register-btn', 'tab-register-sep', 'register-hint'].forEach(id => document.getElementById(id)?.classList.remove('hidden'));
                     switchForm('register');
                 }
             } catch (err) {
-                console.warn('Verificação de status do servidor falhou:', err);
+                setConnectionState(false);
+                console.warn('Verificação de status do serviço falhou:', err);
             }
         }
 
@@ -777,16 +755,12 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 
                     if (res.ok && data.status === 'success') {
                         const _remember = !!(document.getElementById('remember-me') || {}).checked;
-                        const _maxAge = _remember ? 7 * 86400 : 86400;
                         localStorage.setItem('gboc_token', data.token);
                         localStorage.setItem('gboc_server_token', data.token);
                         if (data.user) {
                             localStorage.setItem('gboc_user', JSON.stringify(data.user));
                             localStorage.setItem('gboc_server_user', JSON.stringify(data.user));
                         }
-                        // Fallback de cookie no cliente
-                        document.cookie = `gboc_token=${data.token}; path=/; max-age=${_maxAge}; SameSite=Lax`;
-                        document.cookie = `gboc_server_token=${data.token}; path=/; max-age=${_maxAge}; SameSite=Lax`;
 
                         // "Lembrar credencial": sessão de 7 dias + usuário e senha no cofre de senhas do PRÓPRIO
                         // navegador (o GBOC nunca grava a senha). Antes só o usuário era guardado.
@@ -876,8 +850,6 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                                 localStorage.setItem('gboc_user', JSON.stringify(loginData.user));
                                 localStorage.setItem('gboc_server_user', JSON.stringify(loginData.user));
                             }
-                            document.cookie = `gboc_token=${loginData.token}; path=/; max-age=86400; SameSite=Lax`;
-                            document.cookie = `gboc_server_token=${loginData.token}; path=/; max-age=86400; SameSite=Lax`;
                             setTimeout(() => {
                                 window.location.href = '/';
                             }, 500);
@@ -903,19 +875,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 
         // ── 8. Inicialização ────────────────────────────────────────────────
         (function init() {
-            // Restaura iluminação salva ou assume amber/laranja e preto
-            const savedTheme = localStorage.getItem('gboc-color-theme') || localStorage.getItem('gboc-theme') || 'amber';
-            setIllumination(savedTheme);
-
-            // Ajusta branding se executado no GBOC-Agent
-            const isAgent = window.location.port === '9200' || window.location.port === '8081';
-            if (isAgent) {
-                const badge = document.getElementById('app-badge-title');
-                if (badge) badge.textContent = 'GBOC AGENT NODE';
-                const tag = document.getElementById('brand-edition-tag');
-                if (tag) tag.textContent = 'V7 AGENT';
-                document.title = 'GBOC Agent - Login Enterprise V7';
-            }
+            applySavedTheme();
 
             // Preenche credencial lembrada se existir (usuário; a senha vem do cofre de senhas do navegador)
             const remembered = localStorage.getItem('gboc_remember_user');
@@ -939,6 +899,6 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         })();
     </script>
     <!-- Versão real do serviço no rodapé (rota pública) -->
-    <script>fetch('/api/v1/version').then(function(r){return r.ok?r.json():null}).then(function(v){var s=v&&(v.version||v.gboc_version);var e=document.getElementById('gboc-login-version');if(s&&e)e.textContent='v'+String(s).replace(/^v/,'')}).catch(function(){});</script>
+    <script>fetch('/api/v1/version').then(function(r){return r.ok?r.json():null}).then(function(v){var s=v&&(v.version||v.gboc_version);var t='v'+String(s||'').replace(/^v/,'');if(!s)return;['gboc-login-version','brand-version'].forEach(function(id){var e=document.getElementById(id);if(e)e.textContent=t})}).catch(function(){});</script>
 </body>
 </html>

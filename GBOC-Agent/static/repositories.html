@@ -194,6 +194,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                             <option value="auto">Automática (recomendada)</option>
                             <option value="fast">Rápida (menos CPU)</option>
                             <option value="max">Máxima (menor tamanho, mais CPU)</option>
+                            <option value="lzma2">Arquivamento — LZMA2 (menor ainda, bem mais lento; motor nativo)</option>
                             <option value="none">Sem compressão</option>
                         </select>
                         <small style="color:var(--text-muted);font-size:.78em">Arquivos já compactados (zip, jpg, mp4, pst…) não são recompactados no motor nativo. No Kopia, "Automática" liga a compressão zstd (por padrão ele não compacta).</small>
@@ -844,7 +845,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 }
 
                 const _cmpEl = document.getElementById('repoCompression');
-                if (_cmpEl) _cmpEl.value = ['auto', 'fast', 'max', 'none'].includes(repo.compression) ? repo.compression : 'auto';
+                if (_cmpEl) _cmpEl.value = ['auto', 'fast', 'max', 'lzma2', 'none'].includes(repo.compression) ? repo.compression : 'auto';
                 const _parEl = document.getElementById('repoParallel');
                 if (_parEl) _parEl.value = repo.parallel_uploads || '';
 

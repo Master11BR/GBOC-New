@@ -462,6 +462,20 @@ Zero-Overflow & Smart Sidebar Presence Detection.
             }
         });
 
+        // Menu que passaria da borda direita da janela abre alinhado à direita (ex.: menu do avatar saía da tela)
+        if (!window._gbocDropdownEdgeBound) {
+            window._gbocDropdownEdgeBound = true;
+            const fitMenu = (dd) => requestAnimationFrame(() => {
+                const menu = dd && dd.querySelector(':scope > .tb-dropdown-menu');
+                if (!menu) return;
+                menu.classList.remove('tb-align-right');
+                const r = menu.getBoundingClientRect();
+                if (r.width && r.right > document.documentElement.clientWidth - 8) menu.classList.add('tb-align-right');
+            });
+            document.addEventListener('mouseover', (e) => { const dd = e.target.closest && e.target.closest('.tb-dropdown'); if (dd) fitMenu(dd); }, true);
+            document.addEventListener('click', (e) => { const dd = e.target.closest && e.target.closest('.tb-dropdown'); if (dd) fitMenu(dd); }, true);
+        }
+
         // Close open dropdowns when clicking outside
         if (!window._gbocDropdownCloseBound) {
             window._gbocDropdownCloseBound = true;
@@ -856,11 +870,20 @@ Zero-Overflow & Smart Sidebar Presence Detection.
             } catch (e) { /* tenta o próximo; a limpeza local acontece de qualquer forma */ }
         }
 
+        // Cookies não são isolados por porta: Agente e Servidor no mesmo host enxergam os cookies um do
+        // outro. Só apaga cookie que guarda o token DESTE sistema (o do outro continua logado).
+        const ownTokens = new Set();
+        ['gboc_token', 'gboc_server_token'].forEach(k => {
+            try { const v = localStorage.getItem(k); if (v) ownTokens.add(v); } catch (e) { /* armazenamento bloqueado */ }
+        });
         ['gboc_token', 'gboc_server_token', 'gboc_user', 'gboc_server_user'].forEach(k => {
-            try { localStorage.removeItem(k); } catch (e) { /* */ }
+            try { localStorage.removeItem(k); } catch (e) { /* armazenamento bloqueado */ }
         });
         ['gboc_token', 'gboc_server_token'].forEach(c => {
-            document.cookie = c + '=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+            const m = document.cookie.match(new RegExp('(?:^|;\\s*)' + c + '=([^;]+)'));
+            if (m && ownTokens.has(decodeURIComponent(m[1]))) {
+                document.cookie = c + '=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+            }
         });
         window.location.replace('/login.html');
     }
@@ -1319,4 +1342,307 @@ Zero-Overflow & Smart Sidebar Presence Detection.
     window.addEventListener('load', () => { hookSwitchTab(); refresh(); });
 
     window.GBOCNav = { setActive, syncFromKey, toggleMenu, refresh, markTopbar, resolveForPage };
+})();
+
+/* ════════════════════════════════════════════════════════════════════════════
+   GBOCPageHeader — nome do módulo na barra superior + busca global + sem duplicados
+   • O título/subtítulo do cabeçalho da página vai para o topbar (ao lado da busca), com o grupo do menu
+     como trilha. O cabeçalho da página fica só com as ações, compacto, sem sobrepor o conteúdo.
+   • Sem cabeçalho na página (Server/SPA), o título vem do item ativo do menu.
+   • A busca do topbar não tinha nenhuma função ligada: agora sugere as funções do menu (Enter abre) e,
+     no Agente, sem correspondência, busca nas tarefas — o mesmo que a busca duplicada do Dashboard fazia.
+   • Botões que repetem o topbar (Sair → menu do avatar; busca do Dashboard → busca global) saem da página.
+   ════════════════════════════════════════════════════════════════════════════ */
+(function () {
+    'use strict';
+    if (window.GBOCPageHeader) return;
+
+    const clean = (t) => (t || '').replace(/\s+/g, ' ').trim();
+    const norm = (t) => clean(t).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    const isAuth = () => /\/(login|setup|first-access|primeiro-acesso)(\.html)?$/i.test(location.pathname) ||
+                         (document.body && document.body.hasAttribute('data-no-layout'));
+
+    // Cabeçalho da página = bloco que contém o primeiro <h1> visível do conteúdo. As páginas usam marcações
+    // diferentes (header, .header, .content-header, .hermes-header, .page-header...), então parte do título.
+    function pageHeader() {
+        const main = document.querySelector('.main-content');
+        if (!main) return null;
+        // já tratado antes (o título dele está oculto, então as buscas abaixo não o achariam de novo)
+        const done = main.querySelector('.gboc-header-promoted, .gboc-header-empty');
+        if (done) return done;
+        const hiddenCtx = '.modal, [role="dialog"], #gboc-topbar, .sidebar, .tab-pane:not(.active), [hidden]';
+        // 1) cabeçalho explícito da página (header.page-header / .content-header / header.header) com h1 ou h2
+        const explicit = [...main.querySelectorAll('header.page-header, .page-header, .content-header, header.header, :scope > header, :scope > * > header')]
+            .find(h => !h.closest(hiddenCtx) && h.offsetParent !== null && h.querySelector('h1, h2'));
+        if (explicit) return explicit;
+        // 2) senão, o bloco do primeiro <h1> visível
+        const h1 = [...main.querySelectorAll('h1')].find(t =>
+            !t.closest('.modal, [role="dialog"], #gboc-topbar, .sidebar, .tab-pane:not(.active), [hidden]') && t.offsetParent !== null);
+        if (!h1) return null;
+        let box = h1.closest('header, .header, .page-header, .content-header, [class*="-header"]');
+        if (!box || !main.contains(box) || box === main) box = h1.parentElement;
+        // sobe pelos blocos de cabeçalho aninhados (ex.: .hermes-header-text dentro de .hermes-header)
+        while (box.parentElement && box.parentElement !== main && main.contains(box.parentElement) &&
+               /header/i.test(String(box.parentElement.className || '')) && box.parentElement.offsetHeight < 240) {
+            box = box.parentElement;
+        }
+        // sobe até o bloco que também contém as ações do cabeçalho (ex.: <div>título</div><div class="header-actions">)
+        if (box && box.parentElement && box.parentElement !== main && main.contains(box.parentElement) &&
+            box.parentElement.querySelector(':scope > .header-actions, :scope > [class*="actions"]') && !box.matches('header, .header, .content-header, .page-header')) {
+            box = box.parentElement;
+        }
+        return box;
+    }
+
+    function activeNav() {
+        const a = document.querySelector('.sidebar .nav-link.active, .sidebar .nav-link.in-focus');
+        if (!a) return null;
+        const g = a.closest('.nav-group');
+        const gh = g && g.querySelector('.nav-group-header');
+        return {
+            label: clean((a.querySelector('span') || a).textContent),
+            group: gh ? clean((gh.querySelector('span') || gh).textContent) : '',
+            icon: a.querySelector('i'),
+            isTab: /switchTab\s*\(/.test(a.getAttribute('onclick') || '')   // SPA (Server): o item muda sem trocar de página
+        };
+    }
+
+    function slot() {
+        const tb = document.getElementById('gboc-topbar');
+        if (!tb) return null;
+        let s = document.getElementById('tb-page-title');
+        if (!s) {
+            s = document.createElement('div');
+            s.id = 'tb-page-title';
+            s.className = 'tb-page-title';
+            const search = tb.querySelector('.tb-search');
+            if (search) search.insertAdjacentElement('afterend', s);
+            else (tb.querySelector('.tb-logo') || tb.firstElementChild || tb).insertAdjacentElement('afterend', s);
+        }
+        return s;
+    }
+
+    function hasVisibleContent(h) {
+        return [...h.querySelectorAll('*')].some(e =>
+            !e.closest('.gboc-promoted-hide, .gboc-dup-hidden') && e.offsetWidth > 0 && e.offsetHeight > 0 &&
+            (e.matches('button, a, input, select, textarea, .badge, [class*="badge"], [class*="status"]') ||
+             (e.childElementCount === 0 && clean(e.textContent))));
+    }
+
+    function hideDuplicates(root) {
+        root.querySelectorAll('button, a').forEach(b => {
+            if (/\b(handleLogout|doLogout|gbocLogout|gbocLogoutGlobal|logout)\s*\(/i.test(b.getAttribute('onclick') || '')) b.classList.add('gboc-dup-hidden');
+        });
+        // Trilha "GBOC / Dashboard" da página: o topbar já mostra Grupo › Módulo
+        root.querySelectorAll('.breadcrumb, [class*="breadcrumb"]').forEach(b => b.classList.add('gboc-dup-hidden'));
+        // Busca do cabeçalho do Dashboard: a do topbar faz o mesmo (ver setupSearch)
+        const gs = root.querySelector('#globalSearch');
+        if (gs && document.getElementById('tb-global-search')) (gs.closest('.global-search') || gs).classList.add('gboc-dup-hidden');
+    }
+
+    function render(s, group, title, sub, icon) {
+        const key = [group, title, sub].join('|');
+        if (s.dataset.key === key) return;
+        s.dataset.key = key;
+        s.textContent = '';
+        const main = document.createElement('div');
+        main.className = 'tb-pt-main';
+        if (group && norm(group) !== norm(title)) {
+            const c = document.createElement('span'); c.className = 'tb-pt-crumb'; c.textContent = group;
+            const sep = document.createElement('span'); sep.className = 'tb-pt-sep'; sep.textContent = '›';
+            main.append(c, sep);
+        }
+        if (icon) main.appendChild(icon.cloneNode(true));
+        const n = document.createElement('span'); n.className = 'tb-pt-name'; n.textContent = title;
+        main.appendChild(n);
+        s.appendChild(main);
+        if (sub) {
+            const p = document.createElement('div'); p.className = 'tb-pt-sub'; p.textContent = sub;
+            s.appendChild(p);
+        }
+        s.title = [group, title].filter(Boolean).join(' › ') + (sub ? '\n' + sub : '');
+    }
+
+    // ── SPA do Server: uma faixa só de ações por aba ─────────────────────────────
+    // O título interno da aba (h2) sai (vira a descrição no topbar) e as ações gerais do cabeçalho
+    // (IA Diagnóstico, Push Sync) entram na linha de ações da aba. O "Atualizar" geral (loadAll) só
+    // recarrega os números do Dashboard: nas abas que têm o próprio Atualizar, ele não aparece.
+    let spaGlobal = null;   // { box, home }  — ações gerais e o lugar original delas
+    function adjustSpaTab(globalHeader) {
+        if (!spaGlobal) {
+            const box = [...globalHeader.children].find(c => c.querySelector('button, a.btn') && !c.matches('h1, h2'));
+            if (!box) return '';
+            spaGlobal = { box, home: globalHeader };
+            box.classList.add('gboc-spa-global-actions');
+        }
+        const sec = document.querySelector('.main-content .tab-section.active') ||
+                    [...document.querySelectorAll('.main-content .tab-section')].find(s => s.offsetParent !== null);
+        const head = sec && [...sec.children].slice(0, 3).find(c =>
+            !c.classList.contains('gboc-spa-global-actions') && c.querySelector(':scope > h1, :scope > h2, :scope > div > h1, :scope > div > h2'));
+        const refreshAll = [...spaGlobal.box.querySelectorAll('button')].find(b => /\bloadAll\s*\(/.test(b.getAttribute('onclick') || ''));
+        let tabTitle = '';
+        if (head) {
+            const t = head.querySelector('h1, h2');
+            tabTitle = clean(t.textContent);
+            t.classList.add('gboc-promoted-hide');
+            // descrição logo abaixo do título (ex.: Usuários): vai para o topbar no lugar do título da aba
+            const d = t.nextElementSibling;
+            if (d && !d.querySelector('button, input, select, a') && clean(d.textContent) && clean(d.textContent).length < 220) {
+                tabTitle = clean(d.textContent);
+                d.classList.add('gboc-promoted-hide');
+            }
+            head.classList.add('gboc-spa-tab-head');
+            let actions = [...head.children].reverse().find(c => c !== t && !c.contains(t) && !c.classList.contains('gboc-spa-global-actions'));
+            if (!actions) { actions = document.createElement('div'); actions.className = 'gboc-spa-tab-actions'; head.appendChild(actions); }
+            if (spaGlobal.box.parentElement !== actions) actions.appendChild(spaGlobal.box);
+            const ownRefresh = [...head.querySelectorAll('button')].some(b => b !== refreshAll && !spaGlobal.box.contains(b) &&
+                (/atualizar/i.test(b.textContent) || b.querySelector('.fa-sync-alt, .fa-sync, .fa-rotate')));
+            if (refreshAll) refreshAll.classList.toggle('gboc-dup-hidden', ownRefresh);
+        } else {
+            if (spaGlobal.box.parentElement !== spaGlobal.home) spaGlobal.home.appendChild(spaGlobal.box);
+            if (refreshAll) refreshAll.classList.remove('gboc-dup-hidden');
+        }
+        globalHeader.classList.toggle('gboc-header-empty', !globalHeader.contains(spaGlobal.box) && !hasVisibleContent(globalHeader));
+        return tabTitle;
+    }
+
+    function promote() {
+        if (isAuth() || !document.body) return;
+        const s = slot();
+        if (!s) return;
+        const vertical = document.body.classList.contains('layout-vertical');
+        const h = vertical ? pageHeader() : null;
+        let title = '', sub = '', icon = null;
+        if (h) {
+            const t = h.querySelector('h1') || h.querySelector('h2');
+            // Bloco só de cabeçalho (compacto) x contêiner que também tem o conteúdo da página (ex.: .container-fluid)
+            const compact = h.offsetHeight < 240 && !h.querySelector('table, canvas, form, section, .card, .grid, .stats-grid');
+            const sib = t.nextElementSibling;
+            let p = (sib && sib.matches('p, .subtitle, .page-subtitle, .text-muted') && clean(sib.textContent)) ? sib : null;
+            if (!p && compact) p = [...h.querySelectorAll('p, .subtitle, .page-subtitle')].find(x => !x.closest('button, a') && clean(x.textContent)) || null;
+            title = clean(t.textContent);
+            icon = t.querySelector('i');
+            sub = p ? clean(p.textContent) : '';
+            if (!t.classList.contains('gboc-promoted-hide')) {
+                t.classList.add('gboc-promoted-hide');
+                if (p) p.classList.add('gboc-promoted-hide');
+                if (compact) {
+                    h.classList.add('gboc-header-promoted');
+                    hideDuplicates(h);
+                    requestAnimationFrame(() => h.classList.toggle('gboc-header-empty', !hasVisibleContent(h)));
+                }
+            }
+        }
+        const nav = activeNav();
+        // SPA (Server): o cabeçalho é geral ("GBOC Analytics"); o nome do módulo é a aba ativa do menu
+        if (nav && (nav.isTab || !title)) { title = nav.label; icon = nav.icon; if (nav.isTab) sub = ''; }
+        if (nav && nav.isTab && h) {
+            const tabTitle = adjustSpaTab(h);
+            if (tabTitle && norm(tabTitle) !== norm(title)) sub = tabTitle;
+        }
+        if (!title) { s.hidden = true; return; }
+        s.hidden = false;
+        render(s, nav ? nav.group : '', title, sub, icon);
+    }
+
+    // ── Busca global do topbar ──────────────────────────────────────────────
+    function setupSearch() {
+        const inp = document.getElementById('tb-global-search');
+        if (!inp || inp.dataset.gbocBound) return;
+        inp.dataset.gbocBound = '1';
+        inp.setAttribute('autocomplete', 'off');
+        const box = inp.closest('.tb-search') || inp.parentElement;
+        const list = document.createElement('div');
+        list.className = 'tb-search-results';
+        list.hidden = true;
+        box.appendChild(list);
+        let matches = [], sel = -1;
+
+        const entries = () => [...document.querySelectorAll('.sidebar .nav-link')].map(l => {
+            const g = l.closest('.nav-group'), gh = g && g.querySelector('.nav-group-header');
+            const href = (l.getAttribute('href') || '').trim(), oc = l.getAttribute('onclick') || '';
+            return { el: l, label: clean((l.querySelector('span') || l).textContent),
+                     group: gh ? clean((gh.querySelector('span') || gh).textContent) : '',
+                     icon: l.querySelector('i'),
+                     ok: (href && !href.startsWith('javascript') && href !== '#') || /switchTab\s*\(/.test(oc) };
+        }).filter(x => x.ok && x.label);
+
+        const close = () => { list.hidden = true; sel = -1; };
+        const go = (x) => { close(); inp.value = ''; inp.blur(); x.el.click(); };
+
+        function draw() {
+            list.textContent = '';
+            matches.forEach((m, i) => {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'tb-search-item' + (i === sel ? ' active' : '');
+                if (m.icon) b.appendChild(m.icon.cloneNode(true));
+                const l = document.createElement('span'); l.className = 'tb-si-label'; l.textContent = m.label;
+                b.appendChild(l);
+                if (m.group) { const g = document.createElement('span'); g.className = 'tb-si-group'; g.textContent = m.group; b.appendChild(g); }
+                b.addEventListener('mousedown', (e) => { e.preventDefault(); go(m); });
+                list.appendChild(b);
+            });
+            list.hidden = !matches.length;
+        }
+
+        inp.addEventListener('input', () => {
+            const q = norm(inp.value);
+            sel = -1;
+            matches = q ? entries().filter(x => norm(x.label + ' ' + x.group).includes(q)).slice(0, 8) : [];
+            draw();
+        });
+        inp.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                if (!matches.length) return;
+                e.preventDefault();
+                sel = (sel + (e.key === 'ArrowDown' ? 1 : -1) + matches.length) % matches.length;
+                draw();
+            } else if (e.key === 'Enter') {
+                const q = inp.value.trim();
+                if (!q) return;
+                e.preventDefault();
+                if (matches.length) { go(matches[Math.max(sel, 0)]); return; }
+                // Agente: sem função correspondente, busca nas tarefas (mesmo comportamento da busca do Dashboard)
+                if (document.querySelector('.sidebar a[href="/tasks.html"]')) location.href = '/tasks.html?search=' + encodeURIComponent(q);
+            } else if (e.key === 'Escape') {
+                close(); inp.blur();
+            }
+        });
+        inp.addEventListener('blur', () => setTimeout(close, 150));
+        document.addEventListener('keydown', (e) => {   // Ctrl+K abre a busca
+            if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); inp.focus(); inp.select(); }
+        });
+        if (!inp.getAttribute('title')) inp.setAttribute('title', 'Buscar funções do sistema (Ctrl+K)');
+    }
+
+    let pending = false;
+    function update() {
+        if (pending) return;
+        pending = true;
+        requestAnimationFrame(() => { pending = false; try { promote(); setupSearch(); } catch (e) { /* nunca quebra a página */ } });
+    }
+
+    function boot() {
+        update();
+        if (window.MutationObserver) {
+            // Só reage ao que muda o título: topbar/sidebar/cabeçalho inseridos, item ativo do menu (SPA do Server)
+            // e troca de layout no <body>. Listas e animações da página não disparam nada.
+            const relevant = (n) => n.nodeType === 1 && (n.matches('#gboc-topbar, .sidebar, header, .header, .page-header') ||
+                                                         !!n.querySelector('#gboc-topbar, .sidebar, .main-content > header, .main-content > .header'));
+            new MutationObserver((muts) => {
+                for (const m of muts) {
+                    if (m.type === 'attributes') {
+                        if (m.target === document.body || (m.target.classList && m.target.classList.contains('nav-link'))) { update(); return; }
+                    } else {
+                        for (const n of m.addedNodes) { if (relevant(n)) { update(); return; } }
+                    }
+                }
+            }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+        }
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+    else boot();
+
+    window.GBOCPageHeader = { update };
 })();
