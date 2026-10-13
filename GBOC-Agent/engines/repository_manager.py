@@ -134,6 +134,7 @@ class RepositoryManager:
 
         normalized = dict(repo_config)
         raw_config = normalized.get('config')
+        config = None          # sem 'config' (criação nova pela API) a variável ficava indefinida: erro 500 ao criar
         if raw_config:
             try:
                 config = json.loads(raw_config) if isinstance(raw_config, str) else raw_config

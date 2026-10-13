@@ -14,26 +14,41 @@ Agora:
   * envio e download em paralelo (várias conexões) quando o repositório permite;
   * restauração confere o hash de cada bloco e do arquivo inteiro e devolve a data de modificação original.
   * <snapshot>/manifest.json (version 4): lista de arquivos → blocos; o histórico de versões vem dos manifestos.
+  * pacotes (arquivos pequenos): blocos pequenos são agrupados em packs/<aa>/<id> (~8 MiB) em vez de um objeto
+    por bloco. Na nuvem cada objeto custa uma requisição (100–200 ms de latência): milhares de arquivos pequenos
+    viram dezenas de envios. index/<execução>.json diz em que pacote/posição está cada bloco; o fim de cada pacote
+    também traz o próprio índice (recuperação se o index/ se perder). Repositórios só com objects/ continuam
+    válidos: os dois formatos convivem.
 """
 from __future__ import annotations
 
 import hashlib
 import io
+import json
 import logging
 import os
+import secrets
 import shutil
+import struct
 import tempfile
 import lzma
 import threading
 import zlib
-from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
+from collections import OrderedDict, deque
+from concurrent.futures import Future, ThreadPoolExecutor
+from typing import Any, Callable, Deque, Dict, Iterable, List, Optional, Set, Tuple
 
 logger = logging.getLogger("gboc.native.v4")
 
 FORMAT = 4
 CHUNK_SIZE = 4 * 1024 * 1024
 OBJ_DIR = "objects"
+PACK_DIR = "packs"
+INDEX_DIR = "index"
+PACK_TARGET_SIZE = 8 * 1024 * 1024       # pacote fechado e enviado ao atingir ~8 MiB
+PACK_BLOB_MAX = 512 * 1024               # blocos (já compactados) até 512 KiB vão para pacote; maiores, objeto próprio
+PACK_MAGIC = b"GBP1"                     # rodapé do pacote: <índice compactado><tamanho u32 LE><GBP1>
+PACK_CACHE_SLOTS = 6                     # pacotes mantidos em memória na leitura (restauração/verificação)
 
 try:
     import zstandard as _zstd          # opcional (requirements.txt); sem ele usa zlib
@@ -50,6 +65,89 @@ INCOMPRESSIBLE = {
 
 def object_name(h: str) -> str:
     return f"{OBJ_DIR}/{h[:2]}/{h}"
+
+
+def pack_name(pack_id: str) -> str:
+    return f"{PACK_DIR}/{pack_id[:2]}/{pack_id}"
+
+
+def build_pack(blobs: List[Tuple[str, bytes]]) -> Tuple[str, bytes, List[List[Any]]]:
+    """Concatena os blocos e acrescenta o índice no rodapé. Retorna (id do pacote, conteúdo, [[hash, início, tamanho]])."""
+    buf = io.BytesIO()
+    entries: List[List[Any]] = []
+    for h, blob in blobs:
+        entries.append([h, buf.tell(), len(blob)])
+        buf.write(blob)
+    trailer = compress(json.dumps(entries, separators=(",", ":")).encode("utf-8"), "zlib")
+    buf.write(trailer)
+    buf.write(struct.pack("<I", len(trailer)))
+    buf.write(PACK_MAGIC)
+    data = buf.getvalue()
+    return sha256_bytes(data), data, entries
+
+
+def read_pack_trailer(data: bytes) -> List[List[Any]]:
+    """Índice gravado no fim do pacote (para reconstruir o index/ se ele se perder)."""
+    if len(data) < 8 or data[-4:] != PACK_MAGIC:
+        raise ValueError("Pacote sem rodapé GBOC")
+    (n,) = struct.unpack("<I", data[-8:-4])
+    return json.loads(decompress(data[-8 - n:-8]).decode("utf-8"))
+
+
+def _backend_put(be, remote: str, data: bytes) -> Dict[str, Any]:
+    """Envio em memória quando o backend permite (nuvem); senão via arquivo temporário."""
+    put = getattr(be, "put_bytes", None)
+    if callable(put):
+        return put(remote, data)
+    fd, tmp = tempfile.mkstemp(prefix="gboc_obj_")
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+        return be.upload_file(tmp, remote)
+    finally:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+
+
+def _backend_get(be, remote: str) -> bytes:
+    get = getattr(be, "get_bytes", None)
+    if callable(get):
+        return get(remote)
+    fd, tmp = tempfile.mkstemp(prefix="gboc_obj_")
+    os.close(fd)
+    try:
+        r = be.download_file(remote, tmp)
+        if not r.get("success", False):
+            raise RuntimeError(f"Objeto {remote} ausente no repositório")
+        with open(tmp, "rb") as f:
+            return f.read()
+    finally:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+
+
+def load_index(backend, names: Optional[Iterable[str]] = None) -> Tuple[Dict[str, Tuple[str, int, int]], Dict[str, Dict[str, Any]]]:
+    """Lê index/*.json. Retorna ({hash: (pacote, início, tamanho)}, {arquivo de índice: conteúdo})."""
+    if names is None:
+        names = backend.list_files(sub_path=INDEX_DIR) or []
+    files = sorted(n for n in (str(x).replace("\\", "/") for x in names) if n.startswith(INDEX_DIR + "/") and n.endswith(".json"))
+    located: Dict[str, Tuple[str, int, int]] = {}
+    docs: Dict[str, Dict[str, Any]] = {}
+    for name in files:
+        doc = json.loads(decompress(_backend_get(backend, name)).decode("utf-8"))
+        docs[name] = doc
+        for pid, entries in (doc.get("packs") or {}).items():
+            for h, off, ln in entries:
+                located.setdefault(h, (pid, int(off), int(ln)))
+    return located, docs
+
+
+def _encode_index(packs: Dict[str, List[List[Any]]]) -> bytes:
+    return compress(json.dumps({"version": 1, "packs": packs}, separators=(",", ":")).encode("utf-8"), "zlib")
 
 
 def resolve_codec(name: Optional[str]) -> str:
@@ -113,18 +211,33 @@ def iter_chunks(path: str, size: int = CHUNK_SIZE) -> Iterable[bytes]:
 
 
 class ObjectStore:
-    """Envio/download de blocos com paralelismo. backend_factory() cria uma conexão por thread (nuvem)."""
+    """Envio/download de blocos com paralelismo. backend_factory() cria uma conexão por thread (nuvem).
 
-    def __init__(self, backend, backend_factory: Optional[Callable[[], Any]] = None, workers: int = 1):
+    Envio: submit() coloca o bloco numa fila global com no máximo ~2 envios por conexão em andamento (antes cada
+    arquivo esperava o próprio envio terminar e, com arquivos pequenos, as conexões trabalhavam uma de cada vez).
+    Blocos pequenos vão para pacotes. flush() envia o último pacote, espera tudo e grava o índice desta execução;
+    o manifesto só pode ser gravado depois dele."""
+
+    def __init__(self, backend, backend_factory: Optional[Callable[[], Any]] = None, workers: int = 1,
+                 use_packs: bool = True):
         self.backend = backend
         self.factory = backend_factory
         self.workers = max(1, int(workers or 1)) if backend_factory else 1
+        self.use_packs = use_packs
         self._local = threading.local()
         self._known: Optional[Set[str]] = None
+        self._located: Dict[str, Tuple[str, int, int]] = {}      # bloco em pacote → (pacote, início, tamanho)
         self._pending: Set[str] = set()
         self._lock = threading.Lock()
+        self._futures: Deque[Future] = deque()
+        self._pack_blobs: List[Tuple[str, bytes]] = []
+        self._pack_bytes = 0
+        self._run_index: Dict[str, List[List[Any]]] = {}          # pacotes enviados nesta execução
+        self._cache: "OrderedDict[str, bytes]" = OrderedDict()
+        self._cache_locks: Dict[str, threading.Lock] = {}
         self.uploaded_bytes = 0
         self.uploaded_objects = 0
+        self.packs_uploaded = 0
 
     def _be(self):
         if not self.factory or self.workers == 1:
@@ -135,48 +248,115 @@ class ObjectStore:
             self._local.be = be
         return be
 
-    def known(self) -> Set[str]:
+    def known(self, names: Optional[Iterable[str]] = None) -> Set[str]:
+        """Blocos já guardados (objetos soltos + pacotes). names: listagem do repositório já feita (evita listar de novo)."""
         if self._known is None:
-            names = self.backend.list_files(sub_path=OBJ_DIR) or []
-            self._known = {str(n).replace("\\", "/").rsplit("/", 1)[-1] for n in names}
+            names = list(names) if names is not None else None
+            objs = [n for n in names if str(n).replace("\\", "/").startswith(OBJ_DIR + "/")] if names is not None \
+                else (self.backend.list_files(sub_path=OBJ_DIR) or [])
+            known = {str(n).replace("\\", "/").rsplit("/", 1)[-1] for n in objs}
+            self._located, _docs = load_index(self.backend, names)
+            known.update(self._located)
+            self._known = known
         return self._known
+
+    # ── envio ──────────────────────────────────────────────────────────────────────────────────────────────
+    def _wait_window(self) -> None:
+        # memória limitada: no máximo 2 envios por conexão aguardando; erro de envio aparece aqui
+        while len(self._futures) > self.workers * 2:
+            self._futures.popleft().result()
+
+    def submit(self, pool: ThreadPoolExecutor, h: str, blob: bytes) -> None:
+        if self.use_packs and len(blob) <= PACK_BLOB_MAX:
+            sealed = None
+            with self._lock:
+                self._pack_blobs.append((h, blob))
+                self._pack_bytes += len(blob)
+                if self._pack_bytes >= PACK_TARGET_SIZE:
+                    sealed, self._pack_blobs, self._pack_bytes = self._pack_blobs, [], 0
+            if sealed:
+                self._futures.append(pool.submit(self._put_pack, sealed))
+        else:
+            self._futures.append(pool.submit(self.put, h, blob))
+        self._wait_window()
+
+    def flush(self, pool: ThreadPoolExecutor) -> None:
+        with self._lock:
+            sealed, self._pack_blobs, self._pack_bytes = self._pack_blobs, [], 0
+        if sealed:
+            self._futures.append(pool.submit(self._put_pack, sealed))
+        while self._futures:
+            self._futures.popleft().result()
+        if self._run_index:
+            # índice desta execução: nome único (duas tarefas no mesmo repositório não se sobrescrevem)
+            name = f"{INDEX_DIR}/{secrets.token_hex(8)}.json"
+            r = _backend_put(self.backend, name, _encode_index(self._run_index))
+            if not r.get("success", False):
+                raise RuntimeError(f"Gravação do índice de pacotes falhou: {r.get('error') or r.get('message')}")
+            self._run_index = {}
+
+    def _put_pack(self, blobs: List[Tuple[str, bytes]]) -> None:
+        pid, data, entries = build_pack(blobs)
+        r = _backend_put(self._be(), pack_name(pid), data)
+        if not r.get("success", False):
+            raise RuntimeError(f"Envio do pacote {pid[:12]} falhou: {r.get('error') or r.get('message')}")
+        with self._lock:
+            self._run_index[pid] = entries
+            for h, off, ln in entries:
+                self._located[h] = (pid, off, ln)
+                self._known.add(h)
+                self._pending.discard(h)
+            self.uploaded_bytes += len(data)
+            self.uploaded_objects += 1
+            self.packs_uploaded += 1
 
     def put(self, h: str, blob: bytes) -> None:
         with self._lock:
             if h in self.known():
                 return
-        fd, tmp = tempfile.mkstemp(prefix="gboc_obj_")
-        try:
-            with os.fdopen(fd, "wb") as f:
-                f.write(blob)
-            r = self._be().upload_file(tmp, object_name(h))
-            if not r.get("success", False):
-                raise RuntimeError(f"Envio do bloco {h[:12]} falhou: {r.get('error') or r.get('message')}")
-        finally:
-            try:
-                os.remove(tmp)
-            except OSError:
-                pass
+        r = _backend_put(self._be(), object_name(h), blob)
+        if not r.get("success", False):
+            raise RuntimeError(f"Envio do bloco {h[:12]} falhou: {r.get('error') or r.get('message')}")
         with self._lock:
             self._known.add(h)
             self._pending.discard(h)
             self.uploaded_bytes += len(blob)
             self.uploaded_objects += 1
 
+    # ── leitura ────────────────────────────────────────────────────────────────────────────────────────────
+    def _pack_data(self, pid: str) -> bytes:
+        """Pacote inteiro com cache LRU: arquivos pequenos vizinhos saem do mesmo download."""
+        with self._lock:
+            data = self._cache.get(pid)
+            if data is not None:
+                self._cache.move_to_end(pid)
+                return data
+            plock = self._cache_locks.setdefault(pid, threading.Lock())
+        with plock:                                   # duas threads no mesmo pacote: um download só
+            with self._lock:
+                data = self._cache.get(pid)
+            if data is None:
+                data = _backend_get(self._be(), pack_name(pid))
+                if sha256_bytes(data) != pid:
+                    raise RuntimeError(f"Pacote {pid[:12]} corrompido (hash não confere)")
+                with self._lock:
+                    self._cache[pid] = data
+                    while len(self._cache) > max(PACK_CACHE_SLOTS, self.workers + 2):
+                        self._cache.popitem(last=False)
+        return data
+
     def get(self, h: str) -> bytes:
-        fd, tmp = tempfile.mkstemp(prefix="gboc_obj_")
-        os.close(fd)
-        try:
-            r = self._be().download_file(object_name(h), tmp)
-            if not r.get("success", False):
-                raise RuntimeError(f"Bloco {h[:12]} ausente no repositório")
-            with open(tmp, "rb") as f:
-                data = decompress(f.read())
-        finally:
+        self.known()
+        loc = self._located.get(h)
+        if loc:
+            pid, off, ln = loc
+            blob = self._pack_data(pid)[off:off + ln]
+        else:
             try:
-                os.remove(tmp)
-            except OSError:
-                pass
+                blob = _backend_get(self._be(), object_name(h))
+            except Exception as e:
+                raise RuntimeError(f"Bloco {h[:12]} ausente no repositório") from e
+        data = decompress(blob)
         if sha256_bytes(data) != h:
             raise RuntimeError(f"Bloco {h[:12]} corrompido (hash não confere)")
         return data
@@ -187,12 +367,12 @@ class ObjectStore:
 
 def store_file(store: ObjectStore, pool: ThreadPoolExecutor, path: str, codec: str,
                level: Optional[int] = None) -> Tuple[str, List[str], int, int]:
-    """Lê o arquivo em blocos, envia os que ainda não existem. Retorna (hash_arquivo, blocos, novos, bytes_novos)."""
+    """Lê o arquivo em blocos e enfileira os que ainda não existem (não espera o envio: ver ObjectStore.flush).
+    Retorna (hash_arquivo, blocos, novos, bytes_novos)."""
     ext = os.path.splitext(path)[1].lower()
     c = "none" if ext in INCOMPRESSIBLE else codec
     fh = hashlib.sha256()
     chunks: List[str] = []
-    futures = []
     new_count = new_bytes = 0
     for data in iter_chunks(path):
         fh.update(data)
@@ -206,12 +386,7 @@ def store_file(store: ObjectStore, pool: ThreadPoolExecutor, path: str, codec: s
             blob = compress(data, c, level)
             new_count += 1
             new_bytes += len(blob)
-            futures.append(pool.submit(store.put, h, blob))
-            # memória limitada: no máximo 2 blocos por conexão aguardando envio
-            while len(futures) > store.workers * 2:
-                futures.pop(0).result()
-    for f in futures:
-        f.result()
+            store.submit(pool, h, blob)
     return fh.hexdigest(), chunks, new_count, new_bytes
 
 
@@ -243,3 +418,28 @@ def referenced_objects(manifests: Iterable[Dict[str, Any]]) -> Set[str]:
         for e in (m or {}).get("entries") or []:
             out.update(e.get("chunks") or [])
     return out
+
+
+def prune_packs(backend, referenced: Set[str]) -> Dict[str, int]:
+    """Apaga pacotes em que NENHUM bloco é usado pelos snapshots restantes. O índice é regravado ANTES de apagar o
+    pacote: se o processo cair no meio sobra só um pacote órfão (espaço), nunca um índice apontando para o vazio
+    (o que faria um backup futuro deduplicar contra um bloco inexistente). Pacotes com parte em uso ficam inteiros."""
+    _located, docs = load_index(backend)
+    deleted = blocked = 0
+    for name, doc in docs.items():
+        packs = doc.get("packs") or {}
+        dead = [pid for pid, entries in packs.items() if not any(e[0] in referenced for e in entries)]
+        if not dead:
+            continue
+        alive = {pid: e for pid, e in packs.items() if pid not in dead}
+        r = _backend_put(backend, name, _encode_index(alive)) if alive else backend.delete_file(name)
+        if isinstance(r, dict) and not r.get("success", True):
+            blocked += len(dead)
+            continue
+        for pid in dead:
+            r = backend.delete_file(pack_name(pid))
+            if isinstance(r, dict) and not r.get("success", True):
+                blocked += 1
+            else:
+                deleted += 1
+    return {"packs_deleted": deleted, "packs_blocked": blocked}

@@ -239,8 +239,15 @@ def prune_native(engine, pol: Dict[str, int], source_paths: List[str]) -> Dict[s
                 objs_blocked += 1
             else:
                 objs_deleted += 1
+    # Pacotes (blocos pequenos agrupados): apaga os que não têm nenhum bloco em uso
+    packs = {"packs_deleted": 0, "packs_blocked": 0}
+    if by_snap.get("index") and (pruned or chain_only):
+        from native_engine.store_v4 import prune_packs, referenced_objects
+        remaining = [manifests[s] for s in roots if s in manifests] + \
+                    [manifests[s] for s in need_manifests if s in manifests and s not in roots]
+        packs = prune_packs(engine.backend, referenced_objects(remaining))
     return {"pruned": pruned, "kept": len(keep), "blocked": blocked, "chain_kept": kept_for_chain,
-            "files_deleted": freed, "objects_deleted": objs_deleted, "objects_blocked": objs_blocked}
+            "files_deleted": freed, "objects_deleted": objs_deleted, "objects_blocked": objs_blocked, **packs}
 
 
 def _load_chain_manifest(engine, sid: str) -> Optional[Dict[str, Any]]:

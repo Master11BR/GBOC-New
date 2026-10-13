@@ -139,7 +139,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                     <select id="repoType" required onchange="updatePathPlaceholder()">
                         <option value="">Selecione o tipo</option>
                         <option value="local">Local (Filesystem)</option>
-                        <option value="s3">Amazon S3</option>
+                        <option value="s3">Amazon S3 / S3 compatível (MinIO, Ceph, SeaweedFS, Garage)</option>
                         <option value="azure">Azure Blob Storage</option>
                         <option value="gcs">Google Cloud Storage</option>
                         <option value="b2">Backblaze B2</option>
@@ -180,6 +180,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                         <label>Endpoint (opcional)</label>
                         <input type="text" id="endpoint" list="endpointOptions" placeholder="Ex: s3.us-east-1.amazonaws.com">
                         <datalist id="endpointOptions"></datalist>
+                        <small style="color:var(--text-muted);display:block;margin-top:4px;">S3 compatível (MinIO, Ceph RGW, SeaweedFS, Garage): informe a URL completa, com http:// ou https:// e a porta.</small>
                     </div>
                     <div class="form-group">
                         <label>Prefix (opcional - isolamento no bucket)</label>
@@ -327,7 +328,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 
             if (type === 's3') {
                 regionEl.placeholder = 'Ex: us-east-1';
-                endpointEl.placeholder = 'Ex: s3.us-east-1.amazonaws.com';
+                endpointEl.placeholder = 'AWS: s3.us-east-1.amazonaws.com · próprio: http://servidor:9000';
             } else if (type === 'wasabi') {
                 regionEl.placeholder = 'Ex: us-east-1';
                 endpointEl.placeholder = 'Ex: s3.us-east-1.wasabisys.com';
@@ -513,7 +514,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             typeSelect.innerHTML = `
                 <option value="">Selecione o tipo</option>
                 <option value="local">Local (Filesystem)</option>
-                <option value="s3">Amazon S3</option>
+                <option value="s3">Amazon S3 / S3 compatível (MinIO, Ceph, SeaweedFS, Garage)</option>
                 <option value="azure">Azure Blob Storage</option>
                 <option value="gcs">Google Cloud Storage</option>
                 <option value="b2">Backblaze B2</option>
