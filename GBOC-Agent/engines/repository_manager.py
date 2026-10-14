@@ -748,7 +748,8 @@ class RepositoryManager:
         }
 
     def _test_kopia_connection(self, repo_data: Dict[str, Any]) -> Dict[str, Any]:
-        auth = self._validate_kopia_connection(repo_data)
+        # Como no restic: bucket/pasta vazia é inicializada (kopia repository create) na criação do repositório
+        auth = self._validate_kopia_connection(repo_data, allow_init=True)
         if auth.get('valid'):
             return {"success": True, "message": "Conexão Kopia válida"}
         return {
@@ -953,7 +954,8 @@ class RepositoryManager:
                     if repo_type == 'wasabi':
                         endpoint = endpoint or f"s3.{region}.wasabisys.com"
                     if endpoint:
-                        connect_cmd.extend(['--endpoint', endpoint])
+                        from engines.s3_endpoint import kopia_endpoint_args   # sem http(s)://; http → --disable-tls
+                        connect_cmd.extend(kopia_endpoint_args(endpoint))
                     prefix = str(repo.get('prefix') or '').strip()
                     if prefix:
                         if not prefix.endswith('/'):

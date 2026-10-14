@@ -243,6 +243,11 @@ class ObjectStore:
         self.uploaded_bytes = 0
         self.uploaded_objects = 0
         self.packs_uploaded = 0
+        self.cipher = None          # native_engine.crypto.RepoCipher em repositório criptografado
+
+    def chunk_id(self, data: bytes) -> str:
+        """Id do bloco: SHA-256 (sem criptografia) ou HMAC-SHA256 com a chave do repositório."""
+        return self.cipher.chunk_id(data) if self.cipher else sha256_bytes(data)
 
     def _be(self):
         if not self.factory or self.workers == 1:
@@ -370,8 +375,12 @@ class ObjectStore:
                 blob = _backend_get(self._be(), object_name(h))
             except Exception as e:
                 raise RuntimeError(f"Bloco {h[:12]} ausente no repositório") from e
+        if self.cipher:
+            blob = self.cipher.open(blob)
+        elif blob[:1] == b"E":
+            raise RuntimeError("Repositório criptografado: informe a senha do motor do repositório")
         data = decompress(blob)
-        if sha256_bytes(data) != h:
+        if self.chunk_id(data) != h:
             raise RuntimeError(f"Bloco {h[:12]} corrompido (hash não confere)")
         return data
 
@@ -390,7 +399,7 @@ def store_file(store: ObjectStore, pool: ThreadPoolExecutor, path: str, codec: s
     new_count = new_bytes = 0
     for data in iter_chunks(path):
         fh.update(data)
-        h = sha256_bytes(data)
+        h = store.chunk_id(data)
         chunks.append(h)
         with store._lock:
             exists = h in store.known() or h in store._pending
@@ -398,6 +407,8 @@ def store_file(store: ObjectStore, pool: ThreadPoolExecutor, path: str, codec: s
                 store._pending.add(h)
         if not exists:
             blob = compress(data, c, level)
+            if store.cipher:
+                blob = store.cipher.seal(blob)
             new_count += 1
             new_bytes += len(blob)
             store.submit(pool, h, blob)

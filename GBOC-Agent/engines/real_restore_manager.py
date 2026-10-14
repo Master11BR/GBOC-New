@@ -17,6 +17,7 @@ import time
 import shutil
 
 from engines.engine_paths import get_engine_path_or_raise, get_engine_path
+from engines.s3_endpoint import restic_s3_repository   # endpoint próprio (S3 compatível) ou AWS
 
 logger = logging.getLogger(__name__)
 
@@ -123,13 +124,14 @@ class RestoreManager:
             args.extend(['--prefix', prefix])
 
         repo_type = repo.get('type', 'local')
+        from engines.s3_endpoint import kopia_endpoint_args
         if repo_type == 'wasabi':
             endpoint = self._get_wasabi_endpoint(repo)
-            args.extend(['--endpoint', endpoint])
+            args.extend(kopia_endpoint_args(endpoint))
         elif repo_type == 's3':
             endpoint = (repo.get('endpoint') or '').strip()
             if endpoint:
-                args.extend(['--endpoint', endpoint])
+                args.extend(kopia_endpoint_args(endpoint))
 
         return args
 
@@ -538,7 +540,7 @@ class RestoreManager:
                 endpoint = self._get_wasabi_endpoint(repo)
                 env['RESTIC_REPOSITORY'] = f"s3:{endpoint}/{repo['path']}"
             elif repo_type == 's3':
-                env['RESTIC_REPOSITORY'] = f"s3:s3.amazonaws.com/{repo['path']}"
+                env['RESTIC_REPOSITORY'] = restic_s3_repository(repo.get('endpoint'), repo['path'])
 
         cmd = [restic, 'snapshots', '--json']
 
@@ -1169,7 +1171,7 @@ class RestoreManager:
             if repo_type == 'wasabi':
                 env['RESTIC_REPOSITORY'] = f"s3:{self._get_wasabi_endpoint(repo)}/{repo['path']}"
             else:
-                env['RESTIC_REPOSITORY'] = f"s3:s3.amazonaws.com/{repo['path']}"
+                env['RESTIC_REPOSITORY'] = restic_s3_repository(repo.get('endpoint'), repo['path'])
         return env
 
     def _list_native_files(self, repo: Dict, snapshot_id: str, path: str) -> List[Dict]:
@@ -1223,7 +1225,7 @@ class RestoreManager:
                 endpoint = self._get_wasabi_endpoint(repo)
                 env['RESTIC_REPOSITORY'] = f"s3:{endpoint}/{repo['path']}"
             elif repo_type == 's3':
-                env['RESTIC_REPOSITORY'] = f"s3:s3.amazonaws.com/{repo['path']}"
+                env['RESTIC_REPOSITORY'] = restic_s3_repository(repo.get('endpoint'), repo['path'])
 
         cmd = [restic, 'ls', snapshot_id, '--json']
         if path != "/":
@@ -1549,7 +1551,7 @@ class RestoreManager:
                 endpoint = self._get_wasabi_endpoint(repo)
                 env['RESTIC_REPOSITORY'] = f"s3:{endpoint}/{repo['path']}"
             elif repo_type == 's3':
-                env['RESTIC_REPOSITORY'] = f"s3:s3.amazonaws.com/{repo['path']}"
+                env['RESTIC_REPOSITORY'] = restic_s3_repository(repo.get('endpoint'), repo['path'])
 
         # Criar diretório de destino
         os.makedirs(target_path, exist_ok=True)
@@ -1644,11 +1646,14 @@ class RestoreManager:
     ) -> Dict[str, Any]:
         """Restaura arquivos REAIS com Kopia"""
         kopia = get_engine_path_or_raise('kopia')
-        # Obter diretório de configuração (prioriza configurações existentes do backup)
-        config_path, is_temporary = self._get_kopia_config_dir(repo, "restore")
+        # Configuração própria desta restauração: antes reaproveitava a primeira configuração de backup que
+        # respondesse "status" (podia ser de OUTRO repositório) e o connect abaixo a regravava.
+        import tempfile as _tf
+        _cfg_dir = _tf.mkdtemp(prefix=f"gboc_kopia_restore_{repo.get('id')}_")
+        config_path, is_temporary = os.path.join(_cfg_dir, "repository.config"), True
 
         env = os.environ.copy()
-        env['KOPIA_CONFIG_PATH'] = os.path.dirname(config_path)
+        env['KOPIA_CONFIG_PATH'] = config_path            # variável do Kopia = arquivo de configuração
         env['KOPIA_PASSWORD'] = self._get_password(repo)
 
         os.makedirs(target_path, exist_ok=True)
@@ -1674,14 +1679,22 @@ class RestoreManager:
             elif repo['type'] in ('s3', 'wasabi'):
                 connect_cmd.extend(self._build_kopia_s3_args(repo))
 
-            subprocess.run(connect_cmd, env=env, capture_output=True, check=True)
+            cr = subprocess.run(connect_cmd, env=env, capture_output=True, text=True)
+            if cr.returncode != 0:
+                raise RuntimeError(f"Falha ao conectar ao repositório Kopia: {(cr.stderr or cr.stdout or '').strip()[:300]}")
 
-            # 2. Restaurar arquivos
-            for file_path in files:
+            # 2. Restaurar: snapshot inteiro (lista vazia ou "*", como nos outros motores) ou itens selecionados.
+            # Antes: lista vazia não restaurava nada e o item ia como "<id>:<caminho>", formato que o Kopia não aceita.
+            sel = [str(f).replace('\\', '/').strip('/') for f in (files or [])]
+            sel = [f for f in sel if f not in ('', '*')]
+            jobs = [(snapshot_id, target_path)] if not sel else \
+                [(f"{snapshot_id}/{f}", os.path.join(target_path, *f.split('/'))) for f in sel]
+            for file_path, dest in jobs:
+                os.makedirs(os.path.dirname(dest.rstrip('/\\')) or dest, exist_ok=True)
                 cmd = [
-                    kopia, 'restore',
-                    f"{snapshot_id}:{file_path}",
-                    target_path
+                    kopia, 'restore', '--config-file', config_path,
+                    file_path,
+                    dest
                 ]
                 
                 # Adicionar opções de restauração

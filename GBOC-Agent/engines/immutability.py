@@ -400,17 +400,42 @@ def _objects_in_recent_snapshots(repo: Dict[str, Any], days: int) -> set:
     if not base or not (os.path.isdir(os.path.join(base, "objects")) or os.path.isdir(os.path.join(base, "packs"))):
         return out
     limit = datetime.now() - timedelta(days=days)
+    cipher = None
     for d in os.listdir(base):
         if not d.isdigit():
             continue
         try:
             if datetime.strptime(d[:14], "%Y%m%d%H%M%S") < limit:
                 continue
-            with open(os.path.join(base, d, "manifest.json"), encoding="utf-8") as f:
-                for e in (json.load(f).get("entries") or []):
-                    out.update(e.get("chunks") or [])
+            with open(os.path.join(base, d, "manifest.json"), "rb") as f:
+                raw = f.read()
         except (OSError, ValueError):
             continue
+        try:
+            from native_engine import crypto
+            if crypto.is_encrypted_doc(raw):
+                if cipher is None:          # repositório criptografado (gboc-key.json + senha do motor)
+                    from storage_backends.local import LocalStorageBackend
+                    pw = repo.get("motor_password") or repo.get("encryption_password") or repo.get("password") or ""
+                    if not pw and repo.get("id") is not None:
+                        with _core().get_db_connection() as conn:
+                            cur = conn.cursor()
+                            cur.execute("SELECT COALESCE(motor_password, encryption_password, password, '') "
+                                        "FROM repositories WHERE CAST(id AS TEXT) = %s", (str(repo["id"]),))
+                            row = cur.fetchone()
+                            cur.close()
+                        pw = (row[0] if row else "") or ""
+                    cipher = crypto.open_repo(LocalStorageBackend({"type": "local", "path": base}), pw)
+                doc = cipher.open_doc(raw)
+            else:
+                doc = json.loads(raw.decode("utf-8"))
+        except Exception as e:
+            # Manifesto recente ilegível: na dúvida nenhum bloco/pacote é liberado (melhor proteger a mais)
+            logger.warning(f"Manifesto {d} ilegível ({e}): mantendo todos os blocos protegidos")
+            return {os.path.basename(f) for sub in ("objects", "packs")
+                    for f in _iter_files([os.path.join(base, sub)])}
+        for e in (doc.get("entries") or []):
+            out.update(e.get("chunks") or [])
     # Pacotes: um pacote está em uso se QUALQUER bloco dele estiver (o arquivo do pacote leva o id dele, não o do bloco)
     idx = os.path.join(base, "index")
     if out and os.path.isdir(idx):

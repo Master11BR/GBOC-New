@@ -82,8 +82,44 @@ class _Enc(json.JSONEncoder):
 
 # ─── Export ───────────────────────────────────────────────────────
 
-def export_config(include_sensitive: bool = False) -> Dict[str, Any]:
-    """Export the full system configuration as a dictionary."""
+_TASK_RUNTIME_COLS = {'id', 'repository_id', 'status', 'created_at', 'updated_at', 'last_run', 'last_status'}
+_REPO_SECRET_COLS = ('password', 'motor_password', 'cloud_password', 'encryption_password')
+_SECRET_HINTS = ('password', 'secret', 'token', 'account_key', 'api_key')
+
+
+# Próprios deste computador: a chave que assina as sessões de login e as preferências da recuperação automática
+# (a chave de recuperação vai criptografada com a chave local, inútil em outra instalação)
+_LOCAL_ONLY_SETTINGS = {'auth_secret_key', 'config_recovery'}
+
+
+def _is_secret_col(col: str) -> bool:
+    c = (col or '').lower()
+    return any(h in c for h in _SECRET_HINTS)
+
+
+def _export_repository(r: Dict[str, Any], include_secrets: bool) -> Dict[str, Any]:
+    """Repositório sem segredos (arquivo de configuração) ou com eles (pacote de recuperação criptografado).
+    A cópia criptografada local (secret_enc) nunca sai: depende da chave deste computador."""
+    raw = r.get('config')
+    try:
+        cfg = json.loads(raw) if isinstance(raw, str) and raw else (raw or {})
+    except (ValueError, TypeError):
+        cfg = {}
+    out = {'name': r.get('name'), 'type': r.get('type'), 'repo_type': r.get('type'), 'engine': r.get('engine'),
+           'path': r.get('path'), 'enabled': r.get('enabled'),
+           'config': {k: v for k, v in cfg.items() if k != 'secret_enc'}}
+    if include_secrets:
+        from engines import repo_secrets
+        out['secrets'] = {
+            'cloud_secret': repo_secrets.secret_from_config(cfg) or (r.get('cloud_password') or ''),
+            **{c: r.get(c) for c in _REPO_SECRET_COLS if r.get(c)},
+        }
+    return out
+
+
+def export_config(include_sensitive: bool = False, include_secrets: bool = False) -> Dict[str, Any]:
+    """Export the full system configuration as a dictionary.
+    include_secrets: inclui chaves e senhas dos repositórios — SÓ para o pacote de recuperação criptografado."""
     from shared_core import GBOC_VERSION
 
     config = {
@@ -101,55 +137,35 @@ def export_config(include_sensitive: bool = False) -> Dict[str, Any]:
         'replication_policies': [],
     }
 
-    # Repositories (schema real)
-    repos = _query("SELECT id, name, engine, type, path, config, created_at FROM repositories")
-    for r in repos:
-        repo_data = {
-            'name': r.get('name'),
-            'engine': r.get('engine'),
-            'repo_type': r.get('type'),
-            'path': r.get('path'),
-            'config': r.get('config'),
-        }
-        if not include_sensitive and isinstance(repo_data.get('config'), dict):
-            for key in ('password', 'secret_key', 'access_key', 'token', 'aws_secret_key', 'b2_account_key'):
-                if key in repo_data['config']:
-                    repo_data['config'][key] = '***REDACTED***'
-        config['repositories'].append(repo_data)
-
-    # Tasks (schema real)
-    tasks = _query("""
-        SELECT id, name, engine, repository_id, source_paths,
-               schedule_enabled, schedule_cron, enabled,
-               retry_max_attempts, retention_days
-        FROM tasks
-    """)
-    for t in tasks:
-        config['tasks'].append({
-            'name': t.get('name'),
-            'engine': t.get('engine'),
-            'repository_id': t.get('repository_id'),
-            'source_paths': t.get('source_paths'),
-            'schedule_enabled': t.get('schedule_enabled'),
-            'schedule_cron': t.get('schedule_cron'),
-            'enabled': t.get('enabled'),
-            'retry_max_attempts': t.get('retry_max_attempts'),
-            'retention_days': t.get('retention_days'),
-        })
+    # Repositórios e tarefas: todas as colunas de configuração (antes só algumas, e as tarefas perdiam
+    # retenção, repetição e scripts). A tarefa aponta para o repositório pelo NOME (o id muda na importação).
+    for r in _query("SELECT * FROM repositories ORDER BY id"):
+        config['repositories'].append(_export_repository(r, include_secrets))
+    repo_names = {r['id']: r['name'] for r in _query("SELECT id, name FROM repositories")}
+    for t in _query("SELECT * FROM tasks ORDER BY id"):
+        item = {k: v for k, v in t.items()
+                if k not in _TASK_RUNTIME_COLS and (include_secrets or not _is_secret_col(k))}
+        item['repository'] = repo_names.get(t.get('repository_id'))
+        config['tasks'].append(item)
 
     # Settings
     settings_rows = _query("SELECT key, value FROM settings")
     for s in settings_rows:
+        if s['key'] in _LOCAL_ONLY_SETTINGS:
+            continue
         try:
-            config['settings'][s['key']] = json.loads(s['value'])
+            val = json.loads(s['value'])
         except (json.JSONDecodeError, TypeError):
-            config['settings'][s['key']] = s['value']
+            val = s['value']
+        if not include_sensitive and isinstance(val, dict):
+            val = {k: v for k, v in val.items() if not _is_secret_col(k)}
+        config['settings'][s['key']] = val
 
     # SMTP config (resiliente)
     try:
-        smtp = _query("SELECT * FROM smtp_config WHERE id = 1")
-        if smtp:
-            smtp_data = smtp[0]
+        from engines import smtp_store
+        smtp_data = smtp_store.load_from_core()       # coluna server ou host
+        if smtp_data:
             if not include_sensitive:
                 smtp_data.pop('password', None)
             config['smtp'] = smtp_data
@@ -253,43 +269,69 @@ def import_config(config_data: Dict, dry_run: bool = True) -> Dict[str, Any]:
         cur = conn.cursor()
 
     try:
-        # Repositories
+        # Repositórios (antes gravava na coluna inexistente "repo_type" e a importação falhava)
+        from engines import repo_secrets
+        repo_ids: Dict[str, int] = {}
         for repo in config_data.get('repositories', []):
-            existing = _query("SELECT id FROM repositories WHERE name = %s", (repo.get('name', ''),))
+            name = (repo.get('name') or '').strip()
+            existing = _query("SELECT id FROM repositories WHERE name = %s", (name,))
             if existing:
+                repo_ids[name] = existing[0]['id']
                 report['repositories']['skip'] += 1
-                report['warnings'].append(f"Repository '{repo.get('name')}' already exists, skipping")
+                report['warnings'].append(f"Repository '{name}' already exists, skipping")
+                continue
+            report['repositories']['add'] += 1
+            secrets = repo.get('secrets') or {}
+            cfg = dict(repo.get('config') or {}) if isinstance(repo.get('config'), dict) else {}
+            cfg.pop('secret_enc', None)
+            if secrets.get('cloud_secret'):
+                cfg['secret_enc'] = repo_secrets.encrypt(secrets['cloud_secret'])   # chave deste computador
+            elif str(repo.get('type') or repo.get('repo_type') or 'local').lower() != 'local':
+                report['warnings'].append(f"Repository '{name}': informe a chave secreta da nuvem em Repositórios > Editar")
+            if dry_run:
+                repo_ids[name] = -1     # será criado; só para a simulação das tarefas
             else:
-                report['repositories']['add'] += 1
-                if not dry_run:
-                    cur.execute("""
-                        INSERT INTO repositories (name, engine, repo_type, path, config, created_at, updated_at)
-                        VALUES (%s, %s, %s, %s, %s::jsonb, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                    """, (repo.get('name'), repo.get('engine'), repo.get('repo_type'),
-                          repo.get('path'), json.dumps(repo.get('config', {}))))
+                cur.execute("""
+                    INSERT INTO repositories (name, type, engine, path, config, enabled, password, motor_password,
+                                              cloud_password, encryption_password, status, initialized, created_at, updated_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'active', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    RETURNING id
+                """, (name, repo.get('type') or repo.get('repo_type') or 'local', repo.get('engine'), repo.get('path'),
+                      json.dumps(cfg), repo.get('enabled', True) is not False,
+                      secrets.get('password') or secrets.get('motor_password'), secrets.get('motor_password'),
+                      secrets.get('cloud_secret') or secrets.get('cloud_password'),
+                      secrets.get('encryption_password') or secrets.get('motor_password')))
+                repo_ids[name] = cur.fetchone()[0]
 
-        # Tasks
+        # Tarefas: todas as colunas conhecidas pelo banco atual; repositório resolvido pelo nome
+        task_cols = {row['column_name'] for row in _query(
+            "SELECT column_name FROM information_schema.columns WHERE table_name = 'tasks'")} - _TASK_RUNTIME_COLS
         for task in config_data.get('tasks', []):
-            existing = _query("SELECT id FROM tasks WHERE name = %s", (task.get('name', ''),))
+            name = (task.get('name') or '').strip()
+            existing = _query("SELECT id FROM tasks WHERE name = %s", (name,))
             if existing:
                 report['tasks']['skip'] += 1
-                report['warnings'].append(f"Task '{task.get('name')}' already exists, skipping")
-            else:
-                report['tasks']['add'] += 1
-                if not dry_run:
-                    cur.execute("""
-                        INSERT INTO tasks (name, engine, source_path, schedule, schedule_type,
-                                           schedule_interval, enabled, max_retries, retention_days, priority,
-                                           created_at, updated_at)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                    """, (task.get('name'), task.get('engine'), task.get('source_path'),
-                          task.get('schedule'), task.get('schedule_type'),
-                          task.get('schedule_interval'), task.get('enabled', True),
-                          task.get('max_retries', 3), task.get('retention_days', 30),
-                          task.get('priority', 0)))
+                report['warnings'].append(f"Task '{name}' already exists, skipping")
+                continue
+            repo_id = repo_ids.get(task.get('repository'))
+            if task.get('repository') and repo_id is None and not dry_run:
+                found = _query("SELECT id FROM repositories WHERE name = %s", (task.get('repository'),))
+                repo_id = found[0]['id'] if found else None
+            if task.get('repository') and repo_id is None:
+                report['warnings'].append(f"Task '{name}': repositório '{task.get('repository')}' não encontrado")
+            report['tasks']['add'] += 1
+            if not dry_run:
+                row = {k: v for k, v in task.items() if k in task_cols}
+                row['repository_id'] = repo_id
+                cols = list(row)
+                cur.execute(f"INSERT INTO tasks ({', '.join(cols)}, status, created_at, updated_at) "
+                            f"VALUES ({', '.join(['%s'] * len(cols))}, 'idle', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                            [json.dumps(v) if isinstance(v, (dict, list)) else v for v in row.values()])
 
         # Settings
         for key, value in config_data.get('settings', {}).items():
+            if key in _LOCAL_ONLY_SETTINGS:
+                continue
             report['settings']['update'] += 1
             if not dry_run:
                 val_str = json.dumps(value) if not isinstance(value, str) else value
@@ -298,16 +340,44 @@ def import_config(config_data: Dict, dry_run: bool = True) -> Dict[str, Any]:
                     ON CONFLICT (key) DO UPDATE SET value = %s
                 """, (key, val_str, val_str))
 
+        # SMTP (só no pacote com dados sensíveis e se este Agente ainda não tiver SMTP configurado)
+        smtp = config_data.get('smtp')
+        if isinstance(smtp, dict) and smtp.get('password') and (smtp.get('server') or smtp.get('host')):
+            from engines import smtp_store
+            if smtp_store.load_from_core():
+                report['warnings'].append("SMTP já configurado neste Agente, mantido")
+            else:
+                report['smtp'] = 'add'
+                if not dry_run:
+                    cur.execute("SAVEPOINT gboc_smtp")
+                    try:
+                        smtp_store.save(cur, smtp.get('server') or smtp.get('host'), smtp.get('port') or 587,
+                                        smtp.get('username') or '', smtp.get('password'), smtp.get('use_tls', True),
+                                        smtp.get('from_email') or smtp.get('username') or '', smtp.get('from_name') or '')
+                        cur.execute("RELEASE SAVEPOINT gboc_smtp")
+                    except Exception as e:
+                        cur.execute("ROLLBACK TO SAVEPOINT gboc_smtp")
+                        report['warnings'].append(f"SMTP não importado: {e}")
+
         # Report schedules
         for sched in config_data.get('report_schedules', []):
+            if _query("SELECT 1 FROM information_schema.tables WHERE table_name = 'report_schedules'") and \
+                    _query("SELECT 1 FROM report_schedules WHERE name = %s", (sched.get('name'),)):
+                continue                      # já existe (antes duplicava a cada importação)
             report['report_schedules']['add'] += 1
             if not dry_run:
-                cur.execute("""
-                    INSERT INTO report_schedules (name, report_type, format, period_days, cron_expression, email_to, enabled)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """, (sched.get('name'), sched.get('report_type'), sched.get('format', 'html'),
-                      sched.get('period_days', 30), sched.get('cron_expression', '0 8 * * 1'),
-                      sched.get('email_to', ''), sched.get('enabled', True)))
+                cur.execute("SAVEPOINT gboc_sched")
+                try:
+                    cur.execute("""
+                        INSERT INTO report_schedules (name, report_type, format, period_days, cron_expression, email_to, enabled)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """, (sched.get('name'), sched.get('report_type'), sched.get('format', 'html'),
+                          sched.get('period_days', 30), sched.get('cron_expression', '0 8 * * 1'),
+                          sched.get('email_to', ''), sched.get('enabled', True)))
+                    cur.execute("RELEASE SAVEPOINT gboc_sched")
+                except Exception as e:
+                    cur.execute("ROLLBACK TO SAVEPOINT gboc_sched")
+                    report['warnings'].append(f"Agendamento de relatório '{sched.get('name')}' não importado: {e}")
 
         if not dry_run:
             conn.commit()

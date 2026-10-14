@@ -180,8 +180,38 @@ class AutoVerifyEngine:
         return self._integrity_check("kopia", repo_id)
 
     def _verify_duplicati(self, task: Dict[str, Any], repo_id: Optional[int], sandbox_dir: str) -> Dict[str, Any]:
-        """Acesso ao repositório Duplicati e listagem dos backups."""
-        return self._integrity_check("duplicati", repo_id)
+        """Backup do Duplicati Server: resultado do próprio Duplicati (inclui o teste de amostras que ele faz ao fim
+        do backup). Sem correspondência no Server: acesso ao repositório pela linha de comando."""
+        native = self._verify_duplicati_server(task)
+        return native if native is not None else self._integrity_check("duplicati", repo_id)
+
+    def _verify_duplicati_server(self, task: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        try:
+            from core.integrations.duplicati_native import get_duplicati_native_service
+            svc = get_duplicati_native_service()
+            if not svc.probe().get("ok"):
+                return None
+            match = svc.find_backup_for_task(task.get("name"))
+        except Exception as e:
+            logger.debug(f"[SureRestore] Duplicati Server indisponível: {e}")
+            return None
+        if not match:
+            return None
+        last = svc.get_last_result(match["id"])
+        if last.get("status") != "success" or not last.get("parsed_result"):
+            return {"success": False, "engine": "duplicati", "method": "duplicati_server_result",
+                    "error": f"Resultado do Duplicati indisponível: {last.get('message') or 'sem execuções registradas'}"}
+        parsed = str(last.get("parsed_result"))
+        test = last.get("test_result")
+        ok = parsed in ("Success", "Warning") and test in (None, "Success", "Warning")
+        summary = f"Duplicati Server ({match['name']}): último backup {parsed}"
+        if test is not None:
+            summary += f"; teste de amostras {test} ({last.get('tested_volumes', 0)} volume(s))"
+        else:
+            summary += "; teste de amostras não informado pelo Duplicati"
+        errs = [str(e)[:200] for e in (last.get("errors") or [])][:5]
+        return {"success": ok, "engine": "duplicati", "method": "duplicati_server_result", "summary": summary,
+                "backup_id": match["id"], "errors": errs, "error": None if ok else (errs[0] if errs else summary)}
 
     def _verify_native(self, task: Dict[str, Any], repo_id: Optional[int], sandbox_dir: str) -> Dict[str, Any]:
         """Motor nativo: confere se TODOS os blocos de todos os snapshots existem no repositório (local ou nuvem)."""

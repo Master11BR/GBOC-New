@@ -2835,6 +2835,14 @@ function gbocToggleSidebarCollapse(){
                     <div>${input}</div>
                 </div>`;
             }).join('');
+            if(cat==='notifications'){
+                // Testes de envio (antes só existiam na API, sem botão na tela)
+                form.innerHTML+=`<div style="display:flex;gap:10px;flex-wrap:wrap;padding:16px 0 4px">
+                    <button type="button" class="btn btn-secondary" onclick="testNotification('email', this)"><i class="fas fa-envelope"></i> Testar e-mail (SMTP)</button>
+                    <button type="button" class="btn btn-secondary" onclick="testNotification('webhook', this)"><i class="fas fa-link"></i> Testar webhook</button>
+                    <span style="font-size:.8em;color:var(--text-muted);align-self:center">Salva o que está na tela e envia um teste · porta 465 = SSL; 587 = STARTTLS</span>
+                </div>`;
+            }
             document.getElementById('save-status').textContent='';
         }
 
@@ -3164,17 +3172,30 @@ function gbocToggleSidebarCollapse(){
             }
         }
 
-        async function testNotification(channel){
+        async function testNotification(channel, btn){
+            const say=(msg,type)=>window.gbocAlert?gbocAlert(msg,{title:type==='success'?'Teste enviado':'Falha no teste',type}):alert(msg);
+            const body={channel};
+            if(channel==='email'){
+                const cur=document.querySelector('[data-cat="notifications"][data-key="smtp_to"]');
+                const to=window.gbocPrompt
+                    ? await gbocPrompt('Enviar o e-mail de teste para:', (cur&&cur.value)||'', {title:'Teste de SMTP', placeholder:'voce@empresa.com'})
+                    : prompt('Enviar o e-mail de teste para:', (cur&&cur.value)||'');
+                if(!to) return;
+                body.to=to.trim();
+            }
+            if(btn){btn.disabled=true;btn.dataset.html=btn.innerHTML;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Enviando...';}
             try{
+                if(window._currentSettingsTab==='notifications') await saveCurrentTab();   // testa o que está digitado
                 const r=await fetch(`${API}/server/test-notification`,{
                     method:'POST',
                     headers:{'Content-Type':'application/json'},
-                    body:JSON.stringify({channel})
+                    body:JSON.stringify(body)
                 });
-                const d=await r.json();
-                if(r.ok) alert(`✓ Notificação ${channel} enviada com sucesso!`);
-                else alert('Erro: '+(d.detail||'Desconhecido'));
-            }catch(e){alert('Erro: '+e.message)}
+                const d=await r.json().catch(()=>({}));
+                if(r.ok) await say(channel==='email'?`E-mail de teste enviado para ${d.to||body.to}. Confira a caixa de entrada (e o spam).`:'Webhook de teste enviado com sucesso.','success');
+                else await say(d.detail||d.message||('HTTP '+r.status),'error');
+            }catch(e){await say(e.message,'error')}
+            finally{if(btn){btn.disabled=false;btn.innerHTML=btn.dataset.html;}}
         }
 
         function fmtBytes(b){if(!b||b===0)return'0 B';const k=1024,s=['B','KB','MB','GB','TB'],i=Math.floor(Math.log(b)/Math.log(k));return parseFloat((b/Math.pow(k,i)).toFixed(2))+' '+s[i]}
