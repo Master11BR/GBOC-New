@@ -354,10 +354,11 @@ class HistoryImporter:
                     logger.warning(f"  ⚠️ {error_msg}")
                     return { 'repository_id': repo['id'], 'name': repo['name'], 'engine': 'kopia', 'errors': [error_msg], 'snapshots': [], 'statistics': {} }
 
+                from engines.s3_endpoint import kopia_endpoint_args   # sem http(s)://; http → --disable-tls
                 connect_cmd.extend([
                     's3',
                     '--bucket', bucket,
-                    '--endpoint', endpoint,
+                    *kopia_endpoint_args(endpoint),
                     '--access-key', access_key,
                     '--secret-access-key', secret_key
                 ])

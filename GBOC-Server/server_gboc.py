@@ -1683,10 +1683,10 @@ def _send_server_notification_sync(subject: str, body: str) -> Dict:
                 msg['Subject'] = subject
                 msg['From']    = frm
                 msg['To']      = to
-                with smtplib.SMTP(host, port, timeout=15) as s:
-                    s.starttls()
-                    s.login(user, pwd)
-                    s.send_message(msg)
+                # Mesma entrega dos relatórios: porta 465 = SSL; demais = STARTTLS quando o servidor oferece
+                # (antes: STARTTLS obrigatório — falhava na 465 e em servidores sem TLS)
+                from modules.reports.report_schedules import smtp_deliver
+                smtp_deliver(msg, cfg)
                 results.append({"channel": "email", "status": "sent", "to": to})
         except Exception as e:
             results.append({"channel": "email", "status": "error", "error": str(e)})
@@ -4705,17 +4705,17 @@ async def test_server_notification(request: Request):
             user = notif.get('smtp_username', '')
             pwd = notif.get('smtp_password', '')
             frm = notif.get('smtp_from', user)
-            to = notif.get('smtp_to', user)
-            if not host or not user:
-                raise HTTPException(400, "SMTP não configurado")
+            to = (str(data.get('to') or '').strip() or notif.get('smtp_to') or user)   # destinatário informado no teste
+            if not host:
+                raise HTTPException(400, "SMTP não configurado (preencha o servidor SMTP e salve)")
+            if not to:
+                raise HTTPException(400, "Informe o e-mail destinatário")
             msg = MIMEText(f"Teste de notificação do GBOC Server v{SERVER_VERSION}\n{_dt.now(timezone.utc).isoformat()}")
             msg['Subject'] = '[GBOC Server] Teste de Notificação'
-            msg['From'] = frm
+            msg['From'] = frm or 'gboc@localhost'
             msg['To'] = to
-            with smtplib.SMTP(host, port, timeout=15) as s:
-                s.starttls()
-                s.login(user, pwd)
-                s.send_message(msg)
+            from modules.reports.report_schedules import smtp_deliver   # 465 = SSL; demais = STARTTLS se houver
+            await asyncio.to_thread(smtp_deliver, msg, notif)    # fora do event loop
             return {"status": "success", "channel": "email", "to": to}
 
         elif channel == 'webhook':
@@ -4736,7 +4736,18 @@ async def test_server_notification(request: Request):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(500, str(e))
+        import smtplib as _smtp, socket as _sock, ssl as _ssl
+        if isinstance(e, _smtp.SMTPAuthenticationError):
+            msg = "Usuário ou senha do SMTP recusados pelo servidor (Gmail/Microsoft 365: use senha de app)."
+        elif isinstance(e, _ssl.SSLError):
+            msg = f"Falha na negociação SSL/TLS ({e}). Confira a porta: 465 = SSL; 587 = STARTTLS."
+        elif isinstance(e, (_sock.timeout, TimeoutError)):
+            msg = "O servidor SMTP não respondeu a tempo. Confira servidor, porta e firewall (465 = SSL; 587 = STARTTLS)."
+        elif isinstance(e, (ConnectionRefusedError, _sock.gaierror)):
+            msg = f"Não foi possível conectar ao servidor: {e}"
+        else:
+            msg = f"{type(e).__name__}: {e}"
+        raise HTTPException(500, msg)
     finally:
         if 'cur' in locals() and cur: cur.close()
         if conn: release_db(conn)

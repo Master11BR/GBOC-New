@@ -6,6 +6,33 @@
 
 ---
 
+## 14.8.1 — 2026-10-13 (Recuperação automática da configuração e criptografia do motor nativo)
+
+### 🛟 Recuperação automática da configuração (instalação limpa)
+- Config Export/Import > **Recuperação automática da configuração**: defina uma **chave de recuperação** (mínimo de 12 caracteres). O Agente gera um pacote com toda a configuração — repositórios **com as chaves** (senha do motor e chave secreta da nuvem), tarefas, configurações, SMTP — criptografado com AES-256-GCM (chave derivada por scrypt) e grava em `gboc-dr/<agente>/` no bucket de cada repositório do motor nativo.
+- Envio automático quando a configuração muda (verificação a cada 5 min, espera estabilizar) e conferência diária; ficam as últimas 30 versões. "Enviar agora" e "Baixar pacote" na tela.
+- Opcional: o pacote criptografado também vai por e-mail (SMTP do Agente) quando muda. **A chave de recuperação nunca é enviada** (nem para a nuvem nem por e-mail); neste computador fica criptografada como as chaves de nuvem.
+- **Recuperar configuração**: em uma instalação nova, depois do Primeiro acesso, informe os dados do bucket (ou selecione o arquivo do e-mail) e a chave de recuperação; "Simular" mostra o que será criado. Depois de recuperar, a recuperação automática já fica ativa com a mesma chave.
+- **Correção:** importar configuração falhava (coluna inexistente `repo_type`) e perdia retenção, repetição e scripts das tarefas; as tarefas agora apontam para o repositório pelo nome. A chave que assina as sessões de login deixou de ser exportada.
+
+- **Destino próprio do pacote** (bucket ou pasta), independente do motor: quem usa só restic, Kopia ou Duplicati também tem o pacote na nuvem. O acesso é testado antes de salvar; o destino vai dentro do pacote e já fica configurado na máquina nova.
+- **Jobs do Duplicati no pacote**: a definição completa de cada job (destino e passphrase) e a conexão com o Duplicati Server. Na recuperação os jobs são recriados no Duplicati da máquina nova e o reparo é disparado (reconstrói o banco local a partir do destino); job de mesmo nome existente é mantido.
+- Testado em equipamento novo (banco vazio, Duplicati novo): restic, Kopia, nativo e Duplicati recuperados com restauração conferida por SHA-256.
+
+### 🛠️ Correções encontradas no teste de equipamento novo
+- **restic / Kopia com S3 compatível**: o restic ignorava o endpoint e ia para a Amazon; o Kopia recebia o endpoint com `http://` e falhava. Kopia passou a inicializar bucket vazio na criação do repositório, como o restic.
+- **Restauração Kopia**: não restaurava nada no "snapshot inteiro", usava formato de caminho inválido e podia usar a configuração de outro repositório. Corrigido (configuração própria da restauração).
+- **SureRestore Kopia**: usava a chave da nuvem como senha do repositório e não achava a chave secreta ("credenciais incompletas").
+- **Restauração Duplicati 2.1+**: o destino escolhido era ignorado e os arquivos voltavam para o local original.
+- **SMTP do Agente**: bancos com a tabela criada pelo migrador (coluna `host`) davam erro ao salvar. A tela agora carrega a configuração salva; senha em branco mantém a atual. Envio escolhe pela porta: 465 = SSL direto, demais = STARTTLS (antes "Usar TLS" na 465 esperava até estourar o tempo). Mensagens de erro claras (certificado, senha, porta).
+- **SMTP do Servidor**: teste e notificações usam a mesma entrega dos relatórios (465 = SSL; STARTTLS quando oferecido).
+
+### 🔐 Criptografia do motor nativo
+- Repositórios **novos** do motor nativo passam a ser criptografados com AES-256-GCM usando a **senha do motor** do repositório (`gboc-key.json` na raiz guarda a chave mestra protegida por scrypt). Blocos, pacotes e manifestos (nomes e caminhos dos arquivos) ficam ilegíveis sem a senha; ids dos blocos passam a ser HMAC-SHA256 (o nome do objeto não revela o conteúdo) e a deduplicação continua.
+- Repositórios que **já têm backups** continuam sem criptografia e funcionando como antes. `GBOC_NATIVE_ENCRYPTION=0` desativa para repositórios novos.
+- **Guarde a senha do motor**: sem ela o backup criptografado não pode ser restaurado (ela vai dentro do pacote de recuperação).
+- Retenção: se algum manifesto não puder ser lido, a limpeza de blocos e pacotes é adiada (antes os blocos dele podiam ser tratados como sem uso).
+
 ## 14.8.1 — 2026-10-05 (Backup imutável, Implantação em massa, Políticas centrais, IA Local Ollama e Comercial MSP)
 
 ### 🔒 Backup imutável

@@ -1471,6 +1471,73 @@ body[class*="layout-"] :is(.tab-btn, .gboc-tab, .tab-button, .selector-btn, .per
     color: inherit !important;
 }
 
+/* ── 9.7b Botões de ação do cabeçalho (padrão único, Agente e Servidor) ─────────
+   Antes cada página misturava botão sólido com gradiente, contorno, tamanhos e alturas diferentes
+   (ex.: "Manutenção" mais alto, "IA Diagnóstico" laranja sólido ao lado de botões de contorno).
+   Padrão: mesma altura, raio, fonte e espaçamento; neutro por padrão; .btn-primary é a ação principal
+   (preenchimento suave na cor do tema); ações perigosas em vermelho; warning/success/info mantêm só
+   a cor do ícone. Vale só para as barras de ação de cabeçalho/aba — botões dentro do conteúdo não mudam. */
+body[class*="layout-"] :is(.header-actions, .gboc-header-promoted, .gboc-spa-global-actions, .gboc-spa-tab-head, .page-actions, .main-content > .header, .main-content > header.header)
+  :is(a.btn, button.btn):not(.tab-btn, .gboc-tab, .tab-button, .selector-btn, .period-btn, .mode-btn, .dropdown-item, .btn-icon) {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center;
+    gap: 8px;
+    height: var(--control-h, 36px) !important;
+    min-height: 0 !important;
+    padding: 0 14px !important;
+    margin: 0 !important;
+    font-size: var(--fs-sm, 0.8125rem) !important;
+    font-weight: 600 !important;
+    line-height: 1 !important;
+    white-space: nowrap;
+    vertical-align: middle;
+    text-decoration: none !important;
+    background: var(--bg-input, transparent) !important;
+    background-image: none !important;
+    border: 1px solid var(--border-color, var(--border)) !important;
+    border-radius: var(--btn-radius, 8px) !important;
+    color: var(--text-primary, var(--text)) !important;
+    box-shadow: none !important;
+    transform: none !important;
+    transition: background-color .18s ease, border-color .18s ease, color .18s ease;
+}
+body[class*="layout-"] :is(.header-actions, .gboc-header-promoted, .gboc-spa-global-actions, .gboc-spa-tab-head, .page-actions, .main-content > .header, .main-content > header.header)
+  :is(a.btn, button.btn):not(.tab-btn, .gboc-tab, .tab-button, .selector-btn, .period-btn, .mode-btn, .dropdown-item, .btn-icon):hover:not(:disabled) {
+    background: var(--bg-hover) !important;
+    border-color: var(--primary-color) !important;
+    transform: none !important;
+}
+body[class*="layout-"] :is(.header-actions, .gboc-header-promoted, .gboc-spa-global-actions, .gboc-spa-tab-head, .page-actions, .main-content > .header, .main-content > header.header)
+  :is(a.btn, button.btn) i { color: inherit !important; font-size: .95em; }
+/* ação principal */
+body[class*="layout-"] :is(.header-actions, .gboc-header-promoted, .gboc-spa-global-actions, .gboc-spa-tab-head, .page-actions, .main-content > .header, .main-content > header.header)
+  :is(a.btn, button.btn).btn-primary {
+    background: var(--primary-soft) !important;
+    border-color: var(--primary-color) !important;
+    color: var(--primary-color) !important;
+}
+/* ações perigosas (excluir, desligar, reset) */
+body[class*="layout-"] :is(.header-actions, .gboc-header-promoted, .gboc-spa-global-actions, .gboc-spa-tab-head, .page-actions, .main-content > .header, .main-content > header.header)
+  :is(a.btn, button.btn):is(.btn-danger, .btn-outline-danger, [style*="danger"]) {
+    background: transparent !important;
+    border-color: var(--danger-color, #ef4444) !important;
+    color: var(--danger-color, #ef4444) !important;
+}
+body[class*="layout-"] :is(.header-actions, .gboc-header-promoted, .gboc-spa-global-actions, .gboc-spa-tab-head, .page-actions, .main-content > .header, .main-content > header.header)
+  :is(a.btn, button.btn):is(.btn-danger, .btn-outline-danger, [style*="danger"]):hover:not(:disabled) {
+    background: color-mix(in srgb, var(--danger-color, #ef4444) 14%, transparent) !important;
+}
+/* cor semântica só no ícone */
+body[class*="layout-"] :is(.header-actions, .gboc-header-promoted, .gboc-spa-global-actions, .gboc-spa-tab-head, .page-actions, .main-content > .header, .main-content > header.header)
+  :is(a.btn, button.btn):is(.btn-warning, .btn-outline-warning) i { color: var(--warning-color, #f59e0b) !important; }
+body[class*="layout-"] :is(.header-actions, .gboc-header-promoted, .gboc-spa-global-actions, .gboc-spa-tab-head, .page-actions, .main-content > .header, .main-content > header.header)
+  :is(a.btn, button.btn):is(.btn-success, .btn-outline-success) i { color: var(--success-color, #10b981) !important; }
+body[class*="layout-"] :is(.header-actions, .gboc-header-promoted, .gboc-spa-global-actions, .gboc-spa-tab-head, .page-actions, .main-content > .header, .main-content > header.header)
+  :is(a.btn, button.btn):is(.btn-info, .btn-outline-info) i { color: var(--info-color, #3b82f6) !important; }
+/* a linha de ações alinha tudo pelo centro, com o mesmo espaçamento */
+body[class*="layout-"] :is(.header-actions, .gboc-spa-global-actions) { display: flex; align-items: center !important; gap: 8px !important; flex-wrap: wrap; }
+
 /* ── 9.8 Cartões de indicadores ───────────────────────────────────────────── */
 body[class*="layout-"] :is(.kpi-value, .stat-card .val, .status-value) { font-weight: 700; line-height: 1.15; color: var(--text-primary); }
 body[class*="layout-"] :is(.kpi-sub, .stat-card .lbl, .status-label, .kpi-header span) { font-size: var(--fs-xs); color: var(--text-muted); }

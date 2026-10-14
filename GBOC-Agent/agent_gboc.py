@@ -286,6 +286,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"[INSCRIÇÃO] Verificação do enroll.json indisponível: {e}")
 
+    # Recuperação automática: pacote criptografado da configuração na nuvem (Config Export/Import > Recuperação)
+    try:
+        from engines import config_recovery
+        config_recovery.start()
+    except Exception as e:
+        logger.warning(f"[RECUPERAÇÃO] backup automático da configuração indisponível: {e}")
+
     # Retenção automática dos logs do agente (Logs > Retenção; 0 = manter tudo)
     try:
         from api.logs import start_retention_loop
