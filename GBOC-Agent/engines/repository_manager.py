@@ -134,6 +134,7 @@ class RepositoryManager:
 
         normalized = dict(repo_config)
         raw_config = normalized.get('config')
+        config = None          # sem 'config' (criação nova pela API) a variável ficava indefinida: erro 500 ao criar
         if raw_config:
             try:
                 config = json.loads(raw_config) if isinstance(raw_config, str) else raw_config
@@ -150,6 +151,11 @@ class RepositoryManager:
             from engines import repo_secrets
             repo_secrets.inject(normalized, config)
         normalized.pop('secret_enc', None)
+        # Valor mascarado ("********") nunca é chave real: não pode virar a chave secreta na normalização
+        from engines.repo_secrets import MASK as _MASK
+        for _f in ('cloud_password', 'secret_key', 'aws_secret_key', 'b2_account_key', 'azure_account_key'):
+            if str(normalized.get(_f) or '').strip() == _MASK:
+                normalized.pop(_f, None)
 
         # 1. Separar e normalizar senha do motor (criptografia do repositório)
         motor_p = (
@@ -397,14 +403,9 @@ class RepositoryManager:
             raise
 
         # Obter senha da nuvem se fornecida separadamente
-        cloud_pwd = str(
-            data.get('cloud_password') or 
-            data.get('secret_key') or 
-            data.get('aws_secret_key') or 
-            data.get('b2_account_key') or 
-            data.get('azure_account_key') or 
-            (pwd if repo_type == 'local' else '')
-        ).strip()
+        # Mesma ordem usada para a cópia criptografada (secret_enc): coluna e cópia sempre com a mesma chave
+        from engines import repo_secrets as _rs
+        cloud_pwd = str(_rs.secret_from_data(data) or (pwd if repo_type == 'local' else '')).strip()
         if not cloud_pwd:
             cloud_pwd = pwd
 
@@ -495,8 +496,9 @@ class RepositoryManager:
         new_secret = repo_secrets.secret_from_data(data)
         if new_secret:
             config_data['secret_enc'] = repo_secrets.encrypt(new_secret)
-            if 'cloud_password' not in data:
-                data['cloud_password'] = new_secret
+            # cloud_password (coluna) e a cópia criptografada são a MESMA chave da nuvem: gravadas sempre juntas.
+            # Antes, com secret_key e cloud_password diferentes no formulário, cada lugar ficava com um valor.
+            data['cloud_password'] = new_secret
         elif any(data.get(f) == '' for f in repo_secrets.SECRET_FIELDS):
             config_data.pop('secret_enc', None)
             if 'cloud_password' not in data:
@@ -746,7 +748,8 @@ class RepositoryManager:
         }
 
     def _test_kopia_connection(self, repo_data: Dict[str, Any]) -> Dict[str, Any]:
-        auth = self._validate_kopia_connection(repo_data)
+        # Como no restic: bucket/pasta vazia é inicializada (kopia repository create) na criação do repositório
+        auth = self._validate_kopia_connection(repo_data, allow_init=True)
         if auth.get('valid'):
             return {"success": True, "message": "Conexão Kopia válida"}
         return {
@@ -951,7 +954,8 @@ class RepositoryManager:
                     if repo_type == 'wasabi':
                         endpoint = endpoint or f"s3.{region}.wasabisys.com"
                     if endpoint:
-                        connect_cmd.extend(['--endpoint', endpoint])
+                        from engines.s3_endpoint import kopia_endpoint_args   # sem http(s)://; http → --disable-tls
+                        connect_cmd.extend(kopia_endpoint_args(endpoint))
                     prefix = str(repo.get('prefix') or '').strip()
                     if prefix:
                         if not prefix.endswith('/'):

@@ -604,7 +604,6 @@ window.gbocLogout = async function() {
     localStorage.removeItem(SIDEBAR_CONFIG.STORAGE.USER);
     localStorage.removeItem('gboc_server_token');
     document.cookie = `${SIDEBAR_CONFIG.STORAGE.TOKEN}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
-    document.cookie = `gboc_server_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
     window.location.href = '/login.html';
 };
 
@@ -762,7 +761,6 @@ window.gbocLogout = async function(){
     localStorage.removeItem('gboc_server_token');
     localStorage.removeItem('gboc_user');
     document.cookie = 'gboc_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-    document.cookie = 'gboc_server_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
     window.location.href = '/login.html';
 };
 

@@ -676,6 +676,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                             <div class="setting-item">
                                 <label for="smtp-port">Porta SMTP</label>
                                 <input type="number" id="smtp-port" class="form-control" value="587" min="1" max="65535">
+                                <small style="color:var(--text-muted)">465 = SSL direto · 587 = STARTTLS (Gmail, Microsoft 365)</small>
                             </div>
                             
                             <div class="setting-item">
@@ -991,8 +992,8 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 from_name: document.getElementById('smtp-from-name').value
             };
             
-            // Validação básica
-            if (!smtpConfig.server || !smtpConfig.username || !smtpConfig.password) {
+            // Validação básica (senha em branco mantém a senha já salva)
+            if (!smtpConfig.server || !smtpConfig.username || (!smtpConfig.password && !window._smtpPasswordSet)) {
                 alert('Por favor, preencha todos os campos obrigatórios: servidor, usuário e senha.');
                 return;
             }
@@ -1006,6 +1007,8 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 const result = await response.json();
                 
                 if (result.status === 'success') {
+                    document.getElementById('smtp-password').value = '';
+                    loadSmtpConfig();
                     alert('Configuração SMTP salva com sucesso!');
                 } else {
                     alert('Erro ao salvar configuração SMTP: ' + (result.message || 'Erro desconhecido'));
@@ -1013,6 +1016,23 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             } catch (e) {
                 alert('Erro na requisição: ' + e.message);
             }
+        }
+
+        // Preenche a tela com o SMTP salvo (antes os campos voltavam vazios e era preciso digitar tudo de novo)
+        async function loadSmtpConfig() {
+            try {
+                const r = await fetch('/api/smtp/config');
+                const d = await r.json();
+                const c = d && d.config;
+                if (!c) return;
+                const set = (id, v) => { const e = document.getElementById(id); if (e && v !== undefined && v !== null) e.value = v; };
+                set('smtp-server', c.server); set('smtp-port', c.port); set('smtp-username', c.username);
+                set('smtp-from-email', c.from_email); set('smtp-from-name', c.from_name);
+                document.getElementById('smtp-tls').checked = c.use_tls !== false;
+                window._smtpPasswordSet = !!c.password_set;
+                document.getElementById('smtp-password').placeholder = c.password_set
+                    ? 'Senha salva — deixe em branco para manter' : 'Sua senha ou app password';
+            } catch (e) { console.warn('SMTP config', e); }
         }
 
         async function testSmtpConfig() {
@@ -1042,6 +1062,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         document.getElementById('btn-reset-stuck-backups').addEventListener('click', resetStuckBackups);
         document.getElementById('btn-save-smtp').addEventListener('click', saveSmtpConfig);
         document.getElementById('btn-test-smtp').addEventListener('click', testSmtpConfig);
+        loadSmtpConfig();
         document.getElementById('btn-reset-install').addEventListener('click', resetInstall);
 
         async function resetInstall() {

@@ -56,7 +56,10 @@ body.layout-horizontal {
     width: 100%;
     max-width: 100%;
     position: relative;
+    /* clip (e não hidden): com hidden o navegador torna overflow-y "auto" e o .app virava um 2º contêiner de
+       rolagem dentro da página — duas barras e cabeçalho/painéis rolando separados */
     overflow-x: hidden;
+    overflow-x: clip;
 }
 
 .main-content {
@@ -205,6 +208,14 @@ body.layout-horizontal {
 }
 .tb-nav-link i.tb-arrow { font-size: 0.72em; margin-left: 2px; transition: transform 0.2s ease; }
 .tb-dropdown:hover .tb-arrow, .tb-dropdown.active .tb-arrow { transform: rotate(180deg); }
+
+/* Menu do usuário (avatar, canto direito) e menus que passariam da borda: abrem alinhados à direita.
+   O "left: 0 !important" abaixo vencia o style="right:0;left:auto" do _topbar.html e o menu saía da tela. */
+.tb-dropdown-menu.tb-user-menu,
+.tb-dropdown-menu.tb-align-right {
+    left: auto !important;
+    right: 0 !important;
+}
 
 /* SUBMENU DROPDOWN BLINDADO E ISOLADO */
 .tb-dropdown-menu {
@@ -1424,19 +1435,108 @@ body[class*="layout-"] :is(.data-table, .table) th {
 body[class*="layout-"] :is(.data-table, .table) td { color: var(--text-primary); border-bottom: 1px solid var(--border-color); }
 body[class*="layout-"] :is(.data-table, .table) tbody tr:hover { background: var(--bg-hover); }
 
-/* ── 9.7 Abas internas de página ──────────────────────────────────────────── */
-body[class*="layout-"] :is(.tab-btn, .gboc-tab, .tab-button) {
-    display: inline-flex;
+/* ── 9.7 Botões de seleção: abas, filtros, períodos, estilos — UM padrão para todo o sistema ──────────
+   Mesmo visual dos botões de período (Diagnóstico/Logs): contorno e texto na cor do tema; selecionado = fundo suave.
+   Antes cada página desenhava o seu (sublinhado, botão sólido, cartão) e o texto chegava a sumir (vermelho sobre vermelho).
+   O raio acompanha o estilo de UI escolhido (--btn-radius). Páginas que trocam .btn-primary/.btn-secondary
+   nas abas continuam funcionando: o estado visual vem de .active / aria-selected. */
+body[class*="layout-"] :is(.tab-btn, .gboc-tab, .tab-button, .selector-btn, .period-btn, .dr-tab-btn, .saas-tab-btn, .pow-tab-btn, .ad-tab-btn, .ent-tab-btn, .mode-btn) {
+    display: inline-flex !important;
     align-items: center;
-    gap: 8px;
-    min-height: var(--control-h);
-    font-size: var(--fs-md);
-    font-weight: 600;
-    color: var(--text-muted);
+    justify-content: center;
+    gap: 6px;
+    min-height: var(--control-h-sm, 32px) !important;
+    padding: 0 14px !important;
+    font-size: var(--fs-sm, 0.8125rem) !important;
+    font-weight: 600 !important;
+    line-height: 1.2;
+    text-align: center;
+    white-space: normal;
+    background: transparent !important;
+    border: 1px solid var(--primary-color) !important;
+    border-radius: var(--btn-radius, 6px) !important;
+    color: var(--primary-color) !important;
     cursor: pointer;
+    transition: background-color .18s ease, color .18s ease, border-color .18s ease, box-shadow .18s ease;
 }
-body[class*="layout-"] :is(.tab-btn, .gboc-tab, .tab-button):hover { color: var(--text-primary); }
-body[class*="layout-"] :is(.tab-btn, .gboc-tab, .tab-button).active { color: var(--primary-color); border-bottom-color: var(--primary-color); }
+body[class*="layout-"] :is(.tab-btn, .gboc-tab, .tab-button, .selector-btn, .period-btn, .dr-tab-btn, .saas-tab-btn, .pow-tab-btn, .ad-tab-btn, .ent-tab-btn, .mode-btn):hover:not(:disabled) {
+    background: var(--bg-hover) !important;
+}
+body[class*="layout-"] :is(.tab-btn, .gboc-tab, .tab-button, .selector-btn, .period-btn, .dr-tab-btn, .saas-tab-btn, .pow-tab-btn, .ad-tab-btn, .ent-tab-btn, .mode-btn):is(.active, [aria-selected="true"]) {
+    background: var(--primary-soft) !important;
+    border-color: var(--primary-color) !important;
+    color: var(--primary-color) !important;
+}
+body[class*="layout-"] :is(.tab-btn, .gboc-tab, .tab-button, .selector-btn, .period-btn, .dr-tab-btn, .saas-tab-btn, .pow-tab-btn, .ad-tab-btn, .ent-tab-btn, .mode-btn) i {
+    color: inherit !important;
+}
+
+/* ── 9.7b Botões de ação do cabeçalho (padrão único, Agente e Servidor) ─────────
+   Antes cada página misturava botão sólido com gradiente, contorno, tamanhos e alturas diferentes
+   (ex.: "Manutenção" mais alto, "IA Diagnóstico" laranja sólido ao lado de botões de contorno).
+   Padrão: mesma altura, raio, fonte e espaçamento; neutro por padrão; .btn-primary é a ação principal
+   (preenchimento suave na cor do tema); ações perigosas em vermelho; warning/success/info mantêm só
+   a cor do ícone. Vale só para as barras de ação de cabeçalho/aba — botões dentro do conteúdo não mudam. */
+body[class*="layout-"] :is(.header-actions, .gboc-header-promoted, .gboc-spa-global-actions, .gboc-spa-tab-head, .page-actions, .main-content > .header, .main-content > header.header)
+  :is(a.btn, button.btn):not(.tab-btn, .gboc-tab, .tab-button, .selector-btn, .period-btn, .mode-btn, .dropdown-item, .btn-icon) {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center;
+    gap: 8px;
+    height: var(--control-h, 36px) !important;
+    min-height: 0 !important;
+    padding: 0 14px !important;
+    margin: 0 !important;
+    font-size: var(--fs-sm, 0.8125rem) !important;
+    font-weight: 600 !important;
+    line-height: 1 !important;
+    white-space: nowrap;
+    vertical-align: middle;
+    text-decoration: none !important;
+    background: var(--bg-input, transparent) !important;
+    background-image: none !important;
+    border: 1px solid var(--border-color, var(--border)) !important;
+    border-radius: var(--btn-radius, 8px) !important;
+    color: var(--text-primary, var(--text)) !important;
+    box-shadow: none !important;
+    transform: none !important;
+    transition: background-color .18s ease, border-color .18s ease, color .18s ease;
+}
+body[class*="layout-"] :is(.header-actions, .gboc-header-promoted, .gboc-spa-global-actions, .gboc-spa-tab-head, .page-actions, .main-content > .header, .main-content > header.header)
+  :is(a.btn, button.btn):not(.tab-btn, .gboc-tab, .tab-button, .selector-btn, .period-btn, .mode-btn, .dropdown-item, .btn-icon):hover:not(:disabled) {
+    background: var(--bg-hover) !important;
+    border-color: var(--primary-color) !important;
+    transform: none !important;
+}
+body[class*="layout-"] :is(.header-actions, .gboc-header-promoted, .gboc-spa-global-actions, .gboc-spa-tab-head, .page-actions, .main-content > .header, .main-content > header.header)
+  :is(a.btn, button.btn) i { color: inherit !important; font-size: .95em; }
+/* ação principal */
+body[class*="layout-"] :is(.header-actions, .gboc-header-promoted, .gboc-spa-global-actions, .gboc-spa-tab-head, .page-actions, .main-content > .header, .main-content > header.header)
+  :is(a.btn, button.btn).btn-primary {
+    background: var(--primary-soft) !important;
+    border-color: var(--primary-color) !important;
+    color: var(--primary-color) !important;
+}
+/* ações perigosas (excluir, desligar, reset) */
+body[class*="layout-"] :is(.header-actions, .gboc-header-promoted, .gboc-spa-global-actions, .gboc-spa-tab-head, .page-actions, .main-content > .header, .main-content > header.header)
+  :is(a.btn, button.btn):is(.btn-danger, .btn-outline-danger, [style*="danger"]) {
+    background: transparent !important;
+    border-color: var(--danger-color, #ef4444) !important;
+    color: var(--danger-color, #ef4444) !important;
+}
+body[class*="layout-"] :is(.header-actions, .gboc-header-promoted, .gboc-spa-global-actions, .gboc-spa-tab-head, .page-actions, .main-content > .header, .main-content > header.header)
+  :is(a.btn, button.btn):is(.btn-danger, .btn-outline-danger, [style*="danger"]):hover:not(:disabled) {
+    background: color-mix(in srgb, var(--danger-color, #ef4444) 14%, transparent) !important;
+}
+/* cor semântica só no ícone */
+body[class*="layout-"] :is(.header-actions, .gboc-header-promoted, .gboc-spa-global-actions, .gboc-spa-tab-head, .page-actions, .main-content > .header, .main-content > header.header)
+  :is(a.btn, button.btn):is(.btn-warning, .btn-outline-warning) i { color: var(--warning-color, #f59e0b) !important; }
+body[class*="layout-"] :is(.header-actions, .gboc-header-promoted, .gboc-spa-global-actions, .gboc-spa-tab-head, .page-actions, .main-content > .header, .main-content > header.header)
+  :is(a.btn, button.btn):is(.btn-success, .btn-outline-success) i { color: var(--success-color, #10b981) !important; }
+body[class*="layout-"] :is(.header-actions, .gboc-header-promoted, .gboc-spa-global-actions, .gboc-spa-tab-head, .page-actions, .main-content > .header, .main-content > header.header)
+  :is(a.btn, button.btn):is(.btn-info, .btn-outline-info) i { color: var(--info-color, #3b82f6) !important; }
+/* a linha de ações alinha tudo pelo centro, com o mesmo espaçamento */
+body[class*="layout-"] :is(.header-actions, .gboc-spa-global-actions) { display: flex; align-items: center !important; gap: 8px !important; flex-wrap: wrap; }
 
 /* ── 9.8 Cartões de indicadores ───────────────────────────────────────────── */
 body[class*="layout-"] :is(.kpi-value, .stat-card .val, .status-value) { font-weight: 700; line-height: 1.15; color: var(--text-primary); }
@@ -1914,3 +2014,118 @@ body[class*="layout-"] :is(.empty, .empty-logs) { background: var(--bg-input); b
 html[data-color-theme="amber"], html[data-color-theme="orange"] { --text-muted: #c98a3e !important; }
 html[data-color-theme="red"], html[data-color-theme="crimson"]  { --text-muted: #e57373 !important; }
 html[data-color-theme="purple"]                                 { --text-muted: #b388f5 !important; }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   NOME DO MÓDULO NO TOPBAR + BUSCA GLOBAL (gboc-layout-manager.js → GBOCPageHeader)
+   ════════════════════════════════════════════════════════════════════════════ */
+.tb-page-title {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+    flex: 0 1 auto;
+    max-width: 46vw;
+    margin: 0 12px 0 2px;
+    padding-left: 12px;
+    border-left: 1px solid var(--border-color, rgba(255,255,255,0.08));
+    line-height: 1.2;
+    overflow: hidden;
+}
+.tb-page-title[hidden] { display: none !important; }
+.tb-pt-main {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+.tb-pt-main i { color: var(--primary-color); font-size: 0.9em; flex-shrink: 0; }
+.tb-pt-crumb { color: var(--text-muted); font-weight: 600; flex-shrink: 0; }
+.tb-pt-sep { color: var(--text-muted); opacity: 0.6; flex-shrink: 0; }
+.tb-pt-name { overflow: hidden; text-overflow: ellipsis; }
+.tb-pt-sub {
+    margin-top: 2px;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+body.layout-horizontal .tb-page-title { display: none !important; }
+@media (max-width: 1200px) { .tb-pt-sub, .tb-pt-crumb, .tb-pt-sep { display: none; } }
+@media (max-width: 860px)  { .tb-page-title { display: none !important; } }
+
+/* Cabeçalho da página após promover o título: só as ações, compacto, no fluxo normal (não sobrepõe nada) */
+.gboc-promoted-hide, .gboc-dup-hidden { display: none !important; }
+.gboc-header-empty, .main-content .gboc-header-promoted.gboc-header-empty { display: none !important; }
+.main-content .gboc-header-promoted {
+    position: static !important;
+    display: flex !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    gap: 8px;
+    flex-wrap: wrap;
+    min-height: 0 !important;
+    margin: 0 0 14px 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    transform: none !important;
+}
+.main-content .gboc-header-promoted::before,
+.main-content .gboc-header-promoted::after { display: none !important; }
+
+/* Resultados da busca global */
+.tb-search { position: relative; }
+.tb-search-results {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    width: max(100%, 340px);
+    max-height: min(420px, calc(100vh - 90px));
+    overflow-y: auto;
+    padding: 6px;
+    background: var(--bg-card, #1e293b);
+    border: 1px solid var(--border-color, #2a3f5f);
+    border-radius: 12px;
+    box-shadow: 0 16px 45px rgba(0, 0, 0, 0.45);
+    z-index: 10000;
+}
+.tb-search-results[hidden] { display: none !important; }
+.tb-search-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    text-align: left;
+    cursor: pointer;
+}
+.tb-search-item i { width: 16px; text-align: center; color: var(--primary-color); }
+.tb-search-item:hover, .tb-search-item.active { background: var(--primary-soft, rgba(127,127,127,0.14)); }
+.tb-si-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tb-si-group { font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; }
+
+/* SPA do Server: ações gerais (IA Diagnóstico, Push Sync) na mesma linha das ações da aba */
+.gboc-spa-global-actions { display: flex !important; gap: 8px; align-items: center; flex-wrap: wrap; }
+.gboc-spa-tab-head { justify-content: flex-end !important; }
+.gboc-spa-tab-head > div:not(.gboc-promoted-hide) { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* Espaço vazio acima do conteúdo: o <body> já desconta a altura do topbar (padding-top: var(--gboc-topbar-height))
+   e ui/models/modern/layout.css somava mais 64px ao conteúdo (de quando o topbar não era descontado no body).
+   Fica só o respiro normal do conteúdo. */
+body.layout-vertical .main-content, body.layout-vertical main.main-content,
+body.layout-horizontal .main-content, body.layout-horizontal main.main-content {
+    padding-top: var(--gboc-content-top, 24px);
+}
+@media (max-width: 768px) { :root { --gboc-content-top: 16px; } }

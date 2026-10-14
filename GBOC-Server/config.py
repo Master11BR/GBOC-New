@@ -29,7 +29,7 @@ DB_CONFIG = {
     "database": os.getenv("POSTGRES_DB", "gboc"),
     "user": os.getenv("POSTGRES_USER", "postgres"),
     "password": os.getenv("POSTGRES_PASSWORD", "Stoms2025+"),
-    "options": "-c timezone=America/Sao_Paulo",
+    "options": f"-c timezone=America/Sao_Paulo -c lock_timeout={int(os.getenv('GBOC_DB_LOCK_TIMEOUT_MS', 30000))}",
 }
 
 DB_POOL_MIN_CONN = int(os.getenv("DB_POOL_MIN", 2))

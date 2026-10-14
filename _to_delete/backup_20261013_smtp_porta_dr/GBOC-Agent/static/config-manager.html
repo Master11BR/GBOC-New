@@ -1,0 +1,465 @@
+<!--
+==============================================================================
+GBOC System v14.8.1 Enterprise Edition
+Copyright (c) 2026 Master11BR - Todos os direitos reservados.
+Propriedade Intelectual & Direitos Autorais Registrados.
+==============================================================================
+-->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GBOC Agent 14.8.1 - Config Export/Import</title>
+    
+    <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
+    <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.8.1">
+    <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=14.8.1">
+    <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=14.8.1">
+    <link rel="stylesheet" href="/static/ui/models/modern/components.css?v=14.8.1">
+    <link rel="stylesheet" href="/static/ui/models/modern/layout.css?v=14.8.1">
+    <link rel="stylesheet" href="/static/style.css?v=14.8.1">
+    <link rel="stylesheet" href="/static/gboc-themes.css?v=14.8.1">
+    <link rel="stylesheet" href="/static/gboc-layout.css?v=14.8.1">
+    <script src="/static/gboc-perf.js?v=14.8.1"></script>
+    <script src="/static/gboc-layout-manager.js?v=14.8.1"></script>
+    <script src="/static/gboc-modal.js?v=14.8.1"></script>
+<script src="/static/auth_interceptor.js?v=14.8.1"></script>
+    <script src="/static/gboc-global.js?v=14.8.1"></script>
+    <style>
+        .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:16px;margin-bottom:24px}
+        .stat-card{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:18px;text-align:center}
+        .stat-card .val{font-size:1.7em;font-weight:700}
+        .stat-card .lbl{font-size:.8em;color:var(--text-muted);margin-top:4px}
+        .panel{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px}
+        .panel-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+        .panel-body{padding:18px 20px}
+        .tbl{width:100%;border-collapse:collapse}
+        .tbl th,.tbl td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--border);font-size:.85em}
+        .tbl th{background:var(--bg-input);color:var(--text-muted);font-weight:600}
+        .badge-ok{background:rgba(78,203,136,.15);color:var(--success);padding:2px 10px;border-radius:20px;font-size:.8em}
+        .badge-warn{background:rgba(240,169,64,.15);color:var(--warning);padding:2px 10px;border-radius:20px;font-size:.8em}
+        .badge-crit{background:rgba(240,107,107,.15);color:var(--danger);padding:2px 10px;border-radius:20px;font-size:.8em}
+        .empty-msg{text-align:center;color:var(--text-muted);padding:30px 10px}
+        .two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+        .form-group{margin-bottom:14px}
+        .form-group label{display:block;font-size:.85em;color:var(--text-muted);margin-bottom:5px;font-weight:600}
+        .form-group input,.form-group textarea,.form-group select{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:.9em}
+        .form-group input[type=checkbox]{width:auto;padding:0;margin:0 8px 0 0;vertical-align:middle;accent-color:var(--primary)}
+        .diff-box{background:var(--bg-input);border:1px solid var(--border);border-radius:10px;padding:14px;max-height:450px;overflow:auto;font-family:Consolas,monospace;font-size:.82em;white-space:pre-wrap}
+        @media(max-width:900px){.two-col{grid-template-columns:1fr}}
+    </style>
+    <script src="/static/auth_interceptor.js"></script>
+</head>
+<body>
+<div class="app">
+    <main class="main-content">
+        <header class="header">
+            <div>
+                <h1 class="page-title"><i class="fas fa-sliders-h" style="color:var(--primary)"></i> Config Export/Import</h1>
+                <div class="page-subtitle">Snapshots, exportação, importação e diff de configurações do sistema</div>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-secondary" onclick="loadAll()"><i class="fas fa-sync-alt"></i> Atualizar</button>
+                <button class="btn btn-primary" onclick="downloadCurrent()"><i class="fas fa-download"></i> Exportar Atual</button>
+                <button class="btn btn-success" onclick="openUpload()"><i class="fas fa-upload"></i> Importar JSON</button>
+                <input type="file" id="import-file" accept=".json" style="display:none" onchange="uploadConfig(this)">
+            </div>
+        </header>
+
+        <div class="stats-row">
+            <div class="stat-card"><div class="val" id="kpi-snaps">0</div><div class="lbl">Snapshots</div></div>
+            <div class="stat-card"><div class="val" id="kpi-sections">0</div><div class="lbl">Seções Exportáveis</div></div>
+            <div class="stat-card"><div class="val" id="kpi-sensitive" style="color:var(--warning)">Não</div><div class="lbl">Sensíveis no Export</div></div>
+            <div class="stat-card"><div class="val" id="kpi-diff">0</div><div class="lbl">Diferenças no Último Diff</div></div>
+        </div>
+
+        <div class="panel" id="recovery-panel">
+            <div class="panel-header">
+                <h3><i class="fas fa-cloud-arrow-up" style="color:var(--primary)"></i> Recuperação automática da configuração</h3>
+                <span id="rec-badge" class="badge-warn">Carregando...</span>
+            </div>
+            <div class="panel-body">
+                <p style="margin:0 0 14px;font-size:.85em;color:var(--text-muted)">
+                    A configuração completa (repositórios, tarefas e as chaves dos repositórios) é criptografada com a
+                    <strong>chave de recuperação</strong> e guardada em <code>gboc-dr/</code> no bucket dos repositórios do motor nativo
+                    a cada alteração e 1x por dia (últimas 30 versões). Em uma instalação limpa, recupere tudo abaixo com os dados do
+                    bucket e a chave de recuperação. <strong>Guarde a chave fora deste computador</strong> (cofre de senhas): sem ela o
+                    pacote não abre, e ela nunca é enviada para a nuvem nem por e-mail.
+                </p>
+                <div class="two-col">
+                    <div>
+                        <div class="form-group">
+                            <label>Chave de recuperação <span id="rec-pass-hint" style="font-weight:400"></span></label>
+                            <input id="rec-pass" type="password" autocomplete="new-password" placeholder="Mínimo de 12 caracteres (vazio = manter a atual)">
+                        </div>
+                        <div class="form-group">
+                            <label>Confirmar chave</label>
+                            <input id="rec-pass2" type="password" autocomplete="new-password">
+                        </div>
+                        <div class="form-group">
+                            <label><input type="checkbox" id="rec-enabled"> Ativar backup automático da configuração</label>
+                            <label><input type="checkbox" id="rec-email"> Enviar também o pacote criptografado por e-mail quando mudar</label>
+                        </div>
+                        <div class="form-group">
+                            <label>E-mail(s) de destino</label>
+                            <input id="rec-email-to" type="text" placeholder="Vazio = destinatários das Notificações">
+                        </div>
+                        <div style="display:flex;gap:10px;flex-wrap:wrap">
+                            <button class="btn btn-primary" onclick="recSave()"><i class="fas fa-save"></i> Salvar</button>
+                            <button class="btn btn-secondary" onclick="recRun(this)"><i class="fas fa-cloud-arrow-up"></i> Enviar agora</button>
+                            <button class="btn btn-secondary" onclick="recDownload()"><i class="fas fa-download"></i> Baixar pacote</button>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="form-group"><label>Situação</label></div>
+                        <div id="rec-status" style="font-size:.85em;line-height:1.7">Carregando...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">
+                <h3><i class="fas fa-life-ring" style="color:var(--success)"></i> Recuperar configuração (instalação limpa)</h3>
+                <select id="rr-mode" onchange="rrMode()" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text)">
+                    <option value="cloud">Da nuvem</option>
+                    <option value="file">De arquivo (anexo do e-mail)</option>
+                </select>
+            </div>
+            <div class="panel-body">
+                <div id="rr-cloud">
+                    <div class="two-col">
+                        <div>
+                            <div class="form-group">
+                                <label>Provedor</label>
+                                <select id="rr-type">
+                                    <option value="s3">S3 / S3 compatível (endpoint próprio)</option>
+                                    <option value="wasabi">Wasabi</option>
+                                    <option value="b2">Backblaze B2</option>
+                                    <option value="local">Pasta local / rede</option>
+                                </select>
+                            </div>
+                            <div class="form-group rr-cloud-only"><label>Endpoint</label><input id="rr-endpoint" type="text" placeholder="Ex: s3.eu-central-2.wasabisys.com ou http://servidor:8333"></div>
+                            <div class="form-group rr-cloud-only"><label>Bucket (ou bucket/pasta)</label><input id="rr-bucket" type="text"></div>
+                            <div class="form-group rr-cloud-only"><label>Região</label><input id="rr-region" type="text" placeholder="Opcional"></div>
+                            <div class="form-group rr-local-only" style="display:none"><label>Pasta do repositório</label><input id="rr-path" type="text"></div>
+                        </div>
+                        <div>
+                            <div class="form-group rr-cloud-only"><label>Access key / Account ID</label><input id="rr-access" type="text" autocomplete="off"></div>
+                            <div class="form-group rr-cloud-only"><label>Chave secreta da nuvem</label><input id="rr-secret" type="password" autocomplete="new-password"></div>
+                            <button class="btn btn-secondary" onclick="rrList(this)"><i class="fas fa-list"></i> Listar pacotes</button>
+                            <div class="form-group" style="margin-top:14px"><label>Pacote</label><select id="rr-package"><option value="">— liste os pacotes —</option></select></div>
+                        </div>
+                    </div>
+                </div>
+                <div id="rr-file" style="display:none">
+                    <div class="form-group"><label>Arquivo .gbocdr</label><input id="rr-upload" type="file" accept=".gbocdr"></div>
+                </div>
+                <div class="form-group" style="max-width:420px"><label>Chave de recuperação</label><input id="rr-pass" type="password" autocomplete="new-password"></div>
+                <div style="display:flex;gap:10px;flex-wrap:wrap">
+                    <button class="btn btn-secondary" onclick="rrRestore(true,this)"><i class="fas fa-eye"></i> Simular</button>
+                    <button class="btn btn-danger" onclick="rrRestore(false,this)"><i class="fas fa-file-import"></i> Recuperar</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="two-col">
+            <div class="panel">
+                <div class="panel-header">
+                    <h3><i class="fas fa-camera" style="color:var(--primary)"></i> Criar Snapshot</h3>
+                </div>
+                <div class="panel-body">
+                    <div class="form-group">
+                        <label>Nome</label>
+                        <input id="snap-name" type="text" placeholder="Ex: antes-da-migração-rbac">
+                    </div>
+                    <div class="form-group">
+                        <label>Descrição</label>
+                        <textarea id="snap-desc" rows="3" placeholder="Motivo ou contexto do snapshot"></textarea>
+                    </div>
+                    <button class="btn btn-primary" onclick="createSnapshot()"><i class="fas fa-save"></i> Criar Snapshot</button>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <h3><i class="fas fa-file-export" style="color:var(--success)"></i> Export Atual</h3>
+                </div>
+                <div class="panel-body">
+                    <div class="form-group">
+                        <label><input type="checkbox" id="include-sensitive"> Incluir dados sensíveis</label>
+                    </div>
+                    <button class="btn btn-success" onclick="previewExport()"><i class="fas fa-eye"></i> Preview</button>
+                    <button class="btn btn-secondary" onclick="downloadCurrent()"><i class="fas fa-download"></i> Download JSON</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">
+                <h3><i class="fas fa-history" style="color:var(--warning)"></i> Snapshots Salvos</h3>
+                <span id="snap-count" style="font-size:.82em;color:var(--text-muted)"></span>
+            </div>
+            <div class="panel-body" style="padding:0">
+                <table class="tbl">
+                    <thead><tr><th>ID</th><th>Nome</th><th>Descrição</th><th>Criado em</th><th></th></tr></thead>
+                    <tbody id="snapshots-table"><tr><td colspan="5" class="empty-msg">Carregando...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="two-col">
+            <div class="panel">
+                <div class="panel-header">
+                    <h3><i class="fas fa-code-compare" style="color:var(--primary)"></i> Diff entre Snapshots</h3>
+                </div>
+                <div class="panel-body">
+                    <div class="form-group">
+                        <label>Snapshot A</label>
+                        <select id="diff-a"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Snapshot B</label>
+                        <select id="diff-b"></select>
+                    </div>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap">
+                        <button class="btn btn-primary" onclick="runDiff()"><i class="fas fa-code-branch"></i> Comparar</button>
+                        <button class="btn btn-secondary" onclick="diffCurrent()"><i class="fas fa-arrows-rotate"></i> Atual vs Snapshot A</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <h3><i class="fas fa-upload" style="color:var(--danger)"></i> Import Config</h3>
+                </div>
+                <div class="panel-body">
+                    <div class="form-group">
+                        <label>Modo</label>
+                        <select id="import-mode">
+                            <option value="dry">Dry Run (simular)</option>
+                            <option value="apply">Aplicar mudanças</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>JSON manual</label>
+                        <textarea id="import-json" rows="7" placeholder='{"settings": ...}'></textarea>
+                    </div>
+                    <button class="btn btn-danger" onclick="importManual()"><i class="fas fa-file-import"></i> Importar JSON</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">
+                <h3><i class="fas fa-list-check" style="color:var(--success)"></i> Resultado / Preview / Diff</h3>
+            </div>
+            <div class="panel-body">
+                <div id="result-box" class="diff-box">Nenhuma operação executada ainda.</div>
+            </div>
+        </div>
+    </main>
+</div>
+<script src="/static/sidebar.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{new UnifiedSidebar().initialize();loadAll()});
+const API='/api/config';
+let _snaps=[];
+
+async function loadAll(){ await Promise.allSettled([loadSnapshots(),loadRecovery()]); }
+
+async function loadSnapshots(){
+    try{
+        const r=await fetch(API+'/snapshots'); const d=await r.json();
+        _snaps=d.snapshots||[];
+        document.getElementById('kpi-snaps').textContent=_snaps.length;
+        document.getElementById('snap-count').textContent=`${_snaps.length} snapshots`;
+        const tb=document.getElementById('snapshots-table');
+        if(!_snaps.length){tb.innerHTML='<tr><td colspan="5" class="empty-msg">Nenhum snapshot salvo</td></tr>';} else {
+            tb.innerHTML=_snaps.map(s=>`<tr>
+                <td>${s.id}</td>
+                <td><strong>${s.name||'—'}</strong></td>
+                <td style="font-size:.82em;color:var(--text-muted)">${s.description||'—'}</td>
+                <td style="font-size:.82em">${s.created_at?gbocFormatDateTime(s.created_at):'—'}</td>
+                <td>
+                    <button class="btn btn-sm btn-secondary" onclick="downloadSnapshot(${s.id})" title="Baixar"><i class="fas fa-download"></i></button>
+                    <button class="btn btn-sm btn-secondary" onclick="viewSnapshot(${s.id})" title="Visualizar"><i class="fas fa-eye"></i></button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteSnapshot(${s.id})" title="Excluir"><i class="fas fa-trash"></i></button>
+                </td>
+            </tr>`).join('');
+        }
+        const opts=_snaps.map(s=>`<option value="${s.id}">${s.name} (#${s.id})</option>`).join('');
+        document.getElementById('diff-a').innerHTML=opts;
+        document.getElementById('diff-b').innerHTML=opts;
+    }catch(e){console.error('loadSnapshots',e)}
+}
+
+function openUpload(){ document.getElementById('import-file').click(); }
+
+async function createSnapshot(){
+    const name=document.getElementById('snap-name').value.trim();
+    const description=document.getElementById('snap-desc').value.trim();
+    if(!name){alert('Informe o nome do snapshot');return}
+    const r=await fetch(API+'/snapshots',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,description})});
+    const d=await r.json();
+    document.getElementById('result-box').textContent=JSON.stringify(d,null,2);
+    loadAll();
+}
+
+async function previewExport(){
+    const includeSensitive=document.getElementById('include-sensitive').checked;
+    const r=await fetch(`${API}/export?include_sensitive=${includeSensitive}`);
+    const d=await r.json();
+    document.getElementById('kpi-sections').textContent=Object.keys(d).length;
+    document.getElementById('kpi-sensitive').textContent=includeSensitive?'Sim':'Não';
+    document.getElementById('result-box').textContent=JSON.stringify(d,null,2);
+}
+
+async function downloadCurrent(){
+    const includeSensitive=document.getElementById('include-sensitive').checked;
+    window.open(`${API}/export/download?include_sensitive=${includeSensitive}`,'_blank');
+}
+
+async function downloadSnapshot(id){ window.open(`${API}/snapshots/${id}/download`,'_blank'); }
+
+async function viewSnapshot(id){
+    const r=await fetch(`${API}/snapshots/${id}`); const d=await r.json();
+    document.getElementById('result-box').textContent=JSON.stringify(d,null,2);
+}
+
+async function deleteSnapshot(id){
+    if(!confirm('Excluir snapshot?')) return;
+    await fetch(`${API}/snapshots/${id}`,{method:'DELETE'});
+    loadAll();
+}
+
+async function runDiff(){
+    const a=parseInt(document.getElementById('diff-a').value); const b=parseInt(document.getElementById('diff-b').value);
+    if(!a||!b){alert('Selecione ambos snapshots');return}
+    const r=await fetch(`${API}/diff`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({snapshot_a_id:a,snapshot_b_id:b})});
+    const d=await r.json();
+    const diffCount=(d.added?.length||0)+(d.removed?.length||0)+(d.changed?.length||0);
+    document.getElementById('kpi-diff').textContent=diffCount;
+    document.getElementById('result-box').textContent=JSON.stringify(d,null,2);
+}
+
+async function diffCurrent(){
+    const a=parseInt(document.getElementById('diff-a').value);
+    if(!a){alert('Selecione Snapshot A');return}
+    const r=await fetch(`${API}/diff/current/${a}`); const d=await r.json();
+    const diffCount=(d.added?.length||0)+(d.removed?.length||0)+(d.changed?.length||0);
+    document.getElementById('kpi-diff').textContent=diffCount;
+    document.getElementById('result-box').textContent=JSON.stringify(d,null,2);
+}
+
+async function importManual(){
+    const txt=document.getElementById('import-json').value.trim();
+    if(!txt){alert('Cole o JSON');return}
+    const dry=document.getElementById('import-mode').value==='dry';
+    try{
+        const config_data=JSON.parse(txt);
+        const r=await fetch(`${API}/import`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({config_data,dry_run:dry})});
+        const d=await r.json();
+        document.getElementById('result-box').textContent=JSON.stringify(d,null,2);
+        if(!dry) loadAll();
+    }catch(e){alert('JSON inválido: '+e.message)}
+}
+
+async function uploadConfig(input){
+    if(!input.files.length)return;
+    const dry=document.getElementById('import-mode').value==='dry';
+    const fd=new FormData(); fd.append('file',input.files[0]);
+    const r=await fetch(`${API}/import/upload?dry_run=${dry}`,{method:'POST',body:fd});
+    const d=await r.json();
+    document.getElementById('result-box').textContent=JSON.stringify(d,null,2);
+    if(!dry) loadAll();
+    input.value='';
+}
+// ─── Recuperação automática ───
+const REC=API+'/recovery';
+function recEsc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function recDate(v){try{return v?gbocFormatDateTime(v):'—'}catch(e){return v||'—'}}
+async function recJson(r){let d=null;try{d=await r.json()}catch(e){}; if(!r.ok) throw new Error((d&&(d.detail||d.message))||('HTTP '+r.status)); return d}
+async function loadRecovery(){
+    try{
+        const d=await recJson(await fetch(REC+'/status'));
+        document.getElementById('rec-enabled').checked=!!d.enabled;
+        document.getElementById('rec-email').checked=!!d.email_enabled;
+        document.getElementById('rec-email-to').value=d.email_to||'';
+        document.getElementById('rec-pass-hint').textContent=d.passphrase_set?`(definida em ${recDate(d.passphrase_set_at)})`:'(não definida)';
+        const b=document.getElementById('rec-badge');
+        const lr=d.last_result||{};
+        if(!d.enabled){b.className='badge-warn';b.textContent='Desativada'}
+        else if(lr.ok===false){b.className='badge-crit';b.textContent='Com falhas'}
+        else{b.className='badge-ok';b.textContent='Ativa'}
+        const dests=(d.destinations||[]).map(x=>recEsc(x.name)).join(', ')||'<span style="color:var(--warning)">nenhum repositório do motor nativo</span>';
+        const per=(lr.destinations||[]).map(x=>`<div>${x.ok?'<i class="fas fa-check" style="color:var(--success)"></i>':'<i class="fas fa-xmark" style="color:var(--danger)"></i>'} ${recEsc(x.repository)} — ${recEsc(x.ok?x.action:x.error)}</div>`).join('');
+        const em=lr.email?(lr.email.sent?`enviado para ${recEsc((lr.email.to||[]).join(', '))}`:`<span style="color:var(--danger)">${recEsc(lr.email.error)}</span>`):'—';
+        document.getElementById('rec-status').innerHTML=`
+            <div><strong>Agente:</strong> ${recEsc(d.agent)} &nbsp; <strong>Versões mantidas:</strong> ${d.keep_versions}</div>
+            <div><strong>Destinos:</strong> ${dests}</div>
+            <div><strong>Último envio:</strong> ${recDate(d.last_upload_at)} &nbsp; <strong>Última verificação:</strong> ${recDate(d.last_check_at)}</div>
+            <div><strong>Último e-mail:</strong> ${recDate(d.last_email_at)} (${em})</div>
+            ${per?`<div style="margin-top:6px"><strong>Resultado por destino:</strong>${per}</div>`:''}`;
+    }catch(e){document.getElementById('rec-status').textContent='Erro: '+e.message}
+}
+async function recSave(){
+    const passphrase=document.getElementById('rec-pass').value, passphrase_confirm=document.getElementById('rec-pass2').value;
+    const body={enabled:document.getElementById('rec-enabled').checked,email_enabled:document.getElementById('rec-email').checked,
+        email_to:document.getElementById('rec-email-to').value.trim(),passphrase:passphrase||null,passphrase_confirm:passphrase_confirm||null};
+    try{
+        await recJson(await fetch(REC+'/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}));
+        document.getElementById('rec-pass').value='';document.getElementById('rec-pass2').value='';
+        document.getElementById('result-box').textContent=passphrase?'Chave de recuperação salva. Anote-a em local seguro fora deste computador.':'Preferências salvas.';
+        loadRecovery();
+    }catch(e){alert(e.message)}
+}
+async function recRun(btn){
+    btn.disabled=true;const old=btn.innerHTML;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Enviando...';
+    try{const d=await recJson(await fetch(REC+'/run',{method:'POST'}));document.getElementById('result-box').textContent=JSON.stringify(d,null,2)}
+    catch(e){alert(e.message)} finally{btn.disabled=false;btn.innerHTML=old;loadRecovery()}
+}
+async function recDownload(){
+    try{
+        const r=await fetch(REC+'/package'); if(!r.ok){await recJson(r);return}
+        const blob=await r.blob(); const cd=r.headers.get('Content-Disposition')||''; const m=cd.match(/filename="([^"]+)"/);
+        const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=m?m[1]:'gboc.gbocdr'; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+    }catch(e){alert(e.message)}
+}
+function rrMode(){const f=document.getElementById('rr-mode').value==='file';document.getElementById('rr-file').style.display=f?'':'none';document.getElementById('rr-cloud').style.display=f?'none':''}
+document.addEventListener('change',e=>{if(e.target&&e.target.id==='rr-type'){const l=e.target.value==='local';
+    document.querySelectorAll('.rr-cloud-only').forEach(x=>x.style.display=l?'none':'');document.querySelectorAll('.rr-local-only').forEach(x=>x.style.display=l?'':'none')}});
+function rrSource(){const v=id=>document.getElementById(id).value.trim();
+    return {type:v('rr-type'),endpoint:v('rr-endpoint')||null,bucket:v('rr-bucket')||null,region:v('rr-region')||null,access_key:v('rr-access')||null,secret_key:document.getElementById('rr-secret').value||null,path:v('rr-path')||null}}
+async function rrList(btn){
+    btn.disabled=true;
+    try{
+        const d=await recJson(await fetch(REC+'/remote/list',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(rrSource())}));
+        const p=d.packages||[];
+        document.getElementById('rr-package').innerHTML=p.length?p.map(x=>`<option value="${recEsc(x.name)}">${recEsc(x.agent)} — ${recDate(x.created_at)}</option>`).join(''):'<option value="">Nenhum pacote encontrado neste destino</option>';
+    }catch(e){alert(e.message)} finally{btn.disabled=false}
+}
+async function rrRestore(dry,btn){
+    const pass=document.getElementById('rr-pass').value; if(!pass){alert('Informe a chave de recuperação');return}
+    if(!dry&&!confirm('Recuperar a configuração? Repositórios e tarefas com o mesmo nome já existentes são mantidos.')) return;
+    btn.disabled=true;
+    try{
+        let r;
+        if(document.getElementById('rr-mode').value==='file'){
+            const f=document.getElementById('rr-upload').files[0]; if(!f){alert('Selecione o arquivo .gbocdr');return}
+            const fd=new FormData(); fd.append('file',f); fd.append('passphrase',pass); fd.append('dry_run',dry?'true':'false');
+            r=await fetch(REC+'/file/restore',{method:'POST',body:fd});
+        }else{
+            const pk=document.getElementById('rr-package').value; if(!pk){alert('Liste e selecione um pacote');return}
+            r=await fetch(REC+'/remote/restore',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:rrSource(),package:pk,passphrase:pass,dry_run:dry})});
+        }
+        const d=await recJson(r);
+        document.getElementById('result-box').textContent=(dry?'SIMULAÇÃO — nada foi alterado\n':'CONFIGURAÇÃO RECUPERADA\n')+JSON.stringify(d,null,2);
+        if(!dry){document.getElementById('rr-pass').value='';loadAll()}
+    }catch(e){alert(e.message)} finally{btn.disabled=false}
+}
+</script>
+</body>
+</html>
+

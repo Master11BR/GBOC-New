@@ -4,6 +4,7 @@
 Responsável por: Rotas para sistema de alertas e notificações
 """
 
+import asyncio
 from fastapi import APIRouter, HTTPException, Request
 from typing import Dict, Any, List
 import json
@@ -16,13 +17,21 @@ from models import AlertCreate
 logger = logging.getLogger("API-Alerts")
 router = APIRouter(prefix="/api/alerts", tags=["alerts"])
 
+ALERTS_PAGE_MAX = 500
+
+
 @router.get("/")
-async def list_alerts(
-    severity: str = None, 
-    resolved: bool = None, 
-    limit: int = 50
+def list_alerts(
+    severity: str = None,
+    resolved: bool = None,
+    acknowledged: bool = None,
+    q: str = None,
+    limit: int = 50,
+    offset: int = 0,
 ) -> Dict[str, Any]:
-    """Lista alertas do sistema"""
+    """Lista alertas do sistema. Filtros: severidade, resolvido, lido (acknowledged), texto (q); paginação."""
+    limit = max(1, min(int(limit or 50), ALERTS_PAGE_MAX))
+    offset = max(0, int(offset or 0))
     try:
         core = get_shared_core()
         
@@ -37,15 +46,20 @@ async def list_alerts(
             if resolved is not None:
                 conditions.append("resolved = %s")
                 params.append(resolved)
+            if acknowledged is not None:
+                conditions.append("acknowledged = %s")
+                params.append(acknowledged)
+            if q and q.strip():
+                like = f"%{q.strip()}%"
+                conditions.append("(title ILIKE %s OR message ILIKE %s OR source ILIKE %s OR type ILIKE %s)")
+                params.extend([like, like, like, like])
 
-            if conditions:
-                query += " WHERE " + " AND ".join(conditions)
-
-            query += " ORDER BY timestamp DESC LIMIT %s"
-            params.append(limit)
-
+            where = (" WHERE " + " AND ".join(conditions)) if conditions else ""
             cursor = conn.cursor()
-            cursor.execute(query, params)
+            cursor.execute("SELECT COUNT(*) FROM alerts" + where, params)
+            matching = cursor.fetchone()[0]
+
+            cursor.execute(query + where + " ORDER BY timestamp DESC LIMIT %s OFFSET %s", params + [limit, offset])
             
             alerts = []
             for row in cursor.fetchall():
@@ -64,12 +78,14 @@ async def list_alerts(
                 alerts.append(alert)
             
             # Estatísticas
-            stats = await _get_alert_statistics(core)
+            stats = _get_alert_statistics_sync(core)
             
             return {
                 "alerts": alerts,
                 "stats": stats,
                 "total": len(alerts),
+                "matching": matching,            # total que atende aos filtros (para "Carregar mais")
+                "offset": offset,
                 "severity_levels": {
                     "info": "Informativo",
                     "warning": "Aviso", 
@@ -275,9 +291,13 @@ def delete_alert(alert_id: int) -> Dict[str, Any]:
 
 @router.post("/bulk-action")
 async def bulk_alert_action(request: Request) -> Dict[str, Any]:
-    """Ação em lote para alertas"""
+    """Ação em lote para alertas (o trabalho no banco roda fora do event loop)."""
+    data = await request.json()
+    return await asyncio.to_thread(_bulk_alert_action_sync, data)
+
+
+def _bulk_alert_action_sync(data: Dict[str, Any]) -> Dict[str, Any]:
     try:
-        data = await request.json()
         core = get_shared_core()
 
         alert_ids = data.get("alert_ids", [])
@@ -301,18 +321,20 @@ async def bulk_alert_action(request: Request) -> Dict[str, Any]:
                     cursor.execute("DELETE FROM alerts")
                 affected_count = cursor.rowcount
             else:
-                if not alert_ids:
+                if not isinstance(alert_ids, list) or not alert_ids:
                     raise HTTPException(status_code=400, detail="Lista de IDs de alertas é obrigatória")
-                for alert_id in alert_ids:
-                    cursor.execute("SELECT id FROM alerts WHERE id = %s", (alert_id,))
-                    if cursor.fetchone():
-                        if action == "acknowledge":
-                            cursor.execute("UPDATE alerts SET acknowledged = true WHERE id = %s", (alert_id,))
-                        elif action == "resolve":
-                            cursor.execute("UPDATE alerts SET resolved = true, acknowledged = true WHERE id = %s", (alert_id,))
-                        elif action == "delete":
-                            cursor.execute("DELETE FROM alerts WHERE id = %s", (alert_id,))
-                        affected_count += 1
+                try:
+                    ids = sorted({int(i) for i in alert_ids})
+                except (TypeError, ValueError):
+                    raise HTTPException(status_code=400, detail="IDs de alertas inválidos")
+                # Um comando só para a lista inteira (antes: SELECT + UPDATE por alerta)
+                if action == "acknowledge":
+                    cursor.execute("UPDATE alerts SET acknowledged = true WHERE id = ANY(%s)", (ids,))
+                elif action == "resolve":
+                    cursor.execute("UPDATE alerts SET resolved = true, acknowledged = true WHERE id = ANY(%s)", (ids,))
+                elif action == "delete":
+                    cursor.execute("DELETE FROM alerts WHERE id = ANY(%s)", (ids,))
+                affected_count = cursor.rowcount
 
             conn.commit()
         
@@ -331,11 +353,11 @@ async def bulk_alert_action(request: Request) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/statistics/summary")
-async def get_alert_summary() -> Dict[str, Any]:
+def get_alert_summary() -> Dict[str, Any]:
     """Resumo estatístico dos alertas"""
     try:
         core = get_shared_core()
-        stats = await _get_alert_statistics(core)
+        stats = _get_alert_statistics_sync(core)
         
         # Alertas recentes (últimas 24h)
         cutoff_24h = (datetime.now() - timedelta(days=1)).isoformat()
@@ -494,7 +516,7 @@ def create_test_alerts() -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 
 # Funções auxiliares
-async def _get_alert_statistics(core) -> Dict[str, Any]:
+def _get_alert_statistics_sync(core) -> Dict[str, Any]:
     """Estatísticas dos alertas"""
     try:
         with core.get_db_connection() as conn:
@@ -561,6 +583,11 @@ async def _get_alert_statistics(core) -> Dict[str, Any]:
             "resolution_rate": 0,
             "error": str(e)
         }
+
+
+async def _get_alert_statistics(*args, **kwargs):
+    """Roda _get_alert_statistics_sync numa thread: o trabalho síncrono (banco/subprocess) não trava o event loop."""
+    return await asyncio.to_thread(_get_alert_statistics_sync, *args, **kwargs)
 
 async def _process_alert_notifications(core, alert: Dict[str, Any]):
     """Processa notificações para o alerta"""

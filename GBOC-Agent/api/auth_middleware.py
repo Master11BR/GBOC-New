@@ -91,7 +91,7 @@ def _is_server_call(request: Request) -> bool:
 
 def _rate_key(request: Request, client_ip: str):
     auth = request.headers.get("Authorization", "")
-    token = auth[7:].strip() if auth.startswith("Bearer ") else (request.cookies.get("gboc_token") or "")
+    token = auth[7:].strip() if auth.startswith("Bearer ") else (request.cookies.get("gboc_agent_token") or "")
     if token:
         return "s:" + token[-24:], API_RATE_LIMIT_MAX
     return "ip:" + client_ip, API_RATE_LIMIT_ANON_MAX

@@ -93,7 +93,8 @@ DB_CONFIG = {
     'database': os.getenv('POSTGRES_DB', 'gboc'),
     'user': os.getenv('POSTGRES_USER', 'postgres'),
     'password': os.getenv('POSTGRES_PASSWORD', 'Stoms2025+'),
-    'options': '-c timezone=America/Sao_Paulo'
+    # lock_timeout: nenhuma consulta espera lock para sempre (transação esquecida aberta) — erro em 30 s em vez de travar
+    'options': f"-c timezone=America/Sao_Paulo -c lock_timeout={int(os.getenv('GBOC_DB_LOCK_TIMEOUT_MS', 30000))}"
 }
 
 connection_pool = None
@@ -216,16 +217,19 @@ def get_db():
             conn.set_client_encoding('UTF8')
         return conn
     except psycopg2.pool.PoolError:
-        # Pool esgotado, tentar recriar
-        logger.warning("Pool esgotado, recriando...")
-        try:
-            connection_pool.closeall()
-        except Exception:
-            pass
-        connection_pool = psycopg2.pool.ThreadedConnectionPool(minconn=2, maxconn=30, **DB_CONFIG)
-        conn = connection_pool.getconn()
-        conn.set_client_encoding('UTF8')
-        return conn
+        # Pool esgotado: aguarda uma conexão ser devolvida. NÃO recria o pool — closeall() fechava as conexões
+        # que outras requisições estavam usando naquele momento e todas falhavam juntas.
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            time.sleep(0.1)
+            try:
+                conn = connection_pool.getconn()
+                conn.set_client_encoding('UTF8')
+                return conn
+            except psycopg2.pool.PoolError:
+                continue
+        logger.warning("Pool PostgreSQL esgotado por 5 s (30 conexões em uso) — requisição recusada")
+        raise HTTPException(503, "DB Ocupado")
     except Exception:
         raise HTTPException(503, "DB Ocupado")
 
@@ -691,6 +695,7 @@ def init_database():
 def log_event(conn, event_type, message, hostname=None):
     try:
         cur = conn.cursor()
+        cur.execute("SAVEPOINT gboc_sp_log_event")
         cur.execute('''
             INSERT INTO system_events (event_type, message, agent_hostname, created_at)
             VALUES (%s, %s, %s, LOCALTIMESTAMP)
@@ -698,6 +703,10 @@ def log_event(conn, event_type, message, hostname=None):
         conn.commit()
         cur.close()
     except Exception as e:
+        try:  # desfaz só esta etapa: sem isto a transação ficava abortada e o commit final descartava todas as etapas
+            conn.cursor().execute("ROLLBACK TO SAVEPOINT gboc_sp_log_event")
+        except Exception:
+            pass
         logger.error(f"Erro ao logar evento: {e}")
 
 # ===========================
@@ -897,12 +906,15 @@ def _validate_server_token(token: str) -> Optional[Dict]:
         release_db(conn)
 
 def _get_server_user_from_request(request: Request) -> Optional[Dict]:
+    """Header Bearer e depois o cookie do Servidor; o primeiro token válido vence (um header com token
+    de outro sistema não impede mais a sessão do cookie)."""
     auth_header = request.headers.get("Authorization", "")
-    if auth_header.startswith("Bearer "):
-        return _validate_server_token(auth_header[7:])
-    token = request.cookies.get("gboc_server_token")
-    if token:
-        return _validate_server_token(token)
+    candidates = [auth_header[7:].strip() if auth_header.startswith("Bearer ") else None,
+                  request.cookies.get("gboc_server_token")]
+    for token in dict.fromkeys(t for t in candidates if t):
+        user = _validate_server_token(token)
+        if user:
+            return user
     return None
 
 class ServerLoginRequest(BaseModel):
@@ -1113,7 +1125,10 @@ except Exception as _e:
 @app.get("/static/gboc-layout-manager.js", include_in_schema=False)
 @app.get("/gboc-layout-manager.js", include_in_schema=False)
 async def get_layout_manager():
-    return FileResponse(os.path.join(os.path.dirname(__file__), "gboc-layout-manager.js"), media_type="application/javascript")
+    # Mesma ordem das demais rotas estáticas: static/ (sincronizada por tools/sync_css.py) primeiro, raiz como reserva.
+    # Antes servia só a cópia da raiz, que o sync não atualiza — correções do layout manager não chegavam ao Server.
+    found = _find_asset("gboc-layout-manager.js") or os.path.join(os.path.dirname(__file__), "gboc-layout-manager.js")
+    return FileResponse(found, media_type="application/javascript")
 
 @app.get("/static/ai_assistant.js", include_in_schema=False)
 @app.get("/ai_assistant.js", include_in_schema=False)
@@ -1165,7 +1180,7 @@ async def get_ui_config_endpoint():
         "DEFAULT_THEME": "dark",
         "AVAILABLE_THEMES": ["dark", "light", "amber", "purple", "ocean", "red"],
         "DEFAULT_UI_STYLE": "minimal",
-        "AVAILABLE_UI_STYLES": ["minimal", "neumorphism", "claymorphism", "fluent", "nexus-widgets", "nexus-glass", "command-sentinel", "cyber-3d"]
+        "AVAILABLE_UI_STYLES": ["minimal", "neumorphism", "claymorphism", "fluent", "nexus-widgets", "nexus-glass", "command-sentinel", "cyber-3d", "fernly", "fernly-cyberpunk", "fernly-fluid"]
     }
 
 @app.post("/api/v1/system/shutdown", tags=["System"])
@@ -1309,8 +1324,9 @@ async def login_page():
 
 @app.get("/api/v1/auth/status")
 async def server_auth_status(request: Request):
-    enabled = _is_server_auth_enabled()
-    user = _get_server_user_from_request(request)
+    # Consultas ao banco fora do event loop
+    enabled = await asyncio.to_thread(_is_server_auth_enabled)
+    user = await asyncio.to_thread(_get_server_user_from_request, request)
     google_enabled = os.getenv("AUTH_GOOGLE_ENABLED", "false").lower() in ("true", "1", "yes")
     apple_enabled = os.getenv("AUTH_APPLE_ENABLED", "false").lower() in ("true", "1", "yes")
     return {
@@ -1352,17 +1368,26 @@ async def server_auth_oauth_provider(provider: str):
         "message": f"Provedor {name} pronto para autenticação."
     }
 
+SETUP_MIN_PASSWORD_LENGTH = 6   # mesmo mínimo exigido pela tela de primeiro acesso
+
 @app.post("/api/v1/auth/setup")
 def server_auth_setup(req: ServerSetupRequest):
+    username = (req.username or "").strip()
+    if not username or len(req.password or "") < SETUP_MIN_PASSWORD_LENGTH:
+        raise HTTPException(400, f"Usuário e senha (mínimo {SETUP_MIN_PASSWORD_LENGTH} caracteres) são obrigatórios.")
+    req.username = username
     conn = None
     try:
         conn = get_db()
         cur = conn.cursor()
+        # Trava até o commit: dois "Primeiro acesso" simultâneos não criam dois administradores.
+        cur.execute("LOCK TABLE server_auth_users IN SHARE ROW EXCLUSIVE MODE")
         cur.execute("SELECT COUNT(*) FROM server_auth_users")
         count = cur.fetchone()[0]
         if count > 0:
             cur.close()
-            raise HTTPException(400, "Já existem usuários cadastrados. Use /login.")
+            # Depois da instalação, contas só são criadas dentro do sistema (Usuários), por um administrador.
+            raise HTTPException(403, "Configuração inicial já concluída. Novas contas são criadas por um administrador dentro do sistema.")
         pw_hash = _hash_password(req.password)
         cur.execute(
             "INSERT INTO server_auth_users (username, password_hash, display_name, role) VALUES (%s, %s, %s, 'admin')",
@@ -1433,8 +1458,11 @@ def server_auth_login(req: ServerLoginRequest, request: Request, response: Respo
         )
         conn.commit()
         cur.close()
-        response.set_cookie("gboc_server_token", token, httponly=False, max_age=session_hours * 3600, path="/")
-        response.set_cookie("gboc_token", token, httponly=False, max_age=session_hours * 3600, path="/")
+        # Só o cookie do Servidor. gboc_token era compartilhado com o Agente no mesmo host (cookies não
+        # isolam porta) e o login de um derrubava a sessão do outro. Sem "Lembrar": cookie de sessão
+        # (sobrevive a fechar/reabrir a aba; expira ao fechar o navegador).
+        response.set_cookie("gboc_server_token", token, httponly=False, samesite="lax", path="/",
+                            max_age=session_hours * 3600 if req.remember else None)
         return {
             "status": "success",
             "token": token,
@@ -1513,7 +1541,7 @@ async def register(data: AgentRegister):
 # WEBSOCKET ENDPOINTS
 # ===========================
 
-async def handle_realtime_heartbeat(agent_id: str, data: Dict) -> Dict:
+def _handle_realtime_heartbeat_sync(agent_id: str, data: Dict) -> Dict:
     """Processa heartbeat em tempo real"""
     if not isinstance(data, dict):
         logger.error(f"Dados de heartbeat inválidos do agente {agent_id}: {data}")
@@ -1543,6 +1571,11 @@ async def handle_realtime_heartbeat(agent_id: str, data: Dict) -> Dict:
     except Exception as e:
         logger.error(f"Erro no heartbeat em tempo real do agente {agent_id}: {e}")
         return {"status": "error", "message": str(e)}
+
+
+async def handle_realtime_heartbeat(*args, **kwargs):
+    """Roda _handle_realtime_heartbeat_sync numa thread: o trabalho síncrono (banco/subprocess) não trava o event loop."""
+    return await asyncio.to_thread(_handle_realtime_heartbeat_sync, *args, **kwargs)
 
 @app.websocket("/ws/agents/{agent_id}")
 async def websocket_endpoint(websocket: WebSocket, agent_id: str):
@@ -1650,10 +1683,10 @@ def _send_server_notification_sync(subject: str, body: str) -> Dict:
                 msg['Subject'] = subject
                 msg['From']    = frm
                 msg['To']      = to
-                with smtplib.SMTP(host, port, timeout=15) as s:
-                    s.starttls()
-                    s.login(user, pwd)
-                    s.send_message(msg)
+                # Mesma entrega dos relatórios: porta 465 = SSL; demais = STARTTLS quando o servidor oferece
+                # (antes: STARTTLS obrigatório — falhava na 465 e em servidores sem TLS)
+                from modules.reports.report_schedules import smtp_deliver
+                smtp_deliver(msg, cfg)
                 results.append({"channel": "email", "status": "sent", "to": to})
         except Exception as e:
             results.append({"channel": "email", "status": "error", "error": str(e)})
@@ -1692,6 +1725,7 @@ async def save_agent_historical_data(conn, agent_id: str, data: Dict):
     """Salva dados históricos do agente"""
     try:
         cur = conn.cursor()
+        cur.execute("SAVEPOINT gboc_sp_save_agent_historical_data")
         cur.execute('''
             INSERT INTO agent_metrics (agent_id, cpu_usage, ram_usage, disk_usage, timestamp)
             VALUES (%s, %s, %s, %s, LOCALTIMESTAMP)
@@ -1702,12 +1736,17 @@ async def save_agent_historical_data(conn, agent_id: str, data: Dict):
             data.get('disk_usage')
         ))
     except Exception as e:
+        try:  # desfaz só esta etapa: sem isto a transação ficava abortada e o commit final descartava todas as etapas
+            conn.cursor().execute("ROLLBACK TO SAVEPOINT gboc_sp_save_agent_historical_data")
+        except Exception:
+            pass
         logger.warning(f"Erro ao salvar métricas históricas: {e}")
 
 async def sync_repositories(conn, agent_id: str, repositories: List[Dict]):
     """Sincroniza repositórios do agente"""
     try:
         cur = conn.cursor()
+        cur.execute("SAVEPOINT gboc_sp_sync_repositories")
         for repo in repositories:
             cur.execute('''
                 INSERT INTO agent_repositories
@@ -1726,12 +1765,17 @@ async def sync_repositories(conn, agent_id: str, repositories: List[Dict]):
         conn.commit()
         logger.info(f"✅ {len(repositories)} repositórios sincronizados para agente {agent_id}")
     except Exception as e:
+        try:  # desfaz só esta etapa: sem isto a transação ficava abortada e o commit final descartava todas as etapas
+            conn.cursor().execute("ROLLBACK TO SAVEPOINT gboc_sp_sync_repositories")
+        except Exception:
+            pass
         logger.warning(f"Erro ao sincronizar repositórios: {e}")
 
 async def sync_agent_tasks(conn, agent_id: str, tasks: List[Dict]):
     """Sincroniza tarefas do agente."""
     try:
         cur = conn.cursor()
+        cur.execute("SAVEPOINT gboc_sp_sync_agent_tasks")
         for task in tasks:
             task_id = task.get('id')
             if task_id is None:
@@ -1764,12 +1808,17 @@ async def sync_agent_tasks(conn, agent_id: str, tasks: List[Dict]):
         conn.commit()
         logger.info(f"✅ {len(tasks)} tarefas sincronizadas para agente {agent_id}")
     except Exception as e:
+        try:  # desfaz só esta etapa: sem isto a transação ficava abortada e o commit final descartava todas as etapas
+            conn.cursor().execute("ROLLBACK TO SAVEPOINT gboc_sp_sync_agent_tasks")
+        except Exception:
+            pass
         logger.warning(f"Erro ao sincronizar tarefas: {e}")
 
 async def sync_task_executions(conn, agent_id: str, executions: List[Dict]):
     """Sincroniza execuções de tarefas do agente"""
     try:
         cur = conn.cursor()
+        cur.execute("SAVEPOINT gboc_sp_sync_task_executions")
         for ex in executions:
             cur.execute('''
                 INSERT INTO agent_task_executions 
@@ -1791,12 +1840,17 @@ async def sync_task_executions(conn, agent_id: str, executions: List[Dict]):
         conn.commit()
         logger.info(f"✅ {len(executions)} execuções sincronizadas para agente {agent_id}")
     except Exception as e:
+        try:  # desfaz só esta etapa: sem isto a transação ficava abortada e o commit final descartava todas as etapas
+            conn.cursor().execute("ROLLBACK TO SAVEPOINT gboc_sp_sync_task_executions")
+        except Exception:
+            pass
         logger.warning(f"Erro ao sincronizar execuções: {e}")
 
 async def sync_system_events(conn, agent_id: str, events: List[Dict]):
     """Sincroniza eventos do sistema do agente"""
     try:
         cur = conn.cursor()
+        cur.execute("SAVEPOINT gboc_sp_sync_system_events")
         for event in events:
             cur.execute('''
                 INSERT INTO system_events (event_type, message, agent_hostname, created_at)
@@ -1809,6 +1863,10 @@ async def sync_system_events(conn, agent_id: str, events: List[Dict]):
                 event.get('timestamp', _dt.now(timezone.utc).isoformat())
             ))
     except Exception as e:
+        try:  # desfaz só esta etapa: sem isto a transação ficava abortada e o commit final descartava todas as etapas
+            conn.cursor().execute("ROLLBACK TO SAVEPOINT gboc_sp_sync_system_events")
+        except Exception:
+            pass
         logger.warning(f"Erro ao sincronizar eventos: {e}")
 
 async def sync_alerts(conn, agent_id: str, alerts: List[Dict]):
@@ -3624,7 +3682,7 @@ def _fetch_agent_rows(cur, table: str, agent_id: str, since_timestamp: Optional[
     return [dict(r) for r in cur.fetchall()]
 
 
-async def get_agent_full_data(agent_id: str, since_timestamp: Optional[str] = None) -> Dict:
+def _get_agent_full_data_sync(agent_id: str, since_timestamp: Optional[str] = None) -> Dict:
     """Obtém todos os dados sincronizados do agente (uma única conexão do pool)."""
     conn = None
     try:
@@ -3676,7 +3734,12 @@ async def get_agent_full_data(agent_id: str, since_timestamp: Optional[str] = No
             release_db(conn)
 
 
-async def get_agent_repositories(agent_id: str, since_timestamp: Optional[str] = None) -> List[Dict]:
+async def get_agent_full_data(*args, **kwargs):
+    """Roda _get_agent_full_data_sync numa thread: o trabalho síncrono (banco/subprocess) não trava o event loop."""
+    return await asyncio.to_thread(_get_agent_full_data_sync, *args, **kwargs)
+
+
+def _get_agent_repositories_sync(agent_id: str, since_timestamp: Optional[str] = None) -> List[Dict]:
     """Obtém repositórios sincronizados do agente."""
     conn = None
     try:
@@ -3695,7 +3758,12 @@ async def get_agent_repositories(agent_id: str, since_timestamp: Optional[str] =
             release_db(conn)
 
 
-async def get_agent_tasks(agent_id: str, since_timestamp: Optional[str] = None) -> List[Dict]:
+async def get_agent_repositories(*args, **kwargs):
+    """Roda _get_agent_repositories_sync numa thread: o trabalho síncrono (banco/subprocess) não trava o event loop."""
+    return await asyncio.to_thread(_get_agent_repositories_sync, *args, **kwargs)
+
+
+def _get_agent_tasks_sync(agent_id: str, since_timestamp: Optional[str] = None) -> List[Dict]:
     """Obtém tarefas sincronizadas do agente."""
     conn = None
     try:
@@ -3712,6 +3780,11 @@ async def get_agent_tasks(agent_id: str, since_timestamp: Optional[str] = None) 
     finally:
         if conn:
             release_db(conn)
+
+
+async def get_agent_tasks(*args, **kwargs):
+    """Roda _get_agent_tasks_sync numa thread: o trabalho síncrono (banco/subprocess) não trava o event loop."""
+    return await asyncio.to_thread(_get_agent_tasks_sync, *args, **kwargs)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -4632,17 +4705,17 @@ async def test_server_notification(request: Request):
             user = notif.get('smtp_username', '')
             pwd = notif.get('smtp_password', '')
             frm = notif.get('smtp_from', user)
-            to = notif.get('smtp_to', user)
-            if not host or not user:
-                raise HTTPException(400, "SMTP não configurado")
+            to = (str(data.get('to') or '').strip() or notif.get('smtp_to') or user)   # destinatário informado no teste
+            if not host:
+                raise HTTPException(400, "SMTP não configurado (preencha o servidor SMTP e salve)")
+            if not to:
+                raise HTTPException(400, "Informe o e-mail destinatário")
             msg = MIMEText(f"Teste de notificação do GBOC Server v{SERVER_VERSION}\n{_dt.now(timezone.utc).isoformat()}")
             msg['Subject'] = '[GBOC Server] Teste de Notificação'
-            msg['From'] = frm
+            msg['From'] = frm or 'gboc@localhost'
             msg['To'] = to
-            with smtplib.SMTP(host, port, timeout=15) as s:
-                s.starttls()
-                s.login(user, pwd)
-                s.send_message(msg)
+            from modules.reports.report_schedules import smtp_deliver   # 465 = SSL; demais = STARTTLS se houver
+            await asyncio.to_thread(smtp_deliver, msg, notif)    # fora do event loop
             return {"status": "success", "channel": "email", "to": to}
 
         elif channel == 'webhook':
@@ -4663,7 +4736,18 @@ async def test_server_notification(request: Request):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(500, str(e))
+        import smtplib as _smtp, socket as _sock, ssl as _ssl
+        if isinstance(e, _smtp.SMTPAuthenticationError):
+            msg = "Usuário ou senha do SMTP recusados pelo servidor (Gmail/Microsoft 365: use senha de app)."
+        elif isinstance(e, _ssl.SSLError):
+            msg = f"Falha na negociação SSL/TLS ({e}). Confira a porta: 465 = SSL; 587 = STARTTLS."
+        elif isinstance(e, (_sock.timeout, TimeoutError)):
+            msg = "O servidor SMTP não respondeu a tempo. Confira servidor, porta e firewall (465 = SSL; 587 = STARTTLS)."
+        elif isinstance(e, (ConnectionRefusedError, _sock.gaierror)):
+            msg = f"Não foi possível conectar ao servidor: {e}"
+        else:
+            msg = f"{type(e).__name__}: {e}"
+        raise HTTPException(500, msg)
     finally:
         if 'cur' in locals() and cur: cur.close()
         if conn: release_db(conn)
