@@ -36,6 +36,8 @@
 - O gerador escolhe o Python mais novo cujas bibliotecas já existem prontas para Windows (ex.: 3.15 ainda sem `pydantic-core` → empacota o 3.14).
 - `Setup.bat` mostra antes de instalar o que a máquina já tem × o que veio no pacote. Para cada programa: já instalado (inclusive fora da pasta do GBOC) → mantido; senão → do pacote; não está no pacote → internet. O Setup agora também instala o PostgreSQL quando falta (senha do superusuário perguntada; ENTER = padrão do GBOC).
 - `install_agent.ps1` executado de dentro do pacote usa o `Prereqs\` automaticamente (Python, bibliotecas, motores, PostgreSQL, NSSM).
+- **Correção (segurança):** o pacote levava os dados de uso da máquina onde foi gerado — `GBOC-Agent\data` (bancos, chave privada TLS, configurações do Kopia/Duplicati, identidade do agente e chave do Servidor central), `repositorios`, `config\global_settings.json` e `GBOC-Server\data`. Agora ficam fora (pastas recriadas vazias); cada instalação começa limpa. Pacotes gerados antes desta correção não devem ser distribuídos.
+- Mensagens normais do `pip` não aparecem mais como erro vermelho (`NativeCommandError`) no PowerShell 5.1, no gerador e no instalador.
 - **Correção:** a instalação do NSSM no `install_agent.ps1` movia o `nssm.exe` para uma pasta inexistente (virava um arquivo `nssm`) e o serviço GBOCAgent não era criado na primeira instalação.
 
 ### 📊 Progresso ao vivo dos backups (tela de Tarefas)

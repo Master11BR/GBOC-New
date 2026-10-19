@@ -313,14 +313,14 @@ function Install-GbocPipRequirements([string]$Exe, [string]$Req, [switch]$Upgrad
     if ($wd) {
         Write-GbocInfo "Bibliotecas Python do pacote: $wd"
         if ($UpgradePip) { & $Exe -m pip install --disable-pip-version-check --no-index --find-links $wd --upgrade pip -q 2>&1 | Out-Null }
-        & $Exe -m pip install --disable-pip-version-check --no-index --find-links $wd -r $Req -q 2>&1 | Out-Host
+        & $Exe -m pip install --disable-pip-version-check --no-index --find-links $wd -r $Req -q 2>&1 | ForEach-Object { Write-Host ("    " + "$_") -ForegroundColor DarkGray }
         if ($LASTEXITCODE -eq 0) { return $true }
         Write-GbocWarn "Bibliotecas do pacote nao cobriram tudo; completando pela internet..."
-        & $Exe -m pip install --disable-pip-version-check --find-links $wd -r $Req -q 2>&1 | Out-Host
+        & $Exe -m pip install --disable-pip-version-check --find-links $wd -r $Req -q 2>&1 | ForEach-Object { Write-Host ("    " + "$_") -ForegroundColor DarkGray }
         return ($LASTEXITCODE -eq 0)
     }
     if ($UpgradePip) { & $Exe -m pip install --disable-pip-version-check --upgrade pip -q 2>&1 | Out-Null }
-    & $Exe -m pip install --disable-pip-version-check -r $Req -q 2>&1 | Out-Host     # mostra, mas nao vira retorno
+    & $Exe -m pip install --disable-pip-version-check -r $Req -q 2>&1 | ForEach-Object { Write-Host ("    " + "$_") -ForegroundColor DarkGray }     # mostra, mas nao vira retorno
     return ($LASTEXITCODE -eq 0)
 }
 
