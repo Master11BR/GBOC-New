@@ -328,6 +328,23 @@ TOPICS: List[Dict] = [
         "tips": [],
     },
     {
+        "id": "duplicati_native",
+        "title": "Importar todos os motores (Restic, Kopia, Duplicati e Borg) para o Motor Nativo GBOC",
+        "keywords": ["importar", "importacao", "importar motores", "importar para nativo", "motor nativo", "duplicati",
+                     "restic", "kopia", "borg", "converter", "converter motores", "duplicati nativo"],
+        "agent": {"menu": "Motores Nativos > Duplicati Nativo > Importar para Nativo", "url": "/duplicati-native.html"},
+        "server": {"menu": "Configuração > Migração de Motores", "tab": "engine-migration",
+                   "note": "No Server, a migração de tarefas é feita em Migração de Motores. A importação de motores "
+                           "é feita no Agente."},
+        "steps": [
+            "No Agente, abra **Motores Nativos** e clique em **Duplicati Nativo**.",
+            "Na página Duplicati Nativo, clique em **Importar para Nativo**.",
+            "Clique em **Importar Motores para o Nativo** e confirme: o GBOC converte repositórios e tarefas de Restic, Kopia, Duplicati e Borg para o Motor Nativo GBOC.",
+            "Aguarde a mensagem de conclusão. Os backups antigos continuam nos repositórios de origem.",
+        ],
+        "tips": ["A página de importação não aparece no menu lateral; o acesso é pelo botão em Motores Nativos."],
+    },
+    {
         "id": "engine_migration",
         "title": "Migrar tarefas para o Motor Nativo GBOC",
         "keywords": ["migrar", "migracao", "motor nativo", "trocar motor", "restic para", "duplicati para", "kopia para"],

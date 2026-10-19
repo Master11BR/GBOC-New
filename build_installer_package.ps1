@@ -161,7 +161,7 @@ function New-GbocPrereqsBundle([string]$Dest, [string]$BuildPython, [string]$Req
         Remove-Item $wdir -Recurse -Force -ErrorAction SilentlyContinue
         Write-GbocInfo "Baixando bibliotecas para Python $mm (Windows x64)..."
         & $BuildPython -m pip download --disable-pip-version-check -q --only-binary=:all: --platform win_amd64 `
-            --python-version $mm --implementation cp -d $wdir -r $Requirements pip setuptools wheel 2>&1 | Out-Host
+            --python-version $mm --implementation cp -d $wdir -r $Requirements pip setuptools wheel 2>&1 | ForEach-Object { Write-Host ("    " + "$_") -ForegroundColor DarkGray }
         if ($LASTEXITCODE -ne 0) {
             Write-GbocWarn "Bibliotecas do GBOC ainda nao disponiveis para Python $mm; tentando a versao anterior"
             Remove-Item $wdir -Recurse -Force -ErrorAction SilentlyContinue

@@ -67,6 +67,32 @@ def create_unified_requirements(server_req_path: Path, agent_req_path: Path, out
             f.write(f"{dep}\n")
     print(f"  [OK] Dependencias consolidadas criadas em: {output_path}")
 
+# Dados de USO desta maquina que nao podem ir no pacote (bancos, chaves TLS, identidade do agente e chave do
+# Servidor central em data/central, configuracoes com senhas, repositorios de backup...). Relativo a raiz do componente.
+RUNTIME_PATHS = {
+    "GBOC-Agent": ["data", "repositorios", "enc-v1", "config/global_settings.json"],
+    "GBOC-Server": ["data"],
+}
+
+
+def prune_runtime(target_dir: Path, component_name: str):
+    """Remove do pacote os dados de uso copiados junto com o codigo e recria as pastas vazias."""
+    removed = []
+    for rel in RUNTIME_PATHS.get(component_name, []):
+        p = target_dir / rel
+        if p.is_dir():
+            shutil.rmtree(p, ignore_errors=True)
+            removed.append(rel + "/")
+        elif p.exists():
+            p.unlink()
+            removed.append(rel)
+    for rel in RUNTIME_PATHS.get(component_name, []):
+        if "." not in Path(rel).name and rel != "enc-v1":
+            (target_dir / rel).mkdir(parents=True, exist_ok=True)      # pastas vazias (o sistema preenche no uso)
+    if removed:
+        print(f"  [OK] {component_name}: dados de uso desta maquina fora do pacote: {', '.join(removed)}")
+
+
 def copy_component(source_dir: Path, target_dir: Path, component_name: str):
     """Copia uma árvore de diretórios aplicando filtro de exclusão."""
     if not source_dir.exists():
@@ -156,11 +182,13 @@ def build_package(source_root: Path, output_dir: Path, clean: bool = False):
     server_src = source_root / "GBOC-Server"
     server_dst = output_dir / "Server"
     copy_component(server_src, server_dst, "GBOC-Server")
+    prune_runtime(server_dst, "GBOC-Server")
 
     # 2. Copiar GBOC-Agent
     agent_src = source_root / "GBOC-Agent"
     agent_dst = output_dir / "Agent"
     copy_component(agent_src, agent_dst, "GBOC-Agent")
+    prune_runtime(agent_dst, "GBOC-Agent")
 
     # 3. Criar pasta Dependencies
     deps_dir = output_dir / "Dependencies"
