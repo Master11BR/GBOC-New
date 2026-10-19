@@ -1,0 +1,14 @@
+{
+  "server_url": "https://localhost:8000",
+  "api_key": "gboc_pk_zrohFrgVKgGCVL56djiduUWABV4MpJfk_TivYxMN0LU",
+  "enabled": true,
+  "heartbeat_interval_minutes": 2,
+  "sync_interval_minutes": 10,
+  "send_logs": true,
+  "send_metrics": true,
+  "auto_connect": true,
+  "max_retry_attempts": 5,
+  "retry_delay_seconds": 30,
+  "tenant_id": null,
+  "configured_at": "2026-10-05T13:49:49.294737"
+}

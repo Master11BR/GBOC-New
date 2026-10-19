@@ -186,7 +186,8 @@ function Get-GbocPythonReleases([int]$Minors = 3, [switch]$Online) {
     # Ultimo patch de cada uma das $Minors versoes mais novas que tenham instalador Windows x64.
     # Com pacote: as versoes do pacote (a internet so e consultada se o pacote nao trouxer o Python).
     if (-not $Online) {
-        $fromPkg = Get-GbocPackagePythons
+        $null = Get-GbocPackage          # inicializa o pacote antes (no Windows PowerShell 5.1 a primeira chamada aninhada vinha vazia)
+        $fromPkg = @(Get-GbocPackagePythons)
         if ($fromPkg.Count -gt 0) { return $fromPkg }
     }
     $out = @()
