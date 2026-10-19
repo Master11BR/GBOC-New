@@ -300,9 +300,9 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                                 <option value="gemini">Google Gemini (Gemini 1.5 / 2.0)</option>
                                 <option value="deepseek">DeepSeek (V3 / R1 Nuvem)</option>
                                 <option value="claude">Anthropic Claude (3.5 Sonnet)</option>
-                                <option value="qwen">Qwen 2.5 (Alibaba / Ollama)</option>
+                                <option value="qwen">Qwen 3.5 (Alibaba / Ollama)</option>
                                 <option value="mistral">Mistral AI (Codestral / Le Chat)</option>
-                                <option value="llama3">Meta Llama 3.3 (70B Local/Cloud)</option>
+                                <option value="llama3">Meta Llama 3.1 (8B Local)</option>
                                 <option value="cohere">Cohere (Command R+)</option>
                             </select>
                         </div>
@@ -321,12 +321,12 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                             <label for="ai-model"><i class="fas fa-brain"></i> Modelo LLM de IA (Ollama / Cloud)</label>
                             <div style="display:flex;gap:8px;flex-direction:column">
                                 <select id="ai-model-select" class="form-control" onchange="onModelSelectChanged(this.value)">
-                                    <option value="llama3">🟢 llama3:latest (Instalado / Padrão)</option>
+                                    <option value="">Clique em "Detectar IA Local" para listar os modelos</option>
                                 </select>
                                 <div id="model-status-badge" style="font-size:0.83em;padding:6px 10px;border-radius:6px;background:rgba(255,255,255,0.05);color:var(--text-muted)">
                                     <i class="fas fa-info-circle"></i> Selecione um modelo da lista acima.
                                 </div>
-                                <input type="text" id="ai-model" class="form-control" value="llama3" placeholder="Ex: llama3, mistral, llama3.2:latest, deepseek-r1" style="margin-top:4px">
+                                <input type="text" id="ai-model" class="form-control" value="qwen3.5:4b" placeholder="Ex: qwen3.5:4b, gemma4:12b, glm-5.3-flash:cloud" style="margin-top:4px">
                             </div>
                         </div>
 
@@ -676,6 +676,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                             <div class="setting-item">
                                 <label for="smtp-port">Porta SMTP</label>
                                 <input type="number" id="smtp-port" class="form-control" value="587" min="1" max="65535">
+                                <small style="color:var(--text-muted)">465 = SSL direto · 587 = STARTTLS (Gmail, Microsoft 365)</small>
                             </div>
                             
                             <div class="setting-item">
@@ -991,8 +992,8 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 from_name: document.getElementById('smtp-from-name').value
             };
             
-            // Validação básica
-            if (!smtpConfig.server || !smtpConfig.username || !smtpConfig.password) {
+            // Validação básica (senha em branco mantém a senha já salva)
+            if (!smtpConfig.server || !smtpConfig.username || (!smtpConfig.password && !window._smtpPasswordSet)) {
                 alert('Por favor, preencha todos os campos obrigatórios: servidor, usuário e senha.');
                 return;
             }
@@ -1006,6 +1007,8 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 const result = await response.json();
                 
                 if (result.status === 'success') {
+                    document.getElementById('smtp-password').value = '';
+                    loadSmtpConfig();
                     alert('Configuração SMTP salva com sucesso!');
                 } else {
                     alert('Erro ao salvar configuração SMTP: ' + (result.message || 'Erro desconhecido'));
@@ -1013,6 +1016,23 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             } catch (e) {
                 alert('Erro na requisição: ' + e.message);
             }
+        }
+
+        // Preenche a tela com o SMTP salvo (antes os campos voltavam vazios e era preciso digitar tudo de novo)
+        async function loadSmtpConfig() {
+            try {
+                const r = await fetch('/api/smtp/config');
+                const d = await r.json();
+                const c = d && d.config;
+                if (!c) return;
+                const set = (id, v) => { const e = document.getElementById(id); if (e && v !== undefined && v !== null) e.value = v; };
+                set('smtp-server', c.server); set('smtp-port', c.port); set('smtp-username', c.username);
+                set('smtp-from-email', c.from_email); set('smtp-from-name', c.from_name);
+                document.getElementById('smtp-tls').checked = c.use_tls !== false;
+                window._smtpPasswordSet = !!c.password_set;
+                document.getElementById('smtp-password').placeholder = c.password_set
+                    ? 'Senha salva — deixe em branco para manter' : 'Sua senha ou app password';
+            } catch (e) { console.warn('SMTP config', e); }
         }
 
         async function testSmtpConfig() {
@@ -1042,6 +1062,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         document.getElementById('btn-reset-stuck-backups').addEventListener('click', resetStuckBackups);
         document.getElementById('btn-save-smtp').addEventListener('click', saveSmtpConfig);
         document.getElementById('btn-test-smtp').addEventListener('click', testSmtpConfig);
+        loadSmtpConfig();
         document.getElementById('btn-reset-install').addEventListener('click', resetInstall);
 
         async function resetInstall() {
@@ -1369,17 +1390,17 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             const modelInput = document.getElementById('ai-model');
 
             const defaultModels = {
-                ollama: 'llama3',
-                kimi: 'moonshot-v1-8k',
-                grok: 'grok-2',
+                ollama: 'qwen3.5:4b',
+                kimi: 'kimi-k2.6',
+                grok: 'grok-4.7',
                 openai: 'gpt-4o-mini',
-                gemini: 'gemini-1.5-flash',
-                deepseek: 'deepseek-chat',
-                claude: 'claude-3-5-sonnet-20241022',
-                qwen: 'qwen2.5',
+                gemini: 'gemini-flash-latest',
+                deepseek: 'deepseek-flash',
+                claude: 'claude-sonnet-5-5',
+                qwen: 'qwen3.5:9b',
                 mistral: 'mistral-large-latest',
-                llama3: 'llama3.3:70b',
-                cohere: 'command-r-plus'
+                llama3: 'llama3.1:8b',
+                cohere: 'command-a-plus-05-2026'
             };
 
             if (modelInput && defaultModels[provider]) {
@@ -1396,11 +1417,10 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         }
 
         let gInstalledModels = [];
-        let gRecommendedModels = [
-            "llama3:latest", "llama3.2:latest", "llama3.3:70b", "mistral:latest",
-            "deepseek-r1:latest", "deepseek-r1:1.5b", "qwen2.5:latest", "gemma2:latest",
-            "codellama:latest", "phi3:latest"
-        ];
+        // Reserva: a lista oficial vem da API do agente (recommended_models)
+        let gRecommendedModels = ["qwen3.5:4b", "qwen3.5:9b", "gemma4:12b", "gpt-oss:20b", "qwen3.8:27b", "llama3.1:8b", "deepseek-r1:8b",
+            "glm-5.3-flash:cloud", "deepseek-v4.1-flash:cloud", "kimi-k3:cloud", "gemma4:31b-cloud"];
+        window.gOllamaModelSizes = window.gOllamaModelSizes || {"qwen3.5:4b": "~6 GB", "gemma4:12b": "~11 GB", "qwen3.8:27b": "~28 GB"};
 
         function updateModelDropdownUI(installed, recommended, currentVal) {
             const select = document.getElementById('ai-model-select');
@@ -1419,10 +1439,21 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             }
 
             const availableNotInstalled = recs.filter(m => !gInstalledModels.includes(m));
-            if (availableNotInstalled.length > 0) {
-                html += `<optgroup label="⚪ Modelos Disponíveis na Nuvem / Library (Requer 'ollama pull')">`;
-                availableNotInstalled.forEach(m => {
-                    html += `<option value="${m}">⚪ ${m} (Não Instalado - Requer 'ollama pull')</option>`;
+            const _isCloud = m => /[:-]cloud$/i.test(m);
+            const _size = m => (window.gOllamaModelSizes && window.gOllamaModelSizes[m]) ? ` - ${window.gOllamaModelSizes[m]}` : '';
+            const _local = availableNotInstalled.filter(m => !_isCloud(m));
+            const _cloud = availableNotInstalled.filter(_isCloud);
+            if (_local.length > 0) {
+                html += `<optgroup label="⚪ Modelos locais para baixar (rodam nesta máquina)">`;
+                _local.forEach(m => {
+                    html += `<option value="${m}">⚪ ${m}${_size(m)} (não baixado)</option>`;
+                });
+                html += `</optgroup>`;
+            }
+            if (_cloud.length > 0) {
+                html += `<optgroup label="☁️ Modelos na nuvem do Ollama (requer 'ollama signin')">`;
+                _cloud.forEach(m => {
+                    html += `<option value="${m}">☁️ ${m} (não adicionado)</option>`;
                 });
                 html += `</optgroup>`;
             }
@@ -1445,7 +1476,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 badge.innerHTML = `<i class="fas fa-check-circle"></i> Modelo <strong>${val}</strong> está INSTALADO no Ollama e pronto para uso imediato!`;
             } else {
                 badge.style.cssText = 'font-size:0.83em;padding:6px 10px;border-radius:6px;background:rgba(237,137,54,0.15);color:#ed8936;border:1px solid rgba(237,137,54,0.3);margin-top:4px';
-                badge.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Modelo <strong>${val}</strong> não está instalado localmente.<br>` +
+                badge.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Modelo <strong>${val}</strong> não está instalado localmente.<br>${/[:-]cloud$/i.test(val) ? 'Modelo na nuvem do Ollama: antes, entre na conta com <code>ollama signin</code> no servidor.<br>' : ''}` +
                     `<button type="button" class="btn btn-sm btn-primary" style="margin-top:6px;padding:4px 8px;font-size:0.85em" onclick="pullOllamaModel('${val}')"><i class="fas fa-download"></i> Instalar Modelo Automaticamente</button>`;
             }
         }
@@ -1504,10 +1535,16 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 
             try {
                 const res = await fetch(window.GBOC_API_BASE + `/api/v1/diagnostics/ollama-models?host=${encodeURIComponent(host)}`);
-                const data = await res.json();
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    // Erro da API do agente (sessao expirada, permissao, URL invalida) - nao e o Ollama
+                    const det = data.detail || data.message || `HTTP ${res.status}`;
+                    throw new Error(res.status === 401 ? 'Sessao expirada. Faca login novamente.' : (typeof det === 'string' ? det : JSON.stringify(det)));
+                }
                 
                 const installed = data.installed_models || data.models || [];
                 const recommended = data.recommended_models || gRecommendedModels;
+                if (data.model_sizes) window.gOllamaModelSizes = data.model_sizes;
 
                 updateModelDropdownUI(installed, recommended, input.value);
 
@@ -1520,7 +1557,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 } else if (data.connected) {
                     alert(`✅ Conectado ao Ollama Local (${data.ollama_host}), mas nenhum modelo foi baixado ainda.\n\nEscolha um modelo da lista abaixo e execute 'ollama pull <modelo>' no terminal.`);
                 } else {
-                    alert(`⚠️ Serviço Ollama local não respondeu em ${host}.\n\nSe o app Ollama estiver aberto, você pode selecionar o modelo desejado da lista abaixo.`);
+                    alert(`⚠️ Serviço Ollama local não respondeu em ${host}.\n\nDetalhe: ${data.message || 'sem resposta'}\n\nConfira se o Ollama está aberto (ícone na bandeja) e a porta: se a variável OLLAMA_HOST estiver definida, use o mesmo endereço aqui.`);
                 }
             } catch(e) {
                 updateModelDropdownUI([], gRecommendedModels, input.value);

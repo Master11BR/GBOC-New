@@ -29,7 +29,9 @@ class ContinuousDataProtectionEngine:
         self.monitored_paths: List[str] = ["C:\\", "D:\\"] if sys.platform == "win32" else ["/data", "/var"]
         self.checkpoints: List[Dict[str, Any]] = []
         self.lock = threading.Lock()
-        self.cdp_journal_dir = Path("C:/GBOC-CDP-Journal") if sys.platform == "win32" else Path("./data/cdp_journal")
+        # dentro da pasta do Agente (antes: C:\\GBOC-... criada a cada inicializacao) - core/gboc_paths.py
+        from core.gboc_paths import data_dir as _gboc_data_dir
+        self.cdp_journal_dir = _gboc_data_dir("cdp_journal", create=False)
         try:
             self.cdp_journal_dir.mkdir(parents=True, exist_ok=True)
         except Exception:
@@ -112,7 +114,8 @@ class ContinuousDataProtectionEngine:
             if not chk:
                 chk = {"checkpoint_id": checkpoint_id, "timestamp": datetime.now().isoformat(), "delta_size_kb": 256}
 
-        target = target_restore_path or "C:\\GBOC-CDP-Rollback-Target"
+        from core.gboc_paths import data_dir as _gboc_data_dir
+        target = target_restore_path or str(_gboc_data_dir("cdp_rollback", create=False))
         os.makedirs(target, exist_ok=True)
 
         logs = [

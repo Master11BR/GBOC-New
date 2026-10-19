@@ -87,7 +87,7 @@ async def get_agent_ui_config_v2(request: Request):
         "DEFAULT_THEME": "dark",
         "AVAILABLE_THEMES": ["dark", "light", "purple", "ocean"],
         "DEFAULT_UI_STYLE": "minimal",
-        "AVAILABLE_UI_STYLES": ["minimal", "neumorphism", "claymorphism", "fluent"]
+        "AVAILABLE_UI_STYLES": ["minimal", "neumorphism", "claymorphism", "fluent", "fernly", "fernly-cyberpunk", "fernly-fluid"]
     }
     elapsed = (time.perf_counter() - t0) * 1000
     return build_v2_response(data=ui_data, execution_time_ms=elapsed)

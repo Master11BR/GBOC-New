@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Portal do Cliente — Backups</title>
 
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
     <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.8.1">
     <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=14.8.1">
     <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=14.8.1">
@@ -58,7 +59,8 @@ footer { text-align:center; color:var(--ink2); font-size:.78em; padding:20px; }
 @media (max-width: 640px) { main { padding:12px; } header { padding:12px; } .grid2 { grid-template-columns:1fr; } td, th { padding:6px 4px; } }
 </style>
 </head>
-<body>
+<!-- data-no-layout: portal do CLIENTE tem cabeçalho próprio; sem isto o layout manager injetava o menu de administração do Server -->
+<body data-no-layout>
 <header>
     <div class="brand" id="brand"><i class="fas fa-shield-halved" style="font-size:1.6em;color:var(--brand)"></i><h1>Portal do Cliente<small>Carregando…</small></h1></div>
     <div class="who"><span id="who"></span><button id="logout"><i class="fas fa-right-from-bracket"></i> Sair</button></div>

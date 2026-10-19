@@ -2767,7 +2767,7 @@ function gbocToggleSidebarCollapse(){
                                     <div id="cfg-model-status-badge" style="font-size:0.83em;padding:6px 10px;border-radius:6px;background:rgba(255,255,255,0.05);color:var(--text-muted)">
                                         <i class="fas fa-info-circle"></i> Selecione um modelo da lista acima.
                                     </div>
-                                    <input type="text" id="cfg-ai-model" value="llama3" placeholder="Ex: llama3, mistral, llama3.2:latest, deepseek-r1" style="width:100%;padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:.9em;margin-top:4px">
+                                    <input type="text" id="cfg-ai-model" value="qwen3.5:4b" placeholder="Ex: qwen3.5:4b, gemma4:12b, glm-5.3-flash:cloud" style="width:100%;padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:.9em;margin-top:4px">
                                 </div>
                             </div>
 
@@ -2835,6 +2835,14 @@ function gbocToggleSidebarCollapse(){
                     <div>${input}</div>
                 </div>`;
             }).join('');
+            if(cat==='notifications'){
+                // Testes de envio (antes só existiam na API, sem botão na tela)
+                form.innerHTML+=`<div style="display:flex;gap:10px;flex-wrap:wrap;padding:16px 0 4px">
+                    <button type="button" class="btn btn-secondary" onclick="testNotification('email', this)"><i class="fas fa-envelope"></i> Testar e-mail (SMTP)</button>
+                    <button type="button" class="btn btn-secondary" onclick="testNotification('webhook', this)"><i class="fas fa-link"></i> Testar webhook</button>
+                    <span style="font-size:.8em;color:var(--text-muted);align-self:center">Salva o que está na tela e envia um teste · porta 465 = SSL; 587 = STARTTLS</span>
+                </div>`;
+            }
             document.getElementById('save-status').textContent='';
         }
 
@@ -2884,6 +2892,10 @@ function gbocToggleSidebarCollapse(){
         }
 
         let gServerInstalledModels = [];
+        // Reserva: a lista oficial vem da API do servidor (recommended_models)
+        let _ollamaRecs = ["qwen3.5:4b", "qwen3.5:9b", "gemma4:12b", "gpt-oss:20b", "qwen3.8:27b", "llama3.1:8b", "deepseek-r1:8b",
+            "glm-5.3-flash:cloud", "deepseek-v4.1-flash:cloud", "kimi-k3:cloud", "gemma4:31b-cloud"];
+        window.gOllamaModelSizes = window.gOllamaModelSizes || {"qwen3.5:4b": "~6 GB", "gemma4:12b": "~11 GB", "qwen3.8:27b": "~28 GB"};
         function updateModelDropdownUIServer(installed, recommended, currentVal) {
             const select = document.getElementById('cfg-ai-model-select');
             if (!select) return;
@@ -2897,10 +2909,21 @@ function gbocToggleSidebarCollapse(){
                 html += `</optgroup>`;
             }
             const availableNotInstalled = recommended.filter(m => !gServerInstalledModels.includes(m));
-            if (availableNotInstalled.length > 0) {
-                html += `<optgroup label="☁️ Modelos Disponíveis na Nuvem / Library (Requer 'ollama pull')">`;
-                availableNotInstalled.forEach(m => {
-                    html += `<option value="${_aiEsc(m)}">☁️ ${_aiEsc(m)} (Não Instalado - Requer 'ollama pull')</option>`;
+            const _isCloud = m => /[:-]cloud$/i.test(m);
+            const _size = m => (window.gOllamaModelSizes && window.gOllamaModelSizes[m]) ? ` - ${window.gOllamaModelSizes[m]}` : '';
+            const _local = availableNotInstalled.filter(m => !_isCloud(m));
+            const _cloud = availableNotInstalled.filter(_isCloud);
+            if (_local.length > 0) {
+                html += `<optgroup label="⚪ Modelos locais para baixar (rodam nesta máquina)">`;
+                _local.forEach(m => {
+                    html += `<option value="${_aiEsc(m)}">⚪ ${_aiEsc(m)}${_size(m)} (não baixado)</option>`;
+                });
+                html += `</optgroup>`;
+            }
+            if (_cloud.length > 0) {
+                html += `<optgroup label="☁️ Modelos na nuvem do Ollama (requer 'ollama signin')">`;
+                _cloud.forEach(m => {
+                    html += `<option value="${_aiEsc(m)}">☁️ ${_aiEsc(m)} (não adicionado)</option>`;
                 });
                 html += `</optgroup>`;
             }
@@ -2920,7 +2943,7 @@ function gbocToggleSidebarCollapse(){
                 badge.innerHTML = `<i class="fas fa-check-circle"></i> Modelo <strong>${val}</strong> está INSTALADO no Ollama e pronto para uso imediato!`;
             } else {
                 badge.style.cssText = 'font-size:0.83em;padding:6px 10px;border-radius:6px;background:rgba(240,169,64,0.15);color:var(--warning);border:1px solid rgba(240,169,64,0.3);margin-top:4px';
-                badge.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Modelo <strong>${val}</strong> não está instalado localmente.<br>` +
+                badge.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Modelo <strong>${val}</strong> não está instalado localmente.<br>${/[:-]cloud$/i.test(val) ? 'Modelo na nuvem do Ollama: antes, entre na conta com <code>ollama signin</code> no servidor.<br>' : ''}` +
                     `<button type="button" class="btn btn-sm btn-primary" style="margin-top:6px;padding:4px 8px;font-size:0.85em" onclick="pullOllamaModelServer('${val}')"><i class="fas fa-download"></i> Instalar Modelo Automaticamente</button>`;
             }
         }
@@ -2972,20 +2995,22 @@ function gbocToggleSidebarCollapse(){
             try {
                 const r = await fetch(window.GBOC_API_BASE + `/api/v1/ai/ollama/models?host=${encodeURIComponent(host)}`);
                 const data = await r.json();
+                if (data.model_sizes) window.gOllamaModelSizes = data.model_sizes;
+                if (Array.isArray(data.recommended_models) && data.recommended_models.length) _ollamaRecs = data.recommended_models;
                 if (data.connected && data.installed_models) {
-                    updateModelDropdownUIServer(data.installed_models, ['llama3:latest', 'llama3.2:latest', 'llama3.3:70b', 'mistral:latest', 'deepseek-r1:latest', 'deepseek-r1:1.5b', 'qwen2.5:latest', 'gemma2:latest', 'codellama:latest', 'phi3:latest'], currentModel);
+                    updateModelDropdownUIServer(data.installed_models, _ollamaRecs, currentModel);
                 } else {
-                    updateModelDropdownUIServer([], ['llama3:latest', 'llama3.2:latest', 'llama3.3:70b', 'mistral:latest', 'deepseek-r1:latest', 'deepseek-r1:1.5b', 'qwen2.5:latest', 'gemma2:latest', 'codellama:latest', 'phi3:latest'], currentModel);
+                    updateModelDropdownUIServer([], _ollamaRecs, currentModel);
                 }
             } catch (e) {
                 console.error('Falha ao detectar modelos:', e);
-                updateModelDropdownUIServer([], ['llama3:latest', 'llama3.2:latest', 'llama3.3:70b', 'mistral:latest', 'deepseek-r1:latest', 'deepseek-r1:1.5b', 'qwen2.5:latest', 'gemma2:latest', 'codellama:latest', 'phi3:latest'], currentModel);
+                updateModelDropdownUIServer([], _ollamaRecs, currentModel);
             }
         }
 
         // ── IA & LLMs (Servidor Central) ─────────────────────────────────────────
         window.GBOC_AI_DEFAULT_MODELS_SERVER = {
-            ollama: 'llama3', qwen: 'qwen2.5', llama3: 'llama3.3:70b',
+            ollama: 'qwen3.5:4b', qwen: 'qwen3.5:9b', llama3: 'llama3.1:8b',
             kimi: 'kimi-k2.6', grok: 'grok-4.7', openai: 'gpt-4o-mini', groq: 'openai/gpt-oss-120b',
             gemini: 'gemini-flash-latest', deepseek: 'deepseek-flash', claude: 'claude-sonnet-5-5',
             mistral: 'mistral-large-latest', cohere: 'command-a-plus-05-2026'
@@ -3164,17 +3189,30 @@ function gbocToggleSidebarCollapse(){
             }
         }
 
-        async function testNotification(channel){
+        async function testNotification(channel, btn){
+            const say=(msg,type)=>window.gbocAlert?gbocAlert(msg,{title:type==='success'?'Teste enviado':'Falha no teste',type}):alert(msg);
+            const body={channel};
+            if(channel==='email'){
+                const cur=document.querySelector('[data-cat="notifications"][data-key="smtp_to"]');
+                const to=window.gbocPrompt
+                    ? await gbocPrompt('Enviar o e-mail de teste para:', (cur&&cur.value)||'', {title:'Teste de SMTP', placeholder:'voce@empresa.com'})
+                    : prompt('Enviar o e-mail de teste para:', (cur&&cur.value)||'');
+                if(!to) return;
+                body.to=to.trim();
+            }
+            if(btn){btn.disabled=true;btn.dataset.html=btn.innerHTML;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Enviando...';}
             try{
+                if(window._currentSettingsTab==='notifications') await saveCurrentTab();   // testa o que está digitado
                 const r=await fetch(`${API}/server/test-notification`,{
                     method:'POST',
                     headers:{'Content-Type':'application/json'},
-                    body:JSON.stringify({channel})
+                    body:JSON.stringify(body)
                 });
-                const d=await r.json();
-                if(r.ok) alert(`✓ Notificação ${channel} enviada com sucesso!`);
-                else alert('Erro: '+(d.detail||'Desconhecido'));
-            }catch(e){alert('Erro: '+e.message)}
+                const d=await r.json().catch(()=>({}));
+                if(r.ok) await say(channel==='email'?`E-mail de teste enviado para ${d.to||body.to}. Confira a caixa de entrada (e o spam).`:'Webhook de teste enviado com sucesso.','success');
+                else await say(d.detail||d.message||('HTTP '+r.status),'error');
+            }catch(e){await say(e.message,'error')}
+            finally{if(btn){btn.disabled=false;btn.innerHTML=btn.dataset.html;}}
         }
 
         function fmtBytes(b){if(!b||b===0)return'0 B';const k=1024,s=['B','KB','MB','GB','TB'],i=Math.floor(Math.log(b)/Math.log(k));return parseFloat((b/Math.pow(k,i)).toFixed(2))+' '+s[i]}

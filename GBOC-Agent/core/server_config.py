@@ -16,8 +16,10 @@ class ServerConfigManager:
     """Gerenciador de configuração do servidor central"""
 
     def __init__(self):
-        self.config_dir = Path("C:/ProgramData/GBOC") if os.name == 'nt' else Path.home() / ".gboc"
-        self.config_file = self.config_dir / "central_config.json"
+        # data/central/ do Agente (antes: C:\\ProgramData\\GBOC; copiado de la na primeira vez) - core/gboc_paths.py
+        from core.gboc_paths import central_dir, central_file
+        self.config_dir = central_dir()
+        self.config_file = central_file("central_config.json")
         self._config = {}
         self._load_config()
 

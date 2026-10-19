@@ -16,13 +16,25 @@ echo   GBOC Server v14.8.1 - Instalador
 echo ========================================
 echo.
 
-REM Detectar comando Python
-set PYTHON_CMD=
+REM Python: ULTIMA versao estavel do python.org (reaproveita a instalada se ja for a mais nova) com as
+REM dependencias do Server - scripts\gboc_prereqs.ps1. Se elas ainda nao instalarem na versao mais nova,
+REM usa a anterior. O start_server.bat escolhe o Python sozinho: atualizar o Python depois nao quebra nada.
+set "PYTHON_CMD="
+set "PYEXE="
+echo Verificando/instalando o Python mais recente (pode levar alguns minutos)...
+set "GBOC_OUT=%TEMP%\gboc_py_path.txt"
+del "%GBOC_OUT%" >nul 2>&1
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\gboc_prereqs.ps1" -Python -Requirements "%~dp0requirements.txt" -OutFile "%GBOC_OUT%"
+if exist "%GBOC_OUT%" set /p PYEXE=<"%GBOC_OUT%"
+if defined PYEXE if exist "%PYEXE%" (
+    set PYTHON_CMD="%PYEXE%"
+    goto :python_found
+)
 
-REM Preferir Python 3.14 explicitamente
-py -3.14 --version >nul 2>&1
+REM Sem internet/administrador: Python ja instalado (o launcher "py -3" usa a versao mais nova)
+py -3 --version >nul 2>&1
 if %errorlevel% equ 0 (
-    set PYTHON_CMD=py -3.14
+    set PYTHON_CMD=py -3
     goto :python_found
 )
 
@@ -32,26 +44,10 @@ if %errorlevel% equ 0 (
     goto :python_found
 )
 
-py --version >nul 2>&1
-if %errorlevel% equ 0 (
-    set PYTHON_CMD=py
-    goto :python_found
-)
-
-python3 --version >nul 2>&1
-if %errorlevel% equ 0 (
-    set PYTHON_CMD=python3
-    goto :python_found
-)
-
 REM Python não encontrado
 echo [ERRO] Python nao encontrado!
 echo.
-echo Tentamos os comandos: python, py, python3
-echo.
-echo Por favor, instale Python 3.8 ou superior:
-echo https://www.python.org/downloads/
-echo.
+echo Instale o Python mais recente: https://www.python.org/downloads/
 echo Durante a instalacao, marque "Add Python to PATH"
 echo.
 pause
@@ -131,29 +127,19 @@ if exist "C:\GBOC\Tools\PostgreSQL\pgsql\bin\psql.exe" (
     goto :pg_found
 )
 
-if exist "C:\Program Files\PostgreSQL\18\bin\psql.exe" (
-    set PSQL=C:\Program Files\PostgreSQL\18\bin\psql.exe
-    echo [OK] PostgreSQL 18 encontrado
-    goto :pg_found
-)
-
-if exist "C:\Program Files\PostgreSQL\17\bin\psql.exe" (
-    set PSQL=C:\Program Files\PostgreSQL\17\bin\psql.exe
-    echo [OK] PostgreSQL 17 encontrado
-    goto :pg_found
-)
-
-if exist "C:\Program Files\PostgreSQL\16\bin\psql.exe" (
-    set PSQL=C:\Program Files\PostgreSQL\16\bin\psql.exe
-    echo [OK] PostgreSQL 16 encontrado
-    goto :pg_found
-)
-
-if exist "C:\Program Files\PostgreSQL\15\bin\psql.exe" (
-    set PSQL=C:\Program Files\PostgreSQL\15\bin\psql.exe
-    echo [OK] PostgreSQL 15 encontrado
-    goto :pg_found
-)
+REM PostgreSQL instalado (qualquer versao: servico, Program Files ou portatil) - a mais nova
+set "PG_BIN="
+set "GBOC_OUT=%TEMP%\gboc_pg_bin.txt"
+del "%GBOC_OUT%" >nul 2>&1
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\gboc_prereqs.ps1" -Postgres -OutFile "%GBOC_OUT%" >nul 2>&1
+if exist "%GBOC_OUT%" set /p PG_BIN=<"%GBOC_OUT%"
+if defined PG_BIN if exist "%PG_BIN%\psql.exe" goto :pg_generic_ok
+goto :pg_generic_next
+:pg_generic_ok
+set "PSQL=%PG_BIN%\psql.exe"
+echo [OK] PostgreSQL encontrado: %PG_BIN%
+goto :pg_found
+:pg_generic_next
 
 where psql >nul 2>&1
 if %errorlevel% equ 0 (

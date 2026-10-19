@@ -29,7 +29,9 @@ if ($existing) {
 }
 
 # Criar Acao
-$Action = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"$LauncherBat`"" -WorkingDirectory $AgentDir
+# "/service": sem "pause" (a tarefa roda sem console). O start_scheduler.bat escolhe o Python sozinho
+# (scripts\gboc_python.ps1), entao atualizar o Python nao impede o agendador de iniciar.
+$Action = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"$LauncherBat`" /service" -WorkingDirectory $AgentDir
 
 # Criar Gatilho de Inicializacao do Sistema (Boot)
 $TriggerBoot = New-ScheduledTaskTrigger -AtStartup

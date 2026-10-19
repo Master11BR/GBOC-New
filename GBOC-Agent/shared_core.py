@@ -97,7 +97,9 @@ DB_CONFIG = {
     'password': os.getenv('POSTGRES_PASSWORD', 'Stoms2025+'),
     'client_encoding': 'UTF8',  # Força UTF-8 para evitar erros de decodificação
     'connect_timeout': int(os.getenv('POSTGRES_CONNECT_TIMEOUT', 5)),
-    'application_name': 'gboc_agent'
+    'application_name': 'gboc_agent',
+    # Nenhuma consulta espera lock para sempre (ex.: transação esquecida aberta): erro em 30 s em vez de travar o Agente
+    'options': f"-c lock_timeout={int(os.getenv('GBOC_DB_LOCK_TIMEOUT_MS', 30000))}"
 }
 
 if USE_POSTGRESQL:

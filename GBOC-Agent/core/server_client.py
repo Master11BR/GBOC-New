@@ -160,6 +160,11 @@ class CentralServerClient:
     def _duplicati_monitor_loop(self):
         """Loop de monitoramento: verifica resultado dos backups a cada 5 minutos."""
         CHECK_INTERVAL = 300  # segundos
+        # Na inicialização o WebSocket conecta ~2 s depois: esperar evita perder o 1º alerta
+        for _ in range(30):
+            if self.websocket_connected:
+                break
+            time.sleep(1)
         while True:
             try:
                 self._check_duplicati_results()
@@ -215,33 +220,25 @@ class CentralServerClient:
             )
             logger.warning(f"🚨 [DuplicatiMonitor] {alert_msg}")
 
-            # Enviar alerta via WebSocket (assíncrono)
+            # Enviar alerta via WebSocket. Esta thread não tem event loop: o envio é agendado
+            # no loop da thread do WebSocket (asyncio.get_event_loop() aqui lançava erro e o alerta se perdia).
+            ws_loop = getattr(self, "_ws_loop", None)
+            if not (self.websocket_connected and self.websocket and ws_loop and ws_loop.is_running()):
+                self._duplicati_last_seen.pop(backup_id, None)  # reenviar no próximo ciclo
+                logger.warning("[DuplicatiMonitor] WebSocket não conectado — alerta será reenviado no próximo ciclo")
+                continue
             try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    asyncio.ensure_future(self.send_realtime_alert(
-                        alert_type="duplicati_backup_error",
-                        message=alert_msg,
-                        details={
-                            "backup_id": backup_id,
-                            "backup_name": backup_name,
-                            "parsed_result": parsed,
-                            "errors": errors,
-                            "timestamp": timestamp,
-                        },
-                    ))
-                else:
-                    loop.run_until_complete(self.send_realtime_alert(
-                        alert_type="duplicati_backup_error",
-                        message=alert_msg,
-                        details={
-                            "backup_id": backup_id,
-                            "backup_name": backup_name,
-                            "parsed_result": parsed,
-                            "errors": errors,
-                            "timestamp": timestamp,
-                        },
-                    ))
+                asyncio.run_coroutine_threadsafe(self.send_realtime_alert(
+                    alert_type="duplicati_backup_error",
+                    message=alert_msg,
+                    details={
+                        "backup_id": backup_id,
+                        "backup_name": backup_name,
+                        "parsed_result": parsed,
+                        "errors": errors,
+                        "timestamp": timestamp,
+                    },
+                ), ws_loop)
             except Exception as exc:
                 logger.warning(f"[DuplicatiMonitor] falha ao enviar alerta WebSocket: {exc}")
 
@@ -273,10 +270,9 @@ class CentralServerClient:
     def _get_or_create_agent_id(self) -> str:
         """Obtém ou cria ID único do agente"""
         try:
-            config_dir = Path("C:/ProgramData/GBOC") if os.name == 'nt' else Path.home() / ".gboc"
-            config_dir.mkdir(parents=True, exist_ok=True)
-            
-            agent_id_file = config_dir / "agent_id"
+            # data/central/ do Agente (antes: C:\ProgramData\GBOC; copiado de la na primeira vez)
+            from core.gboc_paths import central_file
+            agent_id_file = central_file("agent_id")
             
             if agent_id_file.exists():
                 with open(agent_id_file, 'r') as f:
@@ -635,6 +631,7 @@ class CentralServerClient:
                 _ws_cm = websockets.connect(ws_url, ssl=_ssl_ctx, extra_headers=_hdrs)
             async with _ws_cm as websocket:
                 self.websocket = websocket
+                self._ws_loop = asyncio.get_running_loop()  # usado por threads (ex.: DuplicatiMonitor) para enviar
                 self.websocket_connected = True
                 logger.info(f"🔗 WebSocket conectado: {ws_url}")
                 

@@ -115,8 +115,8 @@ class AIDiagnosticEngine:
             "ollama_host": info["host"],
             "installed_models": info["models"],
             "models": info["models"],
-            "recommended_models": ["llama3.2:latest", "llama3.1:8b", "qwen2.5:7b", "mistral:latest",
-                                   "deepseek-r1:8b", "gemma2:9b", "phi3:latest"],
+            "recommended_models": list(aip.OLLAMA_RECOMMENDED_MODELS),
+            "model_sizes": dict(aip.OLLAMA_MODEL_SIZES),
             "count_installed": len(info["models"]),
             "message": "" if info["connected"] else f"Servidor Ollama inacessível: {info['error']}",
         }

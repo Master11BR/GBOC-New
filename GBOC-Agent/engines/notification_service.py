@@ -24,19 +24,12 @@ def _get_core():
 
 
 def _load_smtp_config() -> Optional[Dict]:
-    try:
-        core = _get_core()
-        with core.get_db_connection() as conn:
-            cur = conn.cursor()
-            cur.execute("SELECT server, port, username, password, use_tls, from_email, from_name FROM smtp_config WHERE id = 1")
-            row = cur.fetchone()
-            if row:
-                return {
-                    'server': row[0], 'port': row[1], 'username': row[2],
-                    'password': row[3], 'use_tls': row[4], 'from_email': row[5], 'from_name': row[6]
-                }
-    except Exception as e:
-        logger.debug(f"No SMTP config available: {e}")
+    # Tabela smtp_config com coluna "server" (tela SMTP) ou "host" (migrador): engines/smtp_store.py
+    from engines import smtp_store
+    cfg = smtp_store.load_from_core()
+    if cfg and cfg.get('server'):
+        return cfg
+    logger.debug("No SMTP config available")
     return None
 
 
@@ -119,15 +112,8 @@ def _send_email_sync(smtp_config, to_emails, subject, html_body):
         msg['To'] = ', '.join(to_emails)
         msg['Subject'] = subject
         msg.attach(MIMEText(html_body, 'html'))
-        if smtp_config.get('use_tls', True):
-            s = smtplib.SMTP(smtp_config['server'], smtp_config['port'], timeout=30)
-            s.ehlo()
-            s.starttls()
-        else:
-            s = smtplib.SMTP_SSL(smtp_config['server'], smtp_config['port'], timeout=30)
-        s.login(smtp_config['username'], smtp_config['password'])
-        s.sendmail(smtp_config['from_email'], to_emails, msg.as_string())
-        s.quit()
+        from engines import smtp_store
+        smtp_store.deliver(smtp_config, to_emails, msg)     # 465 = SSL direto; demais portas = STARTTLS
         logger.info(f"✅ Email notification sent to {', '.join(to_emails)}")
     except Exception as e:
         logger.error(f"❌ Failed to send email: {e}")

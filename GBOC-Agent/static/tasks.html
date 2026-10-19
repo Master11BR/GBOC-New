@@ -30,6 +30,39 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     <script src="/static/toast_notifications.js"></script>
     <script src="/static/auth_interceptor.js?v=14.8.1"></script>
     <script src="/static/gboc-global.js?v=14.8.1"></script>
+<style>
+/* Barra de progresso ao vivo dos backups em execução */
+.gl-wrap { display:flex; flex-direction:column; gap:12px; margin-bottom:24px; }
+.gl-wrap[hidden] { display:none; }
+.gl-title-row { display:flex; align-items:center; gap:8px; color:var(--text); font-weight:600; font-size:1.02em; }
+.gl-dot { width:8px; height:8px; border-radius:50%; background:var(--success,#10b981); box-shadow:0 0 0 0 rgba(16,185,129,.6); animation:gl-pulse 1.6s infinite; }
+@keyframes gl-pulse { 70% { box-shadow:0 0 0 8px rgba(16,185,129,0); } 100% { box-shadow:0 0 0 0 rgba(16,185,129,0); } }
+.gl-card { display:grid; grid-template-columns:auto minmax(0,1fr) minmax(0,1.4fr) auto; gap:18px; align-items:center;
+  background:var(--bg-card); border:1px solid var(--border, rgba(255,255,255,.08)); border-radius:12px; padding:16px 20px; }
+.gl-icon { width:52px; height:52px; border-radius:12px; display:grid; place-items:center; font-size:1.25em;
+  color:#38bdf8; background:rgba(56,189,248,.08); border:1px solid rgba(56,189,248,.25); }
+.gl-name { display:flex; align-items:center; gap:10px; flex-wrap:wrap; color:var(--text); font-weight:600; font-size:1.08em; }
+.gl-badge { font-size:.68em; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:3px 9px; border-radius:999px;
+  color:#38bdf8; background:rgba(56,189,248,.12); border:1px solid rgba(56,189,248,.3); }
+.gl-meta { margin-top:6px; color:var(--text-muted); font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:.86em;
+  display:flex; flex-wrap:wrap; gap:6px 12px; }
+.gl-file { margin-top:4px; color:var(--text-muted); font-size:.8em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.gl-top { display:flex; justify-content:space-between; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:.88em; color:var(--text); }
+.gl-pct { color:#34d399; font-weight:700; }
+.gl-bar { position:relative; height:10px; margin:8px 0; border-radius:999px; background:rgba(148,163,184,.18); overflow:hidden; }
+.gl-fill { height:100%; border-radius:999px; background:linear-gradient(90deg,#10b981,#38bdf8); transition:width .6s ease; }
+.gl-bar.gl-indet .gl-fill { width:35% !important; position:absolute; animation:gl-slide 1.4s ease-in-out infinite; }
+@keyframes gl-slide { 0% { left:-35%; } 100% { left:100%; } }
+.gl-stats { display:flex; justify-content:space-between; flex-wrap:wrap; gap:4px 14px; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:.82em; color:var(--text-muted); }
+.gl-stats .gl-new { color:#34d399; } .gl-stats .gl-upd { color:#38bdf8; }
+.gl-card.gl-done { opacity:.92; } .gl-card.gl-done .gl-icon { color:#34d399; background:rgba(52,211,153,.08); border-color:rgba(52,211,153,.3); }
+.gl-card.gl-fail .gl-icon { color:#f87171; background:rgba(248,113,113,.08); border-color:rgba(248,113,113,.3); }
+.gl-card.gl-fail .gl-fill { background:linear-gradient(90deg,#ef4444,#f87171); } .gl-card.gl-fail .gl-pct { color:#f87171; }
+.gl-actions { min-width:96px; display:flex; justify-content:flex-end; }
+.gl-err { margin-top:6px; color:#f87171; font-size:.8em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+@media (max-width: 900px) { .gl-card { grid-template-columns:auto minmax(0,1fr); } .gl-prog, .gl-actions { grid-column:1 / -1; } .gl-actions { justify-content:flex-start; min-width:0; } .gl-actions:empty { display:none; } }
+@media (prefers-reduced-motion: reduce) { .gl-dot, .gl-bar.gl-indet .gl-fill { animation:none; } .gl-fill { transition:none; } }
+</style>
 </head>
 <body>
 <div class="app">
@@ -66,6 +99,9 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 </div>
             </div>
         </div>
+
+        <!-- Backups em execução: barra de progresso ao vivo (api/tasks/running/live) -->
+        <section id="live-backups" class="gl-wrap" hidden aria-live="polite" aria-label="Backups em execução"></section>
 
         <!-- Legenda de cores -->
         <div class="gboc-legend">
@@ -1001,6 +1037,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         }
 
         showToast(`Backup iniciado (exec ${data.execution_id})`, 'info');
+        if (window.gbocRefreshLiveBackups) setTimeout(window.gbocRefreshLiveBackups, 1500);
     }
 
     async function editTask(id) {
@@ -1679,6 +1716,102 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     }, 5000);
     </script>
     <script src="/static/gboc-file-picker.js"></script>
+<script>
+/* Barra de progresso ao vivo: dados reais do monitor gravados em task_executions */
+(function () {
+    const box = document.getElementById('live-backups');
+    if (!box) return;
+    const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const fmtBytes = b => { b = Number(b) || 0; if (b < 1024) return b + ' B'; const u = ['KB','MB','GB','TB']; let i = -1;
+        do { b /= 1024; i++; } while (b >= 1024 && i < u.length - 1); return b.toFixed(b >= 100 ? 0 : 1) + ' ' + u[i]; };
+    const fmtNum = n => (Number(n) || 0).toLocaleString('pt-BR');
+    const fmtDur = s => { s = Math.max(0, Math.round(Number(s) || 0)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+        return h ? `${h}h ${String(m).padStart(2,'0')}m` : (m ? `${m}m ${String(x).padStart(2,'0')}s` : `${x}s`); };
+    const ENGINE = { gboc_native: 'Nativo', native: 'Nativo', gboc: 'Nativo', local: 'Nativo', restic: 'Restic',
+                     kopia: 'Kopia', duplicati: 'Duplicati' };
+    const engineLabel = e => { const k = String(e || '').toLowerCase(); for (const key in ENGINE) if (k.startsWith(key)) return ENGINE[key]; return e || 'Backup'; };
+
+    const ago = s => { s = Number(s) || 0; return s < 60 ? 'há menos de 1 min' : `há ${Math.floor(s / 60)} min`; };
+    function card(ex) {
+        const finished = !!ex.finished;
+        const ok = finished && ex.status === 'completed';
+        const failLabel = { cancelled: 'Cancelado', interrupted: 'Interrompido' }[ex.status] || 'Falhou';
+        let pct = ex.percent;                         // null = total ainda desconhecido
+        if (ok) pct = 100;
+        const indet = !finished && (pct === null || pct === undefined);
+        if (finished && (pct === null || pct === undefined)) pct = 0;
+        const nativo = engineLabel(ex.engine) === 'Nativo';
+        const preparing = ex.status === 'preparing' && !ex.files_processed;
+        const meta = [
+            `${fmtBytes(ex.bytes_per_sec)}/s`,
+            `${(Number(ex.files_per_sec) || 0).toFixed(1)} arq/s`,
+            `<i class="far fa-clock"></i> ${fmtDur(ex.elapsed_seconds)}`,
+        ];
+        if (ex.eta_seconds && !finished) meta.push(`restam ~${fmtDur(ex.eta_seconds)}`);
+        if (finished) meta[2] = `<i class="far fa-clock"></i> durou ${fmtDur(ex.elapsed_seconds)}`;
+        const stats = [finished
+            ? `<span>${fmtNum(ex.files_processed)} arquivos</span>`
+            : `<span>${fmtNum(ex.files_processed)} de ${ex.files_total ? fmtNum(ex.files_total) : (nativo ? 'contando…' : '?')} arquivos</span>`];
+        if (ex.files_new || nativo) stats.push(`<span class="gl-new"><i class="far fa-check-circle"></i> ${fmtNum(ex.files_new)} novos/alterados</span>`);
+        if (ex.files_unmodified || nativo) stats.push(`<span class="gl-upd"><i class="fas fa-rotate"></i> ${fmtNum(ex.files_unmodified)} inalterados</span>`);
+        stats.push(`<span><i class="fas fa-database"></i> ${fmtBytes(ex.bytes_processed)}${ex.bytes_total ? ' de ' + fmtBytes(ex.bytes_total) : ''}</span>`);
+        if (ex.bytes_added) stats.push(`<span><i class="fas fa-cloud-arrow-up"></i> ${fmtBytes(ex.bytes_added)} enviados</span>`);
+        const label = finished
+            ? (ok ? `<i class="fas fa-check"></i> Concluído ${ago(ex.finished_seconds_ago)}` : `<i class="fas fa-xmark"></i> ${failLabel} ${ago(ex.finished_seconds_ago)}`)
+            : (preparing ? 'Preparando…' : 'Progresso Geral');
+        const pctText = finished && !ok ? failLabel : (indet ? '' : Math.floor(pct) + '%');
+        const icon = finished ? (ok ? 'fa-circle-check' : 'fa-circle-xmark') : 'fa-wave-square';
+        const fileLine = finished && !ok && ex.error_message
+            ? `<div class="gl-err" title="${esc(ex.error_message)}">${esc(ex.error_message)}</div>`
+            : `<div class="gl-file" title="${esc(ex.current_file)}">${!finished && ex.current_file ? esc(ex.current_file) : (ex.repository_name ? 'Repositório: ' + esc(ex.repository_name) : '')}</div>`;
+        return `<div class="gl-card ${finished ? (ok ? 'gl-done' : 'gl-fail') : ''}">
+            <div class="gl-icon"><i class="fas ${icon}"></i></div>
+            <div style="min-width:0">
+                <div class="gl-name">${esc(ex.task_name || ('Tarefa ' + ex.task_id))} <span class="gl-badge">${esc(engineLabel(ex.engine))}</span></div>
+                <div class="gl-meta">${meta.join('<span aria-hidden="true">•</span>')}</div>
+                ${fileLine}
+            </div>
+            <div class="gl-prog">
+                <div class="gl-top"><span>${label}</span><span class="gl-pct">${pctText}</span></div>
+                <div class="gl-bar ${indet ? 'gl-indet' : ''}" role="progressbar" aria-valuemin="0" aria-valuemax="100" ${indet ? '' : `aria-valuenow="${Math.floor(pct)}"`}>
+                    <div class="gl-fill" style="width:${indet ? 35 : (finished ? pct : Math.max(1, pct))}%"></div></div>
+                <div class="gl-stats">${stats.join('')}</div>
+            </div>
+            <div class="gl-actions">${finished ? '' : `<button class="btn btn-sm btn-secondary" onclick="viewLiveProgress(${Number(ex.task_id)})"><i class="fas fa-eye"></i> Detalhes</button>`}</div>
+        </div>`;
+    }
+
+    let timer = null;
+    async function refresh() {
+        let next = 8000;
+        try {
+            const res = await fetch('/api/tasks/running/live', { cache: 'no-store' });
+            if (res.ok) {
+                const data = await res.json();
+                // concluídos ficam no máximo 5 min (a API já filtra; aqui garante mesmo com relógio/atraso)
+                const list = (data.executions || []).filter(x => !x.finished || (Number(x.finished_seconds_ago) || 0) <= 300);
+                const running = list.filter(x => !x.finished).length;
+                if (list.length) {
+                    const title = running
+                        ? `<span class="gl-dot"></span>Em execução (${running})`
+                        : `<i class="fas fa-flag-checkered" style="color:var(--text-muted)"></i>Concluídos recentemente`;
+                    box.innerHTML = `<div class="gl-title-row">${title}</div>` + list.map(card).join('');
+                    box.hidden = false;
+                    next = running ? 2000 : 10000;
+                } else {
+                    box.hidden = true;
+                    box.innerHTML = '';
+                }
+            }
+        } catch (e) { /* rede/sessão: tenta de novo no próximo ciclo */ }
+        if (!document.hidden) timer = setTimeout(refresh, next);
+    }
+    // após "Executar agora" o painel aparece em ~2s sem esperar o ciclo lento
+    window.gbocRefreshLiveBackups = () => { clearTimeout(timer); refresh(); };
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) { clearTimeout(timer); refresh(); } });
+    refresh();
+})();
+</script>
 </body>
 </html>
 

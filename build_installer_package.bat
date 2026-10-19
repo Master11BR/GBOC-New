@@ -12,7 +12,9 @@ echo   Gerando Pacote de Instalacao GBOC...
 echo ========================================================
 echo.
 
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0build_installer_package.ps1"
+REM Sem parametros: pergunta o tipo (Completo / So codigo) e se gera o .zip.
+REM Com parametros: build_installer_package.bat -Mode Completo -Zip   |   -Mode Codigo -NoZip
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0build_installer_package.ps1" %*
 
 if %errorlevel% neq 0 (
     echo.

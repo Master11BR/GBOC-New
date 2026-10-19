@@ -122,6 +122,9 @@ def _record_check(repo: Dict[str, Any], result: Dict[str, Any]) -> None:
 
 def resolve_region(cfg: Dict[str, Any]) -> str:
     """Região informada; senão extraída do endpoint (s3.<região>.wasabisys.com); senão us-east-1."""
+    if "wasabisys.com" in str(cfg.get("endpoint") or "").lower():
+        from storage_backends.cloud import s3_region            # o endpoint Wasabi define a região da assinatura
+        return s3_region(cfg)
     region = str(cfg.get("region") or "").strip()
     if region:
         return region
@@ -148,8 +151,10 @@ def _s3(repo: Dict[str, Any]):
     endpoint = cfg.get("endpoint") or (f"s3.{region}.wasabisys.com" if repo["type"] == "wasabi" else None)
     if endpoint and not endpoint.startswith("http"):
         endpoint = "https://" + endpoint
+    from storage_backends.cloud import s3_addressing_style      # path-style em endpoint próprio (MinIO, Ceph...)
     return boto3.client("s3", aws_access_key_id=ak, aws_secret_access_key=sk, region_name=region, endpoint_url=endpoint,
-                        config=Config(retries={"max_attempts": 3}, connect_timeout=10, read_timeout=30))
+                        config=Config(retries={"max_attempts": 3}, connect_timeout=10, read_timeout=30,
+                                      s3={"addressing_style": s3_addressing_style(cfg, endpoint)}))
 
 
 def _bucket_prefix(repo: Dict[str, Any]) -> Tuple[str, str]:
@@ -328,9 +333,10 @@ def _local_targets(repo: Dict[str, Any]) -> List[str]:
         d = os.path.join(base, "data")          # packs do restic nunca são reescritos (só removidos por prune)
         return [d] if os.path.isdir(d) else []
     out = [os.path.join(base, d) for d in os.listdir(base) if d.isdigit() and os.path.isdir(os.path.join(base, d))]
-    objs = os.path.join(base, "objects")          # motor nativo v4: blocos deduplicados (nunca reescritos)
-    if os.path.isdir(objs):
-        out.append(objs)
+    for d in ("objects", "packs"):                # motor nativo v4: blocos e pacotes deduplicados (nunca reescritos)
+        p = os.path.join(base, d)
+        if os.path.isdir(p):
+            out.append(p)
     return out
 
 
@@ -381,7 +387,7 @@ def lock_local(repo: Dict[str, Any], max_age_days: Optional[int] = None) -> Dict
     acl = 0
     if os.name == "nt":
         for t in _local_targets(repo):
-            if repo["engine"] != "restic" and os.path.basename(t) != "objects":          # pastas de snapshot do motor nativo são imutáveis por completo
+            if repo["engine"] != "restic" and os.path.basename(t) not in ("objects", "packs"):  # pastas de snapshot do motor nativo são imutáveis por completo
                 acl += 1 if _win_deny_delete(t, True) else 0
     return {"locked_now": locked, "already_locked": already, "acl_folders": acl}
 
@@ -391,20 +397,57 @@ def _objects_in_recent_snapshots(repo: Dict[str, Any], days: int) -> set:
     Esses blocos não podem ser liberados enquanto algum snapshot dentro do período de bloqueio os usar."""
     base = repo.get("path") or ""
     out: set = set()
-    if not base or not os.path.isdir(os.path.join(base, "objects")):
+    if not base or not (os.path.isdir(os.path.join(base, "objects")) or os.path.isdir(os.path.join(base, "packs"))):
         return out
     limit = datetime.now() - timedelta(days=days)
+    cipher = None
     for d in os.listdir(base):
         if not d.isdigit():
             continue
         try:
             if datetime.strptime(d[:14], "%Y%m%d%H%M%S") < limit:
                 continue
-            with open(os.path.join(base, d, "manifest.json"), encoding="utf-8") as f:
-                for e in (json.load(f).get("entries") or []):
-                    out.update(e.get("chunks") or [])
+            with open(os.path.join(base, d, "manifest.json"), "rb") as f:
+                raw = f.read()
         except (OSError, ValueError):
             continue
+        try:
+            from native_engine import crypto
+            if crypto.is_encrypted_doc(raw):
+                if cipher is None:          # repositório criptografado (gboc-key.json + senha do motor)
+                    from storage_backends.local import LocalStorageBackend
+                    pw = repo.get("motor_password") or repo.get("encryption_password") or repo.get("password") or ""
+                    if not pw and repo.get("id") is not None:
+                        with _core().get_db_connection() as conn:
+                            cur = conn.cursor()
+                            cur.execute("SELECT COALESCE(motor_password, encryption_password, password, '') "
+                                        "FROM repositories WHERE CAST(id AS TEXT) = %s", (str(repo["id"]),))
+                            row = cur.fetchone()
+                            cur.close()
+                        pw = (row[0] if row else "") or ""
+                    cipher = crypto.open_repo(LocalStorageBackend({"type": "local", "path": base}), pw)
+                doc = cipher.open_doc(raw)
+            else:
+                doc = json.loads(raw.decode("utf-8"))
+        except Exception as e:
+            # Manifesto recente ilegível: na dúvida nenhum bloco/pacote é liberado (melhor proteger a mais)
+            logger.warning(f"Manifesto {d} ilegível ({e}): mantendo todos os blocos protegidos")
+            return {os.path.basename(f) for sub in ("objects", "packs")
+                    for f in _iter_files([os.path.join(base, sub)])}
+        for e in (doc.get("entries") or []):
+            out.update(e.get("chunks") or [])
+    # Pacotes: um pacote está em uso se QUALQUER bloco dele estiver (o arquivo do pacote leva o id dele, não o do bloco)
+    idx = os.path.join(base, "index")
+    if out and os.path.isdir(idx):
+        from native_engine.store_v4 import decompress
+        for fn in os.listdir(idx):
+            try:
+                with open(os.path.join(idx, fn), "rb") as f:
+                    doc = json.loads(decompress(f.read()).decode("utf-8"))
+            except (OSError, ValueError) as e:
+                logger.warning(f"Índice de pacotes ilegível {fn}: {e}")
+                continue
+            out.update(pid for pid, entries in (doc.get("packs") or {}).items() if any(e[0] in out for e in entries))
     return out
 
 

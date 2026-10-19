@@ -49,7 +49,7 @@ function toggleAiFields() {
     const apiKeyLinkDiv = document.getElementById('ai-api-key-link');
 
     const defaultModels = {
-        ollama: 'llama3',
+        ollama: 'qwen3.5:4b',
         kimi: 'kimi-k2.6',
         grok: 'grok-4.7',
         groq: 'openai/gpt-oss-120b',
@@ -58,9 +58,9 @@ function toggleAiFields() {
         gemini: 'gemini-flash-latest',
         deepseek: 'deepseek-flash',
         claude: 'claude-sonnet-5-5',
-        qwen: 'qwen2.5',
+        qwen: 'qwen3.5:9b',
         mistral: 'mistral-large-latest',
-        llama3: 'llama3.3:70b',
+        llama3: 'llama3.1:8b',
         cohere: 'command-a-plus-05-2026'
     };
 
@@ -106,11 +106,10 @@ const _cfgAuthHeaders = (extra = {}) => {
 };
 
 let gInstalledModels = [];
-let gRecommendedModels = [
-    "llama3:latest", "llama3.2:latest", "llama3.3:70b", "mistral:latest",
-    "deepseek-r1:latest", "deepseek-r1:1.5b", "qwen2.5:latest", "gemma2:latest",
-    "codellama:latest", "phi3:latest"
-];
+// Reserva: a lista oficial vem da API do servidor (recommended_models)
+let gRecommendedModels = ["qwen3.5:4b", "qwen3.5:9b", "gemma4:12b", "gpt-oss:20b", "qwen3.8:27b", "llama3.1:8b", "deepseek-r1:8b",
+    "glm-5.3-flash:cloud", "deepseek-v4.1-flash:cloud", "kimi-k3:cloud", "gemma4:31b-cloud"];
+window.gOllamaModelSizes = window.gOllamaModelSizes || {"qwen3.5:4b": "~6 GB", "gemma4:12b": "~11 GB", "qwen3.8:27b": "~28 GB"};
 
 function updateModelDropdownUI(installed, recommended, currentVal) {
     const select = document.getElementById('ai-model-select');
@@ -129,10 +128,21 @@ function updateModelDropdownUI(installed, recommended, currentVal) {
     }
 
     const availableNotInstalled = recs.filter(m => !gInstalledModels.includes(m));
-    if (availableNotInstalled.length > 0) {
-        html += `<optgroup label="☁️ Modelos Disponíveis na Nuvem / Library (Requer 'ollama pull')">`;
-        availableNotInstalled.forEach(m => {
-            html += `<option value="${_cfgEsc(m)}">☁️ ${_cfgEsc(m)} (Não Instalado - Requer 'ollama pull')</option>`;
+    const _isCloud = m => /[:-]cloud$/i.test(m);
+    const _size = m => (window.gOllamaModelSizes && window.gOllamaModelSizes[m]) ? ` - ${window.gOllamaModelSizes[m]}` : '';
+    const _local = availableNotInstalled.filter(m => !_isCloud(m));
+    const _cloud = availableNotInstalled.filter(_isCloud);
+    if (_local.length > 0) {
+        html += `<optgroup label="⚪ Modelos locais para baixar (rodam nesta máquina)">`;
+        _local.forEach(m => {
+            html += `<option value="${_cfgEsc(m)}">⚪ ${_cfgEsc(m)}${_size(m)} (não baixado)</option>`;
+        });
+        html += `</optgroup>`;
+    }
+    if (_cloud.length > 0) {
+        html += `<optgroup label="☁️ Modelos na nuvem do Ollama (requer 'ollama signin')">`;
+        _cloud.forEach(m => {
+            html += `<option value="${_cfgEsc(m)}">☁️ ${_cfgEsc(m)} (não adicionado)</option>`;
         });
         html += `</optgroup>`;
     }
@@ -155,7 +165,7 @@ function onModelSelectChanged(val) {
         badge.innerHTML = `<i class="fas fa-check-circle"></i> Modelo <strong>${val}</strong> está INSTALADO no Ollama e pronto para uso imediato!`;
     } else {
         badge.style.cssText = 'font-size:0.83em;padding:6px 10px;border-radius:6px;background:rgba(240,169,64,0.15);color:var(--warning);border:1px solid rgba(240,169,64,0.3);margin-top:4px';
-        badge.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Modelo <strong>${val}</strong> NÃO ESTÁ INSTALADO.<br>` +
+        badge.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Modelo <strong>${val}</strong> NÃO ESTÁ INSTALADO.<br>${/[:-]cloud$/i.test(val) ? 'Modelo na nuvem do Ollama: antes, entre na conta com <code>ollama signin</code> no servidor.<br>' : ''}` +
             `<button type="button" class="btn btn-sm btn-primary" style="margin-top:6px;padding:4px 8px;font-size:0.85em" onclick="pullOllamaModel('${val}')"><i class="fas fa-download"></i> Instalar Modelo Automaticamente</button>`;
     }
 }
@@ -211,10 +221,12 @@ async function detectOllamaModels() {
         const r = await fetch(window.GBOC_API_BASE + `/api/v1/ai/ollama/models?host=${encodeURIComponent(host)}`, { headers: _cfgAuthHeaders() });
         const data = await r.json();
         
+        if (data.model_sizes) window.gOllamaModelSizes = data.model_sizes;
+        const recs = (Array.isArray(data.recommended_models) && data.recommended_models.length) ? data.recommended_models : gRecommendedModels;
         if (data.connected && data.installed_models) {
-            updateModelDropdownUI(data.installed_models, gRecommendedModels, currentModel);
+            updateModelDropdownUI(data.installed_models, recs, currentModel);
         } else {
-            updateModelDropdownUI([], gRecommendedModels, currentModel);
+            updateModelDropdownUI([], recs, currentModel);
         }
     } catch (e) {
         console.error('Falha ao detectar modelos:', e);

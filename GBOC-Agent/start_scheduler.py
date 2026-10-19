@@ -27,6 +27,16 @@ AGENT_DIR = os.path.dirname(os.path.abspath(__file__))
 if AGENT_DIR not in sys.path:
     sys.path.insert(0, AGENT_DIR)
 
+try:
+    import gboc_encoding_compat  # noqa: F401  Python 3.15+ no Windows: saida dos comandos em cp850/cp1252
+except Exception:
+    pass
+try:
+    from core import gboc_paths as _gboc_paths      # temporarios/caches dentro da pasta do Agente
+    _gboc_paths.setup_process_dirs()
+except Exception:
+    pass
+
 # Configuração de logging
 LOGS_DIR = os.path.join(AGENT_DIR, "logs")
 os.makedirs(LOGS_DIR, exist_ok=True)

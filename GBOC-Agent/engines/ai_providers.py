@@ -25,6 +25,7 @@ from __future__ import annotations
 import asyncio
 import ipaddress
 import logging
+import os
 import time
 from dataclasses import dataclass, field
 from typing import Any
@@ -38,7 +39,7 @@ DEFAULT_OLLAMA_HOST = "http://localhost:11434"
 
 # Modelos padrão vigentes (revisados em out/2026). Todos podem ser sobrescritos na configuração.
 DEFAULT_MODELS: dict[str, str] = {
-    "ollama": "llama3",
+    "ollama": "qwen3.5:4b",
     "openai": "gpt-4o-mini",
     "groq": "openai/gpt-oss-120b",          # llama-3.3-70b-versatile foi descontinuado no Groq (ago/2026)
     "gemini": "gemini-flash-latest",        # Gemini 1.5/2.0 desligados; 2.5 com acesso restrito
@@ -49,6 +50,22 @@ DEFAULT_MODELS: dict[str, str] = {
     "mistral": "mistral-large-latest",
     "cohere": "command-a-plus-05-2026",
 }
+
+# Modelos sugeridos para baixar no Ollama (biblioteca ollama.com, revisada em out/2026).
+# Fonte única: Agente e Servidor devolvem esta lista nas APIs de modelos e as telas a exibem.
+# ":cloud"/"-cloud" = roda na nuvem do Ollama (requer "ollama signin"; o pull só registra o modelo).
+OLLAMA_RECOMMENDED_MODELS: list[str] = [
+    "qwen3.5:4b", "qwen3.5:9b", "gemma4:12b", "gpt-oss:20b", "qwen3.8:27b", "llama3.1:8b", "deepseek-r1:8b",
+    "glm-5.3-flash:cloud", "deepseek-v4.1-flash:cloud", "kimi-k3:cloud", "gemma4:31b-cloud",
+]
+# Tamanho do download informado pelo próprio Ollama (só os conferidos).
+OLLAMA_MODEL_SIZES: dict[str, str] = {"qwen3.5:4b": "~6 GB", "gemma4:12b": "~11 GB", "qwen3.8:27b": "~28 GB"}
+
+
+def is_ollama_cloud_model(name: str) -> bool:
+    n = (name or "").lower()
+    return n.endswith(":cloud") or n.endswith("-cloud")
+
 
 PROVIDER_LABELS: dict[str, str] = {
     "ollama": "Ollama Local (On-Premises)",
@@ -309,17 +326,58 @@ def resolve_model(cfg: dict[str, Any], provider: str) -> str:
     return DEFAULT_MODELS.get(provider, "")
 
 
+def is_local_url(url: str) -> bool:
+    """Host local/rede interna (localhost, loopback, IP privado, *.local)."""
+    host = (urlparse(url).hostname or "").lower()
+    if host in ("localhost", "localhost.localdomain") or host.endswith((".local", ".localhost", ".lan")):
+        return True
+    try:
+        ip = ipaddress.ip_address(host)
+        return ip.is_loopback or ip.is_private or ip.is_link_local
+    except ValueError:
+        return "." not in host and bool(host)          # nome de máquina da rede (ex.: SERVIDOR-IA)
+
+
+def _http_opts(url: str) -> dict[str, Any]:
+    """Host local não passa pelo proxy do Windows/variáveis HTTP(S)_PROXY: com proxy configurado o httpx
+    mandava http://localhost:11434 para o proxy e o Ollama "não respondia" mesmo rodando."""
+    return {"trust_env": False} if is_local_url(url) else {}
+
+
+def _env_ollama_host() -> str | None:
+    """OLLAMA_HOST do Ollama (ex.: 0.0.0.0:11500, 127.0.0.1:11434, http://ia:11434) como endereço acessível."""
+    raw = (os.environ.get("OLLAMA_HOST") or "").strip()
+    if not raw:
+        return None
+    if "://" not in raw:
+        raw = "http://" + raw
+    p = urlparse(raw)
+    host = p.hostname or "127.0.0.1"
+    if host in ("0.0.0.0", "::", ""):
+        host = "127.0.0.1"
+    if ":" in host:
+        host = f"[{host}]"
+    return f"{p.scheme}://{host}:{p.port or 11434}"
+
+
 def resolve_ollama_hosts(cfg: dict[str, Any], override: str | None = None) -> list[str]:
     hosts: list[str] = []
-    for h in (override, cfg.get("ollama_url"), cfg.get("ollama_host"), DEFAULT_OLLAMA_HOST, "http://127.0.0.1:11434"):
+    for h in (override, cfg.get("ollama_url"), cfg.get("ollama_host"), _env_ollama_host(),
+              DEFAULT_OLLAMA_HOST, "http://127.0.0.1:11434"):
         if not h:
             continue
         try:
             norm = validate_http_url(str(h))
         except ValueError:
             continue
-        if norm not in hosts:
-            hosts.append(norm)
+        p = urlparse(norm)
+        variants = [norm]
+        if (p.hostname or "").lower() == "localhost":
+            # IPv4 primeiro: "localhost" no Windows tenta ::1 antes e o Ollama escuta só em 127.0.0.1
+            variants.insert(0, norm.replace(p.netloc, p.netloc.lower().replace("localhost", "127.0.0.1"), 1))
+        for v in variants:
+            if v not in hosts:
+                hosts.append(v)
     return hosts
 
 
@@ -348,18 +406,18 @@ def _http_error(provider: str, resp: httpx.Response) -> str:
 
 def list_ollama_models(cfg: dict[str, Any], host_override: str | None = None, timeout: float = 10.0) -> dict[str, Any]:
     """Consulta /api/tags do Ollama. Retorna {connected, host, models, error}."""
-    last_error = "Nenhum host Ollama válido configurado."
+    errors: list[str] = []
     for host in resolve_ollama_hosts(cfg, host_override):
         try:
-            resp = httpx.get(f"{host}/api/tags", timeout=timeout)
+            resp = httpx.get(f"{host}/api/tags", timeout=httpx.Timeout(timeout, connect=3.0), **_http_opts(host))
             if resp.status_code == 200:
                 models = [m.get("name") or m.get("model") for m in resp.json().get("models", [])]
                 return {"connected": True, "host": host, "models": [m for m in models if m], "error": ""}
-            last_error = f"{host} respondeu HTTP {resp.status_code}"
+            errors.append(f"{host} respondeu HTTP {resp.status_code}")
         except (httpx.HTTPError, ValueError) as exc:
-            last_error = f"{host}: {exc.__class__.__name__}: {exc}"
+            errors.append(f"{host}: {exc.__class__.__name__}: {exc}")
     return {"connected": False, "host": host_override or cfg.get("ollama_url") or DEFAULT_OLLAMA_HOST,
-            "models": [], "error": last_error}
+            "models": [], "error": " | ".join(errors) or "Nenhum host Ollama válido configurado."}
 
 
 def _pick_ollama_model(target: str, installed: list[str]) -> str:
@@ -393,6 +451,7 @@ def _call_ollama(cfg: dict[str, Any], system: str, prompt: str, temperature: flo
                 "options": {"temperature": temperature, "num_predict": min(MAX_OUTPUT_TOKENS, 512)},
             },
             timeout=httpx.Timeout(timeout_val, connect=15.0),
+            **_http_opts(info["host"]),
         )
         if resp.status_code != 200:
             return AIResult(False, "ollama", provider_label("ollama"), model=model, error=_http_error("ollama", resp),
@@ -557,7 +616,9 @@ async def alist_ollama_models(cfg: dict[str, Any], host_override: str | None = N
 def pull_ollama_model(host: str, model: str, timeout: float = 3600.0) -> tuple[bool, str]:
     """Executa o pull real do modelo no Ollama (bloqueante; chamar em background)."""
     try:
-        resp = httpx.post(f"{validate_http_url(host)}/api/pull", json={"model": model, "stream": False}, timeout=timeout)
+        host = validate_http_url(host)
+        resp = httpx.post(f"{host}/api/pull", json={"model": model, "stream": False}, timeout=timeout,
+                          **_http_opts(host))
         if resp.status_code == 200:
             return True, f"Modelo '{model}' baixado com sucesso."
         return False, f"Ollama respondeu HTTP {resp.status_code}: {resp.text[:300]}"

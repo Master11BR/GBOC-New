@@ -23,7 +23,9 @@ class StorageArrayIntegrationEngine:
     """
 
     def __init__(self):
-        self.config_dir = Path("C:/GBOC-Config") if sys.platform == "win32" else Path("./data/config")
+        # dentro da pasta do Agente (antes: C:\\GBOC-... criada a cada inicializacao) - core/gboc_paths.py
+        from core.gboc_paths import data_dir as _gboc_data_dir
+        self.config_dir = _gboc_data_dir("config", create=False)
         try:
             self.config_dir.mkdir(parents=True, exist_ok=True)
         except Exception:

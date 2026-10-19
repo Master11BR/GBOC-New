@@ -787,7 +787,8 @@ class DuplicatiNativeService:
             payload: Dict[str, Any] = {
                 "paths": paths,
                 "time": time_ver,
-                "restore-path": restore_path,
+                "restore-path": restore_path,      # Duplicati 2.0.x
+                "restore_path": restore_path,      # Duplicati 2.1+ (sem ele restaurava no LOCAL ORIGINAL)
                 "overwrite": overwrite,
             }
             if passphrase:
@@ -819,11 +820,18 @@ class DuplicatiNativeService:
             msg_raw = entry.get("Message", "")
             parsed_result = "Unknown"
             error_messages: List[str] = []
+            test_result = None
+            tested = 0
             try:
                 import json as _json
                 data = _json.loads(msg_raw)
                 parsed_result = data.get("ParsedResult", "Unknown")
                 error_messages = data.get("Errors", []) or []
+                # Teste de amostras que o Duplicati faz ao fim do backup (backup-test-samples)
+                tr = data.get("TestResults") or {}
+                if isinstance(tr, dict) and tr:
+                    test_result = tr.get("ParsedResult")
+                    tested = len(tr.get("Verifications") or [])
             except Exception:
                 pass
             return {
@@ -831,11 +839,25 @@ class DuplicatiNativeService:
                 "backup_id": backup_id,
                 "parsed_result": parsed_result,
                 "errors": error_messages,
+                "test_result": test_result,
+                "tested_volumes": tested,
                 "timestamp": entry.get("Timestamp"),
                 "raw_type": entry.get("Type"),
             }
         except Exception as e:
             return {"status": "error", "message": str(e)}
+
+    def find_backup_for_task(self, task_name: str) -> Optional[Dict[str, str]]:
+        """Backup do Duplicati Server que corresponde a uma tarefa do GBOC (mesma regra usada na execução)."""
+        task_name = str(task_name or '')
+        for item in self.list_backups().get("items", []):
+            b_obj = item.get("Backup", {}) if isinstance(item, dict) else {}
+            b_id = str(item.get("id") or b_obj.get("ID") or "")
+            b_name = str(item.get("name") or b_obj.get("Name") or "")
+            if b_id and (b_name == task_name or f"Nativo_Duplicati_{b_name}" == task_name or
+                         (b_name and b_name in task_name) or (b_id in task_name and "duplicati" in task_name.lower())):
+                return {"id": b_id, "name": b_name}
+        return None
 
     # ──────────────────────────────────────────────
     # Gerenciamento Completo de Backups (Create, Delete, Repair, Verify, Compact)
@@ -888,6 +910,74 @@ class DuplicatiNativeService:
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
+    # ──────────────────────────────────────────────
+    # Exportar / importar definições dos jobs (pacote de recuperação do GBOC)
+    # ──────────────────────────────────────────────
+
+    def is_configured(self) -> bool:
+        return os.path.exists(CONFIG_FILE)
+
+    def export_backup_config(self, backup_id: str) -> Dict[str, Any]:
+        """Definição completa do job COM as senhas (destino, passphrase), como o "Exportar" do Duplicati.
+        v2.1+: token de uso único (POST auth/issuetoken/export); versões antigas: GET direto."""
+        cfg = self.load_config()
+        token = None
+        try:
+            t = self._api_post(cfg, "api/v1/auth/issuetoken/export")
+            if t.status_code == 200:
+                token = (t.json() or {}).get("Token")
+        except Exception:
+            token = None
+        path = f"api/v1/backup/{backup_id}/export?export-passwords=true" + (f"&token={token}" if token else "")
+        r = self._api_get(cfg, path)
+        if r.status_code != 200:
+            raise RuntimeError(f"Duplicati não exportou o job {backup_id}: HTTP {r.status_code} {r.text[:200]}")
+        data = r.json()
+        if not isinstance(data, dict) or not isinstance(data.get("Backup"), dict):
+            raise RuntimeError(f"Exportação do job {backup_id} em formato inesperado")
+        return data
+
+    def export_all_backups(self) -> Dict[str, Any]:
+        """{"jobs": [exportação de cada job], "errors": [...]} — usado no pacote de recuperação."""
+        items = (self.list_backups() or {}).get("items") or []
+        jobs, errors = [], []
+        for it in items:
+            bid = str(it.get("id") or it.get("ID") or "")
+            if not bid:
+                continue
+            try:
+                jobs.append(self.export_backup_config(bid))
+            except Exception as e:
+                errors.append(f"{it.get('name') or bid}: {e}")
+        return {"jobs": jobs, "errors": errors}
+
+    def import_backup_config(self, exported: Dict[str, Any], repair: bool = True) -> Dict[str, Any]:
+        """Recria um job exportado (instalação nova do Duplicati). Job com o mesmo nome já existente é mantido.
+        repair=True: dispara o reparo, que reconstrói o banco local a partir dos arquivos do destino — sem ele o
+        próximo backup falha por arquivos remotos desconhecidos."""
+        cfg = self.load_config()
+        b = dict(exported.get("Backup") or {})
+        name = str(b.get("Name") or "").strip()
+        if not name:
+            return {"status": "error", "message": "Job sem nome"}
+        existing = {str(i.get("name") or "").strip().lower(): i for i in ((self.list_backups() or {}).get("items") or [])}
+        if name.lower() in existing:
+            return {"status": "skipped", "name": name, "message": "Job com o mesmo nome já existe no Duplicati"}
+        for k in ("ID", "DBPath", "Metadata", "ExternalID", "IsTemporary"):
+            b.pop(k, None)
+        sched = exported.get("Schedule")
+        if isinstance(sched, dict):
+            sched = {k: v for k, v in sched.items() if k not in ("ID", "LastRun", "Tags")}
+        r = self._api_post(cfg, "api/v1/backups", json_body={"Backup": b, "Schedule": sched})
+        if r.status_code not in (200, 201):
+            return {"status": "error", "name": name, "message": f"HTTP {r.status_code}: {r.text[:200]}"}
+        data = r.json() if r.content else {}
+        new_id = str(data.get("ID") or data.get("Id") or (data.get("Backup") or {}).get("ID") or "")
+        out = {"status": "created", "name": name, "id": new_id}
+        if repair and new_id:
+            out["repair"] = self.repair_backup(new_id).get("status")
+        return out
+
     def create_backup(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """
         Cria uma nova rotina de backup no Duplicati Server nativo e sincroniza com o GBOC.
@@ -897,7 +987,9 @@ class DuplicatiNativeService:
 
         name = payload.get("name") or "Backup_GBOC"
         desc = payload.get("description") or ""
-        target_url = str(payload.get("target_url") or "file://C:\\GBOC-Backups").strip()
+        # destino padrao dentro da pasta do Agente (antes: C:\\GBOC-Backups)
+        from core.gboc_paths import REPOSITORIES_DIR as _gboc_repos
+        target_url = str(payload.get("target_url") or f"file://{_gboc_repos / 'duplicati'}").strip()
         if not ("://" in target_url):
             target_url = f"file://{target_url}"
 

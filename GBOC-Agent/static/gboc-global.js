@@ -45,7 +45,6 @@ async function handleLogout() {
         localStorage.removeItem('gboc_server_token');
         localStorage.removeItem('gboc_user');
         document.cookie = 'gboc_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-        document.cookie = 'gboc_server_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
         console.log('🔄 Redirecionando para login...');
         window.location.href = '/login.html';
     } else {

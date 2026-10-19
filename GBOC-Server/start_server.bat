@@ -6,6 +6,9 @@
 
 @echo off
 setlocal enabledelayedexpansion
+REM "/service": execucao sem console (servico/tarefa agendada) - nao espera tecla
+set "GBOC_PAUSE=pause"
+if /i "%~1"=="/service" set "GBOC_PAUSE=rem"
 CLS
 REM ========================================
 REM GBOC Server v14.8.1 - Inicializacao
@@ -20,38 +23,34 @@ echo   GBOC Server v14.8.1 - Iniciando...
 echo ========================================
 echo.
 
-REM Detectar comando Python
-set PYTHON_CMD=
-
-REM Preferir Python 3.14 explicitamente
-py -3.14 --version >nul 2>&1
-if %errorlevel% equ 0 (
-    set PYTHON_CMD=py -3.14
+REM Detectar Python: o mais novo instalado que ja tenha as dependencias do GBOC (scripts\gboc_python.ps1).
+REM Nao fixa versao nem caminho: atualizar o Python (ex.: 3.14 -> 3.15, outra pasta) nao impede a inicializacao;
+REM se a versao nova ainda nao tiver as dependencias, elas sao instaladas nela ou o sistema segue na anterior.
+set "PYTHON_CMD="
+set "PYEXE="
+for /f "usebackq delims=" %%P in (`powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\gboc_python.ps1" -Root "%~dp0." -Component server`) do set "PYEXE=%%P"
+if defined PYEXE (
+    set PYTHON_CMD="!PYEXE!"
     goto :python_found
 )
 
-python --version >nul 2>&1
-if %errorlevel% equ 0 (
+echo [AVISO] Selecao automatica do Python indisponivel. Tentando o Python padrao do sistema...
+py -3 -c "import fastapi" >nul 2>&1
+if !errorlevel! equ 0 (
+    set PYTHON_CMD=py -3
+    goto :python_found
+)
+python -c "import fastapi" >nul 2>&1
+if !errorlevel! equ 0 (
     set PYTHON_CMD=python
     goto :python_found
 )
 
-py --version >nul 2>&1
-if %errorlevel% equ 0 (
-    set PYTHON_CMD=py
-    goto :python_found
-)
-
-python3 --version >nul 2>&1
-if %errorlevel% equ 0 (
-    set PYTHON_CMD=python3
-    goto :python_found
-)
-
-echo [ERRO] Python nao encontrado!
-echo Execute install_server.bat primeiro.
+echo [ERRO] Nenhum Python com as dependencias do GBOC foi encontrado.
+echo Execute install_server.bat ou: python -m pip install -r requirements.txt
+echo Detalhes em: logs\python_runtime.log
 echo.
-pause
+%GBOC_PAUSE%
 exit /b 1
 
 :python_found
@@ -62,7 +61,7 @@ if errorlevel 1 (
     echo [ERRO] Dependencias nao instaladas!
     echo Execute install_server.bat primeiro.
     echo.
-    pause
+    %GBOC_PAUSE%
     exit /b 1
 )
 
@@ -78,10 +77,8 @@ echo PostgreSQL nao esta rodando. Tentando iniciar...
 
 REM 1. Detectar servicos Windows PostgreSQL existentes (prioridade)
 set PG_SERVICE=
-for %%S in (postgresql-x64-18 postgresql-x64-17 postgresql-x64-16 postgresql-x64-15) do (
-    sc query "%%S" >nul 2>&1
-    if !errorlevel! equ 0 set PG_SERVICE=%%S
-)
+REM Qualquer versao instalada (postgresql-x64-NN, postgresql-gboc...): nao depende de lista fixa de versoes
+for /f "tokens=2 delims=: " %%S in ('sc query state^= all ^| findstr /i /r /c:"SERVICE_NAME: *postgres"') do set "PG_SERVICE=%%S"
 
 if defined PG_SERVICE (
     echo Servico PostgreSQL detectado: %PG_SERVICE%
@@ -115,7 +112,7 @@ if exist "C:\GBOC\Tools\PostgreSQL\pgsql\bin\pg_ctl.exe" (
 echo.
 echo [ERRO] PostgreSQL nao disponivel em localhost:5432
 echo.
-pause
+%GBOC_PAUSE%
 exit /b 1
 
 :pg_ready
@@ -132,7 +129,7 @@ if errorlevel 1 (
     echo [ERRO] Erro de sintaxe detectado em server_gboc.py
     %PYTHON_CMD% -m py_compile server_gboc.py
     echo.
-    pause
+    %GBOC_PAUSE%
     exit /b 1
 )
 
@@ -151,8 +148,10 @@ echo.
 
 REM Iniciar o servidor (PYTHONIOENCODING=utf-8 evita crash do Hypercorn com caracteres Unicode no Windows)
 set PYTHONIOENCODING=utf-8
+REM Python 3.15+ usa UTF-8 por padrao; a saida dos comandos do Windows e cp850/cp1252 (mantem o comportamento anterior)
+if not defined PYTHONUTF8 set PYTHONUTF8=0
 %PYTHON_CMD% -u server_gboc.py
 
 echo.
 echo Servidor encerrado.
-pause
+%GBOC_PAUSE%

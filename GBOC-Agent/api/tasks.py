@@ -326,6 +326,99 @@ def get_running_tasks_detailed() -> Dict[str, Any]:
         logger.error(f"❌ Running detailed: {e}", exc_info=True)
         return {"status": "success", "executions": [], "count": 0}
 
+def _live_row(ex: Dict[str, Any]) -> Dict[str, Any]:
+    """Progresso de uma execução em andamento com velocidade, % e tempo restante calculados."""
+    from datetime import timezone as _tz
+    started, completed = ex.get("started_at"), ex.get("completed_at")
+    finished = ex.get("status") not in ("running", "preparing")
+    elapsed = 0.0
+    if hasattr(started, "isoformat"):
+        now = datetime.now(_tz.utc) if getattr(started, "tzinfo", None) else datetime.now()
+        end = completed if (finished and hasattr(completed, "isoformat")
+                            and bool(getattr(completed, "tzinfo", None)) == bool(getattr(started, "tzinfo", None))) else now
+        elapsed = max(0.0, (end - started).total_seconds())
+        ex["started_at"] = started.isoformat()
+    ex["finished"] = finished
+    if hasattr(completed, "isoformat"):
+        now_c = datetime.now(_tz.utc) if getattr(completed, "tzinfo", None) else datetime.now()
+        ex["finished_seconds_ago"] = max(0, int((now_c - completed).total_seconds()))
+        ex["completed_at"] = completed.isoformat()
+    fp, ft = int(ex.get("files_processed") or 0), int(ex.get("files_total") or 0)
+    bp, bt = int(ex.get("bytes_processed") or 0), int(ex.get("bytes_total") or 0)
+    if bt > 0:
+        percent = min(100.0, bp * 100.0 / bt)
+    elif ft > 0:
+        percent = min(100.0, fp * 100.0 / ft)
+    else:
+        percent = None                                   # total ainda desconhecido (contando / motor sem progresso)
+    bps = bp / elapsed if elapsed >= 1 else 0.0
+    fps = fp / elapsed if elapsed >= 1 else 0.0
+    eta = None
+    if finished:
+        pass                                             # concluído: sem tempo restante
+    elif bt > bp and bps > 0:
+        eta = int((bt - bp) / bps)
+    elif ft > fp and fps > 0 and not bt:
+        eta = int((ft - fp) / fps)
+    ex.update({
+        "elapsed_seconds": int(elapsed), "percent": None if percent is None else round(percent, 1),
+        "bytes_per_sec": round(bps, 1), "files_per_sec": round(fps, 2), "eta_seconds": eta,
+        "files_processed": fp, "files_total": ft, "bytes_processed": bp, "bytes_total": bt,
+        "files_new": int(ex.get("files_new") or 0), "files_unmodified": int(ex.get("files_unmodified") or 0),
+        "bytes_added": int(ex.get("bytes_added") or 0),
+    })
+    return ex
+
+
+@router.get("/running/live")
+def get_running_tasks_live() -> Dict[str, Any]:
+    """Backups em andamento para a barra de progresso ao vivo da tela de tarefas, mais os que terminaram
+    há no máximo 5 minutos (resultado final; depois somem). Lê do banco (o monitor grava lá), então inclui
+    backups disparados pelo processo do agendador."""
+    try:
+        from shared_core import get_shared_core
+        core = get_shared_core()
+        base = """
+            SELECT te.id AS execution_id, te.task_id, te.status, te.started_at, te.completed_at, te.error_message,
+                   te.files_processed, te.bytes_processed, te.current_file, te.progress{extra},
+                   t.name AS task_name, {engine} AS engine, r.name AS repository_name
+            FROM task_executions te
+            LEFT JOIN tasks t ON te.task_id = t.id
+            LEFT JOIN repositories r ON t.repository_id = r.id
+            WHERE te.status IN ('running', 'preparing')
+               OR (te.completed_at IS NOT NULL AND te.completed_at >= NOW() - INTERVAL '5 minutes')
+            ORDER BY te.started_at
+        """
+        extra = (", te.files_total, te.bytes_total, te.files_new, te.files_unmodified, te.bytes_added")
+        rows, cols = [], []
+        for ex_cols, eng in ((extra, "COALESCE(r.engine, t.engine)"), ("", "COALESCE(r.engine, t.engine)"), ("", "t.engine")):
+            try:
+                with core.get_db_connection() as conn:
+                    cur = conn.cursor()
+                    cur.execute(base.format(extra=ex_cols, engine=eng))
+                    rows = cur.fetchall()
+                    cols = [d[0] for d in cur.description]
+                break
+            except Exception as e:                       # banco antigo sem alguma coluna: consulta mais simples
+                logger.debug(f"running/live: {e}")
+        items = [_live_row(dict(zip(cols, r))) for r in rows]
+        running_tasks = {i["task_id"] for i in items if not i["finished"]}
+        # concluído só aparece se a mesma tarefa não estiver rodando de novo; um por tarefa (o mais recente)
+        seen, out = set(), []
+        for i in sorted(items, key=lambda x: (x["finished"], -(x.get("execution_id") or 0))):
+            if i["finished"]:
+                if i["task_id"] in running_tasks or i["task_id"] in seen or (i.get("finished_seconds_ago") or 0) > 300:
+                    continue
+                seen.add(i["task_id"])
+            out.append(i)
+        out.sort(key=lambda x: (x["finished"], x.get("started_at") or ""))
+        return {"status": "success", "executions": out, "count": len(out),
+                "running": sum(1 for i in out if not i["finished"])}
+    except Exception as e:
+        logger.error(f"❌ Running live: {e}", exc_info=True)
+        return {"status": "error", "executions": [], "count": 0, "message": str(e)}
+
+
 @router.get("/{task_id}")
 def get_task(task_id: int) -> Dict[str, Any]:
     """Obtém tarefa por ID"""

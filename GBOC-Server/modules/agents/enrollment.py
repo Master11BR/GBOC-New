@@ -140,10 +140,13 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
 $Server = '{server_url}'
 $Token = '{token}'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-{tls}$seedDir = 'C:\\ProgramData\\GBOC'
-New-Item -ItemType Directory -Force -Path $seedDir | Out-Null
-$svc = Get-Service -Name 'GBOCAgent' -ErrorAction SilentlyContinue
+{tls}$svc = Get-Service -Name 'GBOCAgent' -ErrorAction SilentlyContinue
 if ($svc) {{
+    # Semente dentro da pasta do Agente instalado (data\\central); C:\\ProgramData\\GBOC so se nao achar a pasta
+    $seedDir = 'C:\\ProgramData\\GBOC'
+    try {{ $appDir = (Get-ItemProperty 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\GBOCAgent\\Parameters' -ErrorAction Stop).AppDirectory }} catch {{ $appDir = $null }}
+    if ($appDir -and (Test-Path $appDir)) {{ $seedDir = Join-Path $appDir 'data\\central' }}
+    New-Item -ItemType Directory -Force -Path $seedDir | Out-Null
     # Agente já instalado: apenas inscreve neste Server (o serviço processa o enroll.json ao reiniciar)
     @{{ server_url = $Server; install_token = $Token }} | ConvertTo-Json | Set-Content -Path "$seedDir\\enroll.json" -Encoding UTF8
     Restart-Service 'GBOCAgent'

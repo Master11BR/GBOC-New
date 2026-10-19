@@ -28,30 +28,19 @@ if exist "C:\GBOC\Tools\PostgreSQL\pgsql\bin\psql.exe" (
 	goto :found
 )
 
-REM 2. PostgreSQL padrão (18 a 15)
-if exist "C:\Program Files\PostgreSQL\18\bin\psql.exe" (
-	set PSQL=C:\Program Files\PostgreSQL\18\bin\psql.exe
-	echo [OK] PostgreSQL encontrado: C:\Program Files\PostgreSQL\18\bin
-	goto :found
-)
-
-if exist "C:\Program Files\PostgreSQL\17\bin\psql.exe" (
-	set PSQL=C:\Program Files\PostgreSQL\17\bin\psql.exe
-	echo [OK] PostgreSQL encontrado: C:\Program Files\PostgreSQL\17\bin
-	goto :found
-)
-
-if exist "C:\Program Files\PostgreSQL\16\bin\psql.exe" (
-	set PSQL=C:\Program Files\PostgreSQL\16\bin\psql.exe
-	echo [OK] PostgreSQL encontrado: C:\Program Files\PostgreSQL\16\bin
-	goto :found
-)
-
-if exist "C:\Program Files\PostgreSQL\15\bin\psql.exe" (
-	set PSQL=C:\Program Files\PostgreSQL\15\bin\psql.exe
-	echo [OK] PostgreSQL encontrado: C:\Program Files\PostgreSQL\15\bin
-	goto :found
-)
+REM 2. PostgreSQL instalado (qualquer versao: servico, Program Files ou portatil) - a mais nova
+set "PG_BIN="
+set "GBOC_OUT=%TEMP%\gboc_pg_bin.txt"
+del "%GBOC_OUT%" >nul 2>&1
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\gboc_prereqs.ps1" -Postgres -OutFile "%GBOC_OUT%" >nul 2>&1
+if exist "%GBOC_OUT%" set /p PG_BIN=<"%GBOC_OUT%"
+if defined PG_BIN if exist "%PG_BIN%\psql.exe" goto :pg_generic_ok
+goto :pg_generic_next
+:pg_generic_ok
+set "PSQL=%PG_BIN%\psql.exe"
+echo [OK] PostgreSQL encontrado: %PG_BIN%
+goto :found
+:pg_generic_next
 
 REM 3. No PATH
 where psql >nul 2>&1

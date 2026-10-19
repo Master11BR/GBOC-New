@@ -26,7 +26,7 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Dict, Iterable, List, Optional, Set
+from typing import Any, Callable, Dict, Iterable, List, Optional, Set
 
 logger = logging.getLogger("gboc.retention")
 
@@ -130,6 +130,21 @@ def _norm(f: str) -> str:
     return str(f).replace("\\", "/")
 
 
+RETENTION_WORKERS = 8      # leituras/exclusões simultâneas na nuvem (cada uma espera ~100-200 ms de latência)
+
+
+def _parallel_map(engine, fn: Callable, items: List[Any]) -> List[Any]:
+    """Executa fn em paralelo quando o backend é seguro para várias threads (S3/Wasabi via boto3 e disco
+    local); nos demais (Libcloud) continua um por vez, como antes."""
+    be = engine.backend
+    safe = hasattr(be, "_c") or type(be).__name__ == "LocalStorageBackend"
+    if not safe or len(items) < 2:
+        return [fn(i) for i in items]
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=RETENTION_WORKERS, thread_name_prefix="gboc-retention") as pool:
+        return list(pool.map(fn, items))
+
+
 def prune_native(engine, pol: Dict[str, int], source_paths: List[str]) -> Dict[str, Any]:
     """Remove snapshots do motor nativo desta tarefa (mesmos caminhos) fora da política.
 
@@ -152,17 +167,26 @@ def prune_native(engine, pol: Dict[str, int], source_paths: List[str]) -> Dict[s
 
     manifests: Dict[str, Dict[str, Any]] = {}     # todos os snapshots do repositório (inclusive só-cadeia)
     listed: Set[str] = set()                       # snapshots com manifest.json (restauráveis)
+    wanted = []
     for sid, files in by_snap.items():
         names = {f.split("/", 1)[1] for f in files}
         if "manifest.json" in names:
-            m = engine._load_manifest(sid)
-            if m:
-                manifests[sid] = m
-                listed.add(sid)
+            wanted.append((sid, True))
         elif CHAIN_MANIFEST in names:
-            m = _load_chain_manifest(engine, sid)
-            if m:
-                manifests[sid] = m
+            wanted.append((sid, False))
+    # Manifestos baixados em paralelo (antes: um por vez — centenas de snapshots levavam minutos na nuvem)
+    loaded = _parallel_map(engine, lambda it: engine._load_manifest(it[0]) if it[1] else _load_chain_manifest(engine, it[0]),
+                           wanted)
+    # Manifesto listado mas ilegível (rede, corrompido): os blocos dele não podem ser tratados como sem uso
+    unreadable = [sid for (sid, _l), m in zip(wanted, loaded) if not m]
+    if unreadable:
+        logger.warning(f"[RETENÇÃO] {len(unreadable)} manifesto(s) ilegível(is) ({', '.join(unreadable[:3])}): "
+                       "limpeza de blocos e pacotes adiada")
+    for (sid, is_listed), m in zip(wanted, loaded):
+        if m:
+            manifests[sid] = m
+            if is_listed:
+                listed.add(sid)
 
     times: Dict[str, datetime] = {}
     for sid in listed:
@@ -200,25 +224,35 @@ def prune_native(engine, pol: Dict[str, int], source_paths: List[str]) -> Dict[s
 
     chain_only = {sid for sid in manifests if sid not in listed}
     pruned, blocked, kept_for_chain, freed = 0, 0, 0, 0
-    for sid in sorted(remove | chain_only):
-        if sid in need_manifests and sid in remove:
-            if not _write_chain_manifest(engine, sid, manifests[sid]):
-                blocked += 1
-                continue
-        ok = True
+    targets = sorted(remove | chain_only)
+    # 1º o manifesto de cadeia dos removidos que ainda servem de cadeia (antes de apagar o manifest.json deles)
+    chain_sids = [sid for sid in targets if sid in need_manifests and sid in remove]
+    written = dict(zip(chain_sids, _parallel_map(engine, lambda sid: _write_chain_manifest(engine, sid, manifests[sid]),
+                                                 chain_sids)))
+    failed_chain = {sid for sid, ok in written.items() if not ok}
+    blocked += len(failed_chain)
+    # 2º as exclusões, em paralelo
+    to_delete = []
+    for sid in targets:
+        if sid in failed_chain:
+            continue
         for f in by_snap.get(sid, []):
             name = f.split("/", 1)[1]
             if f in need_files or (sid in need_manifests and name == CHAIN_MANIFEST):
                 continue
             if sid in need_manifests and name == "manifest.json" and sid not in remove:
                 continue
-            r = engine.backend.delete_file(f)
-            if isinstance(r, dict) and not r.get("success", True):
-                ok = False
-            else:
-                freed += 1
-        if sid in remove:
-            if ok:
+            to_delete.append((sid, f))
+    results = _parallel_map(engine, lambda it: engine.backend.delete_file(it[1]), to_delete)
+    failed_sids = set()
+    for (sid, _f), r in zip(to_delete, results):
+        if isinstance(r, dict) and not r.get("success", True):
+            failed_sids.add(sid)
+        else:
+            freed += 1
+    for sid in targets:
+        if sid in remove and sid not in failed_chain:
+            if sid not in failed_sids:
                 pruned += 1
                 kept_for_chain += 1 if sid in need_manifests else 0
             else:
@@ -226,7 +260,7 @@ def prune_native(engine, pol: Dict[str, int], source_paths: List[str]) -> Dict[s
     # Formato 4: blocos deduplicados em objects/ — apaga os que nenhum snapshot restante usa
     objs_deleted = objs_blocked = 0
     obj_files = by_snap.get("objects", [])
-    if obj_files and (pruned or chain_only):
+    if obj_files and (pruned or chain_only) and not unreadable:
         from native_engine.store_v4 import referenced_objects
         remaining = [manifests[s] for s in roots if s in manifests] + \
                     [manifests[s] for s in need_manifests if s in manifests and s not in roots]
@@ -239,41 +273,29 @@ def prune_native(engine, pol: Dict[str, int], source_paths: List[str]) -> Dict[s
                 objs_blocked += 1
             else:
                 objs_deleted += 1
+    # Pacotes (blocos pequenos agrupados): apaga os que não têm nenhum bloco em uso
+    packs = {"packs_deleted": 0, "packs_blocked": 0}
+    if by_snap.get("index") and (pruned or chain_only) and not unreadable:
+        from native_engine.store_v4 import prune_packs, referenced_objects
+        remaining = [manifests[s] for s in roots if s in manifests] + \
+                    [manifests[s] for s in need_manifests if s in manifests and s not in roots]
+        packs = prune_packs(engine.backend, referenced_objects(remaining))
     return {"pruned": pruned, "kept": len(keep), "blocked": blocked, "chain_kept": kept_for_chain,
-            "files_deleted": freed, "objects_deleted": objs_deleted, "objects_blocked": objs_blocked}
+            "files_deleted": freed, "objects_deleted": objs_deleted, "objects_blocked": objs_blocked, **packs}
 
 
 def _load_chain_manifest(engine, sid: str) -> Optional[Dict[str, Any]]:
-    import os
-    import shutil
-    import tempfile
-    tmp = tempfile.mkdtemp(prefix="gboc_chain_")
     try:
-        local = os.path.join(tmp, CHAIN_MANIFEST)
-        dl = engine.backend.download_file(f"{sid}/{CHAIN_MANIFEST}", local)
-        if not dl.get("success", False):
-            return None
-        with open(local, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except (OSError, ValueError):
+        return engine.read_doc(f"{sid}/{CHAIN_MANIFEST}")       # criptografado ou não (native_engine/crypto.py)
+    except (OSError, ValueError, RuntimeError) as e:
+        logger.warning(f"[RETENÇÃO] manifesto de cadeia {sid} ilegível: {e}")
         return None
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)
 
 
 def _write_chain_manifest(engine, sid: str, manifest: Dict[str, Any]) -> bool:
-    import os
-    import shutil
-    import tempfile
-    tmp = tempfile.mkdtemp(prefix="gboc_chain_")
     try:
-        local = os.path.join(tmp, CHAIN_MANIFEST)
-        with open(local, "w", encoding="utf-8") as f:
-            json.dump(dict(manifest, retained_for_chain=True), f)
-        r = engine.backend.upload_file(local, f"{sid}/{CHAIN_MANIFEST}")
+        r = engine.write_doc(f"{sid}/{CHAIN_MANIFEST}", dict(manifest, retained_for_chain=True))
         return bool(r.get("success", False))
-    except OSError as e:
+    except (OSError, RuntimeError) as e:
         logger.warning(f"[RETENÇÃO] manifesto de cadeia {sid}: {e}")
         return False
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)

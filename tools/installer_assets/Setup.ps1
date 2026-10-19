@@ -32,7 +32,11 @@ param (
 
     [Parameter(Mandatory = $false)]
     [ValidateSet("postgresql", "sqlite")]
-    [string]$DatabaseEngine = "postgresql"
+    [string]$DatabaseEngine = "postgresql",
+
+    # Senha do superusuario "postgres" se o PostgreSQL precisar ser instalado (vazio = pergunta / padrao do GBOC)
+    [Parameter(Mandatory = $false)]
+    [string]$PostgresPassword = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -89,6 +93,18 @@ if (-not (Test-Path "$PackageRoot\package_manifest.json")) {
     $PackageRoot = (Get-Item $PSScriptRoot).FullName
 }
 
+# Pre-requisitos sempre na ULTIMA versao estavel (Python, restic, Kopia, Duplicati), descoberta na hora
+$prereqs = @("$PackageRoot\gboc_prereqs.ps1", "$PackageRoot\Agent\scripts\gboc_prereqs.ps1", "$PackageRoot\Server\scripts\gboc_prereqs.ps1") |
+    Where-Object { Test-Path $_ } | Select-Object -First 1
+if (-not $prereqs) {
+    Write-Host "    [ERRO] gboc_prereqs.ps1 nao encontrado no pacote." -ForegroundColor Red
+    exit 1
+}
+. $prereqs
+# Pacote completo (pasta Prereqs\): programas instalados do pacote; o que a maquina ja tem e mantido
+$GbocPackage = Set-GbocPackageDir $PackageRoot
+$WasInteractive = ($InstallMode -eq "Interactive")
+
 # Deteccao do Python
 function Get-PythonExecutable {
     $pythonCandidates = @("python.exe", "py.exe", "python3.exe", "C:\Python311\python.exe", "C:\Python312\python.exe", "C:\Python313\python.exe", "C:\Python314\python.exe")
@@ -142,6 +158,11 @@ function Show-InteractiveMenu {
     Write-Host "          GBOC SYSTEM v14.8.1 - INSTALADOR FULL STABLE           " -ForegroundColor Cyan
     Write-Host "          Servidor Central, Agente e Motores de Backup           " -ForegroundColor Cyan
     Write-Host "=================================================================" -ForegroundColor Cyan
+    if ($GbocPackage) {
+        Write-Host "  Pacote COMPLETO: programas incluidos (instala sem internet)" -ForegroundColor Green
+    } else {
+        Write-Host "  Pacote SO CODIGO: os programas que faltarem serao baixados da internet" -ForegroundColor Yellow
+    }
     Write-Host ""
     Write-Host "Selecione o modo de instalacao desejado:" -ForegroundColor White
     Write-Host ""
@@ -193,6 +214,17 @@ if ($InstallMode -eq "Interactive") {
 
 Write-Header "INICIANDO INSTALACAO: MODO [$InstallMode] | BANCO [$DatabaseEngine] EM [$TargetDir]"
 
+# Resumo: o que a maquina ja tem, o que veio no pacote e o que sera feito com cada programa
+$needPg = ($DatabaseEngine -eq "postgresql") -and ($InstallMode -in @("Agent", "Server", "Both"))
+Write-Step "Programas nesta maquina x pacote$(if (-not $GbocPackage) { ' (pacote so com codigo)' })..."
+$statusRows = Get-GbocPrereqStatus -ToolsDir (Join-Path $TargetDir "Tools") -NoPostgres:(-not $needPg)
+if ($InstallMode -eq "Server" -or $SkipEngines) { $statusRows = @($statusRows | Where-Object { $_.Programa -in @("Python", "PostgreSQL") }) }
+$statusRows | Format-Table @{ L = "Programa"; E = { $_.Programa } }, @{ L = "Nesta maquina"; E = { $_.Maquina } },
+    @{ L = "No pacote"; E = { $_.Pacote } }, @{ L = "Acao"; E = { $_.Acao } } -AutoSize | Out-Host
+if ($WasInteractive) {
+    Read-Host "Pressione ENTER para continuar (CTRL+C cancela)" | Out-Null
+}
+
 # 1. Criacao das Pastas Base
 Write-Step "Criando estrutura de diretorios em $TargetDir..."
 $ServerDir = Join-Path $TargetDir "Server"
@@ -238,26 +270,59 @@ if ($InstallMode -in @("Server", "Both")) {
 }
 Write-Success "Configuracao de banco ($DatabaseEngine) gravada com sucesso!"
 
-# 2. Localizar ou Instalar Python
-Write-Step "Verificando interpretador Python..."
-$pythonExe = Get-PythonExecutable
-
-if (-not $pythonExe) {
-    Write-Warning "Python 3 nao encontrado no PATH do sistema."
-    Write-Step "Baixando instalador do Python 3.11.9 64-bit..."
-    $pythonInstallerUrl = "https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe"
-    $tempPythonInstaller = Join-Path $env:TEMP "python-3.11.9-amd64.exe"
-    
-    if (Download-FileWithRetry -Url $pythonInstallerUrl -DestinationPath $tempPythonInstaller) {
-        Write-Step "Instalando Python 3.11.9 silenciosamente..."
-        Start-Process -FilePath $tempPythonInstaller -ArgumentList "/quiet InstallAllUsers=1 PrependPath=1 Include_test=0" -Wait
-        $pythonExe = Get-PythonExecutable
+# PostgreSQL: ja instalado -> mantido; senao do pacote (ou da internet). O Agente/Servidor criam o proprio banco.
+if ($needPg) {
+    Write-Step "Verificando PostgreSQL..."
+    $pgBin = Find-GbocPostgresBin -ToolsDir $ToolsDir
+    if ($pgBin) {
+        Write-Success "PostgreSQL ja instalado: $pgBin (mantido)"
+    } else {
+        $GbocDefaultPgPassword = "Stoms2025+"         # padrao do Agente/Servidor (POSTGRES_PASSWORD nao definido)
+        $pgPass = $PostgresPassword
+        if (-not $pgPass -and $WasInteractive) {
+            Write-Host "    O PostgreSQL sera instalado. Senha do superusuario 'postgres':" -ForegroundColor White
+            Write-Host "    (ENTER = senha padrao do GBOC; outra senha fica na variavel de ambiente POSTGRES_PASSWORD da maquina)" -ForegroundColor Gray
+            for ($try = 1; $try -le 3; $try++) {
+                $s1 = Read-Host "    Senha" -AsSecureString
+                $p1 = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($s1))
+                if (-not $p1) { break }
+                $s2 = Read-Host "    Confirme a senha" -AsSecureString
+                $p2 = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($s2))
+                if ($p1 -eq $p2) { $pgPass = $p1; break }
+                Write-Warning "As senhas nao conferem."
+            }
+        }
+        if (-not $pgPass) { $pgPass = $GbocDefaultPgPassword }
+        $pgBin = Install-GbocPostgres -ToolsDir $ToolsDir -Password $pgPass
+        if ($pgBin) {
+            Write-Success "PostgreSQL pronto: $pgBin"
+            if ($pgPass -ne $GbocDefaultPgPassword) {
+                [Environment]::SetEnvironmentVariable("POSTGRES_PASSWORD", $pgPass, "Machine")
+                $env:POSTGRES_PASSWORD = $pgPass
+                Write-Success "Senha gravada em POSTGRES_PASSWORD (variavel de ambiente da maquina) para o Agente e o Servidor"
+            }
+        } else {
+            Write-Warning "PostgreSQL nao instalado. Instale-o e execute o instalador novamente (ou use SQLite)."
+        }
+        $pgPass = $null
     }
 }
 
+# 2. Python: ultima versao estavel do python.org (reaproveita a instalada se ja for a mais nova).
+#    Se as dependencias do GBOC ainda nao instalarem na versao mais nova, usa a anterior.
+Write-Step "Verificando interpretador Python (ultima versao estavel)..."
+if ($InstallMode -eq "Server") {
+    $reqForPython = Join-Path $PackageRoot "Dependencies\requirements-server.txt"
+} elseif ($InstallMode -eq "Agent") {
+    $reqForPython = Join-Path $PackageRoot "Dependencies\requirements-agent.txt"
+} else {
+    $reqForPython = Join-Path $PackageRoot "Dependencies\requirements-all.txt"
+}
+$pythonExe = Install-GbocPython -Requirements $reqForPython
+
 if (-not $pythonExe) {
     Write-Fail "Nao foi possivel localizar ou instalar o Python 3 automaticamente."
-    Write-Warning "Por favor, instale o Python 3.11+ manualmente com a opcao 'Add Python to PATH' e tente novamente."
+    Write-Warning "Instale o Python mais recente (python.org) e execute o instalador novamente."
     exit 1
 }
 
@@ -280,10 +345,6 @@ if (-not (Test-Path $VenvPython)) {
     Write-Success "Ambiente virtual existente reutilizado."
 }
 
-# Atualizar pip
-Write-Step "Atualizando pip no ambiente virtual..."
-& $VenvPython -m pip install --upgrade pip --quiet
-
 # 4. Instalando Dependencias Python
 Write-Step "Instalando dependencias necessarias..."
 $reqFileToInstall = $null
@@ -298,8 +359,8 @@ if ($InstallMode -eq "Server") {
 
 if ($reqFileToInstall -and (Test-Path $reqFileToInstall)) {
     Write-Host "    Instalando a partir de: $reqFileToInstall" -ForegroundColor Gray
-    & $VenvPip install -r $reqFileToInstall
-    if ($LASTEXITCODE -ne 0) {
+    # Bibliotecas do pacote primeiro (sem internet); o que faltar vem da internet
+    if (-not (Install-GbocPipRequirements $VenvPython $reqFileToInstall -UpgradePip)) {
         Write-Warning "Alguns pacotes secundarios podem ter falhado. Garantindo componentes criticos..."
         & $VenvPip install fastapi uvicorn pydantic sqlalchemy psutil requests httpx websockets cryptography
     }
@@ -334,53 +395,17 @@ if ($InstallMode -in @("Agent", "Both")) {
 
 # 6. Configuracao dos Motores de Backup (Restic & Kopia para Agent)
 if ($InstallMode -in @("Agent", "Both", "DependenciesOnly") -and (-not $SkipEngines)) {
-    Write-Step "Configurando motores de backup (Restic / Kopia)..."
+    Write-Step "Configurando motores de backup (Restic / Kopia / Duplicati, ultima versao)..."
     $ResticDir = Join-Path $ToolsDir "Restic"
     $KopiaDir = Join-Path $ToolsDir "Kopia"
     
     if (-not (Test-Path $ResticDir)) { New-Item -ItemType Directory -Path $ResticDir -Force | Out-Null }
     if (-not (Test-Path $KopiaDir)) { New-Item -ItemType Directory -Path $KopiaDir -Force | Out-Null }
 
-    # Restic
-    $resticExe = Join-Path $ResticDir "restic.exe"
-    if (-not (Test-Path $resticExe)) {
-        Write-Host "    Baixando Restic 0.17.3 x64..." -ForegroundColor Gray
-        $resticZip = Join-Path $env:TEMP "restic.zip"
-        $resticUrl = "https://github.com/restic/restic/releases/download/v0.17.3/restic_0.17.3_windows_amd64.zip"
-        if (Download-FileWithRetry -Url $resticUrl -DestinationPath $resticZip) {
-            $extractTemp = Join-Path $env:TEMP "restic_extracted"
-            Expand-Archive -Path $resticZip -DestinationPath $extractTemp -Force
-            $foundRestic = Get-ChildItem -Path $extractTemp -Filter "restic*.exe" -Recurse | Select-Object -First 1
-            if ($foundRestic) {
-                Copy-Item -Path $foundRestic.FullName -Destination $resticExe -Force
-                Write-Success "Restic instalado em $resticExe"
-            }
-            Remove-Item -Path $extractTemp -Recurse -Force -ErrorAction SilentlyContinue
-            Remove-Item -Path $resticZip -Force -ErrorAction SilentlyContinue
-        }
-    } else {
-        Write-Success "Restic ja instalado em $resticExe"
-    }
-
-    # Kopia
-    $kopiaExe = Join-Path $KopiaDir "kopia.exe"
-    if (-not (Test-Path $kopiaExe)) {
-        Write-Host "    Baixando Kopia 0.18.2 x64..." -ForegroundColor Gray
-        $kopiaZip = Join-Path $env:TEMP "kopia.zip"
-        $kopiaUrl = "https://github.com/kopia/kopia/releases/download/v0.18.2/kopia-0.18.2-windows-x64.zip"
-        if (Download-FileWithRetry -Url $kopiaUrl -DestinationPath $kopiaZip) {
-            $extractTemp = Join-Path $env:TEMP "kopia_extracted"
-            Expand-Archive -Path $extractTemp -DestinationPath $extractTemp -Force
-            $foundKopia = Get-ChildItem -Path $extractTemp -Filter "kopia.exe" -Recurse | Select-Object -First 1
-            if ($foundKopia) {
-                Copy-Item -Path $foundKopia.FullName -Destination $kopiaExe -Force
-                Write-Success "Kopia instalado em $kopiaExe"
-            }
-            Remove-Item -Path $extractTemp -Recurse -Force -ErrorAction SilentlyContinue
-            Remove-Item -Path $kopiaZip -Force -ErrorAction SilentlyContinue
-        }
-    } else {
-        Write-Success "Kopia ja instalado em $kopiaExe"
+    # Ultima release do GitHub; versao instalada mais antiga e atualizada (inclui o Duplicati)
+    $engines = Install-GbocEngines -ToolsDir $ToolsDir
+    foreach ($k in @("restic", "kopia", "duplicati")) {
+        if ($engines[$k]) { Write-Success "${k}: $($engines[$k])" } else { Write-Warning "$k nao instalado" }
     }
 }
 
@@ -395,8 +420,8 @@ if ($InstallMode -in @("Server", "Both")) {
         "cd /d ""$ServerDir""",
         "set SERVER_PORT=$ServerPort",
         "set SERVER_HOST=0.0.0.0",
-        """$VenvPython"" gboc_server.py",
-        "pause"
+        "REM O start_server.bat do Server escolhe o Python mais novo com as dependencias (scripts\gboc_python.ps1)",
+        "call ""$ServerDir\start_server.bat"""
     )
     [System.IO.File]::WriteAllLines((Join-Path $TargetDir "start_server.bat"), $sLines)
     Write-Success "Criado: $TargetDir\start_server.bat"
@@ -412,8 +437,8 @@ if ($InstallMode -in @("Agent", "Both")) {
         "set AGENT_HOST=0.0.0.0",
         "set RESTIC_PATH=$ToolsDir\Restic\restic.exe",
         "set KOPIA_PATH=$ToolsDir\Kopia\kopia.exe",
-        """$VenvPython"" agent_server.py",
-        "pause"
+        "REM O start_agent.bat do Agent escolhe o Python mais novo com as dependencias (scripts\gboc_python.ps1)",
+        "call ""$AgentDir\start_agent.bat"""
     )
     [System.IO.File]::WriteAllLines((Join-Path $TargetDir "start_agent.bat"), $aLines)
     Write-Success "Criado: $TargetDir\start_agent.bat"
@@ -540,6 +565,6 @@ Write-Host "Script Parada:     $TargetDir\stop_all.bat" -ForegroundColor Yellow
 Write-Host "Desinstalador:     $TargetDir\uninstall.bat" -ForegroundColor Red
 Write-Host ""
 
-if ($InstallMode -eq "Interactive") {
+if ($WasInteractive) {
     Read-Host "Pressione ENTER para finalizar..."
 }

@@ -295,7 +295,8 @@ class HistoryImporter:
         logger.info(f"📦 Kopia: {repo['name']}")
 
         # Usar um diretório de configuração temporário para evitar conflitos
-        config_dir = os.path.join(os.path.expanduser("~"), ".kopia", f"gboc_config_{repo['id']}")
+        from core.gboc_paths import data_dir as _gboc_data_dir
+        config_dir = str(_gboc_data_dir("kopia", f"gboc_config_{repo['id']}", create=False))   # antes: ~/.kopia
         os.makedirs(config_dir, exist_ok=True)
         config_file = os.path.join(config_dir, "repository.config")
         
@@ -354,10 +355,11 @@ class HistoryImporter:
                     logger.warning(f"  ⚠️ {error_msg}")
                     return { 'repository_id': repo['id'], 'name': repo['name'], 'engine': 'kopia', 'errors': [error_msg], 'snapshots': [], 'statistics': {} }
 
+                from engines.s3_endpoint import kopia_endpoint_args   # sem http(s)://; http → --disable-tls
                 connect_cmd.extend([
                     's3',
                     '--bucket', bucket,
-                    '--endpoint', endpoint,
+                    *kopia_endpoint_args(endpoint),
                     '--access-key', access_key,
                     '--secret-access-key', secret_key
                 ])

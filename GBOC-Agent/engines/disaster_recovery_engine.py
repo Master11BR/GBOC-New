@@ -33,7 +33,9 @@ class DisasterRecoveryEngine:
     def __init__(self):
         self.active_jobs: Dict[str, Dict[str, Any]] = {}
         self.lock = threading.Lock()
-        self.dr_exports_dir = Path("C:/GBOC-DR") if sys.platform == "win32" else Path("./data/dr_exports")
+        # dentro da pasta do Agente (antes: C:\\GBOC-... criada a cada inicializacao) - core/gboc_paths.py
+        from core.gboc_paths import data_dir as _gboc_data_dir
+        self.dr_exports_dir = _gboc_data_dir("dr_exports", create=False)
         try:
             self.dr_exports_dir.mkdir(parents=True, exist_ok=True)
         except Exception:

@@ -14,6 +14,18 @@ import ssl
 # Add current directory to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+try:
+    import gboc_encoding_compat  # noqa: F401  Python 3.15+ no Windows: saida dos comandos em cp850/cp1252
+except Exception:
+    pass
+
+# Temporarios, caches do restic/Kopia e logs do Kopia dentro da pasta do Agente (core/gboc_paths.py)
+try:
+    from core import gboc_paths as _gboc_paths
+    _gboc_paths.setup_process_dirs()
+except Exception:
+    _gboc_paths = None
+
 _http2 = os.getenv("GBOC_HTTP2", "true").lower() in ("1", "true", "yes")
 # Selector loop apenas quando HTTP/2 está desligado
 if sys.platform == 'win32' and not _http2:
@@ -23,6 +35,13 @@ try:
     from agent_gboc import app
 except ImportError:
     from agent_server import app
+
+# O que versoes anteriores criaram fora da pasta do Agente (C:\\ProgramData\\GBOC, C:\\GBOC-*, ~/.kopia)
+try:
+    if _gboc_paths:
+        _gboc_paths.relocate_legacy()
+except Exception as _reloc_err:
+    logging.getLogger("gboc_paths").warning(f"[PASTAS] Migracao das pastas antigas nao concluida: {_reloc_err}")
 
 
 async def _redirect_app(scope, receive, send):

@@ -250,11 +250,32 @@ class HermesSelfHealEngine:
         bytes_freed = 0
         purge_patterns = []
 
-        # Windows Temp
-        win_temp = os.environ.get("TEMP") or os.environ.get("TMP") or "C:\\Windows\\Temp"
-        if os.path.isdir(win_temp):
-            purge_patterns.extend(glob.glob(os.path.join(win_temp, "*.tmp")))
-            purge_patterns.extend(glob.glob(os.path.join(win_temp, "gboc_*")))
+        # Temporarios do proprio GBOC: data/tmp (pasta TEMP do Agente) com mais de 1 dia e sobras gboc_* de versoes
+        # anteriores nas pastas TEMP do Windows. Antes apagava todos os *.tmp da pasta TEMP, inclusive de outros programas.
+        try:
+            from core.gboc_paths import DATA_DIR as _gboc_data
+            agent_tmp = os.path.join(str(_gboc_data), "tmp")
+            if os.path.isdir(agent_tmp):
+                limit = time.time() - 86400
+                for name in os.listdir(agent_tmp):
+                    p = os.path.join(agent_tmp, name)
+                    try:
+                        if os.path.getmtime(p) >= limit:
+                            continue
+                        if os.path.isdir(p):
+                            size = sum(os.path.getsize(os.path.join(r, f)) for r, _d, fs in os.walk(p) for f in fs)
+                            shutil.rmtree(p, ignore_errors=True)
+                            bytes_freed += size
+                        else:
+                            purge_patterns.append(p)
+                    except OSError:
+                        pass
+        except Exception:
+            pass
+        for sys_temp in {os.path.join(os.environ.get("SystemRoot", "C:\\Windows"), "Temp"),
+                         os.path.join(os.environ.get("LOCALAPPDATA", ""), "Temp")}:
+            if os.path.isdir(sys_temp):
+                purge_patterns.extend(p for p in glob.glob(os.path.join(sys_temp, "gboc_*")) if os.path.isfile(p))
 
         # GBOC Agent cache
         agent_cache = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "cache")

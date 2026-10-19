@@ -580,7 +580,7 @@ async def execute_agent_ransomware_action(agent_id: str, request: Request):
 
 
 @router.get("/overview")
-async def get_ransomware_overview():
+def get_ransomware_overview():
     # Somente agentes reais registrados (o Servidor Central não é um nó protegido pelo Guardian).
     total_agents = 0
     protected_agents = 0
