@@ -6,7 +6,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
 -->
 <!DOCTYPE html>
-<html lang="pt-BR" data-theme="unifi">
+<html lang="pt-BR" data-theme="dark">
 
 <head>
     <meta charset="UTF-8">
@@ -389,7 +389,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     <script src="/static/gboc-global.js?v=14.8.1"></script>
 </head>
 
-<body data-theme="unifi">
+<body>
     <div class="app">
         <main class="main-content">
             <header class="header">
@@ -601,7 +601,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         let currentCategory = 'ALL';
 
         document.addEventListener('DOMContentLoaded', () => {
-            document.documentElement.setAttribute('data-theme', 'unifi');
+            // (removido) forçar data-theme="unifi" ignorava o tema escolhido — no tema claro ficava texto escuro sobre fundo escuro
             loadAllReports();
         });
 

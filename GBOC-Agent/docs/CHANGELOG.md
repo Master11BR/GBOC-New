@@ -6,6 +6,79 @@
 
 ---
 
+## 14.8.1 — 2026-10-15 (Instaladores com versões mais recentes e inicialização independente do caminho do Python)
+
+### 📦 Instaladores sempre com a última versão
+- Novo `scripts/gboc_prereqs.ps1` (Agente e Servidor), usado por `install_agent.ps1`, `install_agent_portable.ps1`, `Setup.ps1`, `install_server.bat` e `setup_database.bat`:
+  - **Python**: consulta python.org e instala o patch mais recente da série mais nova que tenha instalador Windows; se a série nova falhar, tenta a anterior. Atualização de patch para os serviços GBOCAgent/GBOCServer antes e mantém a série atual se der erro.
+  - **PostgreSQL**: usa o já instalado; senão consulta postgresql.org e baixa o build EDB mais recente disponível (instalador ou binários no portátil).
+  - **restic, Kopia e Duplicati**: última release do GitHub; só baixa de novo quando sai versão nova (arquivo `.gboc_version`). Variáveis `RESTIC_PATH`, `KOPIA_PATH`, `DUPLICATI_PATH` e `GBOC_TOOLS_DIR` atualizadas.
+  - Sem internet, usa versões conhecidas (Python 3.14.0/3.13.9/3.12.10, PostgreSQL 17.6, restic 0.19.1, Kopia 0.23.1).
+- Detecção do PostgreSQL genérica (qualquer versão/pasta/serviço), não mais versões fixas.
+
+### 🚀 Inicialização independente do caminho do Python
+- Novo `scripts/gboc_python.ps1`: a cada inicialização procura todos os Pythons da máquina (py launcher, registro, Program Files, AppData, PATH) e usa o **mais novo que tenha as dependências**. Se o mais novo ainda não tiver, instala o `requirements.txt` nele; se falhar, usa o anterior que funciona e só tenta de novo após 24 h (`data\python_runtime.json`, `logs\python_runtime.log`).
+- `start_agent.bat/.ps1`, `start_scheduler.bat/.ps1`, `start_server.bat/.ps1` e os atalhos GUI usam essa escolha — atualizar o Python (que muda a pasta, ex. Python313 → Python314) não quebra mais a inicialização.
+- **Serviço do Agente (NSSM)** passa a executar `powershell.exe -File start_agent.ps1 -Service` em vez de um `python.exe` fixo. Serviços já instalados: execute `install_agent.ps1` novamente para registrar o novo formato.
+- Forçar um Python específico: variável de ambiente `GBOC_PYTHON` (caminho do python.exe).
+- **Python 3.15+**: o 3.15 passou a usar UTF-8 por padrão e a leitura da saída dos comandos do Windows (vssadmin etc., em cp850/cp1252) caía com `UnicodeDecodeError` (ex.: "Erro ao listar VSS Writers"). Os scripts de inicialização definem `PYTHONUTF8=0` (mesmo comportamento das versões anteriores) e o novo `gboc_encoding_compat.py` (Agente, agendador e Servidor) cobre quando o Python é iniciado por outro caminho.
+- O atalho `python.exe` do PyManager (que aponta para a versão padrão do momento) é convertido no python.exe real da instalação.
+
+### 🧹 Nada do sistema fora da pasta do Agente
+- Antes o Agente criava, a cada inicialização, `C:\GBOC-Config`, `C:\GBOC-DR`, `C:\GBOC-SaaS-Backups`, `C:\GBOC-K8s-Backups`, `C:\GBOC-Enterprise-DB`, `C:\GBOC-CDP-Journal`, `C:\GBOC-AD-Backups` (mesmo sem usar os módulos); guardava a identidade do agente e a configuração do Servidor central em `C:\ProgramData\GBOC`; criava uma configuração do Kopia em `%USERPROFILE%\.kopia` a cada verificação; e os caches do restic/Kopia e os temporários iam para o perfil do usuário / TEMP do Windows.
+- Agora tudo fica dentro da pasta do Agente (`core/gboc_paths.py`): `data\central` (agent_id, central_config.json, inscrição), `data\<módulo>`, `data\kopia`, `data\cache\restic|kopia`, `logs\kopia` e `data\tmp` (TEMP do Agente e dos programas que ele executa; `GBOC_USE_SYSTEM_TEMP=1` volta ao TEMP do Windows). Destinos padrão de backup sem caminho definido: `repositorios\` (antes `C:\GBOC-Backups`).
+- Migração automática na inicialização: identidade e configuração copiadas de `C:\ProgramData\GBOC` (conferidas byte a byte) e só então removidas do local antigo — o agente continua com o mesmo ID no Servidor; pastas antigas vazias são removidas; pastas antigas **com dados** não são mexidas (aviso no log). Semente `enroll.json` de GPO/Intune continua aceita em `C:\ProgramData\GBOC` e a pasta é removida depois de processada.
+- Script de inscrição do Servidor e `install_agent.ps1` gravam a semente dentro da pasta do Agente; o script do Servidor não cria mais `C:\ProgramData\GBOC` em instalação nova.
+- **Correção:** a limpeza automática de disco (Hermes) apagava todos os `*.tmp` da pasta TEMP do Windows, inclusive de outros programas; agora só remove temporários do GBOC (`data\tmp` com mais de 1 dia e sobras `gboc_*`).
+
+### 📦 Pacote de instalação Completo (instala sem internet)
+- `build_installer_package.bat` pergunta o tipo: **Completo** (código + Python com as bibliotecas do GBOC em wheels, PostgreSQL, restic, Kopia, Duplicati e NSSM na pasta `Prereqs\`, com versões e SHA-256 em `prereqs.json`) ou **Só código** (como antes). Opcional: gera o `.zip` pronto para copiar. Sem perguntas: `-Mode Completo|Codigo -Zip|-NoZip`.
+- O gerador escolhe o Python mais novo cujas bibliotecas já existem prontas para Windows (ex.: 3.15 ainda sem `pydantic-core` → empacota o 3.14).
+- `Setup.bat` mostra antes de instalar o que a máquina já tem × o que veio no pacote. Para cada programa: já instalado (inclusive fora da pasta do GBOC) → mantido; senão → do pacote; não está no pacote → internet. O Setup agora também instala o PostgreSQL quando falta (senha do superusuário perguntada; ENTER = padrão do GBOC).
+- `install_agent.ps1` executado de dentro do pacote usa o `Prereqs\` automaticamente (Python, bibliotecas, motores, PostgreSQL, NSSM).
+- **Correção:** a instalação do NSSM no `install_agent.ps1` movia o `nssm.exe` para uma pasta inexistente (virava um arquivo `nssm`) e o serviço GBOCAgent não era criado na primeira instalação.
+
+### 📊 Progresso ao vivo dos backups (tela de Tarefas)
+- Painel **Em execução** no topo da tela de Tarefas: para cada backup rodando mostra MB/s, arquivos/s, tempo decorrido e restante, **barra de Progresso Geral**, arquivos (processados/total), novos/alterados, inalterados, bytes lidos e enviados, e o arquivo atual. "Detalhes" abre o monitor existente. Atualiza a cada 2 s enquanto há backup rodando.
+- Funciona também para backups disparados pelo agendador (os dados vêm do banco: nova API `GET /api/tasks/running/live`).
+- O painel só aparece com backup em execução. Ao terminar, o cartão mostra o resultado (concluído em verde com duração e totais; falha/cancelamento em vermelho com o erro) por **no máximo 5 minutos** e some.
+- **Motor nativo** passa a informar o progresso durante a execução (antes só no final); os totais são contados em paralelo, sem atrasar o início. Restic e Duplicati já informavam. Kopia mostra barra em movimento (sem percentual) até concluir.
+
+### 🤖 IA local (Ollama)
+- Ollama rodando mas o sistema dizia que não: a conexão com o Ollama passava pelo proxy do Windows/variáveis `HTTP(S)_PROXY`. Hosts locais e da rede interna agora conectam direto (Agente e Servidor).
+- Tenta `127.0.0.1` antes de `localhost` (evita a espera do IPv6) e respeita a variável `OLLAMA_HOST` do Ollama (outra porta/endereço).
+- Configurações > IA: o aviso mostra o motivo real (erro de conexão, sessão expirada) em vez de sempre "não respondeu".
+- Lista de modelos para baixar atualizada (biblioteca do Ollama, out/2026) e centralizada em `ai_providers.py`: as telas do Agente e do Servidor usam a lista devolvida pela API. Separada em **modelos locais** (com tamanho do download) e **modelos na nuvem do Ollama** (`:cloud`, requer `ollama signin`). Removida a opção fixa "llama3:latest (Instalado)", que aparecia mesmo sem o modelo. Modelo padrão do Ollama: `qwen3.5:4b`.
+
+---
+
+## 14.8.1 — 2026-10-13 (Recuperação automática da configuração e criptografia do motor nativo)
+
+### 🛟 Recuperação automática da configuração (instalação limpa)
+- Config Export/Import > **Recuperação automática da configuração**: defina uma **chave de recuperação** (mínimo de 12 caracteres). O Agente gera um pacote com toda a configuração — repositórios **com as chaves** (senha do motor e chave secreta da nuvem), tarefas, configurações, SMTP — criptografado com AES-256-GCM (chave derivada por scrypt) e grava em `gboc-dr/<agente>/` no bucket de cada repositório do motor nativo.
+- Envio automático quando a configuração muda (verificação a cada 5 min, espera estabilizar) e conferência diária; ficam as últimas 30 versões. "Enviar agora" e "Baixar pacote" na tela.
+- Opcional: o pacote criptografado também vai por e-mail (SMTP do Agente) quando muda. **A chave de recuperação nunca é enviada** (nem para a nuvem nem por e-mail); neste computador fica criptografada como as chaves de nuvem.
+- **Recuperar configuração**: em uma instalação nova, depois do Primeiro acesso, informe os dados do bucket (ou selecione o arquivo do e-mail) e a chave de recuperação; "Simular" mostra o que será criado. Depois de recuperar, a recuperação automática já fica ativa com a mesma chave.
+- **Correção:** importar configuração falhava (coluna inexistente `repo_type`) e perdia retenção, repetição e scripts das tarefas; as tarefas agora apontam para o repositório pelo nome. A chave que assina as sessões de login deixou de ser exportada.
+
+- **Destino próprio do pacote** (bucket ou pasta), independente do motor: quem usa só restic, Kopia ou Duplicati também tem o pacote na nuvem. O acesso é testado antes de salvar; o destino vai dentro do pacote e já fica configurado na máquina nova.
+- **Jobs do Duplicati no pacote**: a definição completa de cada job (destino e passphrase) e a conexão com o Duplicati Server. Na recuperação os jobs são recriados no Duplicati da máquina nova e o reparo é disparado (reconstrói o banco local a partir do destino); job de mesmo nome existente é mantido.
+- Testado em equipamento novo (banco vazio, Duplicati novo): restic, Kopia, nativo e Duplicati recuperados com restauração conferida por SHA-256.
+
+### 🛠️ Correções encontradas no teste de equipamento novo
+- **restic / Kopia com S3 compatível**: o restic ignorava o endpoint e ia para a Amazon; o Kopia recebia o endpoint com `http://` e falhava. Kopia passou a inicializar bucket vazio na criação do repositório, como o restic.
+- **Restauração Kopia**: não restaurava nada no "snapshot inteiro", usava formato de caminho inválido e podia usar a configuração de outro repositório. Corrigido (configuração própria da restauração).
+- **SureRestore Kopia**: usava a chave da nuvem como senha do repositório e não achava a chave secreta ("credenciais incompletas").
+- **Restauração Duplicati 2.1+**: o destino escolhido era ignorado e os arquivos voltavam para o local original.
+- **SMTP do Agente**: bancos com a tabela criada pelo migrador (coluna `host`) davam erro ao salvar. A tela agora carrega a configuração salva; senha em branco mantém a atual. Envio escolhe pela porta: 465 = SSL direto, demais = STARTTLS (antes "Usar TLS" na 465 esperava até estourar o tempo). Mensagens de erro claras (certificado, senha, porta).
+- **SMTP do Servidor**: teste e notificações usam a mesma entrega dos relatórios (465 = SSL; STARTTLS quando oferecido).
+
+### 🔐 Criptografia do motor nativo
+- Repositórios **novos** do motor nativo passam a ser criptografados com AES-256-GCM usando a **senha do motor** do repositório (`gboc-key.json` na raiz guarda a chave mestra protegida por scrypt). Blocos, pacotes e manifestos (nomes e caminhos dos arquivos) ficam ilegíveis sem a senha; ids dos blocos passam a ser HMAC-SHA256 (o nome do objeto não revela o conteúdo) e a deduplicação continua.
+- Repositórios que **já têm backups** continuam sem criptografia e funcionando como antes. `GBOC_NATIVE_ENCRYPTION=0` desativa para repositórios novos.
+- **Guarde a senha do motor**: sem ela o backup criptografado não pode ser restaurado (ela vai dentro do pacote de recuperação).
+- Retenção: se algum manifesto não puder ser lido, a limpeza de blocos e pacotes é adiada (antes os blocos dele podiam ser tratados como sem uso).
+
 ## 14.8.1 — 2026-10-05 (Backup imutável, Implantação em massa, Políticas centrais, IA Local Ollama e Comercial MSP)
 
 ### 🔒 Backup imutável

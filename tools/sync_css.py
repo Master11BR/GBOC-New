@@ -39,6 +39,7 @@ CSS_FILES = [
     "gboc-themes.css",
     "gboc-hardware-hud.css",
     "gboc-file-picker.css",
+    "gboc-fernly.css",
 ]
 JS_FILES = [
     "gboc-perf.js",
@@ -46,6 +47,7 @@ JS_FILES = [
     "gboc-layout-manager.js",
     "gboc-hardware-hud.js",
     "gboc-motion.js",
+    "gboc-fernly.js",
 ]
 CSS_DIRS = [
     os.path.join("ui", "design-system"),

@@ -154,7 +154,9 @@ class BackupVerifier:
             return
 
         # Config temporária
-        config_dir = os.path.join(os.path.expanduser("~"), ".kopia", f"diag_{repo['id']}_{int(datetime.now().timestamp())}")
+        # dentro da pasta do Agente, uma por repositorio (antes: ~/.kopia/diag_<id>_<horario>, uma nova a cada verificacao)
+        from core.gboc_paths import data_dir as _gboc_data_dir
+        config_dir = str(_gboc_data_dir("kopia", f"diag_{repo['id']}", create=False))
         os.makedirs(config_dir, exist_ok=True)
         env["KOPIA_CONFIG_PATH"] = config_dir
         config_file = os.path.join(config_dir, "repository.config")

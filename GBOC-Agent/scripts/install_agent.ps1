@@ -14,25 +14,20 @@ Write-Host "`n========================================" -ForegroundColor Cyan
 Write-Host "  GBOC Agent 14.8.1 - Instalador" -ForegroundColor Cyan
 Write-Host "========================================`n" -ForegroundColor Cyan
 
+# Python: ULTIMA versao estavel do python.org (reaproveita a instalada se ja for a mais nova) com as
+# dependencias do Agente. Se elas ainda nao instalarem na mais nova, usa a anterior.
+$prereqs = @("$PSScriptRoot\gboc_prereqs.ps1", "$PSScriptRoot\scripts\gboc_prereqs.ps1") | Where-Object { Test-Path $_ } | Select-Object -First 1
 $PythonExe = $null
 $PythonBaseArgs = @()
-
-if (Get-Command py -ErrorAction SilentlyContinue) {
-    try {
-        & py -3.14 --version *> $null
-        if ($LASTEXITCODE -eq 0) {
-            $PythonExe = "py"
-            $PythonBaseArgs = @("-3.14")
-        }
-    } catch {}
+if ($prereqs) {
+    . $prereqs
+    $PythonExe = Install-GbocPython -Requirements (Join-Path (Get-Location) "requirements.txt")
 }
-
+if (-not $PythonExe -and (Get-Command py -ErrorAction SilentlyContinue)) { $PythonExe = "py"; $PythonBaseArgs = @("-3") }
 if (-not $PythonExe -and (Get-Command python -ErrorAction SilentlyContinue)) { $PythonExe = "python" }
-if (-not $PythonExe -and (Get-Command py -ErrorAction SilentlyContinue)) { $PythonExe = "py" }
-if (-not $PythonExe -and (Get-Command python3 -ErrorAction SilentlyContinue)) { $PythonExe = "python3" }
 
 if (-not $PythonExe) {
-    Write-Host "[ERRO] Python nao encontrado!" -ForegroundColor Red
+    Write-Host "[ERRO] Python nao encontrado! Instale o mais recente: https://www.python.org/downloads/" -ForegroundColor Red
     exit 1
 }
 
@@ -82,5 +77,5 @@ Write-Host "  ✓ Instalacao Concluida" -ForegroundColor Green
 Write-Host "========================================`n" -ForegroundColor Cyan
 Write-Host "Proximos passos:" -ForegroundColor Cyan
 Write-Host "  1. Execute: .\start_agent.ps1"
-Write-Host "  2. Acesse: http://localhost:9200"
+Write-Host "  2. Acesse: https://localhost:9200"
 

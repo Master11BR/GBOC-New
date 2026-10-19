@@ -34,6 +34,7 @@ def list_agents_v2(
     agents = []
     total = 0
     
+    conn = None
     try:
         from server_gboc import get_db, release_db
         conn = get_db()
@@ -109,8 +110,11 @@ def list_agents_v2(
                 
             cur.close()
             release_db(conn)
+            conn = None
     except Exception as e:
         logger.error(f"[API v2] Erro ao listar agentes: {e}")
+        if conn is not None:   # erro no meio da consulta: devolver a conexão (antes ficava presa até esgotar o pool)
+            release_db(conn)
 
     total_pages = (total + per_page - 1) // per_page if total > 0 else 0
     meta = PaginationMeta(
@@ -133,6 +137,7 @@ def get_agent_detail_v2(agent_id: str):
     t0 = time.perf_counter()
     
     agent_data = None
+    conn = None
     try:
         from server_gboc import get_db, release_db
         conn = get_db()
@@ -173,8 +178,11 @@ def get_agent_detail_v2(agent_id: str):
                 }
             cur.close()
             release_db(conn)
+            conn = None
     except Exception as e:
         logger.error(f"[API v2] Erro ao obter detalhes do agente {agent_id}: {e}")
+        if conn is not None:   # erro no meio da consulta: devolver a conexão ao pool
+            release_db(conn)
 
     if not agent_data:
         raise HTTPException(status_code=404, detail=f"Agente com ID '{agent_id}' não encontrado.")

@@ -33,22 +33,19 @@ $RESTIC_DIR = "$TOOLS_DIR\Restic"
 $KOPIA_DIR = "$TOOLS_DIR\Kopia"
 $DUPLICATI_DIR = "$TOOLS_DIR\Duplicati"
 
-$PYTHON_VERSION = "3.11.9"
-$POSTGRES_VERSION = "16.6"  # Versão binária portátil
-$RESTIC_VERSION = "0.17.3"
-$KOPIA_VERSION = "0.18.2"
-$DUPLICATI_VERSION = "2.1.0.2"
+# Versoes: descobertas na hora da instalacao (ultima estavel) por scripts\gboc_prereqs.ps1
+$POSTGRES_VERSION = ""
 
 $DB_NAME = "gboc_agent"
 $DB_USER = "gboc"
 $DB_PASSWORD = "gboc_$(Get-Random -Maximum 999999)"
 
-# URLs - usando PostgreSQL binário portátil
-$PYTHON_URL = "https://www.python.org/ftp/python/$PYTHON_VERSION/python-$PYTHON_VERSION-amd64.exe"
-$POSTGRES_URL = "https://get.enterprisedb.com/postgresql/postgresql-$POSTGRES_VERSION-1-windows-x64-binaries.zip"
-$RESTIC_URL = "https://github.com/restic/restic/releases/download/v$RESTIC_VERSION/restic_${RESTIC_VERSION}_windows_amd64.zip"
-$KOPIA_URL = "https://github.com/kopia/kopia/releases/download/v$KOPIA_VERSION/kopia-${KOPIA_VERSION}-windows-x64.zip"
-$DUPLICATI_URL = "https://github.com/duplicati/duplicati/releases/download/v${DUPLICATI_VERSION}_beta/duplicati-${DUPLICATI_VERSION}_beta_windows-x64.zip"
+$prereqs = @("$PSScriptRoot\scripts\gboc_prereqs.ps1", "$PSScriptRoot\gboc_prereqs.ps1") | Where-Object { Test-Path $_ } | Select-Object -First 1
+if (-not $prereqs) {
+	Write-Host "scripts\gboc_prereqs.ps1 nao encontrado. Execute o instalador a partir da pasta GBOC-Agent." -ForegroundColor Red
+	exit 1
+}
+. $prereqs
 
 # ============================================================================
 # FUNÇÕES AUXILIARES
@@ -134,52 +131,14 @@ Write-Step "Criando estrutura de diretórios"
 # PYTHON
 # ============================================================================
 
-Write-Step "Verificando Python"
-
-$PYTHON_CMD = $null
-
-# 1. Python dedicado do GBOC
-if (Test-Path "$PYTHON_DIR\python.exe") {
-	$PYTHON_CMD = "$PYTHON_DIR\python.exe"
-	Write-Success "Python dedicado: $PYTHON_DIR"
-}
-
-# 2. Python do sistema
+Write-Step "Python (ultima versao estavel)"
+# Ultima versao do python.org (reaproveita a instalada se ja for a mais nova) com as dependencias do Agente.
+# A inicializacao escolhe o Python sozinha (scripts\gboc_python.ps1): atualizar depois nao quebra nada.
+$PYTHON_CMD = Install-GbocPython -Requirements "$PSScriptRoot\requirements.txt"
 if (-not $PYTHON_CMD) {
-	# Testar python.exe no PATH
-	$sysP = Get-Command python -ErrorAction SilentlyContinue
-	if ($sysP) {
-		$ver = & python --version 2>&1
-		if ($ver -match 'Python 3\.') {
-			$PYTHON_CMD = $sysP.Source
-			Write-Success "Python do sistema: $ver"
-		}
-	}
-}
-
-if (-not $PYTHON_CMD) {
-	# Testar py launcher
-	$pyL = Get-Command py -ErrorAction SilentlyContinue
-	if ($pyL) {
-		$ver = & py --version 2>&1
-		if ($ver -match 'Python 3\.') {
-			# Pegar executável real
-			$realPath = & py -c "import sys; print(sys.executable)" 2>&1
-			if (Test-Path $realPath) {
-				$PYTHON_CMD = $realPath.Trim()
-				Write-Success "Python via py launcher: $ver"
-			}
-		}
-	}
-}
-
-if (-not $PYTHON_CMD) {
-	Write-Error "Python 3 não encontrado no sistema!"
-	Write-Host "    Instale em: https://www.python.org/downloads/" -ForegroundColor Yellow
-	Write-Host "    Marque 'Add Python to PATH' durante a instalação" -ForegroundColor Yellow
+	Write-Error "Nao foi possivel instalar o Python com as dependencias do GBOC"
 	exit 1
 }
-
 $PYTHON_DIR = Split-Path $PYTHON_CMD -Parent
 $env:PATH = "$PYTHON_DIR;$PYTHON_DIR\Scripts;$env:PATH"
 Write-Success "Usando: $PYTHON_CMD"
@@ -188,7 +147,7 @@ Write-Success "Usando: $PYTHON_CMD"
 # POSTGRESQL PORTÁTIL
 # ============================================================================
 
-Write-Step "Instalando PostgreSQL $POSTGRES_VERSION (portátil)"
+Write-Step "PostgreSQL (portátil)"
 
 $pgBin = "$POSTGRES_DIR\pgsql\bin"
 $pgExe = "$pgBin\postgres.exe"
@@ -198,9 +157,11 @@ if (Test-Path $pgExe) {
 	Write-Warning "PostgreSQL já instalado"
 }
 else {
+	$pgRelease = Get-GbocPostgresRelease -Binaries
+	$POSTGRES_VERSION = $pgRelease.Version
+	Write-Host "    Ultima versao: PostgreSQL $POSTGRES_VERSION"
 	$pgZip = "$env:TEMP\postgres.zip"
-
-	if (Download-File -Url $POSTGRES_URL -Output $pgZip) {
+	if (Download-File -Url $pgRelease.Url -Output $pgZip) {
 		Write-Host "    Extraindo PostgreSQL..."
 		Expand-Archive -Path $pgZip -DestinationPath $POSTGRES_DIR -Force
 		Remove-Item $pgZip -Force
@@ -402,25 +363,8 @@ catch {
 
 Write-Step "Instalando motores de backup"
 
-# Restic
-if (-not (Test-Path "$RESTIC_DIR\restic.exe")) {
-	$resticZip = "$env:TEMP\restic.zip"
-	if (Download-File -Url $RESTIC_URL -Output $resticZip) {
-		Expand-Archive -Path $resticZip -DestinationPath $RESTIC_DIR -Force
-		Remove-Item $resticZip -Force
-		Write-Success "Restic instalado"
-	}
-}
-
-# Kopia
-if (-not (Test-Path "$KOPIA_DIR\kopia.exe")) {
-	$kopiaZip = "$env:TEMP\kopia.zip"
-	if (Download-File -Url $KOPIA_URL -Output $kopiaZip) {
-		Expand-Archive -Path $kopiaZip -DestinationPath $KOPIA_DIR -Force
-		Remove-Item $kopiaZip -Force
-		Write-Success "Kopia instalado"
-	}
-}
+# restic, Kopia e Duplicati na ultima release (versoes antigas sao atualizadas)
+$engines = Install-GbocEngines -ToolsDir $TOOLS_DIR
 
 $env:PATH = "$RESTIC_DIR;$KOPIA_DIR;$DUPLICATI_DIR;$env:PATH"
 
@@ -480,37 +424,8 @@ Set-Content -Path "$AGENT_DIR\.env" -Value $envContent
 Write-Success "Configuração criada"
 
 # Scripts de inicialização
-$startScript = @"
-@echo off
-title GBOC Agent
-cd /d "$AGENT_DIR"
-set PATH=$PYTHON_DIR;$pgBin;$RESTIC_DIR;$KOPIA_DIR;$DUPLICATI_DIR;%PATH%
-
-echo ============================================
-echo  GBOC Agent - Iniciando...
-echo ============================================
-echo.
-
-echo [1/2] Verificando PostgreSQL...
-"$pgBin\pg_ctl.exe" status -D "$pgData" >nul 2>&1
-if errorlevel 1 (
-	echo PostgreSQL nao esta rodando. Iniciando...
-	"$pgBin\pg_ctl.exe" start -D "$pgData" -l "$POSTGRES_DIR\logfile.log"
-	timeout /t 5 /nobreak >nul
-	echo PostgreSQL iniciado.
-) else (
-	echo PostgreSQL ja esta rodando.
-)
-echo.
-
-echo [2/2] Iniciando GBOC Agent...
-echo Acesse: http://localhost:9200
-echo.
-"$PYTHON_CMD" agent_server.py
-pause
-"@
-
-Set-Content -Path "$AGENT_DIR\start_agent.bat" -Value $startScript
+# start_agent.bat do pacote ja escolhe o Python (scripts\gboc_python.ps1) e inicia o PostgreSQL portatil.
+# Antes era gerado aqui um start_agent.bat com o python.exe fixo, que parava de funcionar ao atualizar o Python.
 
 $stopScript = @"
 @echo off
@@ -556,7 +471,7 @@ pause
 
 Set-Content -Path "$AGENT_DIR\status.bat" -Value $statusScript
 
-Write-Success "Scripts criados (start_agent.bat, stop_agent.bat, status.bat)"
+Write-Success "Scripts criados (stop_agent.bat, status.bat)"
 
 # ============================================================================
 # FINALIZAÇÃO

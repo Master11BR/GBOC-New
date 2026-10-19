@@ -188,8 +188,41 @@ class RealTimeBackupMonitor:
             except Exception as e:
                 logger.error(f"Erro em callback {event}: {e}")
     
+    _extended_columns = True     # files_total/bytes_total/files_new... (bancos antigos podem não ter)
+
+    def _save_extended(self, progress: BackupProgress) -> bool:
+        """Totais, novos/inalterados e bytes enviados: a tela de tarefas mostra a barra de progresso ao vivo com
+        eles, inclusive quando o backup roda no processo do agendador (por isso vão para o banco)."""
+        if not RealTimeBackupMonitor._extended_columns:
+            return False
+        try:
+            with self.core.get_db_connection() as conn:
+                cur = conn.cursor()
+                cur.execute("""
+                    UPDATE task_executions SET
+                        status = %s, files_processed = %s, bytes_processed = %s, current_file = %s, progress = %s,
+                        files_total = %s, bytes_total = %s, files_new = %s, files_changed = %s,
+                        files_unmodified = %s, bytes_added = %s
+                    WHERE id = %s
+                """, (
+                    progress.status, progress.files_processed, progress.bytes_processed, progress.current_file,
+                    int(progress.progress_percent), progress.files_total, progress.bytes_total, progress.files_new,
+                    progress.files_changed, progress.files_unmodified, progress.bytes_added, progress.execution_id,
+                ))
+                conn.commit()
+            return True
+        except Exception as e:
+            if 'column' in str(e).lower():
+                RealTimeBackupMonitor._extended_columns = False
+                logger.info("task_executions sem colunas de progresso detalhado; gravando só o progresso básico")
+            else:
+                logger.debug(f"Progresso detalhado não gravado: {e}")
+            return False
+
     def _save_to_database(self, progress: BackupProgress):
         """Grava progresso no banco com retentativas"""
+        if self._save_extended(progress):
+            return
         last_error = None
         for i in range(5):
             try:

@@ -50,6 +50,69 @@ class GBOCNativeEngine:
         self.level = task_config.get('compression_level')
         self.backend_factory = backend_factory
         self.workers = workers
+        self._cipher = None
+        self._cipher_ready = False
+
+    # ------------------------------------------------------------------
+    # Criptografia (native_engine/crypto.py): repositórios novos são criptografados com a senha do motor
+    # ------------------------------------------------------------------
+
+    def _password(self) -> str:
+        """Senha do motor do repositório: da tarefa, do repositório informado, do backend ou do banco (pelo id)."""
+        tc = self.task_config or {}
+        repo = tc.get('repository') if isinstance(tc.get('repository'), dict) else {}
+        bcfg = getattr(self.backend, 'config', None) or {}
+        for src in (tc, repo, bcfg):
+            for k in ('motor_password', 'encryption_password', 'password'):
+                v = src.get(k) if isinstance(src, dict) else None
+                if v and str(v) != '********':
+                    return str(v)
+        rid = repo.get('id') or bcfg.get('id')
+        if rid:
+            try:
+                from shared_core import get_shared_core
+                rm = getattr(get_shared_core(), 'repository_manager', None)
+                r = rm.get_repository(int(rid)) if rm else None
+                r = rm._normalize_repository_config(r) if (rm and r) else r
+                v = (r or {}).get('motor_password') or (r or {}).get('encryption_password') or (r or {}).get('password')
+                return str(v) if v else ''
+            except Exception as e:
+                self.logger.debug(f"Senha do motor do repositório {rid} indisponível: {e}")
+        return ''
+
+    def _encryption_enabled(self) -> bool:
+        if self.task_config.get('encryption') is False:
+            return False
+        return os.getenv('GBOC_NATIVE_ENCRYPTION', '1').strip().lower() not in ('0', 'false', 'off', 'no')
+
+    def _crypto(self, names: Optional[List[str]] = None, allow_init: bool = False):
+        if not self._cipher_ready or (allow_init and self._cipher is None):
+            from native_engine import crypto
+            pw = self._password()
+            self._cipher = crypto.open_repo(self.backend, pw, names, allow_init=allow_init and self._encryption_enabled())
+            self._cipher_ready = True
+            if allow_init and self._cipher is None and not pw and names is not None and not crypto.has_data(names):
+                self.logger.warning("Repositório novo sem senha do motor: backup gravado SEM criptografia")
+        return self._cipher
+
+    def read_doc(self, remote_name: str) -> Optional[Dict]:
+        """Manifesto (JSON) do repositório, criptografado ou não. None se não existir."""
+        from native_engine import crypto
+        try:
+            data = store_v4._backend_get(self.backend, remote_name)
+        except Exception:
+            return None
+        if crypto.is_encrypted_doc(data):
+            cipher = self._crypto()
+            if cipher is None:
+                raise RuntimeError("Manifesto criptografado mas o repositório não tem gboc-key.json")
+            return cipher.open_doc(data)
+        return json.loads(data.decode('utf-8'))
+
+    def write_doc(self, remote_name: str, doc: Dict, indent: Optional[int] = None) -> Dict[str, Any]:
+        cipher = self._crypto()
+        data = cipher.seal_doc(doc) if cipher else json.dumps(doc, indent=indent, ensure_ascii=False).encode('utf-8')
+        return store_v4._backend_put(self.backend, remote_name, data)
 
     # ------------------------------------------------------------------
     # Helpers
@@ -226,19 +289,11 @@ class GBOCNativeEngine:
             return {}
 
     def _upload_manifest(self, snapshot_id: str, manifest: Dict) -> str:
-        tmp_dir = tempfile.mkdtemp(prefix='gboc_manifest_')
-        try:
-            manifest_path = os.path.join(tmp_dir, 'manifest.json')
-            with open(manifest_path, 'w', encoding='utf-8') as f:
-                json.dump(manifest, f, indent=2, ensure_ascii=False)
-
-            remote_name = f"{snapshot_id}/manifest.json"
-            result = self.backend.upload_file(manifest_path, remote_name)
-            if not result.get('success', False):
-                raise RuntimeError(f"Upload do manifest falhou: {result.get('error')}")
-            return remote_name
-        finally:
-            shutil.rmtree(tmp_dir, ignore_errors=True)
+        remote_name = f"{snapshot_id}/manifest.json"
+        result = self.write_doc(remote_name, manifest, indent=2)
+        if not result.get('success', False):
+            raise RuntimeError(f"Upload do manifest falhou: {result.get('error')}")
+        return remote_name
 
     # ------------------------------------------------------------------
     # Snapshots / File listing
@@ -312,20 +367,11 @@ class GBOCNativeEngine:
 
     def _load_manifest(self, snapshot_id: str) -> Optional[Dict]:
         try:
-            tmp_dir = tempfile.mkdtemp(prefix='gboc_manifest_')
-            try:
-                local_path = os.path.join(tmp_dir, 'manifest.json')
-                remote_name = f"{snapshot_id}/manifest.json"
-                dl = self.backend.download_file(remote_name, local_path)
-                if not dl.get('success', False):
-                    # Snapshot já removido pela retenção mas mantido para a cadeia incremental (engines/retention.py)
-                    dl = self.backend.download_file(f"{snapshot_id}/manifest.chain.json", local_path)
-                    if not dl.get('success', False):
-                        return None
-                with open(local_path, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-            finally:
-                shutil.rmtree(tmp_dir, ignore_errors=True)
+            m = self.read_doc(f"{snapshot_id}/manifest.json")
+            if m is None:
+                # Snapshot já removido pela retenção mas mantido para a cadeia incremental (engines/retention.py)
+                m = self.read_doc(f"{snapshot_id}/manifest.chain.json")
+            return m
         except Exception as e:
             self.logger.error(f"Erro ao carregar manifest {snapshot_id}: {e}")
             return None
@@ -487,15 +533,18 @@ class GBOCNativeEngine:
     # ------------------------------------------------------------------
 
     def _store(self) -> "store_v4.ObjectStore":
-        return store_v4.ObjectStore(self.backend, self.backend_factory, self.workers)
+        store = store_v4.ObjectStore(self.backend, self.backend_factory, self.workers)
+        store.cipher = self._crypto()
+        return store
 
     def _source_key(self, sources: List[str]) -> List[str]:
         return sorted(str(p) for p in sources)
 
-    def _previous_v4(self, sources: List[str]) -> Dict[str, Dict[str, Any]]:
+    def _previous_v4(self, sources: List[str], names: Optional[List[str]] = None) -> Dict[str, Dict[str, Any]]:
         """Entradas do último snapshot DESTA tarefa (mesmos caminhos) para a detecção rápida."""
         want = self._source_key(sources)
-        names = [str(f).replace('\\', '/') for f in self.backend.list_files()]
+        if names is None:
+            names = [str(f).replace('\\', '/') for f in self.backend.list_files()]
         sids = sorted({f.split('/')[0] for f in names if f.endswith('/manifest.json')}, reverse=True)
         for sid in sids[:30]:
             m = self._load_manifest(sid)
@@ -505,6 +554,59 @@ class GBOCNativeEngine:
                 return {}
             return {e['path']: e for e in m.get('entries') or [] if e.get('chunks') is not None}
         return {}
+
+    def _progress_reporter(self, source_paths, stats: Dict[str, int], store):
+        """Progresso ao vivo para quem chamou (task_config['progress_cb']), no máximo 1x por segundo.
+        Os totais (arquivos e bytes) são contados numa thread à parte; até terminar a contagem vão como 0
+        (a tela mostra "contando") e o backup não espera por ela."""
+        cb = (self.task_config or {}).get('progress_cb')
+        if not callable(cb):
+            return lambda *_a, **_k: None
+        import threading
+        import time as _t
+        totals = {"files": 0, "bytes": 0, "done": False}
+
+        def _count():
+            files = size = 0
+            try:
+                for src in source_paths:
+                    src = str(src).strip()
+                    if os.path.isfile(src):
+                        files += 1
+                        size += os.path.getsize(src)
+                        continue
+                    for r, _d, fs in os.walk(src):
+                        for n in fs:
+                            try:
+                                size += os.stat(os.path.join(r, n)).st_size
+                                files += 1
+                            except OSError:
+                                pass
+                totals.update(files=files, bytes=size)
+            finally:
+                totals["done"] = True
+
+        threading.Thread(target=_count, name="gboc-native-count", daemon=True).start()
+        last = [0.0]
+
+        def report(current_file=None, phase="running", force=False):
+            now = _t.time()
+            if not force and now - last[0] < 1.0:
+                return
+            last[0] = now
+            done = totals["done"]
+            try:
+                cb({
+                    "files_processed": stats["files"], "bytes_processed": stats["bytes"],
+                    "files_total": max(totals["files"], stats["files"]) if done else 0,
+                    "bytes_total": max(totals["bytes"], stats["bytes"]) if done else 0,
+                    "files_new": stats["new"], "files_unmodified": stats["reused"],
+                    "bytes_added": int(getattr(store, "uploaded_bytes", 0) or 0),
+                    "current_file": current_file, "phase": phase, "threads": self.workers,
+                })
+            except Exception as e:                       # progresso nunca interrompe o backup
+                self.logger.debug(f"Progresso não informado: {e}")
+        return report
 
     def _run_backup_v4(self) -> Dict[str, Any]:
         import time as _time
@@ -516,17 +618,22 @@ class GBOCNativeEngine:
             if not source_paths:
                 return {"success": False, "error": "Nenhum caminho de origem definido"}
             snapshot_id = datetime.now().strftime('%Y%m%d%H%M%S')
-            existing = {str(f).replace('\\', '/').split('/')[0] for f in self.backend.list_files() if str(f).endswith('manifest.json')}
+            # Uma listagem só do repositório (antes eram três: snapshots, backup anterior e blocos existentes)
+            names = [str(f).replace('\\', '/') for f in self.backend.list_files()]
+            existing = {f.split('/')[0] for f in names if f.endswith('manifest.json')}
             if snapshot_id in existing:                       # dois backups no mesmo segundo
                 _time.sleep(1.1)
                 snapshot_id = datetime.now().strftime('%Y%m%d%H%M%S')
             self.logger.info(f"Backup nativo v4 - snapshot {snapshot_id} (compressão {self.codec}, {self.workers} conexão(ões))")
-            prev = self._previous_v4(source_paths)
+            cipher = self._crypto(names, allow_init=True)     # repositório vazio: cria a chave (gboc-key.json)
+            prev = self._previous_v4(source_paths, names)
             store = self._store()
+            store.known(names)
             multi = len(source_paths) > 1
             entries: List[Dict[str, Any]] = []
             stats = {"files": 0, "bytes": 0, "new": 0, "unchanged": 0, "reused": 0, "chunks_new": 0, "errors": 0}
             pool = store.pool()
+            _report = self._progress_reporter(source_paths, stats, store)
             try:
                 for source in source_paths:
                     source = source.strip()
@@ -544,7 +651,9 @@ class GBOCNativeEngine:
                             st = os.stat(fpath)
                             rel = prefix + os.path.relpath(fpath, base_dir).replace('\\', '/')
                             old = prev.get(rel)
-                            if old and old.get('size') == st.st_size and abs(float(old.get('mtime') or 0) - st.st_mtime) < 0.001:
+                            # inalterado e com todos os blocos presentes no repositório (senão relê e reenvia)
+                            if old and old.get('size') == st.st_size and abs(float(old.get('mtime') or 0) - st.st_mtime) < 0.001 \
+                                    and all(h in store.known() for h in (old.get('chunks') or [])):
                                 entry = dict(old)                   # inalterado: nem lê o arquivo
                                 stats["reused"] += 1
                             else:
@@ -558,11 +667,15 @@ class GBOCNativeEngine:
                             entries.append(entry)
                             stats["files"] += 1
                             stats["bytes"] += st.st_size
+                            _report(fpath)
                         except (OSError, RuntimeError) as e:
                             stats["errors"] += 1
                             self.logger.error(f"Erro ao processar {fpath}: {e}")
                             if isinstance(e, RuntimeError):
                                 raise
+                # último pacote + espera todos os envios + índice de pacotes; só então o manifesto
+                _report(None, phase="finalizing", force=True)
+                store.flush(pool)
             finally:
                 pool.shutdown(wait=True)
             stats["unchanged"] = stats["reused"]
@@ -571,6 +684,7 @@ class GBOCNativeEngine:
                 'compression': self.codec, 'chunk_size': store_v4.CHUNK_SIZE,
                 'files_total': stats["files"], 'files_new': stats["new"], 'files_unchanged': stats["unchanged"],
                 'bytes_total': stats["bytes"], 'bytes_uploaded': store.uploaded_bytes, 'chunks_uploaded': store.uploaded_objects,
+                'packs_uploaded': store.packs_uploaded, 'encrypted': bool(cipher),
                 'source_paths': source_paths, 'errors': stats["errors"], 'entries': entries,
             }
             self._upload_manifest(snapshot_id, manifest)
@@ -581,7 +695,8 @@ class GBOCNativeEngine:
                              f"({saved:.0f}% economizado por deduplicacao/compressao)")
             return {"success": True, "snapshot_id": snapshot_id, "files": stats["files"], "bytes": stats["bytes"],
                     "files_new": stats["new"], "files_unchanged": stats["unchanged"], "bytes_uploaded": store.uploaded_bytes,
-                    "objects_uploaded": store.uploaded_objects, "seconds": secs, "errors": stats["errors"]}
+                    "objects_uploaded": store.uploaded_objects, "packs_uploaded": store.packs_uploaded,
+                    "seconds": secs, "errors": stats["errors"]}
         except Exception as e:
             self.logger.error(f"Erro no backup nativo v4: {e}", exc_info=True)
             return {"success": False, "error": str(e)}
@@ -653,7 +768,7 @@ class GBOCNativeEngine:
         store = self._store()
         snaps = [snapshot_id] if snapshot_id else [s['id'] for s in self.list_snapshots()]
         missing, corrupt, checked, legacy = [], [], set(), 0
-        known = store.known()
+        known = store.known()                        # blocos em pacote ausente já ficam fora (ver ObjectStore.known)
         for sid in snaps:
             m = self._load_manifest(sid) or {}
             if int(m.get('version') or 0) < 4:

@@ -18,5 +18,7 @@ echo.
 start http://127.0.0.1:8080
 
 :: Executa o servidor Python
-python -m http.server 8080
+REM "py -3" usa o Python mais novo instalado (servidor estatico: nao precisa das dependencias do GBOC)
+where py >nul 2>&1
+if %errorlevel% equ 0 (py -3 -m http.server 8080) else (python -m http.server 8080)
 pause

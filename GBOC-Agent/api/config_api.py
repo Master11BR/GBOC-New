@@ -4,7 +4,7 @@ GBOC 14.8.1 - Configuration Export/Import API
 Export/import system configuration, versioned snapshots, diff between configs.
 """
 
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
@@ -77,7 +77,7 @@ async def export_config_download(include_sensitive: bool = False):
 # ─── Import ───────────────────────────────────────────────────────
 
 @router.post("/import")
-async def import_config(body: ImportRequest):
+def import_config(body: ImportRequest):
     """Import a configuration from JSON data.
     Use dry_run=true to preview changes without applying them."""
     from engines.config_manager import import_config as _import
@@ -186,3 +186,128 @@ async def diff_current_vs_snapshot(snapshot_id: int):
     result['compared_to'] = 'current_config'
     return _clean(result)
 
+
+
+# ─── Recuperação automática (pacote criptografado na nuvem) ───────
+
+class RecoverySettings(BaseModel):
+    enabled: bool = False
+    passphrase: Optional[str] = None
+    passphrase_confirm: Optional[str] = None
+    email_enabled: bool = False
+    email_to: str = ""
+
+
+class RecoverySource(BaseModel):
+    type: str = "s3"                 # s3 | wasabi | b2 | local
+    endpoint: Optional[str] = None
+    bucket: Optional[str] = None
+    region: Optional[str] = None
+    access_key: Optional[str] = None
+    secret_key: Optional[str] = None
+    path: Optional[str] = None
+
+
+class RecoveryRemoteRestore(BaseModel):
+    source: RecoverySource
+    package: str
+    passphrase: str
+    dry_run: bool = True
+
+
+@router.get("/recovery/status")
+def recovery_status():
+    from engines import config_recovery
+    return _clean(config_recovery.public_status())
+
+
+@router.post("/recovery/settings")
+def recovery_settings(body: RecoverySettings):
+    from engines import config_recovery
+    if body.passphrase and body.passphrase != (body.passphrase_confirm or ""):
+        raise HTTPException(400, "A confirmação não confere com a chave de recuperação")
+    try:
+        return _clean(config_recovery.configure(body.enabled, body.passphrase, body.email_enabled, body.email_to))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@router.post("/recovery/run")
+def recovery_run():
+    """Gera e envia o pacote agora (para todos os destinos, mesmo sem alteração)."""
+    from engines import config_recovery
+    if not config_recovery.load_settings().get("passphrase_enc"):
+        raise HTTPException(400, "Defina a chave de recuperação primeiro")
+    return _clean(config_recovery.run_backup(force=True, reason="manual"))
+
+
+@router.post("/recovery/remote/list")
+def recovery_remote_list(body: RecoverySource):
+    from engines import config_recovery
+    try:
+        be = config_recovery.backend_from_source(body.dict())
+        chk = be.check_connection() if hasattr(be, "check_connection") else {"success": True}
+        if not chk.get("success", False):
+            raise HTTPException(502, chk.get("message") or chk.get("error") or "Destino inacessível")
+        return {"packages": config_recovery.list_packages(be)}
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        logger.warning(f"[RECUPERAÇÃO] listagem remota falhou: {e}")
+        raise HTTPException(502, f"Não foi possível acessar o destino: {type(e).__name__}: {e}")
+
+
+@router.post("/recovery/remote/restore")
+def recovery_remote_restore(body: RecoveryRemoteRestore):
+    from engines import config_recovery
+    try:
+        be = config_recovery.backend_from_source(body.source.dict())
+        blob = config_recovery.read_package(be, body.package)
+        return _clean(config_recovery.restore(blob, body.passphrase, dry_run=body.dry_run))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        logger.warning(f"[RECUPERAÇÃO] recuperação remota falhou: {e}")
+        raise HTTPException(502, f"Falha na recuperação: {type(e).__name__}: {e}")
+
+
+@router.post("/recovery/file/restore")
+async def recovery_file_restore(file: UploadFile = File(...), passphrase: str = Form(...), dry_run: bool = Form(True)):
+    """Recupera do arquivo .gbocdr (por exemplo, o anexo do e-mail)."""
+    import asyncio
+    from engines import config_recovery
+    blob = await file.read()
+    try:
+        return _clean(await asyncio.to_thread(config_recovery.restore, blob, passphrase, dry_run))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@router.get("/recovery/package")
+def recovery_package_download():
+    """Baixa o pacote criptografado atual (mesmo conteúdo enviado à nuvem)."""
+    from engines import config_recovery
+    phrase = config_recovery._passphrase(config_recovery.load_settings())
+    if not phrase:
+        raise HTTPException(400, "Defina a chave de recuperação primeiro")
+    payload, digest = config_recovery.build_payload()
+    blob = config_recovery.seal(payload, phrase)
+    fname = f"gboc-{config_recovery.agent_name()}-{datetime.now().strftime('%Y%m%d-%H%M%S')}{config_recovery.EXT}"
+    return StreamingResponse(io.BytesIO(blob), media_type="application/octet-stream",
+                             headers={"Content-Disposition": f'attachment; filename="{fname}"'})
+
+
+@router.post("/recovery/destination")
+def recovery_destination(body: RecoverySource):
+    """Destino próprio do pacote (bucket ou pasta), independente do motor. Bucket/pasta vazio remove.
+    Antes de salvar confere o acesso gravando, lendo e apagando um arquivo de teste."""
+    from engines import config_recovery
+    try:
+        return _clean(config_recovery.set_destination(body.dict(), test=True))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        logger.warning(f"[RECUPERAÇÃO] destino próprio recusado: {e}")
+        raise HTTPException(502, f"Destino inacessível: {type(e).__name__}: {e}")

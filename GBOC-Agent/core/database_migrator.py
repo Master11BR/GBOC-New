@@ -719,6 +719,9 @@ def run_auto_migrations(conn):
             """)
 
             # integrity_checks FK -> repositories: garantir ON DELETE CASCADE
+            # SAVEPOINT: em instalação nova integrity_checks ainda não existe; sem ele o erro abortava a transação
+            # inteira e o commit() final descartava TODAS as migrações desta execução (log dizia "sucesso").
+            cursor.execute("SAVEPOINT fk_integrity_checks")
             try:
                 cursor.execute("""
                     SELECT rc.delete_rule, tc.constraint_name
@@ -746,8 +749,10 @@ def run_auto_migrations(conn):
                         ON DELETE CASCADE
                     """)
                     logging.info("✅ integrity_checks FK ajustada para ON DELETE CASCADE")
+                cursor.execute("RELEASE SAVEPOINT fk_integrity_checks")
             except Exception as e:
                 # tabela pode não existir ainda em algumas instalações
+                cursor.execute("ROLLBACK TO SAVEPOINT fk_integrity_checks")
                 logging.info(f"ℹ️ Migração FK integrity_checks ignorada: {e}")
 
             migrations_run += 1

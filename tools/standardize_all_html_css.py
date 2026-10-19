@@ -9,12 +9,12 @@ if hasattr(sys.stdout, 'reconfigure'):
     except Exception:
         pass
 
-folders = [r"GBOC-Agent\static", r"GBOC-Server"]
+folders = [r"GBOC-Agent\static", r"GBOC-Agent\modules", r"GBOC-Server"]
 updated_files = []
 standalone_pages = []
 fragment_templates = []
 
-STANDARD_HEAD_INJECTIONS = """    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+STANDARD_HEAD_INJECTIONS = """    <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
     <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.8.1">
     <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=14.8.1">
     <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=14.8.1">
@@ -49,7 +49,9 @@ for folder in folders:
                     has_style = "style.css" in head_part
                     has_themes = "gboc-themes.css" in head_part
                     has_layout = "gboc-layout.css" in head_part
-                    has_fa = "font-awesome" in head_part or "all.min.css" in head_part
+                    # FontAwesome deve ser o vendor LOCAL (offline-first).
+                    # CDN externo bloqueia o first paint em redes isoladas.
+                    has_fa = "/static/vendor/fontawesome/css/all.min.css" in head_part
                     has_layout_mgr = "gboc-layout-manager.js" in head_part
                     has_modal = "gboc-modal.js" in head_part
                     has_perf = "gboc-perf.js" in head_part

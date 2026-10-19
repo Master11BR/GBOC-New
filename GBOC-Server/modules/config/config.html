@@ -67,9 +67,9 @@
                         <option value="gemini">Google Gemini (Gemini 1.5 / 2.0)</option>
                         <option value="deepseek">DeepSeek (V3 / R1 Nuvem)</option>
                         <option value="claude">Anthropic Claude (3.5 Sonnet)</option>
-                        <option value="qwen">Qwen 2.5 (Alibaba / Ollama)</option>
+                        <option value="qwen">Qwen 3.5 (Alibaba / Ollama)</option>
                         <option value="mistral">Mistral AI (Codestral / Le Chat)</option>
-                        <option value="llama3">Meta Llama 3.3 (70B Local/Cloud)</option>
+                        <option value="llama3">Meta Llama 3.1 (8B Local)</option>
                         <option value="cohere">Cohere (Command R+)</option>
                     </select>
                 </div>
@@ -86,12 +86,12 @@
                     <label style="display:block;font-size:.88em;font-weight:600;margin-bottom:8px;color:var(--text)" for="ai-model"><i class="fas fa-brain" style="color:var(--primary);margin-right:6px"></i> Modelo LLM de IA (Ollama / Cloud)</label>
                     <div style="display:flex;gap:8px;flex-direction:column">
                         <select id="ai-model-select" onchange="onModelSelectChanged(this.value)" style="width:100%;padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:.9em">
-                            <option value="llama3">🟢 llama3:latest (Instalado / Padrão)</option>
+                            <option value="">Clique em "Detectar IA Local" para listar os modelos</option>
                         </select>
                         <div id="model-status-badge" style="font-size:0.83em;padding:6px 10px;border-radius:6px;background:rgba(255,255,255,0.05);color:var(--text-muted)">
                             <i class="fas fa-info-circle"></i> Selecione um modelo da lista acima.
                         </div>
-                        <input type="text" id="ai-model" value="llama3" placeholder="Ex: llama3, mistral, llama3.2:latest, deepseek-r1" style="width:100%;padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:.9em;margin-top:4px">
+                        <input type="text" id="ai-model" value="qwen3.5:4b" placeholder="Ex: qwen3.5:4b, gemma4:12b, glm-5.3-flash:cloud" style="width:100%;padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:.9em;margin-top:4px">
                     </div>
                 </div>
 

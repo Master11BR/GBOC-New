@@ -238,7 +238,7 @@ async def get_storage_forecast():
 
 
 @router.get("/sla-compliance")
-async def get_sla_compliance(days: int = 30):
+def get_sla_compliance(days: int = 30):
     """Calcula SLA compliance por tarefa — RPO, taxa de sucesso, última execução"""
     core = _get_core()
     try:

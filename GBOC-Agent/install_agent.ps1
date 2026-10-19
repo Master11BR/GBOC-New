@@ -9,10 +9,10 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 # ============================================================================
 # GBOC Agent - Instalador Completo v14.8.1
 # ============================================================================
-# Instala e configura automaticamente:
-# - Python 3.11+
-# - PostgreSQL 16
-# - Restic, Kopia, Duplicati (motores de backup)
+# Instala e configura automaticamente, sempre na ULTIMA versao estavel (consultada na hora):
+# - Python (python.org; se as dependencias ainda nao instalarem na mais nova, usa a anterior)
+# - PostgreSQL (postgresql.org/EDB; instalacao existente e mantida)
+# - Restic, Kopia, Duplicati (GitHub; versoes antigas sao atualizadas)
 # - Dependências Python do Agent
 # - Serviço Windows do Agent (opcional)
 # ============================================================================
@@ -45,22 +45,20 @@ $RESTIC_DIR = "$TOOLS_DIR\Restic"
 $KOPIA_DIR = "$TOOLS_DIR\Kopia"
 $DUPLICATI_DIR = "$TOOLS_DIR\Duplicati"
 
-$PYTHON_VERSION = "3.11.9"
-$POSTGRES_VERSION = "16.6-1"
-$RESTIC_VERSION = "0.17.3"
-$KOPIA_VERSION = "0.18.2"
-$DUPLICATI_VERSION = "2.1.0.2"
+# Versoes: nao ficam mais fixas aqui. scripts\gboc_prereqs.ps1 descobre a ultima versao estavel de cada
+# programa no momento da instalacao (com versao conhecida de reserva se a consulta falhar).
+$POSTGRES_VERSION = ""
 
 $DB_NAME = "gboc_agent"
 $DB_USER = "gboc"
 $DB_PASSWORD = "gboc_$(Get-Random -Maximum 999999)"
 
-# URLs de download
-$PYTHON_URL = "https://www.python.org/ftp/python/$PYTHON_VERSION/python-$PYTHON_VERSION-amd64.exe"
-$POSTGRES_URL = "https://get.enterprisedb.com/postgresql/postgresql-$POSTGRES_VERSION-windows-x64.exe"
-$RESTIC_URL = "https://github.com/restic/restic/releases/download/v$RESTIC_VERSION/restic_${RESTIC_VERSION}_windows_amd64.zip"
-$KOPIA_URL = "https://github.com/kopia/kopia/releases/download/v$KOPIA_VERSION/kopia-${KOPIA_VERSION}-windows-x64.zip"
-$DUPLICATI_URL = "https://github.com/duplicati/duplicati/releases/download/v${DUPLICATI_VERSION}_beta/duplicati-${DUPLICATI_VERSION}_beta_windows-x64.zip"
+$prereqs = @("$PSScriptRoot\scripts\gboc_prereqs.ps1", "$PSScriptRoot\gboc_prereqs.ps1") | Where-Object { Test-Path $_ } | Select-Object -First 1
+if (-not $prereqs) {
+	Write-Host "scripts\gboc_prereqs.ps1 nao encontrado. Execute o instalador a partir da pasta GBOC-Agent." -ForegroundColor Red
+	exit 1
+}
+. $prereqs
 
 # ============================================================================
 # FUNÇÕES AUXILIARES
@@ -161,55 +159,19 @@ Write-Step "Criando estrutura de diretórios"
 # INSTALAÇÃO DO PYTHON
 # ============================================================================
 
-Write-Step "Verificando Python"
+Write-Step "Python (ultima versao estavel)"
 
-$pythonExe = "$PYTHON_DIR\python.exe"
-$pythonInstalled = Test-Path $pythonExe
-
-if ($pythonInstalled) {
-	$pyVersion = & $pythonExe --version 2>&1
-	Write-Warning "Python já instalado: $pyVersion"
-	Write-Host "    Use a instalação existente? (S/N): " -NoNewline -ForegroundColor Yellow
-	$response = if ($Unattended) { Write-Host "S (automático)"; "S" } else { Read-Host }
-	if ($response -eq "N" -or $response -eq "n") {
-		$pythonInstalled = $false
-	}
+# Instala a versao mais nova do python.org (para todos os usuarios, com o launcher "py") se ainda nao
+# existir e ja instala as dependencias do Agente nela. Os scripts de inicializacao e o servico escolhem o
+# Python sozinhos (scripts\gboc_python.ps1): atualizar o Python depois nao impede o Agente de iniciar.
+$reqSource = if (Test-Path "$PSScriptRoot\requirements.txt") { "$PSScriptRoot\requirements.txt" } else { "$(Split-Path -Parent $PSScriptRoot)\requirements.txt" }
+$pythonExe = Install-GbocPython -Requirements $reqSource
+if (-not $pythonExe) {
+	Write-Error "Nao foi possivel instalar o Python com as dependencias do GBOC"
+	exit 1
 }
-
-if (-not $pythonInstalled) {
-	Write-Step "Instalando Python $PYTHON_VERSION"
-
-	$pythonInstaller = "$env:TEMP\python-installer.exe"
-
-	if (Download-File -Url $PYTHON_URL -Output $pythonInstaller) {
-		Write-Host "    Instalando Python (modo silencioso)..."
-
-		$installArgs = @(
-			"/quiet",
-			"InstallAllUsers=0",
-			"PrependPath=0",
-			"Include_test=0",
-			"Include_doc=0",
-			"TargetDir=$PYTHON_DIR"
-		)
-
-		Start-Process -FilePath $pythonInstaller -ArgumentList $installArgs -Wait -NoNewWindow
-
-		if (Test-Path $pythonExe) {
-			Write-Success "Python instalado com sucesso"
-		}
-		else {
-			Write-Error "Falha na instalação do Python"
-			exit 1
-		}
-
-		Remove-Item $pythonInstaller -Force
-	}
-	else {
-		Write-Error "Não foi possível baixar o Python"
-		exit 1
-	}
-}
+$PYTHON_DIR = Split-Path -Parent $pythonExe
+Write-Success "Python: $pythonExe"
 
 # Adicionar Python ao PATH da sessão
 $env:PATH = "$PYTHON_DIR;$PYTHON_DIR\Scripts;$env:PATH"
@@ -224,15 +186,38 @@ $pgBin = "$POSTGRES_DIR\bin"
 $pgExe = "$pgBin\postgres.exe"
 $pgInstalled = Test-Path $pgExe
 
+# PostgreSQL ja instalado em outro lugar (servico, Program Files): usa o existente em vez de instalar outro
+if (-not $pgInstalled) {
+	$existingPgBin = Find-GbocPostgresBin -ToolsDir $TOOLS_DIR
+	if ($existingPgBin -and (Test-Path "$existingPgBin\postgres.exe")) {
+		$pgBin = $existingPgBin
+		$pgExe = "$pgBin\postgres.exe"
+		$POSTGRES_DIR = Split-Path -Parent $pgBin
+		$pgInstalled = $true
+	}
+}
+
 if ($pgInstalled) {
-	Write-Warning "PostgreSQL já instalado"
+	Write-Warning "PostgreSQL já instalado ($pgBin) - mantido (trocar a versao principal exige migrar os dados)"
 }
 else {
+	$pgRelease = Get-GbocPostgresRelease
+	$POSTGRES_VERSION = $pgRelease.Version
+	$POSTGRES_URL = $pgRelease.Url
 	Write-Step "Instalando PostgreSQL $POSTGRES_VERSION"
 
 	$pgInstaller = "$env:TEMP\postgres-installer.exe"
 
-	if (Download-File -Url $POSTGRES_URL -Output $pgInstaller) {
+	# Pacote completo (Prereqs\): instalador do PostgreSQL ja vem no pacote, sem download
+	$pgReady = $false
+	if ($pgRelease.PSObject.Properties["File"] -and $pgRelease.File) {
+		Write-Host "    Usando o instalador do PostgreSQL do pacote"
+		Copy-Item $pgRelease.File $pgInstaller -Force
+		$pgReady = Test-Path $pgInstaller
+	} else {
+		$pgReady = Download-File -Url $POSTGRES_URL -Output $pgInstaller
+	}
+	if ($pgReady) {
 		Write-Host "    Instalando PostgreSQL (modo silencioso)..."
 		Write-Host "    Senha do superusuário postgres: postgres" -ForegroundColor Yellow
 
@@ -514,65 +499,20 @@ if (-not $dbCreated) {
 # INSTALAÇÃO DOS MOTORES DE BACKUP
 # ============================================================================
 
-Write-Step "Instalando motores de backup (SISTEMA)"
+Write-Step "Instalando/atualizando motores de backup (ultima versao)"
 
-# Restic
-if (-not (Test-Path "$RESTIC_DIR\restic.exe")) {
-	Write-Host "    Instalando Restic $RESTIC_VERSION..."
-	$resticZip = "$env:TEMP\restic.zip"
-
-	if (Download-File -Url $RESTIC_URL -Output $resticZip) {
-		Expand-Archive -Path $resticZip -DestinationPath $RESTIC_DIR -Force
-		Remove-Item $resticZip -Force
-		Write-Success "Restic instalado"
-	}
-}
-else {
-	Write-Success "Restic já instalado"
-}
-
-# Kopia
-if (-not (Test-Path "$KOPIA_DIR\kopia.exe")) {
-	Write-Host "    Instalando Kopia $KOPIA_VERSION..."
-	$kopiaZip = "$env:TEMP\kopia.zip"
-
-	if (Download-File -Url $KOPIA_URL -Output $kopiaZip) {
-		Expand-Archive -Path $kopiaZip -DestinationPath $KOPIA_DIR -Force
-		Remove-Item $kopiaZip -Force
-		Write-Success "Kopia instalado"
-	}
-}
-else {
-	Write-Success "Kopia já instalado"
-}
-
-# Duplicati (instalação de CLI apenas)
-if (-not (Test-Path "$DUPLICATI_DIR\Duplicati.CommandLine.exe")) {
-	Write-Host "    Instalando Duplicati $DUPLICATI_VERSION..."
-	$duplicatiZip = "$env:TEMP\duplicati.zip"
-
-	# Duplicati requer .NET, verificar se está disponível
-	$dotnetInstalled = Test-CommandExists "dotnet"
-	if (-not $dotnetInstalled) {
-		Write-Warning "Duplicati requer .NET Runtime. Pulando instalação do Duplicati."
-		Write-Warning "Instale o .NET 6 Runtime manualmente: https://dotnet.microsoft.com/download/dotnet/6.0"
-	}
-	else {
-		if (Download-File -Url $DUPLICATI_URL -Output $duplicatiZip) {
-			Expand-Archive -Path $duplicatiZip -DestinationPath $DUPLICATI_DIR -Force
-			Remove-Item $duplicatiZip -Force
-			Write-Success "Duplicati instalado"
-		}
-	}
-}
-else {
-	Write-Success "Duplicati já instalado"
+# restic, Kopia e Duplicati na ultima release do GitHub; versao instalada mais antiga e atualizada.
+# Tambem define RESTIC_PATH / KOPIA_PATH / DUPLICATI_PATH (maquina).
+$engines = Install-GbocEngines -ToolsDir $TOOLS_DIR
+foreach ($k in @("restic", "kopia", "duplicati")) {
+	if ($engines[$k]) { Write-Success "${k}: $($engines[$k])" } else { Write-Warning "$k nao instalado" }
 }
 
 # Adicionar motores ao PATH do SISTEMA (não apenas da sessão)
 Write-Step "Configurando PATH do sistema"
 $systemPath = [Environment]::GetEnvironmentVariable("Path", "Machine")
-$pathsToAdd = @($RESTIC_DIR, $KOPIA_DIR, $DUPLICATI_DIR, $PYTHON_DIR, "$PYTHON_DIR\Scripts", $pgBin)
+# Python fica fora: o instalador do Python cuida do PATH dele (pasta de versao fixa ficaria velha ao atualizar)
+$pathsToAdd = @($RESTIC_DIR, $KOPIA_DIR, $DUPLICATI_DIR, $pgBin)
 
 $updated = $false
 foreach ($pathToAdd in $pathsToAdd) {
@@ -704,16 +644,8 @@ LOG_LEVEL=INFO
 Set-Content -Path "$AGENT_DIR\.env" -Value $envContent
 Write-Success "Arquivo .env criado"
 
-# Criar script de inicialização
-$startScript = @"
-@echo off
-cd /d "$AGENT_DIR"
-"$PYTHON_DIR\python.exe" agent_server.py
-pause
-"@
-
-Set-Content -Path "$AGENT_DIR\start_agent.bat" -Value $startScript
-Write-Success "Script de inicialização criado"
+# start_agent.bat / start_agent.ps1 copiados do pacote escolhem o Python sozinhos (scripts\gboc_python.ps1).
+# Antes era gerado aqui um start_agent.bat com o caminho do python.exe fixo e o ponto de entrada antigo.
 
 # ============================================================================
 # CONFIGURAÇÃO DO SERVIÇO WINDOWS (OPCIONAL)
@@ -726,19 +658,11 @@ $installService = if ($Unattended) { Write-Host "S (automático)"; "S" } else { 
 if ($installService -eq "S" -or $installService -eq "s") {
 	Write-Step "Configurando serviço Windows"
 
-	# NSSM (Non-Sucking Service Manager) para criar serviço
-	$nssmUrl = "https://nssm.cc/release/nssm-2.24.zip"
-	$nssmZip = "$env:TEMP\nssm.zip"
+	# NSSM (Non-Sucking Service Manager) para criar serviço: do pacote (Prereqs\) ou da internet.
+	# Antes o nssm.exe era movido para "$TOOLS_DIR\nssm" sem a pasta existir (virava um arquivo "nssm") e o serviço não era criado.
 	$nssmDir = "$TOOLS_DIR\nssm"
-
-	if (-not (Test-Path "$nssmDir\nssm.exe")) {
-		Write-Host "    Baixando NSSM..."
-		if (Download-File -Url $nssmUrl -Output $nssmZip) {
-			Expand-Archive -Path $nssmZip -DestinationPath $TOOLS_DIR -Force
-			Move-Item "$TOOLS_DIR\nssm-2.24\win64\nssm.exe" $nssmDir -Force
-			Remove-Item $nssmZip -Force
-			Remove-Item "$TOOLS_DIR\nssm-2.24" -Recurse -Force
-		}
+	if (-not (Install-GbocNssm -ToolsDir $TOOLS_DIR)) {
+		Write-Warning "NSSM não disponível (sem pacote e sem acesso a nssm.cc); serviço do Windows não será criado"
 	}
 
 	$serviceName = "GBOCAgent"
@@ -751,8 +675,15 @@ if ($installService -eq "S" -or $installService -eq "s") {
 	}
 
 	Write-Host "    Criando serviço $serviceName..."
-	& "$nssmDir\nssm.exe" install $serviceName "$PYTHON_DIR\python.exe" "$AGENT_DIR\agent_server.py"
+	# O servico executa start_agent.ps1 -Service (e nao um python.exe com caminho fixo): a cada inicio o
+	# script escolhe o Python mais novo com as dependencias. Atualizar ou trocar a pasta do Python nao
+	# derruba o servico. (AGENT_DIR sem espacos: C:\GBOC\Agent)
+	New-Item -ItemType Directory -Path "$AGENT_DIR\logs" -Force | Out-Null
+	$psExe = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
+	& "$nssmDir\nssm.exe" install $serviceName $psExe
+	& "$nssmDir\nssm.exe" set $serviceName AppParameters "-NoProfile -ExecutionPolicy Bypass -File $AGENT_DIR\start_agent.ps1 -Service"
 	& "$nssmDir\nssm.exe" set $serviceName AppDirectory $AGENT_DIR
+	& "$nssmDir\nssm.exe" set $serviceName AppRestartDelay 15000
 	& "$nssmDir\nssm.exe" set $serviceName DisplayName "GBOC Backup Agent"
 	& "$nssmDir\nssm.exe" set $serviceName Description "GBOC Agent de backup e restauração"
 	& "$nssmDir\nssm.exe" set $serviceName Start SERVICE_AUTO_START
@@ -761,7 +692,7 @@ if ($installService -eq "S" -or $installService -eq "s") {
 	& "$nssmDir\nssm.exe" set $serviceName ObjectName LocalSystem
 
 	# Configurar variáveis de ambiente do serviço
-	& "$nssmDir\nssm.exe" set $serviceName AppEnvironmentExtra "RESTIC_PATH=$RESTIC_DIR\restic.exe" "KOPIA_PATH=$KOPIA_DIR\kopia.exe" "DUPLICATI_PATH=$DUPLICATI_DIR\Duplicati.CommandLine.exe"
+	& "$nssmDir\nssm.exe" set $serviceName AppEnvironmentExtra "RESTIC_PATH=$RESTIC_DIR\restic.exe" "KOPIA_PATH=$KOPIA_DIR\kopia.exe" "DUPLICATI_PATH=$DUPLICATI_DIR\Duplicati.CommandLine.exe" "PYTHONIOENCODING=utf-8"
 
 	# Configurar stdout/stderr para logs
 	& "$nssmDir\nssm.exe" set $serviceName AppStdout "$AGENT_DIR\logs\service_stdout.log"
@@ -793,7 +724,7 @@ if ($ServerURL -and $InstallToken) {
 	}
 	else {
 		# Sem rede/Server no momento: o serviço tenta novamente sozinho (enroll.json)
-		$seedDir = "C:\ProgramData\GBOC"
+		$seedDir = "$AGENT_DIR\data\central"     # dentro da pasta do Agente (antes: C:\ProgramData\GBOC)
 		New-Item -ItemType Directory -Force -Path $seedDir | Out-Null
 		@{ server_url = $ServerURL; install_token = $InstallToken } | ConvertTo-Json | Set-Content -Path "$seedDir\enroll.json" -Encoding UTF8
 		Write-Warning "Inscrição não concluída agora ($($enrollOut.Trim())). O serviço tentará novamente a cada 5 minutos."
@@ -818,7 +749,7 @@ Write-Host @"
 
 Write-Host "INFORMAÇÕES DA INSTALAÇÃO:" -ForegroundColor Cyan
 Write-Host "  • Agent instalado em: $AGENT_DIR"
-Write-Host "  • Python: $PYTHON_DIR"
+Write-Host "  • Python: $pythonExe (escolhido a cada inicio: scripts\gboc_python.ps1)"
 Write-Host "  • PostgreSQL: $POSTGRES_DIR"
 Write-Host "  • Banco de dados: $DB_NAME"
 Write-Host "  • Usuário do banco: $DB_USER"
@@ -828,7 +759,7 @@ Write-Host "  • Kopia: $KOPIA_DIR\kopia.exe"
 Write-Host "  • Duplicati: $DUPLICATI_DIR\Duplicati.CommandLine.exe"
 
 Write-Host "`nPRÓXIMOS PASSOS:" -ForegroundColor Yellow
-Write-Host "  1. Acesse: http://localhost:9200"
+Write-Host "  1. Acesse: https://localhost:9200"
 Write-Host "  2. Faça login com as credenciais padrão"
 Write-Host "  3. Configure repositórios e tarefas de backup"
 

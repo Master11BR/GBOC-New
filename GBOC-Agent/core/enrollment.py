@@ -8,7 +8,8 @@ configuração central e passa a se comunicar sozinho — sem digitar a chave em
 Formas de uso:
   * linha de comando (usada pelo script de instalação):
       python -m core.enrollment --server https://gboc.empresa.com.br:8000 --token gbi_xxx
-  * arquivo de semente: C:\\ProgramData\\GBOC\\enroll.json  {"server_url": "...", "install_token": "..."}
+  * arquivo de semente: <Agente>\\data\\central\\enroll.json (instalador) ou C:\\ProgramData\\GBOC\\enroll.json (GPO/Intune)
+    {"server_url": "...", "install_token": "..."}
     processado na inicialização do serviço (o token é removido do arquivo depois do uso).
 """
 from __future__ import annotations
@@ -33,14 +34,23 @@ class TokenRejected(RuntimeError):
 
 
 def config_dir() -> Path:
-    d = Path("C:/ProgramData/GBOC") if os.name == "nt" else Path.home() / ".gboc"
-    d.mkdir(parents=True, exist_ok=True)
-    return d
+    """data/central/ do Agente (antes: C:\\ProgramData\\GBOC) - core/gboc_paths.py"""
+    from core.gboc_paths import central_dir
+    return central_dir()
+
+
+def _seed_file() -> Optional[Path]:
+    from core.gboc_paths import enroll_seed_files
+    for f in enroll_seed_files():
+        if f.is_file():
+            return f
+    return None
 
 
 def agent_id() -> str:
     """Mesmo identificador usado pelo cliente do servidor central (arquivo agent_id)."""
-    f = config_dir() / "agent_id"
+    from core.gboc_paths import central_file
+    f = central_file("agent_id")
     if f.exists():
         v = f.read_text().strip()
         if v:
@@ -94,9 +104,9 @@ def enroll(server_url: str, token: str, apply_live: bool = False) -> Dict[str, A
 
 
 def process_seed_file() -> Optional[Dict[str, Any]]:
-    """Processa C:\\ProgramData\\GBOC\\enroll.json (GPO/Intune). Retorna o resultado ou None."""
-    f = config_dir() / "enroll.json"
-    if not f.exists():
+    """Processa o enroll.json (data/central/ ou C:\\ProgramData\\GBOC). Retorna o resultado ou None."""
+    f = _seed_file()
+    if not f:
         return None
     try:
         seed = json.loads(f.read_text(encoding="utf-8-sig"))
@@ -109,16 +119,18 @@ def process_seed_file() -> Optional[Dict[str, Any]]:
         res = enroll(seed["server_url"], seed["install_token"], apply_live=True)
         seed.pop("install_token", None)
         seed.update(enrolled_at=datetime.now().isoformat(), result=res)
-        f.with_name("enroll.done.json").write_text(json.dumps(seed, ensure_ascii=False, indent=2), encoding="utf-8")
+        (config_dir() / "enroll.done.json").write_text(json.dumps(seed, ensure_ascii=False, indent=2), encoding="utf-8")
         f.unlink()
+        _drop_empty_legacy(f)
         return res
     except TokenRejected as e:
         # Não fica tentando por 72 h com um token que o Server já recusou: arquiva e para
         seed.pop("install_token", None)
         seed.update(last_error=str(e)[:300], last_attempt=datetime.now().isoformat())
         try:
-            f.with_name("enroll.failed.json").write_text(json.dumps(seed, ensure_ascii=False, indent=2), encoding="utf-8")
+            (config_dir() / "enroll.failed.json").write_text(json.dumps(seed, ensure_ascii=False, indent=2), encoding="utf-8")
             f.unlink()
+            _drop_empty_legacy(f)
         except OSError:
             pass
         logger.error(f"[INSCRIÇÃO] Token recusado pelo Server ({e}). Gere um novo token no Server e execute o instalador "
@@ -135,12 +147,22 @@ def process_seed_file() -> Optional[Dict[str, Any]]:
         return None
 
 
+def _drop_empty_legacy(seed: Path) -> None:
+    """Semente de GPO/Intune processada: remove C:\\ProgramData\\GBOC se ficou vazia."""
+    try:
+        from core.gboc_paths import LEGACY_CENTRAL_DIR
+        if seed.parent == LEGACY_CENTRAL_DIR and not any(LEGACY_CENTRAL_DIR.iterdir()):
+            LEGACY_CENTRAL_DIR.rmdir()
+    except OSError:
+        pass
+
+
 def seed_loop(interval: int = 300, max_hours: int = 72) -> None:
     """Processa o enroll.json e, se o Server estiver inacessível, tenta novamente a cada 5 minutos."""
     import time
     deadline = time.time() + max_hours * 3600
     while time.time() < deadline:
-        if not (config_dir() / "enroll.json").exists():
+        if not _seed_file():
             return
         if process_seed_file():
             return

@@ -86,7 +86,7 @@ async def get_system_ui_config_v2(request: Request):
         "DEFAULT_THEME": "dark",
         "AVAILABLE_THEMES": ["dark", "light", "amber", "purple", "ocean", "red"],
         "DEFAULT_UI_STYLE": "minimal",
-        "AVAILABLE_UI_STYLES": ["minimal", "neumorphism", "claymorphism", "fluent", "nexus-widgets", "nexus-glass", "command-sentinel", "cyber-3d"]
+        "AVAILABLE_UI_STYLES": ["minimal", "neumorphism", "claymorphism", "fluent", "nexus-widgets", "nexus-glass", "command-sentinel", "cyber-3d", "fernly", "fernly-cyberpunk", "fernly-fluid"]
     }
     elapsed = (time.perf_counter() - t0) * 1000
     return build_v2_response(data=ui_data, execution_time_ms=elapsed)
@@ -137,6 +137,7 @@ def get_system_health_v2(request: Request):
     db_status = "unknown"
     db_latency_ms = None
     
+    conn = None
     try:
         from server_gboc import get_db, release_db
         db_t0 = time.perf_counter()
@@ -147,12 +148,15 @@ def get_system_health_v2(request: Request):
             cur.fetchone()
             cur.close()
             release_db(conn)
+            conn = None
             db_latency_ms = round((time.perf_counter() - db_t0) * 1000, 2)
             db_status = "healthy"
         else:
             db_status = "unavailable"
     except Exception as e:
         db_status = f"error: {str(e)}"
+        if conn is not None:   # erro no meio da consulta: devolver a conexão ao pool
+            release_db(conn)
     
     health_data = {
         "status": "healthy" if db_status == "healthy" else "degraded",

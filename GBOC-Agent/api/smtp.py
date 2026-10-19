@@ -39,48 +39,16 @@ def configure_smtp(config: SMTPConfig) -> Dict[str, Any]:
         from shared_core import get_shared_core
         core = get_shared_core()
 
+        from engines import smtp_store
         with core.get_db_connection() as conn:
             cursor = conn.cursor()
-            
-            # Criar tabela se não existir
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS smtp_config (
-                    id INTEGER PRIMARY KEY DEFAULT 1,
-                    server TEXT NOT NULL,
-                    port INTEGER NOT NULL DEFAULT 587,
-                    username TEXT NOT NULL,
-                    password TEXT NOT NULL,
-                    use_tls BOOLEAN NOT NULL DEFAULT TRUE,
-                    from_email TEXT NOT NULL,
-                    from_name TEXT NOT NULL DEFAULT 'GBOC Backup System',
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            
-            # Inserir ou atualizar configuração (PostgreSQL upsert)
-            cursor.execute("""
-                INSERT INTO smtp_config 
-                (id, server, port, username, password, use_tls, from_email, from_name, updated_at)
-                VALUES (1, %s, %s, %s, %s, %s, %s, %s, NOW())
-                ON CONFLICT (id) DO UPDATE SET
-                    server = EXCLUDED.server,
-                    port = EXCLUDED.port,
-                    username = EXCLUDED.username,
-                    password = EXCLUDED.password,
-                    use_tls = EXCLUDED.use_tls,
-                    from_email = EXCLUDED.from_email,
-                    from_name = EXCLUDED.from_name,
-                    updated_at = NOW()
-            """, (
-                config.server,
-                config.port,
-                config.username,
-                config.password,
-                config.use_tls,
-                config.from_email,
-                config.from_name
-            ))
-            
+            smtp_store.ensure_schema(cursor)
+            password = config.password
+            if not password or password == "********":          # senha em branco na tela: mantém a atual
+                password = (smtp_store.load(cursor) or {}).get("password") or ""
+            # Bancos com a tabela do migrador (coluna "host") passam a ter também "server" (nada é apagado)
+            smtp_store.save(cursor, config.server, config.port, config.username, password, config.use_tls,
+                            config.from_email, config.from_name)
             conn.commit()
 
         logger.info("✅ SMTP configuration saved")
@@ -99,16 +67,11 @@ async def test_smtp(test: SMTPTest) -> Dict[str, Any]:
         core = get_shared_core()
 
         # Carregar configuração SMTP
+        from engines import smtp_store
         with core.get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM smtp_config WHERE id = 1")
-            row = cursor.fetchone()
-            
-            if not row:
-                return {"status": "error", "message": "Configuração SMTP não encontrada. Configure primeiro."}
-            
-            columns = [desc[0] for desc in cursor.description]
-            config_data = dict(zip(columns, row))
+            config_data = smtp_store.load(conn.cursor())        # tabela com "server" ou "host"
+        if not config_data or not config_data.get("server"):
+            return {"status": "error", "message": "Configuração SMTP não encontrada. Configure primeiro."}
 
         # Criar mensagem de teste
         msg = MIMEMultipart()
@@ -130,17 +93,12 @@ async def test_smtp(test: SMTPTest) -> Dict[str, Any]:
 
         msg.attach(MIMEText(body, 'html'))
 
-        # Enviar email
-        await send_email_async(
-            server=config_data['server'],
-            port=config_data['port'],
-            username=config_data['username'],
-            password=config_data['password'],
-            use_tls=config_data['use_tls'],
-            from_email=config_data['from_email'],
-            to_email=test.test_email,
-            message=msg
-        )
+        # Enviar email (465 = SSL direto; demais portas = STARTTLS) fora do event loop
+        try:
+            await asyncio.to_thread(smtp_store.deliver, config_data, [test.test_email], msg)
+        except Exception as send_err:
+            logger.error(f"❌ SMTP test: {send_err}")
+            return {"status": "error", "message": smtp_store.friendly_error(send_err)}
 
         logger.info(f"✅ SMTP test email sent to {test.test_email}")
         return {"status": "success", "message": "Email de teste enviado com sucesso"}
@@ -183,22 +141,17 @@ def get_smtp_config() -> Dict[str, Any]:
         from shared_core import get_shared_core
         core = get_shared_core()
 
+        from engines import smtp_store
         with core.get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT server, port, username, use_tls, from_email, from_name, updated_at 
-                FROM smtp_config WHERE id = 1
-            """)
-            row = cursor.fetchone()
-            
-            if not row:
-                return {"status": "success", "config": None}
-            
-            columns = [desc[0] for desc in cursor.description]
-            config_data = dict(zip(columns, row))
+            full = smtp_store.load(conn.cursor())               # tabela com "server" ou "host"
+        if not full:
+            return {"status": "success", "config": None}
+        config_data = {k: full.get(k) for k in ("server", "port", "username", "use_tls", "from_email",
+                                                "from_name", "updated_at")}
+        config_data["password_set"] = bool(full.get("password"))
 
         return {"status": "success", "config": config_data}
 
     except Exception as e:
         logger.error(f"❌ Get SMTP config: {e}", exc_info=True)
-        return {"status": "error", "message": str(e)}
+        return {"status": "error", "message": str(e)}

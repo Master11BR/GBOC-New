@@ -97,7 +97,9 @@ class VirtualLabSandboxEngine:
             resolved_disk = disk_path
         else:
             # Buscar VHDX de recuperação nos diretórios de exportação
-            candidates = list(Path("data/dr_exports").glob("*.vhdx")) + list(Path("C:/GBOC-DR").glob("*.vhdx"))
+            from core.gboc_paths import data_dir as _gboc_data_dir
+            # pasta atual do DR + a antiga (exportacoes feitas por versoes anteriores)
+            candidates = list(_gboc_data_dir("dr_exports", create=False).glob("*.vhdx")) + list(Path("C:/GBOC-DR").glob("*.vhdx"))
             if candidates:
                 resolved_disk = str(candidates[0])
 

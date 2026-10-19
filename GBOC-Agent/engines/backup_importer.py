@@ -195,7 +195,8 @@ class RealBackupImporter:
                                 raw_target = cand_url
                                 break
                         if raw_target.startswith("enc-v1:"):
-                            raw_target = "C:\\GBOC-Backups"
+                            from core.gboc_paths import REPOSITORIES_DIR as _gboc_repos
+                            raw_target = str(_gboc_repos / "importados")     # antes: C:\\GBOC-Backups
 
                     # Normalizar caminho e determinar tipo específico de repositório
                     is_cloud = any(proto in raw_target.lower() for proto in ["s3://", "wasabi", "b2://", "azure", "sftp://"])
@@ -205,7 +206,8 @@ class RealBackupImporter:
                             clean_path = clean_path[1:]
                         clean_path = clean_path.replace("/", "\\")
                     else:
-                        clean_path = raw_target if raw_target else "C:\\GBOC-Backups"
+                        from core.gboc_paths import REPOSITORIES_DIR as _gboc_repos
+                        clean_path = raw_target if raw_target else str(_gboc_repos / "importados")   # antes: C:\\GBOC-Backups
 
                     # Se for caminho local no Windows/Linux, garantir criação do diretório físico
                     if not is_cloud and clean_path and (":" in clean_path or clean_path.startswith("/")):

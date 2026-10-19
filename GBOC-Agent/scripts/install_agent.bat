@@ -18,13 +18,26 @@ echo   (PostgreSQL habilitado)
 echo ========================================
 echo.
 
-REM Detectar comando Python
-set PYTHON_CMD=
+REM Python: ULTIMA versao estavel do python.org (reaproveita a instalada se ja for a mais nova) com as
+REM dependencias do Agente - gboc_prereqs.ps1. Se elas ainda nao instalarem na mais nova, usa a anterior.
+set "PYTHON_CMD="
+set "PYEXE="
+set "GBOC_PREREQS=%~dp0gboc_prereqs.ps1"
+if not exist "%GBOC_PREREQS%" set "GBOC_PREREQS=%~dp0scripts\gboc_prereqs.ps1"
+echo Verificando/instalando o Python mais recente (pode levar alguns minutos)...
+set "GBOC_OUT=%TEMP%\gboc_py_path.txt"
+del "%GBOC_OUT%" >nul 2>&1
+if exist "%GBOC_PREREQS%" powershell -NoProfile -ExecutionPolicy Bypass -File "%GBOC_PREREQS%" -Python -Requirements "%CD%\requirements.txt" -OutFile "%GBOC_OUT%"
+if exist "%GBOC_OUT%" set /p PYEXE=<"%GBOC_OUT%"
+if defined PYEXE if exist "%PYEXE%" (
+    set PYTHON_CMD="%PYEXE%"
+    goto :python_found
+)
 
-REM Preferir Python 3.14 explicitamente
-py -3.14 --version >nul 2>&1
+REM Sem internet: Python ja instalado (o launcher "py -3" usa a versao mais nova)
+py -3 --version >nul 2>&1
 if %errorlevel% equ 0 (
-    set PYTHON_CMD=py -3.14
+    set PYTHON_CMD=py -3
     goto :python_found
 )
 
@@ -34,19 +47,7 @@ if %errorlevel% equ 0 (
     goto :python_found
 )
 
-py --version >nul 2>&1
-if %errorlevel% equ 0 (
-    set PYTHON_CMD=py
-    goto :python_found
-)
-
-python3 --version >nul 2>&1
-if %errorlevel% equ 0 (
-    set PYTHON_CMD=python3
-    goto :python_found
-)
-
-echo [ERRO] Python nao encontrado!
+echo [ERRO] Python nao encontrado! Instale o mais recente: https://www.python.org/downloads/
 pause
 exit /b 1
 
@@ -130,7 +131,7 @@ if %ALL_OK%==0 (
     echo ========================================
     echo.
     echo Tente:
-    echo 1. Usar Python 3.14 (recomendado)
+    echo 1. Usar o Python mais recente (python.org)
     echo 2. Reexecutar: install_agent.bat
     echo 3. Instalar manualmente:
     echo    py -m pip install "pydantic==2.12.5" "pydantic-core==2.41.5" "fastapi==0.135.1" "starlette==0.52.1" "uvicorn==0.41.0"
@@ -148,6 +149,6 @@ echo Banco esperado do agente: gboc_agent.
 echo.
 echo Proximos passos:
 echo   1. Execute: start_agent.bat
-echo   2. Acesse: http://localhost:9200
+echo   2. Acesse: https://localhost:9200
 echo.
 pause

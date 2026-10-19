@@ -18,7 +18,9 @@ class LocalStorageBackend(StorageBackend):
         super().__init__(config)
         raw_path = str(self.get_path() or '')
         if raw_path.startswith("enc-v1:") or not raw_path:
-            raw_path = "C:\\GBOC-Backups" if os.name == 'nt' else "/tmp/gboc-backups"
+            # dentro da pasta do Agente (antes: C:\\GBOC-Backups / /tmp/gboc-backups)
+            from core.gboc_paths import REPOSITORIES_DIR
+            raw_path = str(REPOSITORIES_DIR / "local")
         self.base_path = Path(raw_path)
         # Garante que o diretório base exista
         try:

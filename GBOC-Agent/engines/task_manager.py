@@ -147,7 +147,8 @@ class TaskManager:
         if repo_type == 'local':
             env["RESTIC_REPOSITORY"] = str(repo_path or '')
         elif repo_type == 's3':
-            env["RESTIC_REPOSITORY"] = f"s3:s3.amazonaws.com/{repo_path}"
+            from engines.s3_endpoint import restic_s3_repository      # endpoint próprio (S3 compatível) ou AWS
+            env["RESTIC_REPOSITORY"] = restic_s3_repository(task.get('endpoint'), repo_path)
             env["AWS_ACCESS_KEY_ID"] = str(task.get('aws_access_key') or '')
             env["AWS_SECRET_ACCESS_KEY"] = str(task.get('aws_secret_key') or '')
         elif repo_type == 'wasabi':
@@ -1331,11 +1332,12 @@ class TaskManager:
                     if not prefix.endswith('/'):
                         prefix += '/'
                     s3_args.extend(['--prefix', prefix])
+                from engines.s3_endpoint import kopia_endpoint_args
                 if repo_type == 'wasabi':
                     endpoint = task.get('endpoint') or f"s3.{region}.wasabisys.com"
-                    s3_args.extend(['--endpoint', endpoint])
+                    s3_args.extend(kopia_endpoint_args(endpoint))
                 elif task.get('endpoint'):
-                    s3_args.extend(['--endpoint', task.get('endpoint')])
+                    s3_args.extend(kopia_endpoint_args(task.get('endpoint')))
                 connect_cmd.extend(s3_args)
             elif repo_type == 'b2':
                 connect_cmd.extend([
@@ -1431,7 +1433,9 @@ class TaskManager:
             args = _ret.restic_forget_args(pol, host, source_paths)
             args.remove('--prune')          # forget e prune separados: a saída --json do forget fica legível
             locked = bool(pol.get('lock_days'))
-            r = subprocess.run([restic, *args, "--json"], env=env, capture_output=True, text=True, timeout=7200)
+            from engines.restic_lock import run_with_stale_unlock
+            # Trava abandonada (processo restic morto) é removida e o forget é repetido uma vez
+            r = run_with_stale_unlock([restic, *args, "--json"], env=env, timeout=7200)
             if r.returncode != 0:
                 err = (r.stderr or r.stdout or '').strip()[:500]
                 logger.warning(f"[RETENÇÃO] restic forget falhou: {err}")
@@ -1444,8 +1448,8 @@ class TaskManager:
                 pass
             if removed:
                 # Repositório imutável: apaga só pacotes 100% sem uso (nunca regrava pacotes recentes, bloqueados)
-                pr = subprocess.run([restic, "prune", *(["--max-unused", "unlimited"] if locked else [])], env=env,
-                                    capture_output=True, text=True, timeout=7200)
+                pr = run_with_stale_unlock([restic, "prune", *(["--max-unused", "unlimited"] if locked else [])],
+                                           env=env, timeout=7200)
                 if pr.returncode != 0:
                     logger.warning(f"[RETENÇÃO] restic prune: {(pr.stderr or '').strip()[:300]}")
             logger.info(f"[RETENÇÃO] restic: {removed} snapshot(s) antigos removidos "
@@ -1484,6 +1488,10 @@ class TaskManager:
                 if not os.path.exists(p):
                     return {"success": False, "error": f"Caminho inválido ou não encontrado: {p}"}
 
+            # Chave secreta do provedor: a já resolvida acima (secret_enc criptografado no config) tem prioridade.
+            # Antes a coluna repositories.cloud_password (pode estar desatualizada após editar a chave) virava
+            # 'secret_key' na normalização e o envio falhava com SignatureDoesNotMatch.
+            _cloud_secret = task.get('aws_secret_key') or task.get('b2_account_key') or task.get('cloud_password')
             repo_cfg = {
                 'id': task.get('repository_id'),
                 'type': task.get('repo_type', 'local'),
@@ -1491,7 +1499,8 @@ class TaskManager:
                 'bucket': task.get('repo_path', ''),
                 'engine': 'gboc_native',
                 'motor_password': task.get('motor_password'),
-                'cloud_password': task.get('cloud_password'),
+                'cloud_password': _cloud_secret,
+                'secret_key': _cloud_secret,
                 'aws_access_key': task.get('aws_access_key'),
                 'aws_secret_key': task.get('aws_secret_key'),
                 'b2_account_id': task.get('b2_account_id'),
@@ -1533,8 +1542,14 @@ class TaskManager:
                     return be
             else:
                 _factory = (lambda: backend)
+            _tid = task.get('id')
+
+            def _native_progress(p, _tid=_tid):
+                # barra de progresso ao vivo da tela de tarefas (monitor -> task_executions)
+                self.monitor.update_progress(_tid, **{k: v for k, v in p.items() if k not in ('phase', 'threads')})
+
             engine = GBOCNativeEngine({'source_paths': source_paths, 'compression_v4': _codec,
-                                       'compression_level': _level},
+                                       'compression_level': _level, 'progress_cb': _native_progress},
                                       backend, backend_factory=_factory, workers=_workers)
             result = engine.run_backup()
 

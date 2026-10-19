@@ -23,7 +23,10 @@ class BitrotScrubEngine:
     Zero-Mock: 100% de leitura de blocos reais do sistema de arquivos.
     """
 
-    def run_bitrot_scrub(self, target_repository_path: str = "C:\\GBOC-Backups") -> Dict[str, Any]:
+    def run_bitrot_scrub(self, target_repository_path: str = "") -> Dict[str, Any]:
+        if not target_repository_path:
+            from core.gboc_paths import REPOSITORIES_DIR
+            target_repository_path = str(REPOSITORIES_DIR)       # antes: C:\\GBOC-Backups
         start_time = time.time()
         logs: List[str] = [f"Iniciando varredura de integridade física e lógica (Scrub) em: {target_repository_path}"]
 

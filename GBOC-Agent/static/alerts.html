@@ -54,6 +54,18 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         .alert-icon.success{background:rgba(78,203,136,.15);color:var(--success)}
 
         .filter-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:20px}
+        .status-pills{display:flex;gap:6px;flex-wrap:wrap}
+        /* Lista longa: o navegador só desenha os alertas visíveis (rolagem leve mesmo com mensagens enormes) */
+        .alert-item{content-visibility:auto;contain-intrinsic-size:auto 120px}
+        .alert-item .alert-sel{margin-top:12px;width:16px;height:16px;flex-shrink:0;cursor:pointer;accent-color:var(--primary)}
+        .alert-msg{font-size:.85em;color:var(--text-muted);overflow-wrap:anywhere;word-break:break-word}
+        .alert-msg pre{white-space:pre-wrap;margin:6px 0 0;font-size:.95em;max-height:320px;overflow:auto;background:var(--bg-input);padding:8px;border-radius:6px}
+        .alert-more{background:none;border:0;color:var(--primary);cursor:pointer;font-size:.8em;padding:0;margin-left:4px}
+        .bulk-bar{display:none;align-items:center;gap:8px;flex-wrap:wrap}
+        .bulk-bar.show{display:flex}
+        .list-tools{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+        .list-tools label{display:flex;align-items:center;gap:6px;font-size:.85em;cursor:pointer}
+        .load-more{display:block;margin:14px auto}
         .filter-bar select,.filter-bar input{padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:.88em}
 
         .two-col{display:grid;grid-template-columns:1fr 1fr;gap:24px}
@@ -81,7 +93,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                     <div class="page-subtitle">Central de alertas, configuração de canais e regras de notificação</div>
                 </div>
                 <div class="header-actions">
-                    <button class="btn btn-secondary" onclick="markAllRead()"><i class="fas fa-check-double"></i> Marcar Lidas</button>
+                    <button class="btn btn-secondary" onclick="markAllRead()" title="Marca TODOS os alertas como lidos"><i class="fas fa-check-double"></i> Marcar Todos Lidos</button>
                     <button class="btn btn-secondary" onclick="loadAll()"><i class="fas fa-sync-alt"></i> Atualizar</button>
                     <button class="btn btn-primary" onclick="openRuleModal()"><i class="fas fa-plus"></i> Nova Regra</button>
                 </div>
@@ -110,23 +122,33 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                     <option value="warning">Aviso</option>
                     <option value="info">Info</option>
                 </select>
-                <select id="flt-status" onchange="loadAlerts()">
-                    <option value="">Todos Status</option>
-                    <option value="unread">Não Lidos</option>
-                    <option value="read">Lidos</option>
-                    <option value="resolved">Resolvidos</option>
-                </select>
-                <input type="text" id="flt-search" placeholder="Buscar alertas..." style="flex:1;min-width:200px" onkeyup="if(event.key==='Enter')loadAlerts()">
+                <nav class="status-pills" aria-label="Filtro de status dos alertas">
+                    <button type="button" class="tab-btn" data-status="pending"><i class="fas fa-bell"></i> Pendentes</button>
+                    <button type="button" class="tab-btn" data-status="read"><i class="fas fa-eye"></i> Lidos</button>
+                    <button type="button" class="tab-btn" data-status="resolved"><i class="fas fa-circle-check"></i> Resolvidos</button>
+                    <button type="button" class="tab-btn" data-status="all"><i class="fas fa-layer-group"></i> Todos</button>
+                </nav>
+                <input type="text" id="flt-search" placeholder="Buscar alertas..." style="flex:1;min-width:200px" oninput="searchDebounced()" onkeyup="if(event.key==='Enter')loadAlerts()">
                 <button class="btn btn-primary" onclick="loadAlerts()"><i class="fas fa-search"></i></button>
             </div>
 
             <!-- Alerts List -->
             <div class="panel">
                 <div class="panel-header">
-                    <h3><i class="fas fa-list" style="color:var(--primary)"></i> Alertas Recentes</h3>
+                    <div class="list-tools">
+                        <h3><i class="fas fa-list" style="color:var(--primary)"></i> Alertas</h3>
+                        <label title="Seleciona todos os alertas carregados nesta lista"><input type="checkbox" id="sel-all" onchange="toggleSelectAll(this.checked)"> Selecionar todos</label>
+                        <div class="bulk-bar" id="bulk-bar">
+                            <span id="sel-count" style="font-size:.82em;color:var(--text-muted)"></span>
+                            <button class="btn btn-sm btn-secondary" onclick="bulkAction('acknowledge')"><i class="fas fa-check"></i> Marcar lidos</button>
+                            <button class="btn btn-sm btn-secondary" onclick="bulkAction('resolve')"><i class="fas fa-check-double"></i> Resolver</button>
+                            <button class="btn btn-sm btn-danger" onclick="bulkAction('delete')"><i class="fas fa-trash"></i> Excluir</button>
+                        </div>
+                    </div>
                     <span id="alerts-count" style="font-size:.82em;color:var(--text-muted)"></span>
                 </div>
                 <div class="panel-body" id="alerts-list"><div class="empty-msg">Carregando...</div></div>
+                <button class="btn btn-secondary load-more" id="load-more" style="display:none" onclick="loadAlerts(true)"><i class="fas fa-angles-down"></i> Carregar mais</button>
             </div>
 
             <div class="two-col">
@@ -243,48 +265,121 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         }catch(e){console.error('loadStats:',e)}
     }
 
-    async function loadAlerts(){
+    // ── Lista de alertas: filtro de status (como em Logs), busca no servidor, seleção e ações em lote ──
+    const PAGE=50, MSG_PREVIEW=280;
+    const STATUS_FILTERS={pending:'&acknowledged=false&resolved=false', read:'&acknowledged=true&resolved=false', resolved:'&resolved=true', all:''};
+    let _status='pending', _offset=0, _alerts=[], _selected=new Set(), _searchTimer=null;
+    try{ const s0=localStorage.getItem('gboc_alerts_status'); if(STATUS_FILTERS[s0]!==undefined)_status=s0; }catch(e){ /* armazenamento indisponível: usa Pendentes */ }
+
+    function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+    function searchDebounced(){clearTimeout(_searchTimer);_searchTimer=setTimeout(()=>loadAlerts(),350)}
+    function setStatus(st){
+        _status=st;
+        try{localStorage.setItem('gboc_alerts_status',st)}catch(e){ /* sem persistência */ }
+        document.querySelectorAll('.status-pills [data-status]').forEach(b=>b.classList.toggle('active',b.dataset.status===st));
+        loadAlerts();
+    }
+    document.addEventListener('DOMContentLoaded',()=>{
+        document.querySelectorAll('.status-pills [data-status]').forEach(b=>{
+            b.classList.toggle('active',b.dataset.status===_status);
+            b.addEventListener('click',()=>setStatus(b.dataset.status));
+        });
+    });
+
+    function alertHtml(a){
+        const sev=a.severity||'info';
+        const iconCls=sev==='critical'?'critical':sev==='warning'?'warning':sev==='success'?'success':'info';
+        const icon=sev==='critical'?'exclamation-circle':sev==='warning'?'exclamation-triangle':'info-circle';
+        const isRead=a.acknowledged||false;
+        const ts=a.timestamp||a.created_at||'';
+        const msg=String(a.message||'');
+        const long=msg.length>MSG_PREVIEW;
+        const msgHtml=long
+            ?`${esc(msg.slice(0,MSG_PREVIEW))}… <button class="alert-more" onclick="toggleMsg(${Number(a.id)},this)">ver mais</button><pre hidden></pre>`
+            :esc(msg);
+        return `<div class="alert-item ${isRead?'':'unread'}" data-id="${Number(a.id)}">
+            <input type="checkbox" class="alert-sel" ${_selected.has(a.id)?'checked':''} onchange="toggleSel(${Number(a.id)},this.checked)" aria-label="Selecionar alerta">
+            <div class="alert-icon ${iconCls}"><i class="fas fa-${icon}"></i></div>
+            <div style="flex:1;min-width:0">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;gap:8px">
+                    <strong style="font-size:.92em">${esc(a.title||'Alerta')}</strong>
+                    <span style="font-size:.78em;color:var(--text-muted);white-space:nowrap">${ts?gbocFormatDateTime(ts):'Sem data'}</span>
+                </div>
+                <div class="alert-msg">${msgHtml}</div>
+                <div style="font-size:.75em;color:var(--text-muted);margin-top:4px">
+                    ${a.source?`<i class="fas fa-tag"></i> ${esc(a.source)} · `:''}
+                    ${a.type?`<span class="badge-info">${esc(a.type)}</span> · `:''}
+                    ${a.resolved?'<span class="badge-ok">RESOLVIDO</span>':isRead?'<span class="badge-info">LIDO</span>':'<span class="badge-warn">PENDENTE</span>'}
+                </div>
+            </div>
+            <div style="display:flex;gap:4px;flex-shrink:0">
+                ${!isRead?`<button class="btn btn-sm btn-secondary" onclick="markRead(${Number(a.id)})" title="Marcar como lido"><i class="fas fa-check"></i></button>`:''}
+                ${!a.resolved?`<button class="btn btn-sm btn-secondary" onclick="resolveAlert(${Number(a.id)})" title="Resolver"><i class="fas fa-check-double"></i></button>`:''}
+                <button class="btn btn-sm btn-danger" onclick="deleteAlert(${Number(a.id)})" title="Excluir"><i class="fas fa-trash"></i></button>
+            </div>
+        </div>`;
+    }
+
+    function toggleMsg(id,btn){
+        const pre=btn.nextElementSibling, a=_alerts.find(x=>x.id===id);
+        if(!pre||!a)return;
+        if(pre.hidden){pre.textContent=String(a.message||'');pre.hidden=false;btn.textContent='ver menos'}
+        else{pre.hidden=true;pre.textContent='';btn.textContent='ver mais'}
+    }
+
+    function updateSelectionUi(){
+        const n=_selected.size;
+        document.getElementById('bulk-bar').classList.toggle('show',n>0);
+        document.getElementById('sel-count').textContent=n?`${n} selecionado(s)`:'';
+        const all=document.getElementById('sel-all');
+        all.checked=n>0&&_alerts.length>0&&_alerts.every(a=>_selected.has(a.id));
+        all.indeterminate=n>0&&!all.checked;
+    }
+    function toggleSel(id,on){on?_selected.add(id):_selected.delete(id);updateSelectionUi()}
+    function toggleSelectAll(on){
+        _alerts.forEach(a=>on?_selected.add(a.id):_selected.delete(a.id));
+        document.querySelectorAll('#alerts-list .alert-sel').forEach(c=>c.checked=on);
+        updateSelectionUi();
+    }
+
+    async function loadAlerts(append=false){
         try{
             const sev=document.getElementById('flt-severity').value;
-            const st=document.getElementById('flt-status').value;
-            const q=document.getElementById('flt-search').value;
-            let url=API+'?limit=50';
-            if(sev)url+=`&severity=${sev}`;
-            if(st==='unread')url+=`&resolved=false`;
-            else if(st==='resolved')url+=`&resolved=true`;
+            const q=document.getElementById('flt-search').value.trim();
+            if(!append){_offset=0;_alerts=[];_selected.clear()}
+            let url=`${API}?limit=${PAGE}&offset=${_offset}`+STATUS_FILTERS[_status];
+            if(sev)url+=`&severity=${encodeURIComponent(sev)}`;
+            if(q)url+=`&q=${encodeURIComponent(q)}`;
             const r=await fetch(url);const d=await r.json();
-            const alerts=d.alerts||[];
-            document.getElementById('alerts-count').textContent=`${alerts.length} alertas`;
+            const page=d.alerts||[];
+            _alerts=_alerts.concat(page);
+            _offset+=page.length;
+            const matching=typeof d.matching==='number'?d.matching:_alerts.length;
+            document.getElementById('alerts-count').textContent=`${_alerts.length} de ${matching} alertas`;
+            document.getElementById('load-more').style.display=_alerts.length<matching&&page.length?'block':'none';
             const el=document.getElementById('alerts-list');
-            if(!alerts.length){el.innerHTML='<div class="empty-msg"><i class="fas fa-bell-slash" style="font-size:2em;opacity:.3;margin-bottom:8px;display:block"></i>Nenhum alerta encontrado</div>';return}
-            el.innerHTML=alerts.map(a=>{
-                const sev=a.severity||'info';
-                const iconCls=sev==='critical'?'critical':sev==='warning'?'warning':sev==='success'?'success':'info';
-                const icon=sev==='critical'?'exclamation-circle':sev==='warning'?'exclamation-triangle':'info-circle';
-                const isRead=a.acknowledged||false;
-                const ts=a.timestamp||a.created_at||'';
-                return `<div class="alert-item ${isRead?'':'unread'}">
-                    <div class="alert-icon ${iconCls}"><i class="fas fa-${icon}"></i></div>
-                    <div style="flex:1">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-                            <strong style="font-size:.92em">${a.title||'Alerta'}</strong>
-                            <span style="font-size:.78em;color:var(--text-muted)">${ts?gbocFormatDateTime(ts):'Sem data'}</span>
-                        </div>
-                        <div style="font-size:.85em;color:var(--text-muted)">${a.message||''}</div>
-                        <div style="font-size:.75em;color:var(--text-muted);margin-top:4px">
-                            ${a.source?`<i class="fas fa-tag"></i> ${a.source} · `:''}
-                            ${a.type?`<span class="badge-info">${a.type}</span> · `:''}
-                            ${a.resolved?'<span class="badge-ok">RESOLVIDO</span>':isRead?'<span class="badge-info">LIDO</span>':'<span class="badge-warn">PENDENTE</span>'}
-                        </div>
-                    </div>
-                    <div style="display:flex;gap:4px;flex-shrink:0">
-                        ${!isRead?`<button class="btn btn-sm btn-secondary" onclick="markRead(${a.id})" title="Marcar como lido"><i class="fas fa-check"></i></button>`:''}
-                        ${!a.resolved?`<button class="btn btn-sm btn-secondary" onclick="resolveAlert(${a.id})" title="Resolver"><i class="fas fa-check-double"></i></button>`:''}
-                        <button class="btn btn-sm btn-danger" onclick="deleteAlert(${a.id})" title="Excluir"><i class="fas fa-trash"></i></button>
-                    </div>
-                </div>`;
-            }).join('');
+            if(!_alerts.length){el.innerHTML='<div class="empty-msg"><i class="fas fa-bell-slash" style="font-size:2em;opacity:.3;margin-bottom:8px;display:block"></i>Nenhum alerta encontrado</div>';updateSelectionUi();return}
+            if(append)el.insertAdjacentHTML('beforeend',page.map(alertHtml).join(''));
+            else el.innerHTML=_alerts.map(alertHtml).join('');
+            updateSelectionUi();
         }catch(e){console.error('loadAlerts:',e)}
+    }
+
+    async function confirmAction(msg){
+        if(typeof window.gbocConfirm==='function')return window.gbocConfirm(msg,{title:'Confirmar',type:'warning'});
+        return window.confirm(msg);
+    }
+    async function bulkAction(action){
+        const ids=[..._selected];
+        if(!ids.length)return;
+        const label={acknowledge:'marcar como lidos',resolve:'resolver',delete:'EXCLUIR'}[action];
+        if(!await confirmAction(`Deseja ${label} ${ids.length} alerta(s) selecionado(s)?`))return;
+        try{
+            const r=await fetch(API+'/bulk-action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,alert_ids:ids})});
+            if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.detail||('HTTP '+r.status))}
+            _selected.clear();
+            await Promise.allSettled([loadStats(),loadAlerts()]);
+        }catch(e){alert('Falha na ação em lote: '+e.message)}
     }
 
     // Rules are stored locally (no backend API for rules)
@@ -358,10 +453,10 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     function deleteRule(idx){if(!confirm('Excluir regra?'))return;_localRules.splice(idx,1);localStorage.setItem('gboc_alert_rules',JSON.stringify(_localRules));loadRules()}
     async function deleteChannel(id){if(!confirm('Excluir canal?'))return;try{await fetch('/api/notification-channels/'+id,{method:'DELETE'});loadAll()}catch(e){alert(e.message)}}
     async function testChannel(id){try{const r=await fetch('/api/notification-channels/'+id+'/test',{method:'POST'});const d=await r.json();alert(d.message||d.status||'Teste enviado!')}catch(e){alert(e.message)}}
-    async function markRead(id){try{await fetch(API+'/'+id+'/acknowledge',{method:'PUT'});loadAll()}catch(e){}}
+    async function markRead(id){try{await fetch(API+'/'+id+'/acknowledge',{method:'PUT'});loadStats();loadAlerts()}catch(e){}}
     async function markAllRead(){try{await fetch(API+'/bulk-action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'acknowledge',alert_ids:'all'})});loadAll()}catch(e){}}
-    async function resolveAlert(id){try{await fetch(API+'/'+id+'/resolve',{method:'PUT'});loadAll()}catch(e){}}
-    async function deleteAlert(id){if(!confirm('Excluir este alerta?'))return;try{await fetch(API+'/'+id,{method:'DELETE'});loadAll()}catch(e){}}
+    async function resolveAlert(id){try{await fetch(API+'/'+id+'/resolve',{method:'PUT'});loadStats();loadAlerts()}catch(e){}}
+    async function deleteAlert(id){if(!await confirmAction('Excluir este alerta?'))return;try{await fetch(API+'/'+id,{method:'DELETE'});loadStats();loadAlerts()}catch(e){}}
     </script>
 </body>
 </html>

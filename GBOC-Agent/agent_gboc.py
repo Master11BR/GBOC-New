@@ -286,6 +286,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"[INSCRIÇÃO] Verificação do enroll.json indisponível: {e}")
 
+    # Recuperação automática: pacote criptografado da configuração na nuvem (Config Export/Import > Recuperação)
+    try:
+        from engines import config_recovery
+        config_recovery.start()
+    except Exception as e:
+        logger.warning(f"[RECUPERAÇÃO] backup automático da configuração indisponível: {e}")
+
     # Retenção automática dos logs do agente (Logs > Retenção; 0 = manter tudo)
     try:
         from api.logs import start_retention_loop
@@ -432,7 +439,7 @@ async def get_agent_ui_config_endpoint():
         "DEFAULT_THEME": "dark",
         "AVAILABLE_THEMES": ["dark", "light", "purple", "ocean"],
         "DEFAULT_UI_STYLE": "minimal",
-        "AVAILABLE_UI_STYLES": ["minimal", "neumorphism", "claymorphism", "fluent"]
+        "AVAILABLE_UI_STYLES": ["minimal", "neumorphism", "claymorphism", "fluent", "fernly", "fernly-cyberpunk", "fernly-fluid"]
     }
 
 _allowed_origins_raw = os.getenv("AGENT_CORS_ORIGINS", "http://localhost:9200,http://127.0.0.1:9200")

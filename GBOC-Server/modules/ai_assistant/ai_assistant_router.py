@@ -526,16 +526,16 @@ async def get_ollama_models(request: Request):
             return JSONResponse({"status": "error", "connected": False, "message": str(e)}, status_code=400)
 
     info = await aip.alist_ollama_models(load_server_ai_config(), host)
-    recommended = ["llama3.2:latest", "llama3.1:8b", "qwen2.5:7b", "mistral:latest", "deepseek-r1:8b", "gemma2:9b", "phi3:latest"]
+    recommended = list(aip.OLLAMA_RECOMMENDED_MODELS)
     if info["connected"]:
         return JSONResponse({
             "status": "success", "connected": True, "ollama_host": info["host"],
-            "installed_models": info["models"], "recommended_models": recommended,
+            "installed_models": info["models"], "recommended_models": recommended, "model_sizes": dict(aip.OLLAMA_MODEL_SIZES),
             "count_installed": len(info["models"]),
         })
     return JSONResponse({
         "status": "error", "connected": False, "ollama_host": info["host"],
-        "installed_models": [], "recommended_models": recommended, "count_installed": 0,
+        "installed_models": [], "recommended_models": recommended, "model_sizes": dict(aip.OLLAMA_MODEL_SIZES), "count_installed": 0,
         "message": f"Servidor Ollama inacessível: {info['error']}",
     })
 

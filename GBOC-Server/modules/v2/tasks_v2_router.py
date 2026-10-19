@@ -31,6 +31,7 @@ def list_tasks_v2(
     tasks = []
     total = 0
 
+    conn = None
     try:
         from server_gboc import get_db, release_db
         conn = get_db()
@@ -89,8 +90,11 @@ def list_tasks_v2(
 
             cur.close()
             release_db(conn)
+            conn = None
     except Exception as e:
         logger.error(f"[API v2] Erro ao listar tarefas: {e}")
+        if conn is not None:   # erro no meio da consulta: devolver a conexão ao pool
+            release_db(conn)
 
     total_pages = (total + per_page - 1) // per_page if total > 0 else 0
     meta = PaginationMeta(

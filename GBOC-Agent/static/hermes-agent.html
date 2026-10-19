@@ -320,6 +320,25 @@
       .pillars-grid { grid-template-columns: 1fr 1fr; }
       .hermes-header { padding: 18px; flex-wrap: wrap; }
     }
+
+    /* Tema claro: a paleta acima é escura e fixa; o tema claro trocava só a cor do texto (escuro sobre cartão escuro = invisível).
+       html[...] vence o :root desta página. Cabeçalho e terminal continuam escuros, com texto claro. */
+    html[data-theme="light"], html[data-color-theme="light"] {
+      --bg-primary: #f8fafc;
+      --bg-card: #ffffff;
+      --bg-card-alt: #f1f5f9;
+      --border: rgba(15,23,42,0.10);
+      --text-primary: #0f172a;
+      --text-secondary: #475569;
+      --text-muted: #64748b;
+    }
+    html[data-theme="light"] .hermes-header, html[data-color-theme="light"] .hermes-header,
+    html[data-theme="light"] .heal-terminal, html[data-color-theme="light"] .heal-terminal {
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --border: rgba(255,255,255,0.07);
+    }
   </style>
 </head>
 <body>
