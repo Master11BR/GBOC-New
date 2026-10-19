@@ -436,6 +436,10 @@ while (-not $dbCreated -and $retryCount -lt $maxRetries) {
 
 		# Criar banco de dados
 		$createDbScript = @"
+-- Sincronizar collation version se houver atualizacao do SO
+ALTER DATABASE template1 REFRESH COLLATION VERSION;
+ALTER DATABASE postgres REFRESH COLLATION VERSION;
+
 -- Criar banco se não existir
 SELECT 'CREATE DATABASE $DB_NAME' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '$DB_NAME')\gexec
 

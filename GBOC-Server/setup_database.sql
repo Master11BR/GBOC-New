@@ -15,7 +15,10 @@ BEGIN
    END IF;
 END $$;
 
--- 2. Cria o banco se não existir (fora de transação implícita)
+-- 2. Sincroniza collation version com SO e cria o banco se não existir (fora de transação implícita)
+ALTER DATABASE template1 REFRESH COLLATION VERSION;
+ALTER DATABASE postgres REFRESH COLLATION VERSION;
+
 SELECT 'CREATE DATABASE gboc OWNER gboc_user'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'gboc')\gexec
 

@@ -264,8 +264,29 @@ class SharedCore:
             exists = cur.fetchone() is not None
             if not exists:
                 logger.warning(f"[DB] Banco '{target_db}' não encontrado. Criando automaticamente...")
-                cur.execute(sql.SQL("CREATE DATABASE {} ENCODING 'UTF8'").format(sql.Identifier(target_db)))
+                try:
+                    cur.execute(sql.SQL("CREATE DATABASE {} ENCODING 'UTF8'").format(sql.Identifier(target_db)))
+                except Exception as ce:
+                    if "collation" in str(ce).lower():
+                        logger.warning("[DB] Mismatch de collation detectado no PostgreSQL. Atualizando versões de collation e tentando novamente...")
+                        try:
+                            cur.execute("ALTER DATABASE template1 REFRESH COLLATION VERSION;")
+                        except Exception:
+                            pass
+                        try:
+                            cur.execute("ALTER DATABASE postgres REFRESH COLLATION VERSION;")
+                        except Exception:
+                            pass
+                        cur.execute(sql.SQL("CREATE DATABASE {} ENCODING 'UTF8'").format(sql.Identifier(target_db)))
+                    else:
+                        raise
                 logger.info(f"[DB] Banco '{target_db}' criado com sucesso.")
+            else:
+                # Tenta manter a versão da collation sincronizada com o SO
+                try:
+                    cur.execute(sql.SQL("ALTER DATABASE {} REFRESH COLLATION VERSION;").format(sql.Identifier(target_db)))
+                except Exception:
+                    pass
             cur.close()
         except UnicodeDecodeError:
             logger.error("[DB] Erro de encoding ao conectar no PostgreSQL. Verifique locale/encoding do servidor e mensagens em UTF-8.")
