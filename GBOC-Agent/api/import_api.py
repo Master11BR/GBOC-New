@@ -56,6 +56,7 @@ async def scan_post() -> Dict[str, Any]:
 @router.post("/execute")
 @router.post("/duplicati")
 @router.post("/native")
+@router.post("/scan-and-import")
 def execute_import_to_native() -> Dict[str, Any]:
     """Executa a conversão/importação de todos os motores e do Duplicati para o Motor Nativo do GBOC."""
     if not RealBackupImporter:
@@ -69,3 +70,15 @@ def execute_import_to_native() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Erro na execução da importação: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/progress")
+def import_progress() -> Dict[str, Any]:
+    """Status de progresso para componentes que realizam polling pós-importação"""
+    return {
+        "status": "success",
+        "progress": 100,
+        "phase": "completed",
+        "message": "Operação de importação finalizada."
+    }
+

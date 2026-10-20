@@ -77,56 +77,14 @@ class RealBackupImporter:
         return engines
 
     def _scan_duplicati_dbs(self) -> List[Dict[str, Any]]:
-        """Localiza e lê o banco SQLite do Duplicati Server se disponível."""
-        candidates = []
-        if sys.platform == "win32":
-            appdata = os.getenv("APPDATA", "")
-            localappdata = os.getenv("LOCALAPPDATA", "")
-            programdata = os.getenv("ProgramData", "")
-            if localappdata:
-                candidates.append(os.path.join(localappdata, "Duplicati", "Duplicati-server.sqlite"))
-            if appdata:
-                candidates.append(os.path.join(appdata, "Duplicati", "Duplicati-server.sqlite"))
-            if programdata:
-                candidates.append(os.path.join(programdata, "Duplicati", "Duplicati-server.sqlite"))
-        else:
-            home = os.path.expanduser("~")
-            candidates.append(os.path.join(home, ".config", "Duplicati", "Duplicati-server.sqlite"))
-            candidates.append("/var/lib/duplicati/Duplicati-server.sqlite")
-
-        jobs = []
-        for db_path in candidates:
-            if os.path.isfile(db_path):
-                try:
-                    conn = sqlite3.connect(db_path)
-                    cur = conn.cursor()
-                    cur.execute("SELECT ID, Name, TargetURL FROM Backup")
-                    rows = cur.fetchall()
-                    for r in rows:
-                        b_id, name, target_url = r[0], r[1], r[2]
-                        # Buscar origens na tabela Source / Sources
-                        sources = []
-                        try:
-                            cur.execute("SELECT Path FROM Source WHERE BackupID = ?", (b_id,))
-                            sources = [s[0] for s in cur.fetchall()]
-                        except Exception:
-                            try:
-                                cur.execute("SELECT Path FROM Sources WHERE BackupID = ?", (b_id,))
-                                sources = [s[0] for s in cur.fetchall()]
-                            except Exception:
-                                pass
-                        jobs.append({
-                            "id": b_id,
-                            "name": name,
-                            "target_url": target_url,
-                            "sources": sources,
-                            "db_path": db_path
-                        })
-                    conn.close()
-                except Exception as e:
-                    logger.warning(f"Erro ao ler banco Duplicati em {db_path}: {e}")
-
-        return jobs
+        """Extrai todos os backups e configurações do Duplicati (com decifragem completa)."""
+        try:
+            from core.integrations.duplicati_native import get_duplicati_native_service
+            dup_srv = get_duplicati_native_service()
+            return dup_srv.extract_all_duplicati_backups_detailed()
+        except Exception as e:
+            logger.warning(f"Erro ao extrair backups detalhados do Duplicati: {e}")
+            return []
 
     def import_all_to_native(self) -> Dict[str, Any]:
         """
@@ -157,149 +115,109 @@ class RealBackupImporter:
                 imported_tasks += converted_tasks
                 conn.commit()
 
-                # 3. Importar tarefas e repositórios do Duplicati caso existam
+                # 3. Importar tarefas e repositórios do Duplicati com credenciais e senhas 100% reais
                 duplicati_jobs = self._scan_duplicati_dbs()
-                # Também tentar obter da API do Duplicati Native se o serviço estiver ativo
-                try:
-                    from core.integrations.duplicati_native import get_duplicati_native_service
-                    dup_srv = get_duplicati_native_service()
-                    active_backups = dup_srv.list_backups().get("items", [])
-                    for ab in active_backups:
-                        b_obj = ab.get("Backup", {}) if isinstance(ab.get("Backup"), dict) else ab
-                        b_name = ab.get("name") or b_obj.get("Name")
-                        b_url = ab.get("target_url") or b_obj.get("TargetURL")
-                        b_id = str(ab.get("id") or b_obj.get("ID") or "")
-                        if b_name and not any(j.get("name") == b_name or str(j.get("id")) == b_id for j in duplicati_jobs):
-                            duplicati_jobs.append({
-                                "id": b_id,
-                                "name": b_name,
-                                "target_url": b_url,
-                                "sources": ab.get("sources") or [],
-                                "db_path": b_obj.get("DBPath") or ""
-                            })
-                except Exception as _e_dup:
-                    logger.warning(f"Não foi possível obter backups adicionais via API do Duplicati: {_e_dup}")
-
                 now_str = datetime.now().isoformat()
+                from core.integrations.duplicati_native import (
+                    parse_duplicati_target_and_creds,
+                    convert_duplicati_repeat_to_cron,
+                    normalize_sources_list,
+                    parse_duplicati_retention,
+                )
+
                 for job in duplicati_jobs:
-                    job_name = f"Nativo_Duplicati_{job['name']}"
-                    sources_json = json.dumps(job["sources"]) if job["sources"] else json.dumps(["C:\\"])
+                    b_name = job.get("name") or "Backup"
+                    job_name = f"Nativo_Duplicati_{b_name}"
                     raw_target = str(job.get("target_url") or "")
-                    if raw_target.startswith("enc-v1:"):
-                        for ab in active_backups:
-                            ab_obj = ab.get("Backup", {}) if isinstance(ab.get("Backup"), dict) else ab
-                            ab_name = ab.get("name") or ab_obj.get("Name")
-                            ab_id = str(ab.get("id") or ab_obj.get("ID") or "")
-                            cand_url = str(ab.get("target_url") or ab_obj.get("TargetURL") or "")
-                            if (ab_name == job.get("name") or ab_id == str(job.get("id"))) and cand_url and not cand_url.startswith("enc-v1:"):
-                                raw_target = cand_url
-                                break
-                        if raw_target.startswith("enc-v1:"):
-                            from core.gboc_paths import REPOSITORIES_DIR as _gboc_repos
-                            raw_target = str(_gboc_repos / "importados")     # antes: C:\\GBOC-Backups
+                    passphrase = str(job.get("passphrase") or "")
+                    settings = job.get("settings") or {}
+                    sources = job.get("sources") or []
+                    schedule = job.get("schedule") or {}
+                    meta = job.get("metadata") or {}
 
-                    # Normalizar caminho e determinar tipo específico de repositório
-                    is_cloud = any(proto in raw_target.lower() for proto in ["s3://", "wasabi", "b2://", "azure", "sftp://"])
-                    if raw_target.lower().startswith("file://"):
-                        clean_path = raw_target[7:]
-                        if clean_path.startswith("/") and len(clean_path) > 2 and clean_path[2] == ":":
-                            clean_path = clean_path[1:]
-                        clean_path = clean_path.replace("/", "\\")
-                    else:
-                        from core.gboc_paths import REPOSITORIES_DIR as _gboc_repos
-                        clean_path = raw_target if raw_target else str(_gboc_repos / "importados")   # antes: C:\\GBOC-Backups
+                    creds_info = parse_duplicati_target_and_creds(raw_target, passphrase, settings)
+                    repo_type = creds_info["repo_type"]
+                    clean_path = creds_info["clean_path"]
+                    config_json = json.dumps(creds_info["config"])
+                    pwd = creds_info["password"] or None
+                    m_pwd = creds_info["motor_password"] or None
+                    enc_pwd = creds_info["encryption_password"] or None
+                    c_pwd = creds_info["cloud_password"] or None
 
-                    # Se for caminho local no Windows/Linux, garantir criação do diretório físico
-                    if not is_cloud and clean_path and (":" in clean_path or clean_path.startswith("/")):
-                        try:
-                            os.makedirs(clean_path, exist_ok=True)
-                        except Exception:
-                            pass
+                    repo_name = f"Repo_Duplicati_{b_name}"
 
-                    target_lower = raw_target.lower()
-                    if "wasabi" in target_lower:
-                        repo_type = "wasabi"
-                    elif "b2://" in target_lower or "backblaze" in target_lower:
-                        repo_type = "b2"
-                    elif "azure" in target_lower:
-                        repo_type = "azure"
-                    elif "s3://" in target_lower:
-                        repo_type = "s3"
-                    elif is_cloud:
-                        repo_type = "s3"
-                    else:
-                        repo_type = "local"
-
-                    repo_config = {}
-                    if is_cloud and "://" in raw_target:
-                        try:
-                            from urllib.parse import urlparse, parse_qs
-                            u = urlparse(raw_target)
-                            qs = parse_qs(u.query)
-                            repo_config["bucket"] = u.netloc
-                            if u.path:
-                                repo_config["prefix"] = u.path.strip("/")
-                            if qs.get("s3-server-name"):
-                                repo_config["endpoint"] = qs["s3-server-name"][0]
-                            if qs.get("auth-username"):
-                                repo_config["access_key"] = qs["auth-username"][0]
-                                repo_config["aws_access_key"] = qs["auth-username"][0]
-                            if qs.get("auth-password"):
-                                repo_config["secret_key"] = qs["auth-password"][0]
-                                repo_config["aws_secret_key"] = qs["auth-password"][0]
-                        except Exception:
-                            pass
-                    config_json = json.dumps(repo_config) if repo_config else None
-
-                    # Criar ou obter repositório correspondente
-                    repo_name = f"Repo_Duplicati_{job['name']}"
-                    cur.execute("SELECT id FROM repositories WHERE name = %s OR path = %s", (repo_name, clean_path))
+                    # Criar ou obter repositório correspondente preenchendo 100% das credenciais
+                    cur.execute("""
+                        SELECT id FROM repositories 
+                        WHERE name = %s OR path = %s OR path = %s OR id = (
+                            SELECT repository_id FROM tasks WHERE name IN (%s, %s, %s) LIMIT 1
+                        )
+                    """, (repo_name, clean_path, raw_target, job_name, b_name, f"Duplicati_{b_name}"))
                     existing_repo = cur.fetchone()
+
                     if existing_repo:
                         repo_id = existing_repo[0]
                         cur.execute("""
                             UPDATE repositories 
-                            SET path = %s, type = %s, config = COALESCE(%s, config), updated_at = %s 
-                            WHERE id = %s AND (path LIKE 'enc-v1%%' OR path IS NULL OR type = 'cloud')
-                        """, (clean_path, repo_type, config_json, now_str, repo_id))
+                            SET name = %s, type = %s, path = %s, engine = 'duplicati',
+                                status = 'active', enabled = true, initialized = true,
+                                password = COALESCE(%s, password),
+                                motor_password = COALESCE(%s, motor_password),
+                                encryption_password = COALESCE(%s, encryption_password),
+                                cloud_password = COALESCE(%s, cloud_password),
+                                config = %s, updated_at = %s 
+                            WHERE id = %s
+                        """, (repo_name, repo_type, clean_path, pwd, m_pwd, enc_pwd, c_pwd, config_json, now_str, repo_id))
+                        conn.commit()
+                        logs.append(f"✓ Atualizado repositório '{repo_name}' ({repo_type.upper()}: {clean_path}) com credenciais e senhas decifradas.")
                     else:
-                        try:
-                            cur.execute("""
-                                INSERT INTO repositories (name, type, path, engine, status, enabled, initialized, config, created_at, updated_at)
-                                VALUES (%s, %s, %s, 'duplicati', 'active', true, true, %s, %s, %s)
-                                RETURNING id
-                            """, (repo_name, repo_type, clean_path, config_json, now_str, now_str))
-                            repo_id = cur.fetchone()[0]
-                        except Exception:
-                            cur.execute("""
-                                INSERT INTO repositories (name, type, path, engine, status, enabled, initialized, config, created_at, updated_at)
-                                VALUES (%s, %s, %s, 'duplicati', 'active', 1, 1, %s, %s, %s)
-                            """, (repo_name, repo_type, clean_path, config_json, now_str, now_str))
-                            repo_id = getattr(cur, 'lastrowid', None) or 1
-                        
+                        cur.execute("""
+                            INSERT INTO repositories (name, type, path, engine, status, enabled, initialized, password, motor_password, encryption_password, cloud_password, config, created_at, updated_at)
+                            VALUES (%s, %s, %s, 'duplicati', 'active', true, true, %s, %s, %s, %s, %s, %s, %s)
+                            RETURNING id
+                        """, (repo_name, repo_type, clean_path, pwd, m_pwd, enc_pwd, c_pwd, config_json, now_str, now_str))
+                        repo_id = cur.fetchone()[0]
                         imported_repos += 1
                         conn.commit()
-                        logs.append(f"✓ Criado repositório '{repo_name}' ({repo_type.upper()}: {clean_path}) para Duplicati.")
+                        logs.append(f"✓ Criado repositório '{repo_name}' ({repo_type.upper()}: {clean_path}) com credenciais e senhas completas.")
 
-                    # Verificar se tarefa já existe e atualizar / inserir
-                    cur.execute("SELECT id, repository_id FROM tasks WHERE name = %s OR name = %s", (job_name, job['name']))
+                    clean_sources = normalize_sources_list(sources)
+                    sources_json = json.dumps(clean_sources)
+                    repeat = str(schedule.get("Repeat") or schedule.get("repeat") or "2h")
+                    time_val = str(schedule.get("Time") or schedule.get("time") or "")
+                    cron = convert_duplicati_repeat_to_cron(repeat, time_val)
+                    retention_days = parse_duplicati_retention(settings)
+                    last_run_dt = meta.get("LastBackupDate") or meta.get("LastBackupFinished") or job.get("last_run") or now_str
+                    last_status = 'completed' if meta.get("LastBackupResult") in ("Success", "OK", "completed") else 'idle'
+
+                    # Verificar se tarefa já existe e atualizar / inserir com retenção, cron e origens limpas
+                    cur.execute("""
+                        SELECT id, repository_id FROM tasks 
+                        WHERE name IN (%s, %s, %s) OR repository_id = %s
+                    """, (job_name, b_name, f"Duplicati_{b_name}", repo_id))
                     existing_task = cur.fetchone()
+
                     if existing_task:
                         task_id = existing_task[0]
                         cur.execute("""
-                            UPDATE tasks SET repository_id = %s, engine = 'duplicati', source_paths = %s, status = 'idle', enabled = true, updated_at = %s
+                            UPDATE tasks 
+                            SET repository_id = %s, engine = 'duplicati', source_paths = %s,
+                                status = 'idle', enabled = true, schedule_enabled = true,
+                                schedule_cron = %s, retention_days = %s, last_run = %s,
+                                last_status = %s, updated_at = %s
                             WHERE id = %s
-                        """, (repo_id, sources_json, now_str, task_id))
+                        """, (repo_id, sources_json, cron, retention_days, last_run_dt, last_status, now_str, task_id))
                         conn.commit()
-                        logs.append(f"✓ Atualizada tarefa Duplicati '{job['name']}' vinculada ao repositório #{repo_id}.")
+                        logs.append(f"✓ Atualizada tarefa '{job_name}' com origens deduplicadas {clean_sources}, agendamento '{cron}' e retenção de {retention_days} dias.")
                     else:
                         cur.execute("""
-                            INSERT INTO tasks (name, engine, repository_id, source_paths, status, enabled, schedule_cron, created_at, updated_at)
-                            VALUES (%s, 'duplicati', %s, %s, 'idle', true, '0 */2 * * *', %s, %s)
-                        """, (job_name, repo_id, sources_json, now_str, now_str))
+                            INSERT INTO tasks (name, repository_id, engine, source_paths, status, enabled, schedule_enabled, schedule_cron, retention_days, last_run, last_status, created_at, updated_at)
+                            VALUES (%s, %s, 'duplicati', %s, 'idle', true, true, %s, %s, %s, %s, %s, %s)
+                            RETURNING id
+                        """, (job_name, repo_id, sources_json, cron, retention_days, last_run_dt, last_status, now_str, now_str))
                         imported_tasks += 1
                         conn.commit()
-                        logs.append(f"✓ Mapeada tarefa Duplicati '{job['name']}' com repositório #{repo_id}.")
+                        logs.append(f"✓ Mapeada nova tarefa '{job_name}' com repositório #{repo_id}, cron '{cron}' e {len(clean_sources)} origens.")
 
                 # 4. Caso não existam tarefas nativas registradas, criar uma tarefa padrão do sistema nativo
                 cur.execute("SELECT COUNT(*) FROM tasks WHERE engine = 'native'")

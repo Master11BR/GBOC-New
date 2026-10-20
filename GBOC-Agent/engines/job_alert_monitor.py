@@ -123,12 +123,24 @@ def ensure_alert_tables():
                     last_retried_at TIMESTAMPTZ,
                     resolved_at TIMESTAMPTZ
                 );
+                ALTER TABLE job_failure_log ADD COLUMN IF NOT EXISTS task_id TEXT;
+                ALTER TABLE job_failure_log ADD COLUMN IF NOT EXISTS task_name TEXT;
+                ALTER TABLE job_failure_log ADD COLUMN IF NOT EXISTS execution_id TEXT;
+                ALTER TABLE job_failure_log ADD COLUMN IF NOT EXISTS failure_reason TEXT;
+                ALTER TABLE job_failure_log ADD COLUMN IF NOT EXISTS retry_count INTEGER DEFAULT 0;
+                ALTER TABLE job_failure_log ADD COLUMN IF NOT EXISTS max_retries INTEGER DEFAULT 3;
+                ALTER TABLE job_failure_log ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'failed';
+                ALTER TABLE job_failure_log ADD COLUMN IF NOT EXISTS alert_sent BOOLEAN DEFAULT FALSE;
+                ALTER TABLE job_failure_log ADD COLUMN IF NOT EXISTS escalated BOOLEAN DEFAULT FALSE;
+                ALTER TABLE job_failure_log ADD COLUMN IF NOT EXISTS first_failed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
+                ALTER TABLE job_failure_log ADD COLUMN IF NOT EXISTS last_retried_at TIMESTAMPTZ;
+                ALTER TABLE job_failure_log ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMPTZ;
+                CREATE INDEX IF NOT EXISTS idx_job_failure_log_task_status ON job_failure_log (task_id, status);
             """)
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_job_failure_log_task_status ON job_failure_log (task_id, status);")
             conn.commit()
             _ALERT_TABLES_ENSURED = True
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"[JobAlertMonitor] Aviso ao garantir tabelas de alerta: {e}")
 
 def record_job_failure(task_id: str, task_name: str, execution_id: str, reason: str) -> Dict[str, Any]:
     """Registra falha de job e retorna o registro criado."""
