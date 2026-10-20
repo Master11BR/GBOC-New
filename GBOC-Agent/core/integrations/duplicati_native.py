@@ -32,6 +32,194 @@ class DuplicatiConfig:
     timeout_seconds: int = 8
 
 
+def parse_duplicati_target_and_creds(target_url: str, passphrase: str = "", settings: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    from urllib.parse import urlparse, parse_qs
+    import re
+    settings = settings or {}
+    passphrase = (passphrase or "").strip()
+    if passphrase.startswith("enc-v1:"):
+        passphrase = ""
+
+    target_url = str(target_url or "").strip()
+    if target_url.startswith("enc-v1:"):
+        clean_path = target_url
+        endpoint = ""
+        bucket = ""
+        prefix = ""
+        access_key = ""
+        secret_key = ""
+        repo_type = "cloud"
+    else:
+        u = urlparse(target_url)
+        qs = parse_qs(u.query)
+        bucket = u.netloc or ""
+        prefix = u.path.strip("/") if u.path else ""
+        endpoint = qs.get("s3-server-name", [""])[0]
+        access_key = qs.get("auth-username", [""])[0]
+        secret_key = qs.get("auth-password", [""])[0]
+        if secret_key == "***************":
+            secret_key = ""
+
+        is_cloud = any(p in target_url.lower() for p in ["s3:", "wasabi", "b2:", "azure", "sftp:"]) or bool(endpoint)
+        target_lower = (target_url + " " + endpoint).lower()
+        if "wasabi" in target_lower:
+            repo_type = "wasabi"
+        elif "b2" in target_lower or "backblaze" in target_lower:
+            repo_type = "b2"
+        elif "azure" in target_lower:
+            repo_type = "azure"
+        elif is_cloud:
+            repo_type = "s3"
+        else:
+            repo_type = "local"
+
+        if is_cloud:
+            clean_path = f"s3://{bucket}/{prefix}" if prefix else f"s3://{bucket}"
+        else:
+            clean_path = target_url[7:] if target_url.startswith("file://") else target_url
+            if clean_path.startswith("/") and len(clean_path) > 2 and clean_path[2] == ":":
+                clean_path = clean_path[1:]
+            clean_path = os.path.normpath(clean_path)
+
+    region = ""
+    if endpoint:
+        m = re.search(r"s3[.-]([a-z0-9-]+)\.(?:wasabisys|amazonaws)\.com", endpoint, re.IGNORECASE)
+        if m:
+            region = m.group(1)
+        elif qs.get("s3-location-constraint"):
+            region = qs.get("s3-location-constraint")[0]
+
+    enc_mod = settings.get("encryption-module") or settings.get("--encryption-module") or "aes"
+    comp_mod = settings.get("compression-module") or settings.get("--compression-module") or "zip"
+    dblock = settings.get("dblock-size") or settings.get("--dblock-size") or "50MB"
+
+    config = {
+        "bucket": bucket,
+        "prefix": prefix,
+        "endpoint": endpoint,
+        "region": region,
+        "access_key": access_key,
+        "secret_key": secret_key,
+        "aws_access_key": access_key,
+        "aws_secret_key": secret_key,
+        "b2_account_id": access_key,
+        "b2_account_key": secret_key,
+        "azure_account_name": access_key,
+        "azure_account_key": secret_key,
+        "passphrase": passphrase,
+        "encryption_module": enc_mod,
+        "compression_module": comp_mod,
+        "dblock_size": dblock
+    }
+
+    return {
+        "repo_type": repo_type,
+        "clean_path": clean_path,
+        "config": config,
+        "password": passphrase,
+        "motor_password": passphrase,
+        "encryption_password": passphrase,
+        "cloud_password": secret_key
+    }
+
+
+def convert_duplicati_repeat_to_cron(repeat: str, time_str: str = "") -> str:
+    import re
+    repeat = (repeat or "").strip().lower()
+    time_str = (time_str or "").strip()
+
+    minute = "0"
+    hour = "2"
+    if time_str:
+        m = re.search(r"T(\d{2}):(\d{2})", time_str)
+        if m:
+            hour = str(int(m.group(1)))
+            minute = str(int(m.group(2)))
+
+    if not repeat or repeat == "manual":
+        return f"{minute} {hour} * * *"
+
+    m_h = re.match(r"^(\d+)\s*h", repeat)
+    if m_h:
+        h = int(m_h.group(1))
+        if h <= 1:
+            return f"{minute} * * * *"
+        return f"{minute} */{h} * * *"
+
+    m_m = re.match(r"^(\d+)\s*m(?:in)?$", repeat)
+    if m_m:
+        m_val = int(m_m.group(1))
+        return f"*/{m_val} * * * *" if m_val > 1 else "* * * * *"
+
+    m_d = re.match(r"^(\d+)\s*d", repeat)
+    if m_d:
+        d = int(m_d.group(1))
+        if d <= 1:
+            return f"{minute} {hour} * * *"
+        return f"{minute} {hour} */{d} * *"
+
+    m_w = re.match(r"^(\d+)\s*w", repeat)
+    if m_w:
+        return f"{minute} {hour} * * 0"
+
+    return "0 */2 * * *"
+
+
+def normalize_sources_list(sources_list: Any) -> List[str]:
+    if not sources_list:
+        return ["C:\\"] if sys.platform == "win32" else ["/"]
+    if isinstance(sources_list, str):
+        try:
+            sources_list = json.loads(sources_list)
+        except Exception:
+            sources_list = [sources_list]
+    if not isinstance(sources_list, list):
+        sources_list = [str(sources_list)]
+
+    clean = []
+    seen = set()
+    for s in sources_list:
+        if not s:
+            continue
+        s_str = str(s).strip()
+        if sys.platform == "win32":
+            if len(s_str) == 3 and s_str[1] == ':' and s_str[2] in ('\\', '/'):
+                norm = s_str[:2].upper() + '\\'
+            elif len(s_str) == 2 and s_str[1] == ':':
+                norm = s_str.upper() + '\\'
+            else:
+                norm = os.path.normpath(s_str)
+        else:
+            norm = os.path.normpath(s_str)
+        norm_key = norm.lower() if sys.platform == "win32" else norm
+        if norm_key not in seen:
+            seen.add(norm_key)
+            clean.append(norm)
+    return clean or (["C:\\"] if sys.platform == "win32" else ["/"])
+
+
+def parse_duplicati_retention(settings: Optional[Dict[str, Any]] = None) -> int:
+    import re
+    if not settings:
+        return 30
+    kt = str(settings.get("keep-time") or settings.get("--keep-time") or "").strip().lower()
+    if kt:
+        m = re.match(r"^(\d+)\s*([dmy])", kt)
+        if m:
+            val = int(m.group(1))
+            unit = m.group(2)
+            if unit == 'd':
+                return val
+            if unit == 'm':
+                return val * 30
+            if unit == 'y':
+                return val * 365
+    kv = str(settings.get("keep-versions") or settings.get("--keep-versions") or "").strip()
+    if kv.isdigit() and int(kv) > 0:
+        return max(30, int(kv))
+    return 30
+
+
 class DuplicatiNativeService:
     def __init__(self) -> None:
         os.makedirs(DATA_DIR, exist_ok=True)
@@ -412,6 +600,37 @@ class DuplicatiNativeService:
                         except Exception:
                             pass
 
+                        # Buscar caminhos de origem na tabela Source
+                        sources = []
+                        try:
+                            cur.execute("SELECT Path FROM Source WHERE BackupID = ?", (b_id,))
+                            sources = [s["Path"] for s in cur.fetchall()]
+                        except Exception:
+                            try:
+                                cur.execute("SELECT Path FROM Sources WHERE BackupID = ?", (b_id,))
+                                sources = [s["Path"] for s in cur.fetchall()]
+                            except Exception:
+                                pass
+
+                        # Buscar opções na tabela Option (passphrase, encryption-module, etc)
+                        options_dict = {}
+                        passphrase = ""
+                        try:
+                            cur.execute("SELECT Name, Value FROM Option WHERE BackupID = ?", (b_id,))
+                            for opt in cur.fetchall():
+                                opt_name = (opt["Name"] or "").lstrip("-")
+                                opt_val = opt["Value"]
+                                if opt_name and opt_val is not None:
+                                    options_dict[opt_name] = opt_val
+                            raw_pass = options_dict.get("passphrase") or ""
+                            if raw_pass and not raw_pass.startswith("enc-v1:"):
+                                passphrase = raw_pass
+                            elif desc and not desc.startswith("enc-v1:"):
+                                passphrase = desc
+                        except Exception:
+                            if desc and not desc.startswith("enc-v1:"):
+                                passphrase = desc
+
                         last_backup_date = fix_iso_date(metadata.get("LastBackupDate"))
                         last_result = metadata.get("LastBackupResult", "OK")
                         source_size = metadata.get("SourceFilesSize", "0")
@@ -428,7 +647,11 @@ class DuplicatiNativeService:
                             "id": b_id,
                             "name": name,
                             "description": desc,
+                            "target_url": target_url,
                             "target_label": dest_label,
+                            "passphrase": passphrase,
+                            "sources": sources,
+                            "settings": options_dict,
                             "last_run": last_backup_date,
                             "last_status": last_result,
                             "source_size": source_size,
@@ -442,6 +665,7 @@ class DuplicatiNativeService:
                                 "Name": name,
                                 "Description": desc,
                                 "TargetURL": target_url,
+                                "Sources": sources,
                                 "Metadata": metadata
                             }
                         })
@@ -453,6 +677,99 @@ class DuplicatiNativeService:
                     logger.warning(f"Erro ao ler banco do Duplicati em {path}: {e}")
 
         return []
+
+    def extract_all_duplicati_backups_detailed(self) -> List[Dict[str, Any]]:
+        """
+        Extrai todos os backups do Duplicati com decifragem nativa de credenciais via ServerUtil.exe
+        ou com fallback avançado via SQLite (com Sources e Options) e HTTP API.
+        """
+        import subprocess
+        import tempfile
+        import shutil
+        from pathlib import Path
+
+        candidates = [
+            r"C:\Program Files\Duplicati 2\Duplicati.CommandLine.ServerUtil.exe",
+            r"C:\Program Files (x86)\Duplicati 2\Duplicati.CommandLine.ServerUtil.exe",
+            os.path.expandvars(r"%LOCALAPPDATA%\Programs\Duplicati 2\Duplicati.CommandLine.ServerUtil.exe"),
+            shutil.which("Duplicati.CommandLine.ServerUtil.exe") or "",
+            shutil.which("duplicati-serverutil") or "",
+            "/usr/lib/duplicati/Duplicati.CommandLine.ServerUtil.exe",
+        ]
+        serverutil_path = next((c for c in candidates if c and os.path.isfile(c)), None)
+
+        backups: List[Dict[str, Any]] = []
+
+        if serverutil_path:
+            tmp_dir = tempfile.mkdtemp(prefix="gboc_dup_exp_")
+            try:
+                cmd = [serverutil_path, "export", "all", "--unencrypted", "--export-passwords", "--destination", tmp_dir, "--overwrite", "--json"]
+                proc = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+                if proc.returncode == 0:
+                    for json_file in Path(tmp_dir).glob("*.json"):
+                        try:
+                            with open(json_file, "r", encoding="utf-8") as f:
+                                data = json.load(f)
+                            b = data.get("Backup", {})
+                            s = data.get("Schedule", {})
+                            settings_list = b.get("Settings", [])
+                            settings_dict = {}
+                            for item in settings_list:
+                                n = (item.get("Name") or "").lstrip("-")
+                                v = item.get("Value")
+                                if n and v is not None:
+                                    settings_dict[n] = v
+
+                            passphrase = settings_dict.get("passphrase") or b.get("Description") or ""
+                            sources = b.get("Sources") or []
+
+                            dest_label = "Destino Remoto"
+                            target_url = str(b.get("TargetURL") or "")
+                            if "wasabi" in target_url.lower():
+                                dest_label = "Wasabi S3 Cloud"
+                            elif "s3.amazonaws" in target_url.lower() or "s3://" in target_url.lower():
+                                dest_label = "Amazon S3 Cloud"
+                            elif "b2" in target_url.lower():
+                                dest_label = "Backblaze B2 Cloud"
+                            elif "azure" in target_url.lower():
+                                dest_label = "Azure Blob Cloud"
+                            elif "file://" in target_url.lower() or ":" in target_url:
+                                dest_label = "Disco Local / Pasta"
+
+                            meta = b.get("Metadata", {})
+                            last_run = meta.get("LastBackupDate") or meta.get("LastBackupFinished")
+
+                            backups.append({
+                                "id": str(b.get("ID") or ""),
+                                "name": b.get("Name") or "",
+                                "description": b.get("Description") or "",
+                                "target_url": target_url,
+                                "target_label": dest_label,
+                                "passphrase": passphrase,
+                                "sources": sources,
+                                "schedule": s,
+                                "settings": settings_dict,
+                                "metadata": meta,
+                                "last_run": last_run,
+                                "last_status": meta.get("LastBackupResult", "completed"),
+                                "source_origin": "serverutil_export",
+                                "Backup": b,
+                                "Schedule": s
+                            })
+                        except Exception as _fe:
+                            logger.warning(f"Erro lendo export JSON {json_file}: {_fe}")
+            except Exception as _e_cmd:
+                logger.warning(f"Erro ao executar ServerUtil export: {_e_cmd}")
+            finally:
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+
+        if backups:
+            logger.info(f"✅ {len(backups)} backup(s) Duplicati extraído(s) e decifrado(s) com sucesso via ServerUtil.")
+            return backups
+
+        # Fallback via SQLite
+        sqlite_items = self._read_duplicati_server_db()
+        return sqlite_items
 
     def _normalize_backup_item(self, raw_item: Dict[str, Any]) -> Dict[str, Any]:
         """Normaliza um item de backup do Duplicati (seja vindo de HTTP ou de SQLite)."""
@@ -1137,8 +1454,12 @@ class DuplicatiNativeService:
                 logger.warning(f"Não foi possível obter shared_core para sync Duplicati: {e}")
                 return {"status": "error", "message": "shared_core indisponível"}
 
-        backups_res = self.list_backups()
-        items = backups_res.get("items", [])
+        # Obter backups detalhados com todas as credenciais decifradas e configurações completas
+        items = self.extract_all_duplicati_backups_detailed()
+        if not items:
+            backups_res = self.list_backups()
+            items = backups_res.get("items", [])
+
         if not items:
             res = {"status": "success", "synced_tasks": 0, "synced_executions": 0, "message": "Nenhum backup Duplicati detectado"}
             self._last_sync_ts = _py_time.time()
@@ -1170,56 +1491,74 @@ class DuplicatiNativeService:
                 cur = conn.cursor()
 
                 for item in items:
-                    b_obj = item.get("Backup", {}) if isinstance(item, dict) else {}
+                    b_obj = item.get("Backup", {}) if isinstance(item.get("Backup"), dict) else item
                     b_id = str(item.get("id") or b_obj.get("ID") or "")
                     b_name = item.get("name") or b_obj.get("Name") or f"Duplicati #{b_id}"
-                    meta = b_obj.get("Metadata", {}) if isinstance(b_obj, dict) else (item.get("Metadata") or {})
-                    schedule = item.get("Schedule", {}) or b_obj.get("Schedule", {})
-                    target_url = str(b_obj.get("TargetURL") or item.get("target_url") or "")
+                    meta = item.get("metadata") or b_obj.get("Metadata") or {}
+                    schedule = item.get("schedule") or item.get("Schedule") or b_obj.get("Schedule") or {}
+                    raw_target = str(item.get("target_url") or b_obj.get("TargetURL") or "")
+                    passphrase = str(item.get("passphrase") or "")
+                    settings = item.get("settings") or {}
+                    sources = item.get("sources") or b_obj.get("Sources") or []
 
-                    repo_path = target_url
-                    if target_url.startswith("file://"):
-                        repo_path = target_url[7:].lstrip("/") if sys.platform != "win32" else target_url[7:]
+                    creds_info = parse_duplicati_target_and_creds(raw_target, passphrase, settings)
+                    repo_type = creds_info["repo_type"]
+                    clean_path = creds_info["clean_path"]
+                    config_json = json.dumps(creds_info["config"])
+                    pwd = creds_info["password"] or None
+                    m_pwd = creds_info["motor_password"] or None
+                    enc_pwd = creds_info["encryption_password"] or None
+                    c_pwd = creds_info["cloud_password"] or None
 
-                    is_cloud = any(cloud_p in target_url.lower() for cloud_p in ("s3:", "wasabi", "b2:", "azure", "sftp"))
-                    if not is_cloud and repo_path:
-                        try:
-                            os.makedirs(repo_path, exist_ok=True)
-                        except Exception:
-                            pass
-
-                    # Garantir que o repositório existe em 'repositories'
                     repo_name = f"Repo_Duplicati_{b_name}"
-                    cur.execute("SELECT id FROM repositories WHERE name = %s OR path = %s", (repo_name, repo_path))
-                    r_row = cur.fetchone()
                     now_str = datetime.now().isoformat()
+
+                    # Criar ou atualizar repositório com credenciais e configs 100% completas
+                    cur.execute("""
+                        SELECT id FROM repositories 
+                        WHERE name = %s OR path = %s OR path = %s OR id = (
+                            SELECT repository_id FROM tasks WHERE name IN (%s, %s, %s) LIMIT 1
+                        )
+                    """, (repo_name, clean_path, raw_target, f"Nativo_Duplicati_{b_name}", b_name, f"Duplicati_{b_name}"))
+                    r_row = cur.fetchone()
+
                     if r_row:
                         repo_id = r_row[0]
-                    else:
-                        repo_type = "cloud" if is_cloud else "local"
                         cur.execute("""
-                            INSERT INTO repositories (name, type, path, engine, status, enabled, initialized, created_at, updated_at)
-                            VALUES (%s, %s, %s, 'duplicati', 'active', true, true, %s, %s)
+                            UPDATE repositories 
+                            SET name = %s, type = %s, path = %s, engine = 'duplicati',
+                                status = 'active', enabled = true, initialized = true,
+                                password = COALESCE(%s, password),
+                                motor_password = COALESCE(%s, motor_password),
+                                encryption_password = COALESCE(%s, encryption_password),
+                                cloud_password = COALESCE(%s, cloud_password),
+                                config = %s, updated_at = %s
+                            WHERE id = %s
+                        """, (repo_name, repo_type, clean_path, pwd, m_pwd, enc_pwd, c_pwd, config_json, now_str, repo_id))
+                    else:
+                        cur.execute("""
+                            INSERT INTO repositories (name, type, path, engine, status, enabled, initialized, password, motor_password, encryption_password, cloud_password, config, created_at, updated_at)
+                            VALUES (%s, %s, %s, 'duplicati', 'active', true, true, %s, %s, %s, %s, %s, %s, %s)
                             RETURNING id
-                        """, (repo_name, repo_type, repo_path, now_str, now_str))
+                        """, (repo_name, repo_type, clean_path, pwd, m_pwd, enc_pwd, c_pwd, config_json, now_str, now_str))
                         repo_id = cur.fetchone()[0]
 
-                    last_run_dt = _parse_time(meta.get("LastBackupDate") or meta.get("LastBackupFinished") or item.get("last_run"))
-                    files_count = int(meta.get("SourceFilesCount") or 0)
-                    bytes_size = int(meta.get("SourceFilesSize") or item.get("source_size") or 0)
+                    clean_sources = normalize_sources_list(sources)
+                    sources_json = json.dumps(clean_sources)
 
-                    repeat = str(schedule.get("Repeat") or item.get("schedule", {}).get("repeat") or "1D").lower()
-                    cron = "0 */2 * * *" if "2h" in repeat else ("0 2 * * *" if "1d" in repeat else "0 * * * *")
+                    repeat = str(schedule.get("Repeat") or schedule.get("repeat") or "2h")
+                    time_val = str(schedule.get("Time") or schedule.get("time") or "")
+                    cron = convert_duplicati_repeat_to_cron(repeat, time_val)
+                    retention_days = parse_duplicati_retention(settings)
+
+                    last_run_dt = _parse_time(meta.get("LastBackupDate") or meta.get("LastBackupFinished") or item.get("last_run"))
 
                     # Buscar ou criar tarefa correspondente
                     cur.execute("""
                         SELECT id FROM tasks 
-                        WHERE name = %s OR name = %s OR name = %s
-                    """, (f"Nativo_Duplicati_{b_name}", b_name, f"Duplicati_{b_name}"))
+                        WHERE name IN (%s, %s, %s) OR repository_id = %s
+                    """, (f"Nativo_Duplicati_{b_name}", b_name, f"Duplicati_{b_name}", repo_id))
                     task_row = cur.fetchone()
-
-                    sources_list = item.get("sources") or []
-                    sources_json = json.dumps(sources_list) if sources_list else json.dumps(["C:\\"])
 
                     if task_row:
                         task_id = task_row[0]
@@ -1227,22 +1566,24 @@ class DuplicatiNativeService:
                             UPDATE tasks 
                             SET repository_id = %s,
                                 engine = 'duplicati', 
+                                source_paths = %s, 
                                 status = 'idle', 
                                 enabled = true, 
                                 schedule_enabled = true, 
                                 schedule_cron = %s, 
+                                retention_days = %s,
                                 last_run = %s, 
                                 last_status = 'completed',
                                 updated_at = %s
                             WHERE id = %s
-                        """, (repo_id, cron, last_run_dt or now_str, now_str, task_id))
+                        """, (repo_id, sources_json, cron, retention_days, last_run_dt or now_str, now_str, task_id))
                     else:
                         task_name = f"Nativo_Duplicati_{b_name}"
                         cur.execute("""
-                            INSERT INTO tasks (name, repository_id, engine, source_paths, status, enabled, schedule_enabled, schedule_cron, last_run, last_status, created_at, updated_at)
-                            VALUES (%s, %s, 'duplicati', %s, 'idle', true, true, %s, %s, 'completed', %s, %s)
+                            INSERT INTO tasks (name, repository_id, engine, source_paths, status, enabled, schedule_enabled, schedule_cron, retention_days, last_run, last_status, created_at, updated_at)
+                            VALUES (%s, %s, 'duplicati', %s, 'idle', true, true, %s, %s, %s, 'completed', %s, %s)
                             RETURNING id
-                        """, (task_name, repo_id, sources_json, cron, last_run_dt or now_str, now_str, now_str))
+                        """, (task_name, repo_id, sources_json, cron, retention_days, last_run_dt or now_str, now_str, now_str))
                         task_id = cur.fetchone()[0]
 
                     conn.commit()

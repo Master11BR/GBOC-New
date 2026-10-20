@@ -661,11 +661,34 @@ def run_auto_migrations(conn):
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS job_failure_log (
                     id SERIAL PRIMARY KEY,
-                    job_id INTEGER,
-                    job_name TEXT,
-                    error_message TEXT,
-                    failed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                    task_id TEXT NOT NULL,
+                    task_name TEXT,
+                    execution_id TEXT,
+                    failure_reason TEXT,
+                    retry_count INTEGER DEFAULT 0,
+                    max_retries INTEGER DEFAULT 3,
+                    status TEXT DEFAULT 'failed',
+                    alert_sent BOOLEAN DEFAULT FALSE,
+                    escalated BOOLEAN DEFAULT FALSE,
+                    first_failed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                    last_retried_at TIMESTAMPTZ,
+                    resolved_at TIMESTAMPTZ
                 );
+            """)
+            cursor.execute("""
+                ALTER TABLE job_failure_log ADD COLUMN IF NOT EXISTS task_id TEXT;
+                ALTER TABLE job_failure_log ADD COLUMN IF NOT EXISTS task_name TEXT;
+                ALTER TABLE job_failure_log ADD COLUMN IF NOT EXISTS execution_id TEXT;
+                ALTER TABLE job_failure_log ADD COLUMN IF NOT EXISTS failure_reason TEXT;
+                ALTER TABLE job_failure_log ADD COLUMN IF NOT EXISTS retry_count INTEGER DEFAULT 0;
+                ALTER TABLE job_failure_log ADD COLUMN IF NOT EXISTS max_retries INTEGER DEFAULT 3;
+                ALTER TABLE job_failure_log ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'failed';
+                ALTER TABLE job_failure_log ADD COLUMN IF NOT EXISTS alert_sent BOOLEAN DEFAULT FALSE;
+                ALTER TABLE job_failure_log ADD COLUMN IF NOT EXISTS escalated BOOLEAN DEFAULT FALSE;
+                ALTER TABLE job_failure_log ADD COLUMN IF NOT EXISTS first_failed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
+                ALTER TABLE job_failure_log ADD COLUMN IF NOT EXISTS last_retried_at TIMESTAMPTZ;
+                ALTER TABLE job_failure_log ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMPTZ;
+                CREATE INDEX IF NOT EXISTS idx_job_failure_log_task_status ON job_failure_log (task_id, status);
             """)
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS daily_metrics (
