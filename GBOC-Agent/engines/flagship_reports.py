@@ -1,4 +1,4 @@
-# GBOC System v14.8.1 Enterprise Edition
+# GBOC System v14.8.2 Enterprise Edition
 # Module: Flagship Reports Engine v2.0 (Agent)
 # Architecture: 7 Flagship Market Reports with Real-Data Engine & Executive Narrative
 
@@ -13,7 +13,7 @@ import psutil
 try:
     from version_control import __version__ as AGENT_VERSION
 except Exception:
-    AGENT_VERSION = "14.8.1"
+    AGENT_VERSION = "14.8.2"
 
 logger = logging.getLogger("gboc_flagship_reports_agent")
 

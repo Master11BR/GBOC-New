@@ -1,6 +1,6 @@
 """
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║                  GBOC SERVER v14.8.1 - IMPLEMENTAÇÃO COMPLETA                 ║
+║                  GBOC SERVER v14.8.2 - IMPLEMENTAÇÃO COMPLETA                 ║
 ║                                                                              ║
 ║          Todas as Melhorias Implementadas - Pronto para Produção             ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
@@ -304,7 +304,7 @@ IMPORTANTE = """
 
 def exibir_sumario():
     print("\n" + "="*82)
-    print("✨ GBOC SERVER v14.8.1 - IMPLEMENTAÇÃO COMPLETA DE MELHORIAS ✨".center(82))
+    print("✨ GBOC SERVER v14.8.2 - IMPLEMENTAÇÃO COMPLETA DE MELHORIAS ✨".center(82))
     print("="*82)
 
     print("\n📦 MÓDULOS PRINCIPAIS CRIADOS:\n")

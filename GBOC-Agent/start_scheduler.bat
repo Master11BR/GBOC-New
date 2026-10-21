@@ -1,5 +1,5 @@
 @REM ==============================================================================
-@REM GBOC System v14.8.1 Enterprise Edition
+@REM GBOC System v14.8.2 Enterprise Edition
 @REM Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 @REM Propriedade Intelectual & Direitos Autorais Registrados.
 @REM ==============================================================================
@@ -10,12 +10,12 @@ REM "/service": execucao sem console (servico/tarefa agendada) - nao espera tecl
 set "GBOC_PAUSE=pause"
 if /i "%~1"=="/service" set "GBOC_PAUSE=rem"
 CLS
-title GBOC Scheduler Agent - Background Worker (v14.8.1)
+title GBOC Scheduler Agent - Background Worker (v14.8.2)
 color 0B
 
 echo.
 echo ======================================================================
-echo   GBOC System v14.8.1 - Agente Autonomo de Backup e Restore Agendado
+echo   GBOC System v14.8.2 - Agente Autonomo de Backup e Restore Agendado
 echo ======================================================================
 echo.
 

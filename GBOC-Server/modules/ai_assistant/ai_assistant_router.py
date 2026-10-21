@@ -1,4 +1,4 @@
-# GBOC System v14.8.1 Enterprise Edition
+# GBOC System v14.8.2 Enterprise Edition
 # Module: Server AI Copilot Assistant
 # Provedores: Ollama Local, DeepSeek, Groq, Gemini, OpenAI, Claude, Grok, Kimi, Mistral, Cohere
 # Camada de provedores: modules/ai_assistant/ai_providers.py

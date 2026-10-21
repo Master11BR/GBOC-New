@@ -1,6 +1,6 @@
 /*
 ==============================================================================
-GBOC System v14.8.1 Enterprise Edition
+GBOC System v14.8.2 Enterprise Edition
 Layout & Navigation Manager — Controls Dual Layout Engine (Vertical/Horizontal)
 and Color Themes across all resolutions (1024px, 720p HD, 1080p FHD, 4K UHD).
 Zero-Overflow & Smart Sidebar Presence Detection.
@@ -14,7 +14,7 @@ Zero-Overflow & Smart Sidebar Presence Detection.
     if (!window.GBOCModal && !document.getElementById('gboc-modal-script')) {
         const m = document.createElement('script');
         m.id = 'gboc-modal-script';
-        m.src = '/static/gboc-modal.js?v=14.8.1';
+        m.src = '/static/gboc-modal.js?v=14.8.2';
         if (document.head) {
             document.head.appendChild(m);
         } else {
@@ -130,7 +130,7 @@ Zero-Overflow & Smart Sidebar Presence Detection.
         if (window.GBOCAntigravity || document.getElementById('gboc-fernly-js')) return;
         const sc = document.createElement('script');
         sc.id = 'gboc-fernly-js';
-        sc.src = '/static/gboc-fernly.js?v=14.8.1';
+        sc.src = '/static/gboc-fernly.js?v=14.8.2';
         sc.defer = true;
         (document.head || document.documentElement).appendChild(sc);
     }
@@ -735,7 +735,7 @@ Zero-Overflow & Smart Sidebar Presence Detection.
         if (document.getElementById('gboc-charts-js') || window.GBOCCharts) return;
         const sc = document.createElement('script');
         sc.id = 'gboc-charts-js';
-        sc.src = '/static/gboc-charts.js?v=14.8.1-c3';
+        sc.src = '/static/gboc-charts.js?v=14.8.2-c3';
         sc.defer = true;
         document.head.appendChild(sc);
     }
@@ -745,7 +745,7 @@ Zero-Overflow & Smart Sidebar Presence Detection.
         const needed = [
             { id: 'gboc-themes-css',  href: '/static/gboc-themes.css' },
             { id: 'gboc-layout-css',  href: '/static/gboc-layout.css' },
-            { id: 'gboc-fernly-css',  href: '/static/gboc-fernly.css?v=14.8.1' }
+            { id: 'gboc-fernly-css',  href: '/static/gboc-fernly.css?v=14.8.2' }
         ];
         needed.forEach(({ id, href }) => {
             if (!document.getElementById(id)) {

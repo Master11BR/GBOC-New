@@ -1,6 +1,6 @@
 <#
 ==============================================================================
-GBOC System v14.8.1 Enterprise Edition
+GBOC System v14.8.2 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
@@ -36,7 +36,11 @@ param (
 
     # Senha do superusuario "postgres" se o PostgreSQL precisar ser instalado (vazio = pergunta / padrao do GBOC)
     [Parameter(Mandatory = $false)]
-    [string]$PostgresPassword = ""
+    [string]$PostgresPassword = "",
+
+    # Instalar LLM Local Gratuito (Ollama + Qwen 3.5)
+    [Parameter(Mandatory = $false)]
+    [switch]$InstallLLM = $false
 )
 
 $ErrorActionPreference = "Stop"
@@ -155,7 +159,7 @@ function Show-InteractiveMenu {
     Clear-Host
     Write-Host ""
     Write-Host "=================================================================" -ForegroundColor Cyan
-    Write-Host "          GBOC SYSTEM v14.8.1 - INSTALADOR FULL STABLE           " -ForegroundColor Cyan
+    Write-Host "          GBOC SYSTEM v14.8.2 - INSTALADOR FULL STABLE           " -ForegroundColor Cyan
     Write-Host "          Servidor Central, Agente e Motores de Backup           " -ForegroundColor Cyan
     Write-Host "=================================================================" -ForegroundColor Cyan
     if ($GbocPackage) {
@@ -209,6 +213,12 @@ if ($InstallMode -eq "Interactive") {
         $DatabaseEngine = "sqlite"
     } else {
         $DatabaseEngine = "postgresql"
+    }
+
+    Write-Host ""
+    $llmResp = Read-Host "Deseja instalar e integrar a IA Local Gratuita (Ollama + Qwen 3.5)? [S/N, Padrao: S]"
+    if ([string]::IsNullOrWhiteSpace($llmResp) -or $llmResp -match '^[sSyY1]') {
+        $InstallLLM = $true
     }
 }
 
@@ -416,7 +426,7 @@ Write-Step "Criando scripts de controle e execucao em $TargetDir..."
 if ($InstallMode -in @("Server", "Both")) {
     $sLines = @(
         "@echo off",
-        "title GBOC Server v14.8.1 Enterprise",
+        "title GBOC Server v14.8.2 Enterprise",
         "cd /d ""$ServerDir""",
         "set SERVER_PORT=$ServerPort",
         "set SERVER_HOST=0.0.0.0",
@@ -431,7 +441,7 @@ if ($InstallMode -in @("Server", "Both")) {
 if ($InstallMode -in @("Agent", "Both")) {
     $aLines = @(
         "@echo off",
-        "title GBOC Agent v14.8.1 Enterprise",
+        "title GBOC Agent v14.8.2 Enterprise",
         "cd /d ""$AgentDir""",
         "set AGENT_PORT=$AgentPort",
         "set AGENT_HOST=0.0.0.0",
@@ -547,9 +557,18 @@ $testInline = "import sys, fastapi, uvicorn, pydantic, sqlalchemy, psutil; print
 $testResult = & $VenvPython -c $testInline 2>&1
 Write-Host "    $testResult" -ForegroundColor Cyan
 
+# 9.1 Instalacao de IA Local Gratuita (Ollama)
+if ($InstallLLM) {
+    Write-Step "Instalando e integrando motor de IA Local Gratuito (Ollama)..."
+    Install-GbocOllama -Model "qwen3.5:4b" -InstallRoot $TargetDir
+}
+
 # 10. Finalizacao e Resumo
 Write-Header "INSTALACAO CONCLUIDA COM SUCESSO!"
 Write-Host "Diretorio Base: $TargetDir" -ForegroundColor White
+if ($InstallLLM) {
+    Write-Host "IA Local Gratuita: Operacional via Ollama (qwen3.5:4b) em http://localhost:11434" -ForegroundColor Cyan
+}
 if ($InstallMode -in @("Server", "Both")) {
     Write-Host "Painel Web Server: http://localhost:$ServerPort" -ForegroundColor Green
     Write-Host "Script Server:     $TargetDir\start_server.bat" -ForegroundColor Gray

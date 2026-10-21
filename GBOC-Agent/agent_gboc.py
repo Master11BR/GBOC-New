@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-🚀 GBOC Agent 14.8.1 - Servidor Principal
+🚀 GBOC Agent 14.8.2 - Servidor Principal
 Servidor FastAPI com arquitetura modular limpa
 """
 
@@ -67,7 +67,7 @@ try:
     from version_control import __version__ as AGENT_VERSION, get_version_info, auto_increment_build
     auto_increment_build()
 except Exception:
-    AGENT_VERSION = "14.8.1"
+    AGENT_VERSION = "14.8.2"
     def get_version_info():
         return {"raw_version": AGENT_VERSION, "semver": AGENT_VERSION}
 
@@ -251,7 +251,7 @@ except ImportError as e:
 async def lifespan(app: FastAPI):
     """Gerenciamento do ciclo de vida da aplicação"""
     logger.info("=" * 50)
-    logger.info("[STARTUP] GBOC Agent 14.8.1 - Servidor Iniciado")
+    logger.info("[STARTUP] GBOC Agent 14.8.2 - Servidor Iniciado")
     logger.info(f"[DATA] {DATA_DIR}")
     logger.info(f"[LOGS] {LOGS_DIR}")
     

@@ -1,6 +1,6 @@
 <!--
 ==============================================================================
-GBOC System v14.8.1 Enterprise Edition
+GBOC System v14.8.2 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
@@ -10,24 +10,24 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Diagnóstico - GBOC Agent 14.8.1</title>
+    <title>Diagnóstico - GBOC Agent 14.8.2</title>
     
     <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
-    <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.8.1">
-    <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=14.8.1">
-    <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=14.8.1">
-    <link rel="stylesheet" href="/static/ui/models/modern/components.css?v=14.8.1">
-    <link rel="stylesheet" href="/static/ui/models/modern/layout.css?v=14.8.1">
-    <link rel="stylesheet" href="/static/style.css?v=14.8.1">
-    <link rel="stylesheet" href="/static/gboc-themes.css?v=14.8.1">
-    <link rel="stylesheet" href="/static/gboc-layout.css?v=14.8.1">
-    <script src="/static/gboc-perf.js?v=14.8.1"></script>
-    <script src="/static/gboc-layout-manager.js?v=14.8.1"></script>
-    <script src="/static/gboc-modal.js?v=14.8.1"></script>
-<link rel="stylesheet" href="/static/gboc-hardware-hud.css?v=14.8.1">
+    <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.8.2">
+    <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=14.8.2">
+    <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=14.8.2">
+    <link rel="stylesheet" href="/static/ui/models/modern/components.css?v=14.8.2">
+    <link rel="stylesheet" href="/static/ui/models/modern/layout.css?v=14.8.2">
+    <link rel="stylesheet" href="/static/style.css?v=14.8.2">
+    <link rel="stylesheet" href="/static/gboc-themes.css?v=14.8.2">
+    <link rel="stylesheet" href="/static/gboc-layout.css?v=14.8.2">
+    <script src="/static/gboc-perf.js?v=14.8.2"></script>
+    <script src="/static/gboc-layout-manager.js?v=14.8.2"></script>
+    <script src="/static/gboc-modal.js?v=14.8.2"></script>
+<link rel="stylesheet" href="/static/gboc-hardware-hud.css?v=14.8.2">
     <script src="/static/vendor/chart.umd.min.js"></script>
-    <script src="/static/auth_interceptor.js?v=14.8.1"></script>
-    <script src="/static/gboc-hardware-hud.js?v=14.8.1"></script>
+    <script src="/static/auth_interceptor.js?v=14.8.2"></script>
+    <script src="/static/gboc-hardware-hud.js?v=14.8.2"></script>
     <style>
         /* Tabs agora usam .gboc-tabs/.gboc-tab do style.css */
         .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px;margin-bottom:24px;}
@@ -861,7 +861,7 @@ async function loadSystem(){
         document.getElementById('siHostname').textContent=s.hostname||'--';
         document.getElementById('siProcessor').textContent=(s.processor||'--').substring(0,30);
         document.getElementById('siPython').textContent=s.python_version||'--';
-        document.getElementById('siGboc').textContent=sys.gboc_version||'14.8.1';
+        document.getElementById('siGboc').textContent=sys.gboc_version||'14.8.2';
 
         document.getElementById('siCpuCount').textContent=r.cpu_count||'--';
         document.getElementById('siRamTotal').textContent=(r.memory_total_gb||0).toFixed(1)+' GB';

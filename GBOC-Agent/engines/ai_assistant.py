@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 14.8.1 - Multi-Provider AI Assistant Engine (GBOC Copilot AI - Agent)
+GBOC 14.8.2 - Multi-Provider AI Assistant Engine (GBOC Copilot AI - Agent)
 
 Provedores: Ollama Local (padrão/fallback), DeepSeek, Groq, Google Gemini, OpenAI,
 Anthropic Claude, xAI Grok, Moonshot Kimi, Mistral e Cohere — via engines/ai_providers.py.

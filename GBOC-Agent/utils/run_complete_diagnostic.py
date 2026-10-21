@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 14.8.1 - Executar Diagnóstico Completo
+GBOC 14.8.2 - Executar Diagnóstico Completo
 Script para executar todos os diagnósticos e gerar relatórios
 """
 
@@ -24,7 +24,7 @@ try:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from version import GBOC_VERSION as TARGET_VERSION
 except Exception:
-    TARGET_VERSION = "14.8.1"
+    TARGET_VERSION = "14.8.2"
 
 def main():
     """Executa todos os diagnósticos"""

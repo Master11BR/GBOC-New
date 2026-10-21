@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v14.8.1 Enterprise Edition
+# GBOC System v14.8.2 Enterprise Edition
 # Module: Flagship Reports — coleta de dados reais e construtores (Server)
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================

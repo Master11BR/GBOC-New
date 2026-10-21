@@ -1,5 +1,5 @@
 /**
- * GBOC Server v14.8.1 — Storage Module UI Script
+ * GBOC Server v14.8.2 — Storage Module UI Script
  */
 
 let serverStorageChartInstance = null;

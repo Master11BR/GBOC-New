@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v14.8.1 Enterprise Edition
+# GBOC System v14.8.2 Enterprise Edition
 # Module: Disaster Recovery, P2V & Boot Media Engine
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================
@@ -19,7 +19,7 @@ from typing import Dict, Any, List, Optional
 try:
     from version_control import __version__ as AGENT_VERSION
 except Exception:
-    AGENT_VERSION = "14.8.1"
+    AGENT_VERSION = "14.8.2"
 
 logger = logging.getLogger("gboc_dr_engine")
 
