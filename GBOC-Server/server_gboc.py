@@ -1,5 +1,5 @@
 """
-GBOC Server 14.8.1
+GBOC Server 14.8.2
 Servidor Central — Real-time Agent Communication + Complete Data Sync + Advanced Analytics
 Banco de dados: PostgreSQL (oficial)
 """
@@ -84,7 +84,7 @@ try:
     from version_control import __version__ as SERVER_VERSION, get_version_info, auto_increment_build
     auto_increment_build()
 except Exception:
-    SERVER_VERSION = "14.8.1"
+    SERVER_VERSION = "14.8.2"
     def get_version_info():
         return {"raw_version": SERVER_VERSION, "semver": SERVER_VERSION}
 

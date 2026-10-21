@@ -1,8 +1,28 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.8.1 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.8.2 Enterprise. Todos os direitos reservados. -->
 
 # GBOC — Changelog de Atualizações
 
 > Histórico completo de versões, correções e melhorias do sistema GBOC (Agente + Servidor).
+
+---
+
+## 14.8.2 — 2026-10-20 (Compatibilidade com últimas versões do Python, Dependências Opcionais e IA Local Gratuita Integrada)
+
+### 🐍 Compatibilidade e Resiliência com Versões Recentes do Python
+- **Isolamento de Dependências Nativas Opcionais (`requirements-optional.txt`)**: Separação do pacote `zstandard` das dependências obrigatórias de `requirements.txt`. Instalações em versões bleeding-edge do Python no Windows (sem wheels pré-compiladas no PyPI) não falham mais por falta de compilador Microsoft Visual C++ 14.0+. O motor nativo utiliza fallback automático e gracioso para `zlib` nativo.
+- **Upgrade Automático de Ferramentas de Build**: `Install-GbocPipRequirements` agora garante a atualização contínua de `pip`, `setuptools` e `wheel` antes de instalar pacotes.
+- **Instalação Tolerante de Aceleradores**: Tentativa de instalação com flag `--only-binary :all:` para aceleradores opcionais, prevenindo interrupção de deploys e falhas de compilação em hosts de produção.
+- **Download Inteligente no Empacotador (`build_installer_package.ps1`)**: O gerador de pacotes baixa wheels opcionais caso disponíveis para a versão alvo do Python sem rebaixar a versão do interpretador.
+
+### 🤖 Motor de LLM Gratuito e IA Local Integrada (Ollama + Perfis Adaptativos)
+- **Instalação e Integração Automatizada de LLM Local**: Nova rotina `Install-GbocOllama` em `gboc_prereqs.ps1` (Agente e Servidor) para detecção, download silencioso, inicialização do daemon e download automático de modelos gratuitos.
+- **Configuração Automática do Copilot AI**: Atualização automática de `server_ai_config.json` e `ai_config.json` com `AI_PROVIDER=ollama` e endpoint `http://localhost:11434`.
+- **Arquitetura Adaptativa em 3 Perfis de Cliente**:
+  - *Perfil A (Leve / Hardware Modesto)*: Modelos ultra-leves (`qwen2.5:0.5b` de ~390 MB / ~500 MB RAM ou `llama3.2:1b`) para servidores com 4 a 8 GB de RAM.
+  - *Perfil B (Nuvem Gratuita Zero-RAM)*: Suporte a Groq Free e Google Gemini Free com 0 MB de consumo de RAM no servidor do cliente.
+  - *Perfil C (Portátil Standalone)*: Suporte a execução isolada de executável portátil `llama-server.exe` em `Tools\llama.cpp`.
+- **Novo Utilitário 1-Clique**: Adicionado `tools/install_local_llm.ps1` para instalação autônoma rápida de IA local.
+- **Suporte nos Instaladores**: Adicionado parâmetro `-InstallLLM` em `Setup.ps1` e `install_agent.ps1` com pergunta interativa para o operador.
 
 ---
 

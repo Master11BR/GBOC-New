@@ -1,13 +1,13 @@
 <#
 ==============================================================================
-GBOC System v14.8.1 Enterprise Edition
+GBOC System v14.8.2 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
 #>
 
 # ============================================================================
-# GBOC Agent - Instalador Completo v14.8.1
+# GBOC Agent - Instalador Completo v14.8.2
 # ============================================================================
 # Instala e configura automaticamente, sempre na ULTIMA versao estavel (consultada na hora):
 # - Python (python.org; se as dependencias ainda nao instalarem na mais nova, usa a anterior)
@@ -24,7 +24,8 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 param(
 	[string]$ServerURL = "",
 	[string]$InstallToken = "",
-	[switch]$Unattended
+	[switch]$Unattended,
+	[switch]$InstallLLM
 )
 
 #Requires -RunAsAdministrator
@@ -116,7 +117,7 @@ Write-Host @"
 
 ╔═══════════════════════════════════════════════════════════╗
 ║                                                           ║
-║          GBOC Agent - Instalador Completo v14.8.1           ║
+║          GBOC Agent - Instalador Completo v14.8.2           ║
 ║                                                           ║
 ╚═══════════════════════════════════════════════════════════╝
 
@@ -735,6 +736,15 @@ if ($ServerURL -and $InstallToken) {
 	}
 	$svc = Get-Service -Name "GBOCAgent" -ErrorAction SilentlyContinue
 	if ($svc) { Restart-Service "GBOCAgent" -ErrorAction SilentlyContinue }
+}
+
+# ============================================================================
+# IA LOCAL GRATUITA (OLLAMA)
+# ============================================================================
+
+if ($InstallLLM) {
+	Write-Step "Instalando e integrando IA Local Gratuita (Ollama)..."
+	Install-GbocOllama -Model "qwen3.5:4b" -InstallRoot $INSTALL_ROOT
 }
 
 # ============================================================================

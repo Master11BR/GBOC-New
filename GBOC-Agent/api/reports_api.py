@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 14.8.1 - Reports API (Agent)
+GBOC 14.8.2 - Reports API (Agent)
 Generate, schedule, download and manage backup reports with 100% real system data.
 Supports HTML (print-to-PDF), CSV, JSON formats.
 """
@@ -19,7 +19,7 @@ from typing import Dict, Any, List, Optional
 try:
     from version import GBOC_VERSION as AGENT_VERSION
 except ImportError:
-    AGENT_VERSION = "14.8.1"
+    AGENT_VERSION = "14.8.2"
 
 try:
     from engines.v4_reports_engine import (
@@ -82,7 +82,7 @@ def get_usd_to_brl_rate() -> float:
     try:
         req = urllib.request.Request(
             "https://economia.awesomeapi.com.br/json/last/USD-BRL",
-            headers={"User-Agent": "GBOC-System/14.8.1"}
+            headers={"User-Agent": "GBOC-System/14.8.2"}
         )
         with urllib.request.urlopen(req, timeout=3) as resp:
             if resp.status == 200:
@@ -434,8 +434,8 @@ def get_system_health():
     try:
         from version import GBOC_VERSION, version_string
     except ImportError:
-        GBOC_VERSION = "14.8.1"
-        version_string = lambda: "GBOC Agent v14.8.1 Enterprise"
+        GBOC_VERSION = "14.8.2"
+        version_string = lambda: "GBOC Agent v14.8.2 Enterprise"
 
     import psutil, os, time
     proc = psutil.Process(os.getpid())
@@ -506,6 +506,6 @@ async def get_system_version():
             "string": version_string()
         })
     except Exception:
-        return JSONResponse({"version": "14.8.1", "build": "stable", "edition": "Enterprise"})
+        return JSONResponse({"version": "14.8.2", "build": "stable", "edition": "Enterprise"})
 
 

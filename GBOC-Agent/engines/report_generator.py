@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 14.8.1 - Report Generator Engine
+GBOC 14.8.2 - Report Generator Engine
 Generates HTML/PDF reports for backup operations, SLA, capacity, executive summary.
 """
 
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 try:
     from version_control import __version__ as GBOC_VERSION
 except Exception:
-    GBOC_VERSION = "14.8.1"
+    GBOC_VERSION = "14.8.2"
 
 def _get_core():
     from shared_core import get_shared_core

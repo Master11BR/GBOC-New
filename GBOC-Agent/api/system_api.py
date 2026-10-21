@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 14.8.1 - API de Sistema Completo
+GBOC 14.8.2 - API de Sistema Completo
 Endpoint para diagnóstico completo do sistema
 """
 
@@ -29,9 +29,9 @@ async def get_system_version_info():
     except Exception:
         return {
             "status": "success",
-            "version": "14.8.1",
-            "raw_version": "14.8.1",
-            "gboc_version": "14.8.1",
+            "version": "14.8.2",
+            "raw_version": "14.8.2",
+            "gboc_version": "14.8.2",
             "app_name": "GBOC Agent Enterprise"
         }
 

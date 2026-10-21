@@ -1,14 +1,14 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.8.1 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v14.8.2 Enterprise. Todos os direitos reservados. -->
 
-# 🚀 GBOC - Gestão & Backup Operations Center (v14.8.1 Enterprise Edition)
+# 🚀 GBOC - Gestão & Backup Operations Center (v14.8.2 Enterprise Edition)
 
-[![GBOC System Version](https://img.shields.io/badge/version-14.8.1--Enterprise-blue.svg)](https://github.com/Master11BR/GBOC-New)
+[![GBOC System Version](https://img.shields.io/badge/version-14.8.2--Enterprise-blue.svg)](https://github.com/Master11BR/GBOC-New)
 [![Python Version](https://img.shields.io/badge/python-3.11%2B%20%7C%203.14-green.svg)](https://www.python.org/)
 [![PostgreSQL](https://img.shields.io/badge/postgresql-16-blue.svg)](https://www.postgresql.org/)
 [![UI Model](https://img.shields.io/badge/UI__MODEL-modern%20(Official)-indigo.svg)]()
 [![Status](https://img.shields.io/badge/status-production--ready-brightgreen.svg)]()
 
-> **GBOC (Gestão & Backup Operations Center v14.8.1 Enterprise Edition)** é a mais avançada plataforma corporativa de orquestração de backup, Disaster Recovery (DR) 100% verificável ponta a ponta, RMM, telemetria real (Zero-Mock Strict), modelo visual universal **Modern UI (UnoCSS)**, **Padrão Oficial de Relatórios v3.0 & Flagships** e resposta cibernética a incidentes.
+> **GBOC (Gestão & Backup Operations Center v14.8.2 Enterprise Edition)** é a mais avançada plataforma corporativa de orquestração de backup, Disaster Recovery (DR) 100% verificável ponta a ponta, RMM, telemetria real (Zero-Mock Strict), modelo visual universal **Modern UI (UnoCSS)**, **Padrão Oficial de Relatórios v3.0 & Flagships** e resposta cibernética a incidentes.
 
 ---
 

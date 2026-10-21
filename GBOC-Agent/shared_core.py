@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-GBOC Agent 14.8.1 - SHARED CORE (Refactored)
+GBOC Agent 14.8.2 - SHARED CORE (Refactored)
 Arquitetura centralizada para inicialização de componentes
 """
 
@@ -51,7 +51,7 @@ KOPIA_CONFIGS_DIR = os.path.join(DATA_DIR, "engine_data", "kopia_configs")
 try:
     from version_control import __version__ as GBOC_VERSION
 except Exception:
-    GBOC_VERSION = "14.8.1"
+    GBOC_VERSION = "14.8.2"
 
 # Configuração de logging (ANTES de usar logger)
 os.makedirs(LOGS_DIR, exist_ok=True)

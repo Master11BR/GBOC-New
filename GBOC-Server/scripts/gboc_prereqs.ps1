@@ -1,6 +1,6 @@
 <#
 ==============================================================================
-GBOC System v14.8.1 Enterprise Edition
+GBOC System v14.8.2 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 ==============================================================================
 
@@ -311,18 +311,42 @@ function Install-GbocPipRequirements([string]$Exe, [string]$Req, [switch]$Upgrad
     <# pip install -r: primeiro so com as wheels do pacote (sem internet); se faltar algo, completa online. #>
     $ErrorActionPreference = "Continue"     # avisos do pip no stderr nao podem abortar o instalador
     $wd = Get-GbocWheelDir $Exe
+    $optReq = if ($Req) { Join-Path (Split-Path $Req) "requirements-optional.txt" } else { "" }
+    $mainSuccess = $false
+
     if ($wd) {
         Write-GbocInfo "Bibliotecas Python do pacote: $wd"
-        if ($UpgradePip) { & $Exe -m pip install --disable-pip-version-check --no-index --find-links $wd --upgrade pip -q 2>&1 | Out-Null }
+        if ($UpgradePip) { & $Exe -m pip install --disable-pip-version-check --no-index --find-links $wd --upgrade pip setuptools wheel -q 2>&1 | Out-Null }
         & $Exe -m pip install --disable-pip-version-check --no-index --find-links $wd -r $Req -q 2>&1 | ForEach-Object { Write-Host ("    " + "$_") -ForegroundColor DarkGray }
-        if ($LASTEXITCODE -eq 0) { return $true }
-        Write-GbocWarn "Bibliotecas do pacote nao cobriram tudo; completando pela internet..."
-        & $Exe -m pip install --disable-pip-version-check --find-links $wd -r $Req -q 2>&1 | ForEach-Object { Write-Host ("    " + "$_") -ForegroundColor DarkGray }
-        return ($LASTEXITCODE -eq 0)
+        if ($LASTEXITCODE -eq 0) {
+            $mainSuccess = $true
+        } else {
+            Write-GbocWarn "Bibliotecas do pacote nao cobriram tudo; completando pela internet..."
+            & $Exe -m pip install --disable-pip-version-check --find-links $wd -r $Req -q 2>&1 | ForEach-Object { Write-Host ("    " + "$_") -ForegroundColor DarkGray }
+            $mainSuccess = ($LASTEXITCODE -eq 0)
+        }
+        if ($optReq -and (Test-Path $optReq)) {
+            Write-GbocInfo "Instalando pacotes opcionais de aceleracao do pacote..."
+            & $Exe -m pip install --disable-pip-version-check --find-links $wd --only-binary :all: -r $optReq -q 2>&1 | Out-Null
+        }
+        return $mainSuccess
     }
-    if ($UpgradePip) { & $Exe -m pip install --disable-pip-version-check --upgrade pip -q 2>&1 | Out-Null }
+
+    if ($UpgradePip) { & $Exe -m pip install --disable-pip-version-check --upgrade pip setuptools wheel -q 2>&1 | Out-Null }
     & $Exe -m pip install --disable-pip-version-check -r $Req -q 2>&1 | ForEach-Object { Write-Host ("    " + "$_") -ForegroundColor DarkGray }     # mostra, mas nao vira retorno
-    return ($LASTEXITCODE -eq 0)
+    $mainSuccess = ($LASTEXITCODE -eq 0)
+
+    if ($optReq -and (Test-Path $optReq)) {
+        Write-GbocInfo "Verificando pacotes opcionais de aceleracao (ex: zstandard)..."
+        # Tenta com --only-binary :all: para evitar erro de compilador C++ no Windows
+        & $Exe -m pip install --disable-pip-version-check --only-binary :all: -r $optReq -q 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            # Se nao tiver binary wheel pronta, tenta compilar caso haja compilador instalado no sistema
+            & $Exe -m pip install --disable-pip-version-check -r $optReq -q 2>&1 | Out-Null
+        }
+    }
+
+    return $mainSuccess
 }
 
 function Test-GbocPythonDeps([string]$Exe) {
@@ -715,6 +739,146 @@ function Get-GbocPrereqStatus([string]$ToolsDir = "C:\GBOC\Tools", [switch]$NoPo
             Pacote = $(if ($pe) { $pe.Version } else { "-" }); Acao = $acao }
     }
     return $rows
+}
+
+# ============================================================================
+# LLM LOCAL GRATUITO (OLLAMA)
+# ============================================================================
+
+function Find-GbocOllamaExe {
+    $cands = @()
+    $cmd = Get-Command ollama.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($cmd) { $cands += $cmd.Source }
+    $cands += "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe"
+    $cands += "$env:ProgramFiles\Ollama\ollama.exe"
+    $cands += "${env:ProgramFiles(x86)}\Ollama\ollama.exe"
+    foreach ($c in $cands) {
+        if ($c -and (Test-Path $c -PathType Leaf)) { return (Resolve-Path $c).Path }
+    }
+    return $null
+}
+
+function Test-GbocOllamaRunning([string]$HostUrl = "http://localhost:11434") {
+    try {
+        $r = Invoke-WebRequest -Uri "$HostUrl/api/tags" -UseBasicParsing -TimeoutSec 3 -ErrorAction Stop
+        return ($r.StatusCode -ge 200 -and $r.StatusCode -lt 400)
+    } catch { return $false }
+}
+
+function Start-GbocOllamaService([string]$ExePath) {
+    if (Test-GbocOllamaRunning) { return $true }
+    if (-not $ExePath -or -not (Test-Path $ExePath)) { return $false }
+    Write-GbocInfo "Iniciando motor de IA Local Ollama em segundo plano..."
+    Start-Process -FilePath $ExePath -ArgumentList "serve" -WindowStyle Hidden
+    for ($i = 0; $i -lt 15; $i++) {
+        Start-Sleep -Seconds 1
+        if (Test-GbocOllamaRunning) { return $true }
+    }
+    return (Test-GbocOllamaRunning)
+}
+
+function Configure-GbocAiSystem([string]$InstallRoot = "C:\GBOC", [string]$Model = "qwen3.5:4b") {
+    $aiCfg = @{
+        provider      = "ollama"
+        ollama_url    = "http://localhost:11434"
+        ollama_host   = "http://localhost:11434"
+        ollama_model  = $Model
+        model         = $Model
+        system_prompt = "Você é o GBOC Copilot AI, especialista em backup, recuperação de desastres, virtualização e administração do GBOC Enterprise. Responda em português brasileiro com clareza técnica baseando-se estritamente nos dados reais do sistema."
+    }
+    $jsonContent = $aiCfg | ConvertTo-Json -Depth 4
+    $dirs = @(
+        (Join-Path $InstallRoot "Server\data"),
+        (Join-Path $InstallRoot "Agent\data"),
+        "C:\GBOC\Server\data",
+        "C:\GBOC\Agent\data"
+    )
+    foreach ($d in $dirs) {
+        if (Test-Path (Split-Path -Parent $d)) {
+            New-Item -ItemType Directory -Path $d -Force | Out-Null
+            Set-Content -Path (Join-Path $d "server_ai_config.json") -Value $jsonContent -Encoding UTF8
+            Set-Content -Path (Join-Path $d "ai_config.json") -Value $jsonContent -Encoding UTF8
+        }
+    }
+    [Environment]::SetEnvironmentVariable("GBOC_AI_PROVIDER", "ollama", "Machine")
+    [Environment]::SetEnvironmentVariable("GBOC_OLLAMA_URL", "http://localhost:11434", "Machine")
+    [Environment]::SetEnvironmentVariable("GBOC_AI_MODEL", $Model, "Machine")
+    $env:GBOC_AI_PROVIDER = "ollama"
+    $env:GBOC_OLLAMA_URL = "http://localhost:11434"
+    $env:GBOC_AI_MODEL = $Model
+    Write-GbocOk "Integracao de IA configurada com sucesso no GBOC (Provedor: Ollama | Modelo: $Model)"
+}
+
+function Install-GbocOllama([string]$Model = "qwen3.5:4b", [string]$InstallRoot = "C:\GBOC") {
+    <# Instala o Ollama (LLM Local Gratuito) caso nao exista, garante que esteja rodando,
+       faz o download (pull) do modelo gratuito recomendado e integra com a configuracao do GBOC. #>
+    Write-Host "==> Verificando motor de IA Local Gratuito (Ollama)..." -ForegroundColor Cyan
+    $exe = Find-GbocOllamaExe
+
+    if (-not $exe) {
+        Write-GbocInfo "Ollama nao detectado no host. Iniciando instalacao automatica..."
+        $installed = $false
+
+        $winget = Get-Command winget.exe -ErrorAction SilentlyContinue
+        if ($winget) {
+            Write-GbocInfo "Instalando Ollama via winget..."
+            & winget install Ollama.Ollama --silent --accept-package-agreements --accept-source-agreements 2>&1 | Out-Null
+            $exe = Find-GbocOllamaExe
+            if ($exe) { $installed = $true }
+        }
+
+        if (-not $installed) {
+            Write-GbocInfo "Baixando instalador oficial do Ollama para Windows..."
+            $tmpSetup = Join-Path ([System.IO.Path]::GetTempPath()) "OllamaSetup.exe"
+            $dlOk = Save-GbocDownload "https://ollama.com/download/OllamaSetup.exe" $tmpSetup
+            if ($dlOk -and (Test-Path $tmpSetup)) {
+                Write-GbocInfo "Executando instalacao silenciosa do Ollama..."
+                $proc = Start-Process -FilePath $tmpSetup -ArgumentList "/silent" -Wait -PassThru
+                Start-Sleep -Seconds 3
+                Remove-Item $tmpSetup -Force -ErrorAction SilentlyContinue
+                $exe = Find-GbocOllamaExe
+                if ($exe) { $installed = $true }
+            }
+        }
+
+        if (-not $exe) {
+            Write-GbocWarn "Nao foi possivel instalar o Ollama automaticamente. Instale manualmente em https://ollama.com"
+            return $null
+        }
+        Write-GbocOk "Ollama instalado com sucesso: $exe"
+    } else {
+        Write-GbocOk "Ollama ja instalado no sistema: $exe"
+    }
+
+    $running = Start-GbocOllamaService $exe
+    if (-not $running) {
+        Write-GbocWarn "O motor Ollama nao respondeu em http://localhost:11434. Verifique a porta 11434."
+        return $exe
+    }
+    Write-GbocOk "Motor de IA Ollama operacional em http://localhost:11434"
+
+    $hasModel = $false
+    try {
+        $tags = (Invoke-RestMethod -Uri "http://localhost:11434/api/tags" -TimeoutSec 5).models
+        if ($tags | Where-Object { $_.name -like "$Model*" }) {
+            $hasModel = $true
+            Write-GbocOk "Modelo de IA gratuito $Model ja disponivel localmente."
+        }
+    } catch {}
+
+    if (-not $hasModel) {
+        Write-Host "==> Baixando modelo LLM gratuito '$Model' para operacao offline..." -ForegroundColor Cyan
+        Write-GbocInfo "Download do modelo pode levar alguns minutos na primeira vez..."
+        & $exe pull $Model
+        if ($LASTEXITCODE -eq 0) {
+            Write-GbocOk "Modelo $Model baixado e pronto para uso."
+        } else {
+            Write-GbocWarn "Download automatico do modelo $Model pendente. Execute manualmente: ollama pull $Model"
+        }
+    }
+
+    Configure-GbocAiSystem -InstallRoot $InstallRoot -Model $Model
+    return $exe
 }
 
 # ============================================================================

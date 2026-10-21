@@ -1,4 +1,4 @@
-# GBOC System v14.8.1 Enterprise Edition
+# GBOC System v14.8.2 Enterprise Edition
 # Module: Agent Config Router
 
 import logging
@@ -7,7 +7,7 @@ from fastapi import APIRouter
 try:
     from version_control import __version__ as AGENT_VERSION
 except Exception:
-    AGENT_VERSION = "14.8.1"
+    AGENT_VERSION = "14.8.2"
 
 logger = logging.getLogger("gboc_agent_config")
 router = APIRouter(prefix="/api/v1/agent/config", tags=["Agent Config"])

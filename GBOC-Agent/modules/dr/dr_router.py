@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v14.8.1 Enterprise Edition
+# GBOC System v14.8.2 Enterprise Edition
 # Module: Agent Disaster Recovery Router
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================
@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse
 try:
     from version_control import __version__ as AGENT_VERSION
 except Exception:
-    AGENT_VERSION = "14.8.1"
+    AGENT_VERSION = "14.8.2"
 
 from engines.disaster_recovery_engine import dr_engine
 from engines.universal_restore import universal_restore_engine

@@ -29,13 +29,17 @@ from typing import Dict, List, Optional
 
 logger = logging.getLogger("VersionUnifier")
 
+_here = Path(__file__).resolve().parent.parent
+if str(_here) not in sys.path:
+    sys.path.insert(0, str(_here))
+
 try:
     from version import GBOC_VERSION as TARGET_VERSION
 except Exception:
     try:
         from version_control import __version__ as TARGET_VERSION
     except Exception:
-        TARGET_VERSION = "14.8.1"
+        TARGET_VERSION = "14.8.2"
 
 TARGET_EXTENSIONS = {".py", ".html", ".js", ".css", ".ps1", ".bat", ".txt"}
 EXCLUDE_DIRS = {".git", ".vs", "__pycache__", ".venv", "venv", "logs", "data", "node_modules", "tests", "_claude_sync",
@@ -139,7 +143,12 @@ GlobalVersionUnifier = VersionUnifier          # nome antigo
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-    u = VersionUnifier(apply="--apply" in sys.argv)
+    target_val = None
+    if "--target" in sys.argv:
+        t_idx = sys.argv.index("--target")
+        if t_idx + 1 < len(sys.argv):
+            target_val = sys.argv[t_idx + 1]
+    u = VersionUnifier(target=target_val, apply="--apply" in sys.argv)
     ok = u.unify_versions()
     for f in u.findings:
         print(f"{f['file']}:{f['line']}: {f['text']}")

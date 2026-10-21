@@ -180,5 +180,17 @@ A norma **ISO/IEC 25010** especifica 8 características de qualidade de software
 - **ISO/IEC 12207 — Empacotamento de Distribuição e Integridade do Instalador**:
   - Sincronização e verificação de integridade dos componentes de release (`make_distribution.py`, `Setup.bat`, `Setup.ps1`, `package_manifest.json`) para a versão oficial **14.8.1 Full Stable Enterprise**.
 
+### 15.3 Evidências de Validação — Ciclo v14.8.2 (Compatibilidade Bleeding-Edge & IA Adaptativa)
+- **ISO/IEC 25010 — Portabilidade de Runtime & Resiliência a Ambientes Bleeding-Edge**:
+  - Isolamento de dependências com código C (`zstandard`) em `requirements-optional.txt` e fallback automático para biblioteca padrão (`zlib`).
+  - Prevenção de quebras em compilação MSVC em versões de ponta do Python (3.14+, 3.15+).
+  - Atualização automática de ferramentas de build (`pip`, `setuptools`, `wheel`) na instalação.
+- **ISO/IEC 25010 — Eficiência de Desempenho e Inteligência Adaptativa**:
+  - Implementação da arquitetura adaptativa de IA em 3 perfis de cliente: Perfil A (Local Ultra-Leve ~500 MB RAM com Qwen 0.5B), Perfil B (Nuvem Gratuita Zero-RAM com Groq/Gemini) e Perfil C (Portátil Standalone sem instaladores).
+  - Automação da instalação, inicialização de daemon e provisionamento de modelo no `gboc_prereqs.ps1` (`Install-GbocOllama`).
+  - Script autônomo `tools/install_local_llm.ps1` com execução silenciosa e parâmetros configuráveis.
+- **ISO/IEC 12207 — Empacotamento de Distribuição e Integridade de Release**:
+  - Sincronização formal e verificação de integridade dos componentes de release para a versão oficial **14.8.2 Full Stable Enterprise**.
+
 
 

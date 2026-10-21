@@ -167,6 +167,12 @@ function New-GbocPrereqsBundle([string]$Dest, [string]$BuildPython, [string]$Req
             Remove-Item $wdir -Recurse -Force -ErrorAction SilentlyContinue
             continue
         }
+        # Tenta baixar pacotes opcionais de aceleracao (se houver wheels compiladas para esta versao)
+        $optReq = Join-Path (Split-Path $Requirements) "requirements-optional.txt"
+        if (Test-Path $optReq) {
+            & $BuildPython -m pip download --disable-pip-version-check -q --only-binary=:all: --platform win_amd64 `
+                --python-version $mm --implementation cp -d $wdir -r $optReq 2>&1 | Out-Null
+        }
         $pyRel = "python\python-$($rel.Version)-amd64.exe"
         New-Item -ItemType Directory -Path (Join-Path $Dest "python") -Force | Out-Null
         if (-not (Save-GbocDownload $rel.Url (Join-Path $Dest $pyRel))) {
