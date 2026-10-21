@@ -9,6 +9,130 @@ import sys
 # Add the parent directory to the path to allow imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import re as _re
+
+
+def _split_top_level(body):
+    """Divide a lista de colunas de um CREATE TABLE pelas vírgulas de nível superior."""
+    parts, depth, cur, quoted = [], 0, [], False
+    for ch in body:
+        if ch == "'":
+            quoted = not quoted
+        elif not quoted and ch == '(':
+            depth += 1
+        elif not quoted and ch == ')':
+            depth -= 1
+        if ch == ',' and depth == 0 and not quoted:
+            parts.append(''.join(cur)); cur = []
+        else:
+            cur.append(ch)
+    if ''.join(cur).strip():
+        parts.append(''.join(cur))
+    return [x.strip() for x in parts if x.strip()]
+
+
+_CREATE_RE = _re.compile(r'CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+("?[\w.]+"?)\s*\((.*)\)\s*;?\s*$', _re.I | _re.S)
+_CONSTRAINT_PREFIXES = ('PRIMARY KEY', 'UNIQUE', 'FOREIGN KEY', 'CONSTRAINT', 'CHECK', 'EXCLUDE')
+
+
+def _missing_column_statements(create_sql):
+    """Para um CREATE TABLE IF NOT EXISTS, gera ADD COLUMN IF NOT EXISTS de cada coluna.
+    Bases antigas já têm a tabela, e o CREATE TABLE não acrescenta colunas novas nela.
+    NOT NULL / PRIMARY KEY / UNIQUE / REFERENCES são omitidos: em tabela com linhas eles falhariam."""
+    m = _CREATE_RE.match(create_sql.strip())
+    if not m:
+        return []
+    table, out = m.group(1), []
+    for col in _split_top_level(m.group(2)):
+        if col.upper().startswith(_CONSTRAINT_PREFIXES):
+            continue
+        tokens = col.split(None, 1)
+        if len(tokens) < 2:
+            continue
+        name, rest = tokens
+        rest = _re.sub(r'\bPRIMARY\s+KEY\b|\bNOT\s+NULL\b|\bUNIQUE\b', ' ', rest, flags=_re.I)
+        rest = _re.sub(r'\bREFERENCES\b.*$', ' ', rest, flags=_re.I | _re.S)
+        rest = _re.sub(r'\bSERIAL\b', 'INTEGER', rest, flags=_re.I)
+        rest = ' '.join(rest.split())
+        if rest:
+            out.append(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {name} {rest}")
+    return out
+
+
+class _SafeMigrationCursor:
+    """Executa cada comando da migração no seu próprio SAVEPOINT.
+    Antes, uma falha qualquer (ex.: CREATE INDEX numa coluna que a base antiga não tem) abortava a transação
+    e o rollback final descartava TODAS as migrações, a cada inicialização: as colunas novas nunca chegavam
+    às bases antigas (ex.: job_failure_log.task_id, repositories.engine). Agora a falha é registrada e o resto segue."""
+
+    def __init__(self, cursor, errors):
+        self._cur = cursor
+        self._errors = errors
+        self._n = 0
+        self._ok = True
+        self._rows = None
+        self.rowcount = -1
+        self._explicit = 0   # savepoints abertos pelo próprio código da migração
+
+    def execute(self, sql, params=None):
+        head = sql.lstrip().upper()
+        self._rows = None
+        if head.startswith(('SAVEPOINT', 'RELEASE', 'ROLLBACK')):
+            self._ok = True
+            if head.startswith('SAVEPOINT'):
+                self._explicit += 1
+            elif self._explicit:
+                self._explicit -= 1
+            return self._cur.execute(sql, params)
+        self._n += 1
+        sp = f"gboc_mig_{self._n}"
+        self._cur.execute(f"SAVEPOINT {sp}")
+        try:
+            self._cur.execute(sql, params)
+            self._ok = True
+            self.rowcount = self._cur.rowcount
+            # guardar o resultado antes do RELEASE (que descarta o resultado pendente do cursor)
+            self._rows = list(self._cur.fetchall()) if self._cur.description else None
+        except Exception as e:
+            self._ok = False
+            self._cur.execute(f"ROLLBACK TO SAVEPOINT {sp}")
+            if self._explicit:
+                # bloco já protegido por savepoint próprio: mantém o tratamento original (o except dele decide)
+                self._cur.execute(f"RELEASE SAVEPOINT {sp}")
+                raise
+            first = ' '.join(sql.split())[:160]
+            msg = f"{first} -> {str(e).strip().splitlines()[0] if str(e).strip() else e}"
+            self._errors.append(msg)
+            logging.warning(f"⚠️ Migração: comando ignorado ({msg})")
+        self._cur.execute(f"RELEASE SAVEPOINT {sp}")
+        if self._ok:
+            for stmt in _missing_column_statements(sql):
+                self._n += 1
+                sp2 = f"gboc_mig_{self._n}"
+                self._cur.execute(f"SAVEPOINT {sp2}")
+                try:
+                    self._cur.execute(stmt)
+                except Exception as e:
+                    self._cur.execute(f"ROLLBACK TO SAVEPOINT {sp2}")
+                    self._errors.append(f"{stmt} -> {str(e).strip().splitlines()[0] if str(e).strip() else e}")
+                self._cur.execute(f"RELEASE SAVEPOINT {sp2}")
+            self._ok = True
+
+    def fetchone(self):
+        if not self._ok or not self._rows:
+            return None
+        return self._rows.pop(0)
+
+    def fetchall(self):
+        if not self._ok or not self._rows:
+            return []
+        rows, self._rows = self._rows, []
+        return rows
+
+    def __getattr__(self, name):
+        return getattr(self._cur, name)
+
+
 def run_auto_migrations(conn):
 
     """Runs the database migration."""
@@ -21,7 +145,9 @@ def run_auto_migrations(conn):
 
     
 
-    with conn.cursor() as cursor:
+    with conn.cursor() as _raw_cursor:
+
+        cursor = _SafeMigrationCursor(_raw_cursor, errors)
 
         try:
 
@@ -126,6 +252,22 @@ def run_auto_migrations(conn):
 
             defensive_statements = [
                 "ALTER TABLE repositories ADD COLUMN IF NOT EXISTS encryption_password TEXT;",
+                # Bases antigas criaram "repositories"/"tasks" com poucas colunas (importador falhava em "engine")
+                "ALTER TABLE repositories ADD COLUMN IF NOT EXISTS engine TEXT DEFAULT 'restic';",
+                "ALTER TABLE repositories ADD COLUMN IF NOT EXISTS password TEXT;",
+                "ALTER TABLE repositories ADD COLUMN IF NOT EXISTS motor_password TEXT;",
+                "ALTER TABLE repositories ADD COLUMN IF NOT EXISTS cloud_password TEXT;",
+                "ALTER TABLE repositories ADD COLUMN IF NOT EXISTS config TEXT;",
+                "ALTER TABLE repositories ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';",
+                "ALTER TABLE repositories ADD COLUMN IF NOT EXISTS enabled BOOLEAN DEFAULT TRUE;",
+                "ALTER TABLE repositories ADD COLUMN IF NOT EXISTS initialized BOOLEAN DEFAULT FALSE;",
+                "ALTER TABLE repositories ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ;",
+                "ALTER TABLE repositories ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;",
+                "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS repository_id INTEGER;",
+                "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'idle';",
+                "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ;",
+                "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS pre_script TEXT;",
+                "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS post_script TEXT;",
                 # Bases antigas criaram "alerts" sem estas colunas (HTTP 500 em /api/alerts/)
                 "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS acknowledged BOOLEAN DEFAULT FALSE;",
                 "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS resolved BOOLEAN DEFAULT FALSE;",

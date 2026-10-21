@@ -134,6 +134,38 @@ function Add-GbocBundleItem([System.Collections.IDictionary]$Entry, [string]$Roo
     return $Entry
 }
 
+function Build-GbocMissingWheels([string]$BuildPython, [string]$MM, [string]$WheelDir, [string]$Requirements) {
+    <# Monta (pip wheel) as bibliotecas sem wheel pronta para Python $MM, usando um Python $MM instalado
+       nesta maquina. Retorna $true se montou todas as que faltavam. #>
+    $ErrorActionPreference = "Continue"
+    $localPy = Get-GbocInstalledPythons | Where-Object { ("{0}.{1}" -f $_.Version.Major, $_.Version.Minor) -eq $MM } | Select-Object -First 1
+    if (-not $localPy) {
+        Write-GbocWarn "Para usar o Python $MM, instale-o nesta maquina: algumas bibliotecas precisam ser montadas localmente"
+        return $false
+    }
+    $probe = Join-Path ([System.IO.Path]::GetTempPath()) ("gboc_whl_" + [guid]::NewGuid().ToString("N"))
+    $missing = @()
+    foreach ($line in (Get-Content $Requirements)) {
+        $spec = ($line -replace '#.*$', '').Trim()
+        if (-not $spec) { continue }
+        & $BuildPython -m pip download --disable-pip-version-check -q --no-deps --only-binary=:all: --platform win_amd64 `
+            --python-version $MM --implementation cp -d $probe $spec *> $null
+        if ($LASTEXITCODE -ne 0) { $missing += $spec }
+    }
+    Remove-Item $probe -Recurse -Force -ErrorAction SilentlyContinue
+    if ($missing.Count -eq 0) { return $false }
+    New-Item -ItemType Directory -Path $WheelDir -Force | Out-Null
+    foreach ($spec in $missing) {
+        Write-GbocInfo "Sem wheel pronta para Python ${MM}: $spec (montando com $($localPy.Path))"
+        & $localPy.Path -m pip wheel --disable-pip-version-check -q --no-deps -w $WheelDir $spec 2>&1 | ForEach-Object { Write-Host ("    " + "$_") -ForegroundColor DarkGray }
+        if ($LASTEXITCODE -ne 0) {
+            Write-GbocWarn "Nao foi possivel montar $spec para Python $MM"
+            return $false
+        }
+    }
+    return $true
+}
+
 function New-GbocPrereqsBundle([string]$Dest, [string]$BuildPython, [string]$Requirements) {
     $ErrorActionPreference = "Continue"      # avisos do pip no stderr nao podem abortar o gerador
     New-Item -ItemType Directory -Path $Dest -Force | Out-Null
@@ -162,6 +194,15 @@ function New-GbocPrereqsBundle([string]$Dest, [string]$BuildPython, [string]$Req
         Write-GbocInfo "Baixando bibliotecas para Python $mm (Windows x64)..."
         & $BuildPython -m pip download --disable-pip-version-check -q --only-binary=:all: --platform win_amd64 `
             --python-version $mm --implementation cp -d $wdir -r $Requirements pip setuptools wheel 2>&1 | ForEach-Object { Write-Host ("    " + "$_") -ForegroundColor DarkGray }
+        if ($LASTEXITCODE -ne 0) {
+            # Logo apos o lancamento de um Python, alguns pacotes ainda nao publicam wheel para ele (ex.: pyyaml).
+            # Regra do GBOC: sempre a versao mais nova. Monta essas wheels com um Python desta versao instalado
+            # aqui e baixa o resto de novo, em vez de recuar para a versao anterior.
+            if (Build-GbocMissingWheels -BuildPython $BuildPython -MM $mm -WheelDir $wdir -Requirements $Requirements) {
+                & $BuildPython -m pip download --disable-pip-version-check -q --only-binary=:all: --platform win_amd64 `
+                    --python-version $mm --implementation cp --find-links $wdir -d $wdir -r $Requirements pip setuptools wheel 2>&1 | ForEach-Object { Write-Host ("    " + "$_") -ForegroundColor DarkGray }
+            }
+        }
         if ($LASTEXITCODE -ne 0) {
             Write-GbocWarn "Bibliotecas do GBOC ainda nao disponiveis para Python $mm; tentando a versao anterior"
             Remove-Item $wdir -Recurse -Force -ErrorAction SilentlyContinue

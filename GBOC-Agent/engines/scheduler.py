@@ -150,6 +150,10 @@ class Scheduler:
                         if _in_mw:
                             _ops.record_skip(task_id, task_name, _win)
                             continue
+                        if not self._claim_slot(task_id, now):
+                            # Outro processo (Agente como serviço + agendador separado) já disparou neste minuto
+                            self.logger.info(f"[SCHEDULER] {task_name} (id={task_id}) já disparada neste minuto por outro processo")
+                            continue
                         self.logger.info(f"[SCHEDULER] Disparando tarefa agendada: {task_name} (id={task_id}, cron={cron_expr})")
                         result = task_manager.trigger_task(task_id)
                         if result.get('status') == 'success':
@@ -162,6 +166,43 @@ class Scheduler:
 
         except Exception as e:
             self.logger.error(f"[ERROR] Erro ao verificar tarefas agendadas: {e}")
+
+    def _claim_slot(self, task_id, now: datetime) -> bool:
+        """Reserva o disparo (tarefa, minuto) no banco. O processo do Agente e o agendador separado
+        (GBOC_Scheduler_Agent) rodam este mesmo loop; sem a reserva os dois disparavam o mesmo backup.
+        Se a reserva não puder ser feita (banco indisponível), dispara como antes."""
+        slot = now.strftime("%Y-%m-%d %H:%M")
+        last_err = None
+        for _attempt in range(3):
+            try:
+                with self.shared_core.get_db_connection() as conn:
+                    cur = conn.cursor()
+                    try:
+                        cur.execute("""
+                            CREATE TABLE IF NOT EXISTS scheduler_fires (
+                                task_id TEXT NOT NULL,
+                                slot TEXT NOT NULL,
+                                fired_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                PRIMARY KEY (task_id, slot)
+                            )
+                        """)
+                        conn.commit()
+                    except Exception as e:
+                        # outro processo criou a tabela no mesmo instante: segue para a reserva
+                        conn.rollback()
+                        last_err = e
+                    cur.execute("INSERT INTO scheduler_fires (task_id, slot) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                                (str(task_id), slot))
+                    claimed = (cur.rowcount or 0) > 0
+                    if claimed and now.minute == 0:
+                        cur.execute("DELETE FROM scheduler_fires WHERE fired_at < CURRENT_TIMESTAMP - INTERVAL '2 days'")
+                    conn.commit()
+                    return claimed
+            except Exception as e:
+                last_err = e
+                time.sleep(0.2)
+        self.logger.warning(f"[SCHEDULER] Reserva de disparo indisponível ({last_err}); disparando sem reserva")
+        return True
 
     def get_status(self) -> Dict[str, Any]:
         """Retorna status do scheduler"""

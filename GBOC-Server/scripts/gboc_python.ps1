@@ -133,6 +133,10 @@ function Get-Candidates {
         "$env:ProgramFiles\Python3*\python.exe",
         "$env:LOCALAPPDATA\Programs\Python\Python3*\python.exe",
         "$env:LOCALAPPDATA\Python\pythoncore-3*\python.exe",
+        # Servico do Windows (LocalSystem): %LOCALAPPDATA% e o perfil do sistema; o Python instalado
+        # "so para o usuario" fica no perfil de quem instalou e nao era encontrado (servico nao subia)
+        "$env:SystemDrive\Users\*\AppData\Local\Programs\Python\Python3*\python.exe",
+        "$env:SystemDrive\Users\*\AppData\Local\Python\pythoncore-3*\python.exe",
         "C:\Python3*\python.exe",
         "C:\GBOC\Tools\Python*\python.exe",
         "C:\GBOC\Tools\Python\*\python.exe"

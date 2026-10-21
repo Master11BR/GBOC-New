@@ -698,6 +698,146 @@ function Install-GbocNssm([string]$ToolsDir = "C:\GBOC\Tools") {
 }
 
 # ============================================================================
+# Servicos do Windows (GBOCAgent / GBOCServer): o sistema inteiro roda sem usuario logado.
+# NSSM chama o start_*.ps1 (que escolhe o Python mais novo a cada inicio), inicio automatico,
+# conta LocalSystem e reinicio em caso de falha. Sem NSSM: tarefa de inicializacao como SYSTEM.
+# ============================================================================
+
+function Stop-GbocService([string]$Name, [string]$ToolsDir = "C:\GBOC\Tools") {
+    $ErrorActionPreference = "Continue"
+    $svc = Get-Service -Name $Name -ErrorAction SilentlyContinue
+    if ($svc -and $svc.Status -ne "Stopped") {
+        Write-GbocInfo "Parando o servico $Name..."
+        Stop-Service -Name $Name -Force -ErrorAction SilentlyContinue
+        for ($i = 0; $i -lt 30; $i++) {
+            if ((Get-Service -Name $Name -ErrorAction SilentlyContinue).Status -eq "Stopped") { break }
+            Start-Sleep -Seconds 1
+        }
+    }
+    $task = Get-ScheduledTask -TaskName $Name -ErrorAction SilentlyContinue
+    if ($task -and $task.State -eq "Running") { Stop-ScheduledTask -TaskName $Name -ErrorAction SilentlyContinue }
+}
+
+function Register-GbocService {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][string]$DisplayName,
+        [string]$Description = "",
+        [Parameter(Mandatory = $true)][string]$Script,
+        [string]$ScriptArgs = "",
+        [Parameter(Mandatory = $true)][string]$WorkDir,
+        [string]$LogDir = "",
+        [string]$ToolsDir = "C:\GBOC\Tools",
+        [string[]]$Environment = @(),
+        [switch]$NoStart
+    )
+    # Saida de programas externos (nssm/sc) nao pode virar erro fatal com $ErrorActionPreference=Stop
+    $ErrorActionPreference = "Continue"
+    if (-not (Test-Path -LiteralPath $Script)) { Write-GbocWarn "${Name}: script nao encontrado ($Script)"; return $false }
+    if (-not $LogDir) { $LogDir = Join-Path $WorkDir "logs" }
+    New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
+    $psExe = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
+    $psArgs = ("-NoProfile -ExecutionPolicy Bypass -File `"$Script`" $ScriptArgs").Trim()
+
+    Stop-GbocService -Name $Name -ToolsDir $ToolsDir
+    $nssm = Install-GbocNssm -ToolsDir $ToolsDir
+    if ($nssm) {
+        if (Get-Service -Name $Name -ErrorAction SilentlyContinue) {
+            & $nssm remove $Name confirm *> $null
+            if (Get-Service -Name $Name -ErrorAction SilentlyContinue) { & sc.exe delete $Name *> $null }
+            Start-Sleep -Seconds 2
+        }
+        # Tarefa agendada de fallback de uma instalacao anterior sem NSSM
+        if (Get-ScheduledTask -TaskName $Name -ErrorAction SilentlyContinue) {
+            Unregister-ScheduledTask -TaskName $Name -Confirm:$false -ErrorAction SilentlyContinue
+        }
+        & $nssm install $Name $psExe *> $null
+        if (-not (Get-Service -Name $Name -ErrorAction SilentlyContinue)) {
+            Write-GbocWarn "${Name}: o NSSM nao conseguiu criar o servico"
+            return $false
+        }
+        & $nssm set $Name AppParameters $psArgs *> $null
+        & $nssm set $Name AppDirectory $WorkDir *> $null
+        & $nssm set $Name DisplayName $DisplayName *> $null
+        if ($Description) { & $nssm set $Name Description $Description *> $null }
+        & $nssm set $Name Start SERVICE_AUTO_START *> $null
+        & $nssm set $Name ObjectName LocalSystem *> $null
+        & $nssm set $Name AppExit Default Restart *> $null
+        & $nssm set $Name AppRestartDelay 15000 *> $null
+        & $nssm set $Name AppThrottle 30000 *> $null
+        & $nssm set $Name AppStopMethodConsole 15000 *> $null
+        & $nssm set $Name AppKillProcessTree 1 *> $null
+        & $nssm set $Name AppStdout (Join-Path $LogDir "service_stdout.log") *> $null
+        & $nssm set $Name AppStderr (Join-Path $LogDir "service_stderr.log") *> $null
+        & $nssm set $Name AppRotateFiles 1 *> $null
+        & $nssm set $Name AppRotateOnline 1 *> $null
+        & $nssm set $Name AppRotateSeconds 86400 *> $null
+        & $nssm set $Name AppRotateBytes 10485760 *> $null
+        $envList = @($Environment | Where-Object { $_ })
+        if ($envList.Count -gt 0) { & $nssm set $Name AppEnvironmentExtra @envList *> $null }
+        # Se o proprio NSSM cair, o Windows reinicia o servico
+        & sc.exe failure $Name reset= 86400 actions= restart/15000/restart/15000/restart/60000 *> $null
+        Write-GbocOk "Servico $Name registrado (inicio automatico, LocalSystem, reinicio em falha)"
+    } else {
+        Write-GbocWarn "NSSM indisponivel: $Name sera uma tarefa de inicializacao do Windows (SYSTEM)"
+        if (Get-ScheduledTask -TaskName $Name -ErrorAction SilentlyContinue) {
+            Unregister-ScheduledTask -TaskName $Name -Confirm:$false -ErrorAction SilentlyContinue
+        }
+        $envCmd = ($Environment | Where-Object { $_ } | ForEach-Object {
+            $kv = $_ -split '=', 2; "`$env:$($kv[0])='$($kv[1] -replace "'", "''")';"
+        }) -join ' '
+        $cmd = "$envCmd & '$($Script -replace "'", "''")' $ScriptArgs".Trim()
+        $action = New-ScheduledTaskAction -Execute $psExe -Argument "-NoProfile -ExecutionPolicy Bypass -Command `"$cmd`"" -WorkingDirectory $WorkDir
+        $trigger = New-ScheduledTaskTrigger -AtStartup
+        $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable `
+            -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero)
+        $principal = New-ScheduledTaskPrincipal -UserId "NT AUTHORITY\SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+        try {
+            Register-ScheduledTask -TaskName $Name -Action $action -Trigger $trigger -Settings $settings -Principal $principal `
+                -Description "$DisplayName - $Description" -ErrorAction Stop | Out-Null
+            Write-GbocOk "Tarefa de inicializacao $Name registrada (SYSTEM, sem usuario logado)"
+        } catch {
+            Write-GbocWarn "${Name}: falha ao registrar a tarefa ($($_.Exception.Message))"
+            return $false
+        }
+    }
+    if ($NoStart) { return $true }
+    return (Start-GbocService -Name $Name)
+}
+
+function Start-GbocService([string]$Name, [int]$WaitSec = 20) {
+    $ErrorActionPreference = "Continue"
+    if (Get-Service -Name $Name -ErrorAction SilentlyContinue) {
+        Start-Service -Name $Name -ErrorAction SilentlyContinue
+        for ($i = 0; $i -lt $WaitSec; $i++) {
+            if ((Get-Service -Name $Name).Status -eq "Running") { Write-GbocOk "Servico $Name em execucao"; return $true }
+            Start-Sleep -Seconds 1
+        }
+        Write-GbocWarn "Servico $Name nao ficou em execucao (veja logs\service_stderr.log)"
+        return $false
+    }
+    if (Get-ScheduledTask -TaskName $Name -ErrorAction SilentlyContinue) {
+        Start-ScheduledTask -TaskName $Name -ErrorAction SilentlyContinue
+        Write-GbocOk "Tarefa $Name iniciada"
+        return $true
+    }
+    return $false
+}
+
+function Unregister-GbocService([string]$Name, [string]$ToolsDir = "C:\GBOC\Tools") {
+    $ErrorActionPreference = "Continue"
+    Stop-GbocService -Name $Name -ToolsDir $ToolsDir
+    $nssm = Join-Path $ToolsDir "nssm\nssm.exe"
+    if (Get-Service -Name $Name -ErrorAction SilentlyContinue) {
+        if (Test-Path $nssm) { & $nssm remove $Name confirm *> $null }
+        if (Get-Service -Name $Name -ErrorAction SilentlyContinue) { & sc.exe delete $Name *> $null }
+    }
+    if (Get-ScheduledTask -TaskName $Name -ErrorAction SilentlyContinue) {
+        Unregister-ScheduledTask -TaskName $Name -Confirm:$false -ErrorAction SilentlyContinue
+    }
+}
+
+# ============================================================================
 # Resumo: o que a maquina ja tem x o que veio no pacote
 # ============================================================================
 
