@@ -40,7 +40,12 @@ param (
 
     # Instalar LLM Local Gratuito (Ollama + Qwen 3.5)
     [Parameter(Mandatory = $false)]
-    [switch]$InstallLLM = $false
+    [switch]$InstallLLM = $false,
+
+    # Nao registrar GBOCServer/GBOCAgent como servicos do Windows (padrao: registra; o sistema
+    # continua rodando sem usuario logado e reinicia sozinho se cair)
+    [Parameter(Mandatory = $false)]
+    [switch]$NoService = $false
 )
 
 $ErrorActionPreference = "Stop"
@@ -257,6 +262,11 @@ foreach ($dir in $dirsToCreate) {
     }
 }
 
+# Servicos de uma instalacao anterior: parados antes de trocar arquivos, Python e dependencias
+# (arquivos em uso bloqueiam a copia e o pip). Sao registrados e iniciados de novo no final.
+if ($InstallMode -in @("Server", "Both")) { Stop-GbocService -Name "GBOCServer" -ToolsDir $ToolsDir }
+if ($InstallMode -in @("Agent", "Both")) { Stop-GbocService -Name "GBOCAgent" -ToolsDir $ToolsDir }
+
 # Configurar selecao de banco de dados (.env e system_config.json)
 Write-Step "Gravando configuracao do banco de dados ($DatabaseEngine)..."
 $envContent = @(
@@ -427,6 +437,13 @@ if ($InstallMode -in @("Server", "Both")) {
     $sLines = @(
         "@echo off",
         "title GBOC Server v14.8.2 Enterprise",
+        "REM Instalado como servico do Windows: usa o servico (abrir o console disputaria a porta $ServerPort)",
+        "sc query GBOCServer >nul 2>&1",
+        "if not errorlevel 1 (",
+        "    sc query GBOCServer | find ""RUNNING"" >nul || net start GBOCServer",
+        "    start """" ""http://localhost:$ServerPort""",
+        "    exit /b 0",
+        ")",
         "cd /d ""$ServerDir""",
         "set SERVER_PORT=$ServerPort",
         "set SERVER_HOST=0.0.0.0",
@@ -442,6 +459,13 @@ if ($InstallMode -in @("Agent", "Both")) {
     $aLines = @(
         "@echo off",
         "title GBOC Agent v14.8.2 Enterprise",
+        "REM Instalado como servico do Windows: usa o servico (abrir o console disputaria a porta $AgentPort)",
+        "sc query GBOCAgent >nul 2>&1",
+        "if not errorlevel 1 (",
+        "    sc query GBOCAgent | find ""RUNNING"" >nul || net start GBOCAgent",
+        "    start """" ""https://localhost:$AgentPort""",
+        "    exit /b 0",
+        ")",
         "cd /d ""$AgentDir""",
         "set AGENT_PORT=$AgentPort",
         "set AGENT_HOST=0.0.0.0",
@@ -480,6 +504,8 @@ $stopLines = @(
     "@echo off",
     "title Encerrando Servicos GBOC",
     "echo Finalizando processos do GBOC Server e GBOC Agent...",
+    "sc query GBOCAgent >nul 2>&1 && net stop GBOCAgent",
+    "sc query GBOCServer >nul 2>&1 && net stop GBOCServer",
     "taskkill /f /im python.exe /fi ""WINDOWTITLE eq GBOC*"" 2>nul",
     "echo Processos encerrados.",
     "timeout /t 2 >nul"
@@ -499,6 +525,16 @@ $uninstLines = @(
     "if /i ""%confirm%"" neq ""S"" goto :cancel",
     "",
     "echo Encerrando processos...",
+    "sc query GBOCAgent >nul 2>&1 && net stop GBOCAgent",
+    "sc query GBOCServer >nul 2>&1 && net stop GBOCServer",
+    "if exist ""$ToolsDir\nssm\nssm.exe"" (",
+    "    ""$ToolsDir\nssm\nssm.exe"" remove GBOCAgent confirm >nul 2>&1",
+    "    ""$ToolsDir\nssm\nssm.exe"" remove GBOCServer confirm >nul 2>&1",
+    ")",
+    "sc delete GBOCAgent >nul 2>&1",
+    "sc delete GBOCServer >nul 2>&1",
+    "schtasks /delete /tn GBOCAgent /f >nul 2>&1",
+    "schtasks /delete /tn GBOCServer /f >nul 2>&1",
     "taskkill /f /im python.exe /fi ""WINDOWTITLE eq GBOC*"" 2>nul",
     "",
     "echo Removendo arquivos...",
@@ -557,6 +593,35 @@ $testInline = "import sys, fastapi, uvicorn, pydantic, sqlalchemy, psutil; print
 $testResult = & $VenvPython -c $testInline 2>&1
 Write-Host "    $testResult" -ForegroundColor Cyan
 
+# 9.0 Servicos do Windows: o sistema inteiro (API, painel e agendador) roda sem usuario logado
+$ServicesRegistered = @()
+if (-not $NoService -and $InstallMode -in @("Server", "Both", "Agent")) {
+    Write-Step "Registrando o GBOC como servico do Windows (inicio automatico, sem usuario logado)..."
+    $pgPassMachine = [Environment]::GetEnvironmentVariable("POSTGRES_PASSWORD", "Machine")
+    # Servicos recebem o ambiente do Windows de quando ele iniciou: variaveis gravadas agora
+    # so chegariam apos reiniciar a maquina, entao vao direto na configuracao do servico
+    $commonEnv = @("PYTHONIOENCODING=utf-8", "GBOC_DB_ENGINE=$DatabaseEngine", "DB_ENGINE=$DatabaseEngine")
+    if ($pgPassMachine) { $commonEnv += "POSTGRES_PASSWORD=$pgPassMachine" }
+    if ($InstallMode -in @("Server", "Both")) {
+        $ok = Register-GbocService -Name "GBOCServer" -DisplayName "GBOC Server" `
+            -Description "GBOC Servidor Central (painel web e API, porta $ServerPort)" `
+            -Script (Join-Path $ServerDir "start_server.ps1") -WorkDir $ServerDir -LogDir (Join-Path $ServerDir "logs") `
+            -ToolsDir $ToolsDir -Environment ($commonEnv + @("SERVER_PORT=$ServerPort", "SERVER_HOST=0.0.0.0"))
+        if ($ok) { $ServicesRegistered += "GBOCServer" }
+    }
+    if ($InstallMode -in @("Agent", "Both")) {
+        $ok = Register-GbocService -Name "GBOCAgent" -DisplayName "GBOC Backup Agent" `
+            -Description "GBOC Agente de backup e restauracao (painel, API e agendador, porta $AgentPort)" `
+            -Script (Join-Path $AgentDir "start_agent.ps1") -ScriptArgs "-Service" -WorkDir $AgentDir -LogDir (Join-Path $AgentDir "logs") `
+            -ToolsDir $ToolsDir -Environment ($commonEnv + @("AGENT_PORT=$AgentPort", "AGENT_HOST=0.0.0.0",
+                "RESTIC_PATH=$ToolsDir\Restic\restic.exe", "KOPIA_PATH=$ToolsDir\Kopia\kopia.exe"))
+        if ($ok) { $ServicesRegistered += "GBOCAgent" }
+    }
+    $pgPassMachine = $null
+} elseif ($NoService) {
+    Write-Warning "Servicos do Windows nao registrados (-NoService): o GBOC para quando o usuario sair da sessao."
+}
+
 # 9.1 Instalacao de IA Local Gratuita (Ollama)
 if ($InstallLLM) {
     Write-Step "Instalando e integrando motor de IA Local Gratuito (Ollama)..."
@@ -579,6 +644,9 @@ if ($InstallMode -in @("Agent", "Both")) {
 }
 if ($InstallMode -eq "Both") {
     Write-Host "Script Unificado:  $TargetDir\start_all.bat" -ForegroundColor Green
+}
+if ($ServicesRegistered.Count -gt 0) {
+    Write-Host "Servicos Windows:  $($ServicesRegistered -join ', ') (inicio automatico, rodam sem usuario logado)" -ForegroundColor Green
 }
 Write-Host "Script Parada:     $TargetDir\stop_all.bat" -ForegroundColor Yellow
 Write-Host "Desinstalador:     $TargetDir\uninstall.bat" -ForegroundColor Red

@@ -63,7 +63,7 @@ Write-Host "`n[5/5] Verificando instalacao..." -ForegroundColor Yellow
 Invoke-Python -c "import fastapi; import uvicorn; import websockets; print('[OK] Dependencias principais')"
 if ($LASTEXITCODE -ne 0) {
     Write-Host "[AVISO] Falha ao importar FastAPI/Pydantic. Tentando auto-correcao..." -ForegroundColor Yellow
-    Invoke-Python -m pip install --force-reinstall --no-cache-dir "pydantic==2.12.5" "pydantic-core==2.41.5" "fastapi==0.135.1" "starlette==0.52.1"
+    Invoke-Python -m pip install --force-reinstall --no-cache-dir "pydantic==2.14.1" "pydantic-core==2.50.1" "fastapi==0.135.1" "starlette==0.52.1"
     Invoke-Python -c "import pydantic_core; import pydantic; import fastapi; import uvicorn; import websockets; print('[OK] Stack FastAPI/Pydantic corrigida')"
 }
 

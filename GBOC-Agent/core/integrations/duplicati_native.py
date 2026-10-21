@@ -22,6 +22,35 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 DATA_DIR = os.path.join(BASE_DIR, "data")
 CONFIG_FILE = os.path.join(DATA_DIR, "duplicati_native_config.json")
 
+def _other_profile_duplicati_dbs(already: List[str]) -> List[str]:
+    """Bancos do Duplicati de OUTROS perfis do Windows, do mais recente para o mais antigo.
+    Como serviço (LocalSystem), %LOCALAPPDATA% aponta para o perfil do sistema e o Duplicati do usuário
+    (ou o Duplicati rodando como serviço) não era encontrado: a importação voltava vazia."""
+    if os.name != "nt":
+        return []
+    import glob
+    sysroot = os.environ.get("SystemRoot", r"C:\Windows")
+    users_root = os.path.join(os.environ.get("SystemDrive", "C:") + os.sep, "Users")
+    patterns = [
+        os.path.join(users_root, "*", "AppData", "Local", "Duplicati", "Duplicati-server.sqlite"),
+        os.path.join(users_root, "*", "AppData", "Roaming", "Duplicati", "Duplicati-server.sqlite"),
+        os.path.join(sysroot, "System32", "config", "systemprofile", "AppData", "Local", "Duplicati", "Duplicati-server.sqlite"),
+        os.path.join(sysroot, "System32", "config", "systemprofile", "AppData", "Roaming", "Duplicati", "Duplicati-server.sqlite"),
+    ]
+    seen = {os.path.normcase(os.path.abspath(p)) for p in already if p}
+    found = []
+    for pat in patterns:
+        for f in glob.glob(pat):
+            key = os.path.normcase(os.path.abspath(f))
+            if key in seen:
+                continue
+            seen.add(key)
+            try:
+                found.append((os.path.getmtime(f), f))
+            except OSError:
+                continue
+    return [f for _, f in sorted(found, reverse=True)]
+
 
 @dataclass
 class DuplicatiConfig:
@@ -542,6 +571,7 @@ class DuplicatiNativeService:
             "/var/lib/duplicati/Duplicati-server.sqlite",
             os.path.expanduser("~/.config/Duplicati/Duplicati-server.sqlite"),
         ]
+        db_paths += _other_profile_duplicati_dbs(db_paths)
 
         def fix_iso_date(raw_val: Any) -> Optional[str]:
             if not raw_val:
