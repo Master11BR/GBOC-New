@@ -23,6 +23,7 @@ from fastapi.responses import JSONResponse
 logger = logging.getLogger("gboc_auth_guard")
 
 PUBLIC_EXACT = {
+    "/api/watchdog/ping",              # só "vivo/travado" (serviço GBOCWatchdog)
     "/api/v1/auth/login",
     "/api/v1/auth/setup",
     "/api/v1/auth/status",

@@ -264,6 +264,7 @@ foreach ($dir in $dirsToCreate) {
 
 # Servicos de uma instalacao anterior: parados antes de trocar arquivos, Python e dependencias
 # (arquivos em uso bloqueiam a copia e o pip). Sao registrados e iniciados de novo no final.
+Stop-GbocService -Name "GBOCWatchdog" -ToolsDir $ToolsDir          # nao reiniciar servicos parados pela atualizacao
 if ($InstallMode -in @("Server", "Both")) { Stop-GbocService -Name "GBOCServer" -ToolsDir $ToolsDir }
 if ($InstallMode -in @("Agent", "Both")) { Stop-GbocService -Name "GBOCAgent" -ToolsDir $ToolsDir }
 
@@ -504,6 +505,7 @@ $stopLines = @(
     "@echo off",
     "title Encerrando Servicos GBOC",
     "echo Finalizando processos do GBOC Server e GBOC Agent...",
+    "sc query GBOCWatchdog >nul 2>&1 && net stop GBOCWatchdog",
     "sc query GBOCAgent >nul 2>&1 && net stop GBOCAgent",
     "sc query GBOCServer >nul 2>&1 && net stop GBOCServer",
     "taskkill /f /im python.exe /fi ""WINDOWTITLE eq GBOC*"" 2>nul",
@@ -525,12 +527,15 @@ $uninstLines = @(
     "if /i ""%confirm%"" neq ""S"" goto :cancel",
     "",
     "echo Encerrando processos...",
+    "sc query GBOCWatchdog >nul 2>&1 && net stop GBOCWatchdog",
     "sc query GBOCAgent >nul 2>&1 && net stop GBOCAgent",
     "sc query GBOCServer >nul 2>&1 && net stop GBOCServer",
     "if exist ""$ToolsDir\nssm\nssm.exe"" (",
+    "    ""$ToolsDir\nssm\nssm.exe"" remove GBOCWatchdog confirm >nul 2>&1",
     "    ""$ToolsDir\nssm\nssm.exe"" remove GBOCAgent confirm >nul 2>&1",
     "    ""$ToolsDir\nssm\nssm.exe"" remove GBOCServer confirm >nul 2>&1",
     ")",
+    "sc delete GBOCWatchdog >nul 2>&1",
     "sc delete GBOCAgent >nul 2>&1",
     "sc delete GBOCServer >nul 2>&1",
     "schtasks /delete /tn GBOCAgent /f >nul 2>&1",
@@ -616,6 +621,16 @@ if (-not $NoService -and $InstallMode -in @("Server", "Both", "Agent")) {
             -ToolsDir $ToolsDir -Environment ($commonEnv + @("AGENT_PORT=$AgentPort", "AGENT_HOST=0.0.0.0",
                 "RESTIC_PATH=$ToolsDir\Restic\restic.exe", "KOPIA_PATH=$ToolsDir\Kopia\kopia.exe"))
         if ($ok) { $ServicesRegistered += "GBOCAgent" }
+    }
+    # Vigia anti-travamento: reinicia o Agente/Servidor se o servico estiver rodando mas congelado
+    # (PowerShell puro: funciona mesmo se o Python quebrar). Logs em <Agent ou Server>\logs\watchdog.log
+    if ($ServicesRegistered.Count -gt 0) {
+        $wdRoot = if ($InstallMode -in @("Agent", "Both")) { $AgentDir } else { $ServerDir }
+        $ok = Register-GbocService -Name "GBOCWatchdog" -DisplayName "GBOC Watchdog" `
+            -Description "GBOC vigia anti-travamento (reinicia GBOCAgent/GBOCServer congelados)" `
+            -Script (Join-Path $wdRoot "scripts\gboc_watchdog.ps1") -ScriptArgs "-Service" -WorkDir $wdRoot `
+            -LogDir (Join-Path $wdRoot "logs") -ToolsDir $ToolsDir
+        if ($ok) { $ServicesRegistered += "GBOCWatchdog" }
     }
     $pgPassMachine = $null
 } elseif ($NoService) {

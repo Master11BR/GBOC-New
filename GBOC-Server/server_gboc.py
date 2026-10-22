@@ -989,11 +989,21 @@ async def lifespan(app: FastAPI):
         logger.warning(f"Classificação de logs em segundo plano não iniciada: {_kb_e}")
     if os.getenv("GBOC_AUTO_RETENTION", "1") != "0":
         threading.Thread(target=_retention_scheduler_loop, name="gboc-retention", daemon=True).start()
+    try:
+        import hang_watchdog as _hang_watchdog            # pilha das threads em logs/hang_*.log se o laço travar
+        _hang_watchdog.start("Server", os.path.dirname(os.path.abspath(__file__)))
+    except Exception as _hw_e:
+        logger.warning(f"[VIGIA] vigia de travamento indisponível: {_hw_e}")
     yield
     if connection_pool:
         connection_pool.closeall()
 
 app = FastAPI(title="GBOC Server", version=SERVER_VERSION, lifespan=lifespan)
+try:
+    import hang_watchdog as _hang_watchdog_mod
+    _hang_watchdog_mod.register(app)      # /api/watchdog/ping (usado pelo serviço GBOCWatchdog)
+except Exception as _hw_reg_e:
+    logger.warning(f"[VIGIA] rota de verificação indisponível: {_hw_reg_e}")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 _SLOW_THRESHOLD_MS = float(os.getenv("GBOC_SLOW_MS", "250"))

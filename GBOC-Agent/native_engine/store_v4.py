@@ -385,7 +385,23 @@ class ObjectStore:
         return data
 
     def pool(self) -> ThreadPoolExecutor:
-        return ThreadPoolExecutor(max_workers=self.workers, thread_name_prefix="gboc-native")
+        return ThreadPoolExecutor(max_workers=self.workers, thread_name_prefix="gboc-native",
+                                  initializer=_low_priority_thread)
+
+
+def _low_priority_thread() -> None:
+    """Threads de envio/compressão do backup com prioridade abaixo do normal (Windows), para não disputar CPU
+    com os usuários do servidor. Desligável em Controle de rede > Proteção da máquina."""
+    try:
+        from engines.network_governor import governor
+        r = governor._config()["resource"]
+        if not (r.get("enabled") and r.get("low_priority")) or os.name != "nt":
+            return
+        import ctypes
+        k32 = ctypes.windll.kernel32
+        k32.SetThreadPriority(k32.GetCurrentThread(), -1)        # THREAD_PRIORITY_BELOW_NORMAL
+    except Exception:
+        pass
 
 
 def store_file(store: ObjectStore, pool: ThreadPoolExecutor, path: str, codec: str,

@@ -259,6 +259,13 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                                 </div>
                             </div>
 
+                            <div id="dupManagedBox" style="display:none;margin-top:16px;padding:12px;border:1px solid var(--border,#ccc);border-radius:8px">
+                                <div style="font-size:0.9em;margin-bottom:8px"><i class="fas fa-key"></i> <strong>Senha gerenciada pelo GBOC</strong><br>
+                                    <span style="color:var(--text-muted);font-size:0.85em">O GBOC definiu esta senha no Duplicati porque nenhuma foi informada. Ela é a senha da interface web do Duplicati: guarde-a em local seguro. Ao alterá-la pelo Duplicati, informe a nova senha aqui.</span></div>
+                                <button class="btn btn-secondary" onclick="revealDuplicatiManagedPassword()"><i class="fas fa-eye"></i> Mostrar senha (admin)</button>
+                                <div id="dupManagedOut" style="display:none;margin-top:10px;font-family:monospace;word-break:break-all"></div>
+                            </div>
+
                             <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
                                 <button class="btn btn-primary" onclick="saveDuplicatiNativeConfig()">
                                     <i class="fas fa-save"></i> Salvar
@@ -1659,9 +1666,33 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                     if (data.username) document.getElementById('dupUsername').value = data.username;
                     if (data.timeout_seconds) document.getElementById('dupTimeout').value = data.timeout_seconds;
                     if (data.verify_tls !== undefined) document.getElementById('dupVerifyTls').checked = data.verify_tls;
+                    if (data.password_managed_by_gboc) {
+                        document.getElementById('dupManagedBox').style.display = 'block';
+                        document.getElementById('dupManagedBox').dataset.setAt = data.password_set_at || '';
+                    }
                 }
             } catch(e) {
                 console.warn('Falha ao carregar config Duplicati Native:', e);
+            }
+        }
+
+        async function revealDuplicatiManagedPassword() {
+            const out = document.getElementById('dupManagedOut');
+            out.style.display = 'block';
+            out.textContent = 'Consultando...';
+            try {
+                const res = await fetch('/api/duplicati-native/managed-password');
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    out.textContent = data.detail || ('Erro ' + res.status);
+                    return;
+                }
+                out.innerHTML = '<strong>Senha:</strong> <span id="dupManagedValue"></span>' +
+                    ' <button class="btn btn-secondary" onclick="navigator.clipboard && navigator.clipboard.writeText(document.getElementById(\'dupManagedValue\').textContent)"><i class="fas fa-copy"></i> Copiar</button>' +
+                    '<br><span style="font-size:0.85em;color:var(--text-muted)">Definida em ' + (data.password_set_at || '?') + '. Esta consulta foi registrada na auditoria.</span>';
+                document.getElementById('dupManagedValue').textContent = data.password;
+            } catch(e) {
+                out.textContent = 'Falha ao consultar: ' + e;
             }
         }
 

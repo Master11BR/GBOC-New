@@ -38,6 +38,7 @@ PUBLIC_PATHS = {
     '/favicon.ico',
     '/.well-known/appspecific/com.chrome.devtools.json',
     '/metrics',
+    '/api/watchdog/ping',          # só "vivo/travado" (serviço GBOCWatchdog)
 }
 
 PUBLIC_PREFIXES = [

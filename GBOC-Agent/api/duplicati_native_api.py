@@ -5,11 +5,47 @@ API do módulo isolado de integração com Duplicati.
 
 from typing import Any, Dict
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
 from core.integrations.duplicati_native import get_duplicati_native_service
 
 router = APIRouter(prefix="/api/duplicati-native", tags=["duplicati-native"])
+
+
+def _require_admin(request: Request) -> Dict[str, Any]:
+    """Sessão válida + perfil administrador (mesmo critério das demais rotas sensíveis do Agente)."""
+    from api.auth import get_current_user, is_auth_enabled
+    from api.ai_api import ADMIN_ROLES, _get_user_role
+
+    if not is_auth_enabled():
+        raise HTTPException(status_code=401, detail="Configuração inicial de autenticação necessária.")
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Autenticação necessária.")
+    if (_get_user_role(user.get("user_id")) or "").lower() not in ADMIN_ROLES:
+        raise HTTPException(status_code=403, detail="Permissão negada: somente administradores podem ver a senha gerenciada.")
+    return user
+
+
+@router.get("/managed-password")
+async def get_managed_password(request: Request) -> Dict[str, Any]:
+    """Senha do Duplicati definida pelo próprio GBOC (só administradores; cada consulta fica auditada)."""
+    user = _require_admin(request)
+    service = get_duplicati_native_service()
+    cfg = service.load_config()
+    extra = service._load_extra()
+    if not extra.get("password_managed") or not cfg.password:
+        raise HTTPException(status_code=404, detail="Não há senha gerenciada pelo GBOC (a senha foi informada manualmente).")
+    try:
+        from api.audit_api import audit_security_event
+        audit_security_event("duplicati_managed_password_viewed", username=user.get("username"),
+                             ip=(request.client.host if request.client else None),
+                             detail={"password_set_at": extra.get("password_set_at", "")})
+    except Exception:
+        pass
+    return {"status": "success", "password": cfg.password,
+            "password_set_at": extra.get("password_set_at", ""),
+            "base_url": cfg.base_url, "username": cfg.username}
 
 
 @router.get("/status")

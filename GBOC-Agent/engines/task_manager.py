@@ -105,6 +105,8 @@ class TaskManager:
                 encoding='utf-8'
             )
             err_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+            from core.log_redact import install as _install_log_redact
+            _install_log_redact(err_handler)
             self.task_error_logger.addHandler(err_handler)
             self.task_error_logger.setLevel(logging.ERROR)
             self.task_error_logger.propagate = False
@@ -889,8 +891,14 @@ class TaskManager:
 
             # Limite de banda de upload vigente agora (janela/horário configurados no agente ou pela política central)
             try:
-                from engines import operation_settings as _ops
-                task['_upload_mbps'] = _ops.current_upload_mbps()
+                try:
+                    # controle de rede: agendado + automático + carga da máquina (o motor nativo segue ao vivo)
+                    from engines.network_governor import governor as _gov
+                    task['_upload_mbps'] = _gov.start_limit_mbps()
+                except Exception as _gov_err:
+                    logger.debug(f"Controle de rede indisponível ({_gov_err}); usando só o agendado")
+                    from engines import operation_settings as _ops
+                    task['_upload_mbps'] = _ops.current_upload_mbps()
                 if task['_upload_mbps']:
                     logger.info(f"📶 Limite de upload aplicado: {task['_upload_mbps']:g} Mbps")
             except Exception as _bw_err:
@@ -1004,7 +1012,15 @@ class TaskManager:
 
             from engines import engine_tuning as _tune
             _ts = _tune.settings(task.get('repo_config'))
-            cmd = [restic, "backup", "--json"] + _tune.restic_args(_ts, repo_type) + source_paths
+            # VSS: arquivos abertos/em uso copiados da cópia de sombra (e, se configurado, arquivos abertos na rede)
+            try:
+                from engines import backup_consistency as _bc
+                _bc.before_backup("restic", source_paths)
+                _vss_args = _bc.engine_args("restic", source_paths)
+            except Exception as _vss_err:
+                _vss_args = []
+                logger.debug(f"VSS restic: {_vss_err}")
+            cmd = [restic, "backup", "--json"] + _vss_args + _tune.restic_args(_ts, repo_type) + source_paths
             _kib = self._upload_limit_kib(task)
             if _kib:
                 cmd[2:2] = ["--limit-upload", str(_kib)]
@@ -1208,6 +1224,12 @@ class TaskManager:
             if _kib:
                 cmd.append(f"--throttle-upload={_kib}KB")
             try:
+                from engines import backup_consistency as _bc
+                _bc.before_backup("duplicati", list(valid_sources))
+                cmd.extend(_bc.engine_args("duplicati", list(valid_sources)))      # --snapshot-policy=Auto (VSS)
+            except Exception as _vss_err:
+                logger.debug(f"VSS Duplicati: {_vss_err}")
+            try:
                 from engines import engine_tuning as _tune
                 cmd.extend(_tune.duplicati_args(_tune.settings(task.get('repo_config'))))
             except Exception as _tn_err:
@@ -1381,8 +1403,15 @@ class TaskManager:
             from engines import engine_tuning as _tune
             _ts = _tune.settings(task.get('repo_config'))
             try:
+                try:
+                    from engines import backup_consistency as _bc
+                    _bc.before_backup("kopia", source_paths)
+                    _vss_k = _bc.engine_args("kopia", source_paths)       # --enable-volume-shadow-copy=when-available
+                except Exception as _vss_err:
+                    _vss_k = []
+                    logger.debug(f"VSS Kopia: {_vss_err}")
                 _pc = subprocess.run([kopia, 'policy', 'set', '--config-file', config_path, *source_paths,
-                                      *_tune.kopia_policy_args(_ts)], env=env, capture_output=True, text=True, timeout=120)
+                                      *_tune.kopia_policy_args(_ts), *_vss_k], env=env, capture_output=True, text=True, timeout=120)
                 if _pc.returncode != 0:
                     logger.warning(f"Kopia: compressão não aplicada: {(_pc.stderr or _pc.stdout or '').strip()[:200]}")
             except Exception as _pc_err:
@@ -1533,7 +1562,8 @@ class TaskManager:
             _ts = _tune.settings(_rc4)
             _codec, _level = _tune.native_codec(_ts)
             _is_cloud = str(repo_cfg.get('type') or 'local').lower() != 'local'
-            _workers = 1 if _kib else (_ts['parallel'] or (4 if _is_cloud else 2))
+            # limite agora é global (todas as conexões juntas): não precisa mais cair para 1 conexão
+            _workers = _ts['parallel'] or (4 if _is_cloud else 2)
             if _is_cloud and _workers > 1:
                 def _factory(_cfg=dict(repo_cfg)):
                     be = RepositoryManager(self.core)._create_backend_from_config(dict(_cfg))
@@ -1548,10 +1578,34 @@ class TaskManager:
                 # barra de progresso ao vivo da tela de tarefas (monitor -> task_executions)
                 self.monitor.update_progress(_tid, **{k: v for k, v in p.items() if k not in ('phase', 'threads')})
 
+            # VSS: lê de uma cópia de sombra (arquivos abertos/bloqueados copiados); apagada no fim
+            _vss = None
+            _vss_map = {}
+            try:
+                from engines import backup_consistency as _bc
+                _cfg_c = _bc.load_config()
+                if _cfg_c["close_open_share_files"] == "always":
+                    _bc.close_open_share_files(source_paths, "motor nativo: configurado para fechar sempre")
+                _ok, _why = _bc.vss_status(source_paths)
+                if _ok:
+                    _vss = _bc.ShadowSession().create(source_paths)
+                    _vss_map = {p: _vss.translate(p) for p in source_paths if _vss.ok_for(p)}
+                elif _cfg_c["vss"] != "off":
+                    logger.info(f"🧊 [VSS] motor nativo: sem cópia de sombra ({_why})")
+                _failed = [p for p in source_paths if _bc.local_volume(p) and p not in _vss_map]
+                if _cfg_c["close_open_share_files"] == "on_vss_failure" and _failed and _cfg_c["vss"] != "off":
+                    _bc.close_open_share_files(_failed, "motor nativo: VSS indisponível")
+            except Exception as _vss_err:
+                logger.warning(f"[VSS] motor nativo: {_vss_err}")
             engine = GBOCNativeEngine({'source_paths': source_paths, 'compression_v4': _codec,
-                                       'compression_level': _level, 'progress_cb': _native_progress},
+                                       'compression_level': _level, 'progress_cb': _native_progress,
+                                       'read_map': _vss_map},
                                       backend, backend_factory=_factory, workers=_workers)
-            result = engine.run_backup()
+            try:
+                result = engine.run_backup()
+            finally:
+                if _vss:
+                    _vss.close()
 
             if result.get('success'):
                 self._mark_repository_initialized(task.get('repository_id'))

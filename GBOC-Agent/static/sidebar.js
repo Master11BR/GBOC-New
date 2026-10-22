@@ -456,6 +456,7 @@ class UnifiedSidebar {
                         <a href="/users.html" class="nav-link nav-sub"><i class="fas fa-users-cog nav-icon"></i> <span>Usuários & Permissões</span></a>
                         <a href="/notification-channels.html" class="nav-link nav-sub"><i class="fas fa-envelope nav-icon"></i> <span>Notificações</span></a>
                         <a href="/storage-usage.html" class="nav-link nav-sub"><i class="fas fa-hdd nav-icon"></i> <span>Armazenamento</span></a>
+                        <a href="/network.html" class="nav-link nav-sub"><i class="fas fa-network-wired nav-icon"></i> <span>Rede e Carga</span></a>
                         <a href="/engines.html" class="nav-link nav-sub"><i class="fas fa-cogs nav-icon"></i> <span>Motores e Integrações</span></a>
                         <a href="/settings.html" class="nav-link nav-sub"><i class="fas fa-cog nav-icon"></i> <span>Configurações Gerais</span></a>
                         <a href="/ui-style-selector.html" class="nav-link nav-sub"><i class="fas fa-palette nav-icon"></i> <span>Estilos & Temas UI</span></a>

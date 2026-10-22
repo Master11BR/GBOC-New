@@ -153,6 +153,10 @@ _stderr_handler = SafeRotatingFileHandler(
 _stderr_handler.setLevel(logging.ERROR)
 _stderr_handler.setFormatter(_log_formatter)
 
+# Segredos de S3 (chaves passadas ao kopia/restic na linha de comando) nunca vão para o log em texto puro
+from core.log_redact import install as _install_log_redact
+_install_log_redact(_file_handler, _stream_handler, _stderr_handler)
+
 logging.basicConfig(
     level=logging.INFO,
     handlers=[_file_handler, _stream_handler, _stderr_handler]
@@ -277,6 +281,18 @@ async def lifespan(app: FastAPI):
             
     except Exception as e:
         logger.error(f"[ERROR] Erro na inicializacao do Core: {e}")
+
+    # Vigia de travamento do laço (pilha das threads em logs/hang_*.log) e controle de rede/carga dos backups
+    try:
+        from core import hang_watchdog
+        hang_watchdog.start("Agent", BASE_DIR)
+    except Exception as e:
+        logger.warning(f"[VIGIA] vigia de travamento indisponível: {e}")
+    try:
+        from engines.network_governor import governor as _net_gov
+        _net_gov.ensure_started()
+    except Exception as e:
+        logger.warning(f"[REDE] controle de rede indisponível: {e}")
 
     # Inscrição automática (instalação em massa): C:\ProgramData\GBOC\enroll.json com URL + token de instalação
     try:
@@ -411,6 +427,12 @@ app = FastAPI(
     version=AGENT_VERSION,
     lifespan=lifespan
 )
+
+try:
+    from core import hang_watchdog as _hang_watchdog
+    _hang_watchdog.register(app)          # /api/watchdog/ping (usado pelo serviço GBOCWatchdog)
+except Exception as _hw_err:
+    logging.getLogger(__name__).warning(f"[VIGIA] rota de verificação indisponível: {_hw_err}")
 
 @app.get("/api/v1/version", tags=["System"])
 @app.get("/api/v1/system/version", tags=["System"])
@@ -742,6 +764,7 @@ API_MODULES = [
     ("api.ai_api", "router_v1"),  # ✅ GBOC Copilot AI Assistant v1 (/api/v1/ai)
     ("api.diagnostics", "router_v1"),  # ✅ IA de diagnóstico v1 (/api/v1/diagnostics/ai-*)
     ("api.agent_ops_api", "router"),  # ✅ Teste de restauração, atualização remota e pausa de agendamentos
+    ("api.network_governor_api", "router"),  # ✅ Controle de rede/carga dos backups e vigia de travamento
 ]
 
 
