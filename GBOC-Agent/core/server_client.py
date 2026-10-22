@@ -53,6 +53,43 @@ def key_hint(key: Optional[str]) -> str:
     return f"{key[:8]}…{key[-4:]}" if len(key) > 14 else "…" + key[-2:]
 
 
+
+def _ws_failure_reason(e: BaseException) -> str:
+    """Traduz a falha do WebSocket em causa acionável (vai para o log visível na tela Logs do Agente)."""
+    if "Proxy" in type(e).__name__:  # InvalidProxyStatus/ProxyError: quem recusou foi o proxy, não o Servidor
+        _r = getattr(e, "response", None)
+        _st = getattr(_r, "status_code", "") if _r is not None else ""
+        return (f"PROXY HTTP da rede recusou a conexão ({type(e).__name__} {_st}) — libere o Servidor Central "
+                f"no proxy ou adicione-o ao NO_PROXY/exceções de proxy desta máquina")
+    status = None
+    resp = getattr(e, "response", None)
+    if resp is not None:
+        status = getattr(resp, "status_code", None)
+    if status is None:
+        status = getattr(e, "status_code", None)  # websockets < 14 (InvalidStatusCode)
+    rcvd = getattr(e, "rcvd", None)
+    close_code = getattr(rcvd, "code", None) if rcvd is not None else getattr(e, "code", None)
+    if status in (401, 403) or close_code in (4401, 4403):
+        return (f"Servidor Central REJEITOU a chave de pareamento deste Agente "
+                f"(HTTP {status or close_code}). Gere/cole uma nova chave em Configurações > Servidor Central.")
+    if status is not None:
+        return f"Servidor respondeu HTTP {status} no handshake do WebSocket (proxy/rota /ws bloqueada?)"
+    if isinstance(e, ConnectionRefusedError):
+        return "conexão recusada — Servidor Central offline ou porta bloqueada por firewall"
+    if isinstance(e, (TimeoutError, asyncio.TimeoutError)):
+        return "tempo esgotado — Servidor Central inacessível pela rede (firewall/VPN/rota)"
+    import socket as _sock
+    import ssl as _ssl
+    if isinstance(e, _sock.gaierror):
+        return "nome do Servidor Central não resolvido (DNS) — confira a URL configurada"
+    if isinstance(e, _ssl.SSLError):
+        return f"falha SSL/TLS no handshake ({e}) — confira http/https na URL do Servidor"
+    if isinstance(e, OSError) and getattr(e, "errno", None) in (101, 113, 10051, 10065):
+        return "rede/host do Servidor Central inalcançável — sem rota (VPN/gateway/firewall)"
+    if close_code is not None:
+        return f"conexão fechada pelo Servidor (código {close_code})"
+    return f"{type(e).__name__}: {e}"
+
 class CentralServerClient:
     """Cliente para comunicação com servidor central GBOC"""
 
@@ -603,7 +640,8 @@ class CentralServerClient:
                 _backoff = 30  # reset backoff após conexão bem-sucedida
 
             except Exception as e:
-                logger.warning(f"⚠️ WebSocket indisponível, próxima tentativa em {_backoff}s")
+                self.ws_last_error = _ws_failure_reason(e)
+                logger.warning(f"⚠️ WebSocket indisponível: {self.ws_last_error} — próxima tentativa em {_backoff}s")
                 # Espera interrompível: chave/URL nova → tenta de novo na hora
                 if self._ws_reconnect.wait(_backoff):
                     self._ws_reconnect.clear()
@@ -633,6 +671,7 @@ class CentralServerClient:
                 self.websocket = websocket
                 self._ws_loop = asyncio.get_running_loop()  # usado por threads (ex.: DuplicatiMonitor) para enviar
                 self.websocket_connected = True
+                self.ws_last_error = None
                 logger.info(f"🔗 WebSocket conectado: {ws_url}")
                 
                 # Enviar sincronização inicial

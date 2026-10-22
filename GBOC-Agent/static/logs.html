@@ -190,6 +190,20 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             flex-direction: column;
             gap: 10px;
             min-height: 61px;
+            /* Cabeçalho e filtros ficam parados; só a lista rola, na largura total */
+            max-height: calc(100vh - 400px);
+            min-height: 320px;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            padding-right: 4px;
+        }
+
+        .list .copy,
+        .list .msg-text,
+        .list strong {
+            user-select: text;
+            -webkit-user-select: text;
+            cursor: text;
         }
 
         .toast {
@@ -468,7 +482,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 </div>
             </header>
 
-            <div class="content" style="max-width:960px;margin:0 auto;width:100%;">
+            <div class="content" style="width:100%;">
                 <section class="panel log-toast-panel">
                     <nav class="filters" aria-label="Filtro de notificações de logs">
                         <button class="filter active" data-filter="all"><i class="fas fa-layer-group"></i> Todos</button>
@@ -708,9 +722,20 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             }
         }
 
-        async function loadLogs(more) {
+        let lastLogSig = '';
+
+        function userIsSelectingLogs() {
+            const sel = window.getSelection && window.getSelection();
+            if (!sel || sel.isCollapsed || !sel.rangeCount) return false;
+            return list.contains(sel.anchorNode) || list.contains(sel.focusNode);
+        }
+
+        async function loadLogs(more, auto) {
             more = more === true;
+            auto = auto === true;
             if (isLoading) return;
+            // Atualização automática nunca interrompe quem está lendo/selecionando
+            if (auto && (document.hidden || userIsSelectingLogs())) { scheduleRefresh(); return; }
             isLoading = true;
             try {
                 if (!more) logOffset = 0;
@@ -745,10 +770,17 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                         timestamp: formatTimestamp(log.timestamp)
                     };
                 });
-                allLogs = more ? allLogs.concat(mapped) : mapped;
+                const sig = rawLogs.length + ':' + rawLogs.map(l => l.id || l.timestamp).join(',');
+                const unchanged = auto && sig === lastLogSig;
+                if (!more) lastLogSig = sig;
                 logOffset += rawLogs.length;
-
-                render(!more);
+                if (!unchanged) {
+                    allLogs = more ? allLogs.concat(mapped) : mapped;
+                    const keepScroll = list.scrollTop;
+                    // Animação só no carregamento manual; refresh automático é estático
+                    render(!more && !auto);
+                    if (auto) list.scrollTop = keepScroll;
+                }
                 if (data.total != null) count.textContent = `(${allLogs.length.toLocaleString('pt-BR')} de ${Number(data.total).toLocaleString('pt-BR')})`;
                 document.getElementById('loadMore').style.display = data.has_more ? '' : 'none';
                 if (!more) loadStats();
@@ -813,7 +845,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 
         function scheduleRefresh() {
             if (refreshTimer) clearTimeout(refreshTimer);
-            refreshTimer = setTimeout(loadLogs, 15000);
+            refreshTimer = setTimeout(() => loadLogs(false, true), 15000);
         }
 
         function refreshLogs() {
