@@ -634,18 +634,25 @@ class GBOCNativeEngine:
             stats = {"files": 0, "bytes": 0, "new": 0, "unchanged": 0, "reused": 0, "chunks_new": 0, "errors": 0}
             pool = store.pool()
             _report = self._progress_reporter(source_paths, stats, store)
+            # VSS: leitura pela cópia de sombra (mesmos caminhos relativos no manifesto - restauração igual)
+            read_map = self.task_config.get('read_map') or {}
             try:
                 for source in source_paths:
-                    source = source.strip()
+                    orig = source
+                    source = read_map.get(orig) or read_map.get(orig.strip()) or source.strip()
                     if not os.path.exists(source):
-                        self.logger.warning(f"Origem nao encontrada: {source}")
+                        self.logger.warning(f"Origem nao encontrada: {orig}")
                         stats["errors"] += 1
                         continue
                     if os.path.isfile(source):
                         base_dir, files = os.path.dirname(source), [source]
                     else:
                         base_dir, files = source, (os.path.join(r, n) for r, _d, fs in os.walk(source) for n in fs)
-                    prefix = (os.path.basename(os.path.normpath(source)) + '/') if multi and os.path.isdir(source) else ''
+                    # prefixo pelo caminho ORIGINAL (na cópia de sombra a raiz do volume teria outro nome)
+                    prefix = (os.path.basename(os.path.normpath(orig.strip())) + '/') if multi and os.path.isdir(source) else ''
+                    _src_r = source.rstrip('\\')
+                    _shown = (lambda fp, a=_src_r, b=orig.strip().rstrip('\\'): b + fp[len(a):] if fp.startswith(a) else fp) \
+                        if source != orig.strip() else (lambda fp: fp)
                     for fpath in files:
                         try:
                             st = os.stat(fpath)
@@ -667,10 +674,10 @@ class GBOCNativeEngine:
                             entries.append(entry)
                             stats["files"] += 1
                             stats["bytes"] += st.st_size
-                            _report(fpath)
+                            _report(_shown(fpath))
                         except (OSError, RuntimeError) as e:
                             stats["errors"] += 1
-                            self.logger.error(f"Erro ao processar {fpath}: {e}")
+                            self.logger.error(f"Erro ao processar {_shown(fpath)}: {e}")
                             if isinstance(e, RuntimeError):
                                 raise
                 # último pacote + espera todos os envios + índice de pacotes; só então o manifesto

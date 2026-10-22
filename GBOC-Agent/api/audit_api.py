@@ -292,12 +292,13 @@ async def list_audit_actions():
 
 # ─── Convenience functions for other modules ──────────────────────
 
-def audit_login(username: str, ip: str, success: bool):
+def audit_login(username: str, ip: str, success: bool, reason: Optional[str] = None):
+    # reason: motivo da falha (o login já enviava; sem o parâmetro, senha errada virava erro 500)
     record_audit(
         action='auth.login', resource_type='user', resource_name=username,
         username=username, ip_address=ip,
         result='success' if success else 'failure',
-        error_message=None if success else 'Invalid credentials'
+        error_message=None if success else (f'Invalid credentials ({reason})' if reason else 'Invalid credentials')
     )
 
 

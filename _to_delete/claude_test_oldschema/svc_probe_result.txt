@@ -1,4 +1,0 @@
-﻿whoami=autoridade nt\sistema
-python=C:\Users\Administrador\AppData\Local\Programs\Python\Python315\python.exe
-dup_db_no_perfil_do_processo False
-dup_db_outros_perfis ['C:\\Users\\Administrador\\AppData\\Local\\Duplicati\\Duplicati-server.sqlite']

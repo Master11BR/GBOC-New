@@ -1,0 +1,97 @@
+{
+  "CreatedByVersion": "2.4.0.104",
+  "Schedule": {
+    "ID": 1,
+    "Tags": [
+      "ID=2"
+    ],
+    "Time": "2026-10-21T20:00:00Z",
+    "Repeat": "2h",
+    "LastRun": "2026-10-21T18:00:00Z",
+    "Rule": "",
+    "AllowedDays": null
+  },
+  "Backup": {
+    "ID": "2",
+    "ExternalID": null,
+    "Name": "PEZ2B4L6H7L8R9YIIWNV",
+    "Description": "Net45668637\u002B",
+    "Tags": [],
+    "TargetURL": "s3://gboc-26/GBOC-server?use-ssl=true\u0026s3-server-name=s3.eu-central-2.wasabisys.com\u0026auth-username=6ANHLBH6UZ4DXDFPUNQ3\u0026auth-password=LWpguD24BlSTlSQNcfqDFdte28oJzZjGvYeBF3Bj",
+    "DBPath": "FPSQPXSQYY.sqlite",
+    "ConnectionStringID": -1,
+    "OperationType": "Backup",
+    "Sources": [
+      "D:\\GBOC-New\\"
+    ],
+    "Settings": [
+      {
+        "Filter": "",
+        "Name": "encryption-module",
+        "Value": "aes",
+        "Argument": null
+      },
+      {
+        "Filter": "",
+        "Name": "passphrase",
+        "Value": "Net45668637\u002B",
+        "Argument": null
+      },
+      {
+        "Filter": "",
+        "Name": "dblock-size",
+        "Value": "50MB",
+        "Argument": null
+      },
+      {
+        "Filter": "",
+        "Name": "compression-module",
+        "Value": "zip",
+        "Argument": null
+      },
+      {
+        "Filter": "",
+        "Name": "--encryption-module",
+        "Value": "aes",
+        "Argument": null
+      },
+      {
+        "Filter": "",
+        "Name": "--keep-versions",
+        "Value": "0",
+        "Argument": null
+      }
+    ],
+    "Filters": [],
+    "Metadata": {
+      "LastErrorDate": "20261016T200236Z",
+      "LastErrorMessage": "Este host n\u00E3o \u00E9 conhecido. (s3.eu-central-2.wasabisys.com:443)",
+      "LastBackupDate": "20261021T180000Z",
+      "BackupListCount": "763",
+      "TotalQuotaSpace": "0",
+      "FreeQuotaSpace": "0",
+      "AssignedQuotaSpace": "-1",
+      "TargetFilesSize": "2282960351",
+      "TargetFilesCount": "907",
+      "TargetFilesetsCount": "763",
+      "TargetSizeString": "2,13 GiB",
+      "SourceFilesSize": "864836715",
+      "SourceFilesCount": "10238",
+      "SourceSizeString": "824,77 MiB",
+      "LastBackupStarted": "20261021T180000Z",
+      "LastBackupFinished": "20261021T180204Z",
+      "LastBackupDuration": "00:02:04.0229840",
+      "LastCompactDuration": "00:00:01.4775422",
+      "LastCompactStarted": "20261021T180159Z",
+      "LastCompactFinished": "20261021T180200Z",
+      "LastRestoreDuration": "00:00:11.1070746",
+      "LastRestoreStarted": "20260801T191403Z",
+      "LastRestoreFinished": "20260801T191414Z"
+    },
+    "AdditionalTargetURLs": [],
+    "IsTemporary": false
+  },
+  "DisplayNames": {
+    "D:\\GBOC-New\\": "GBOC-New"
+  }
+}

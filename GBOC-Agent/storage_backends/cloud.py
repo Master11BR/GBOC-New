@@ -206,13 +206,16 @@ class CloudStorageBackend(StorageBackend):
                 self.container = self.driver.get_container(container_name=self.container_name)
 
             with open(local_path, 'rb') as f:
-                # Limite de banda de upload (janela/horário do agente ou política central)
-                limit = float(getattr(self, 'upload_limit_bps', 0) or 0)
-                if limit > 0:
-                    from engines.operation_settings import ThrottledReader
-                    stream = iter(ThrottledReader(f, limit))
-                else:
-                    stream = f
+                # Controle de rede ao vivo (agendado/automático/carga): limite e pausa valem no meio do envio
+                def _governed(fobj, size=1024 * 1024):
+                    from engines.network_governor import consume
+                    while True:
+                        data = fobj.read(size)
+                        if not data:
+                            break
+                        consume(len(data), self._target_on_nic())
+                        yield data
+                stream = _governed(f)
                 obj = self.driver.upload_object_via_stream(
                     iterator=stream,
                     container=self.container,
@@ -250,16 +253,10 @@ class CloudStorageBackend(StorageBackend):
         import os
         import time
         md5b64 = lambda b: base64.b64encode(hashlib.md5(b).digest()).decode('ascii')
-        limit = float(getattr(self, 'upload_limit_bps', 0) or 0)
-        t0, sent = time.monotonic(), 0
-
         def throttle(n):
-            nonlocal sent
-            sent += n
-            if limit > 0:
-                wait = sent / limit - (time.monotonic() - t0)
-                if wait > 0:
-                    time.sleep(wait)
+            # controle de rede ao vivo (limite global de todas as conexões + pausa)
+            from engines.network_governor import consume
+            consume(n, self._target_on_nic())
         try:
             s3 = self._s3_client()
             bucket = self.container_name
@@ -401,17 +398,28 @@ class CloudStorageBackend(StorageBackend):
     # ── Envio/leitura direto em memória (motor nativo: pacotes e leitura parcial, sem arquivo temporário) ──
 
     def _throttle(self, nbytes: int) -> None:
-        """Limite de banda de upload (upload_limit_bps) para envios em memória."""
-        import time
-        limit = float(getattr(self, 'upload_limit_bps', 0) or 0)
-        if limit <= 0:
-            return
-        if not hasattr(self, '_tb_t0'):
-            self._tb_t0, self._tb_sent = time.monotonic(), 0
-        self._tb_sent += nbytes
-        wait = self._tb_sent / limit - (time.monotonic() - self._tb_t0)
-        if wait > 0:
-            time.sleep(wait)
+        """Controle de rede ao vivo para envios em memória: limite global (todas as conexões juntas, antes era
+        por conexão) que muda no meio do backup, e pausa no horário de pico / rede congestionada / máquina
+        sobrecarregada."""
+        from engines.network_governor import consume
+        consume(nbytes, self._target_on_nic())
+
+    def _target_on_nic(self) -> bool:
+        """O destino está fora deste computador? (S3 local/loopback não passa pela placa de rede: não entra na
+        conta do tráfego próprio do controle automático)."""
+        if not hasattr(self, '_on_nic'):
+            import socket
+            from urllib.parse import urlparse
+            ep = str((self.config or {}).get('endpoint') or '').strip()
+            host = (urlparse(ep if '://' in ep else 'http://' + ep).hostname or '').lower() if ep else ''
+            on = True
+            if host:
+                try:
+                    on = not socket.gethostbyname(host).startswith('127.') and host not in ('localhost', '::1')
+                except OSError:
+                    on = True
+            self._on_nic = on
+        return self._on_nic
 
     def put_bytes(self, remote_name: str, data: bytes) -> Dict[str, Any]:
         if self.config.get('object_lock') and str(self.config.get('type', '')).lower() in ('s3', 'wasabi'):

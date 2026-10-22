@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GBOC Agent 14.8.2 - Rede e Carga dos Backups</title>
+    <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
+    <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.8.2">
+    <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=14.8.2">
+    <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=14.8.2">
+    <link rel="stylesheet" href="/static/ui/models/modern/components.css?v=14.8.2">
+    <link rel="stylesheet" href="/static/ui/models/modern/layout.css?v=14.8.2">
+    <link rel="stylesheet" href="/static/style.css?v=14.8.2">
+    <link rel="stylesheet" href="/static/gboc-themes.css?v=14.8.2">
+    <link rel="stylesheet" href="/static/gboc-layout.css?v=14.8.2">
+    <script src="/static/gboc-perf.js?v=14.8.2"></script>
+    <script src="/static/gboc-layout-manager.js?v=14.8.2"></script>
+    <script src="/static/gboc-modal.js?v=14.8.2"></script>
+    <style>
+        .net-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:20px; margin-top:20px; }
+        .net-state { font-size:1.15em; font-weight:700; }
+        .net-state.normal { color:var(--success,#22c55e); }
+        .net-state.limit { color:var(--warning,#f59e0b); }
+        .net-state.pause { color:var(--danger,#ef4444); }
+        .net-reason { font-size:0.82em; color:var(--text-muted); margin-top:4px; min-height:1.2em; }
+        .net-form { display:grid; grid-template-columns:1fr 1fr; gap:12px 16px; }
+        .net-form label { display:flex; flex-direction:column; gap:4px; font-size:0.82em; color:var(--text-muted); }
+        .net-form input[type=number], .net-form input[type=text], .net-rules input, .net-rules select {
+            background:var(--bg-input); border:1px solid var(--border); color:var(--text-primary,inherit);
+            border-radius:8px; padding:7px 9px; font-size:0.95em; }
+        .net-form .full { grid-column:1 / -1; }
+        .net-form label, .net-form > * { min-width:0; }
+        .net-form input[type=number], .net-form input[type=text] { width:100%; box-sizing:border-box; }
+        .net-grid .panel { min-width:0; overflow:hidden; }
+        .net-check { flex-direction:row !important; align-items:center; gap:8px !important; color:var(--text-primary,inherit) !important; font-size:0.9em !important; }
+        .net-modes { display:flex; flex-wrap:wrap; gap:10px; }
+        .net-mode { flex:1 1 180px; border:1px solid var(--border); border-radius:10px; padding:12px; cursor:pointer; background:var(--bg-input); }
+        .net-mode input { margin-right:6px; }
+        .net-mode.sel { border-color:var(--primary); box-shadow:0 0 0 1px var(--primary) inset; }
+        .net-mode small { display:block; color:var(--text-muted); margin-top:4px; font-size:0.78em; }
+        .net-rules { width:100%; border-collapse:collapse; font-size:0.88em; }
+        .net-rules th { text-align:left; color:var(--text-muted); font-weight:600; padding:6px; border-bottom:1px solid var(--border); }
+        .net-rules td { padding:6px; border-bottom:1px solid var(--border); vertical-align:middle; }
+        .net-days { display:flex; gap:3px; flex-wrap:wrap; }
+        .net-days label { display:inline-flex; align-items:center; gap:2px; font-size:0.85em; }
+        .net-events { max-height:280px; overflow:auto; font-size:0.85em; }
+        .net-events div { padding:6px 0; border-bottom:1px solid var(--border); }
+        .net-events time { color:var(--text-muted); margin-right:8px; font-variant-numeric:tabular-nums; }
+        .net-sig { display:grid; grid-template-columns:auto 1fr; gap:4px 12px; font-size:0.85em; }
+        .net-sig span:nth-child(odd) { color:var(--text-muted); }
+        .net-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+        @media (max-width: 640px) { .net-form { grid-template-columns:1fr; } }
+    </style>
+</head>
+<body>
+<div class="app-layout">
+    <div id="sidebar-container"></div>
+    <main class="main-content">
+        <header class="page-header">
+            <div>
+                <h2><i class="fas fa-network-wired" style="color:var(--primary)"></i> Rede e Carga dos Backups</h2>
+                <p style="font-size:0.85em;color:var(--text-muted)">Limita ou pausa os backups em andamento nos horários de pico, quando a rede congestiona ou quando a máquina fica sobrecarregada. Vale no meio do backup.</p>
+            </div>
+            <div class="net-actions">
+                <select id="pause-min" class="btn btn-secondary" title="Duração da pausa manual">
+                    <option value="30">30 min</option><option value="60" selected>1 h</option><option value="120">2 h</option><option value="240">4 h</option>
+                </select>
+                <button class="btn btn-secondary" id="btn-pause" onclick="manualPause()"><i class="fas fa-pause"></i> Pausar backups</button>
+                <button class="btn btn-secondary" id="btn-resume" onclick="manualResume()" style="display:none !important"><i class="fas fa-play"></i> Retomar</button>
+                <button class="btn btn-primary" onclick="saveAll()"><i class="fas fa-save"></i> Salvar</button>
+            </div>
+        </header>
+
+        <div class="stats-row">
+            <div class="stat-card"><div class="val net-state" id="st-action">-</div><div class="lbl">Backups agora</div><div class="net-reason" id="st-reason"></div></div>
+            <div class="stat-card"><div class="val" id="st-link">-</div><div class="lbl">Upload do link (Mbps)</div><div class="net-reason" id="st-link-src"></div></div>
+            <div class="stat-card"><div class="val" id="st-lat">-</div><div class="lbl">Latência da internet (ms)</div><div class="net-reason" id="st-lat-base"></div></div>
+            <div class="stat-card"><div class="val" id="st-load">-</div><div class="lbl">CPU / Memória / Disco</div><div class="net-reason" id="st-watch"></div></div>
+        </div>
+
+        <div class="panel" style="margin-top:20px">
+            <div class="panel-header"><h3><i class="fas fa-sliders-h" style="color:var(--primary)"></i> Modo do controle de rede</h3></div>
+            <div class="net-modes" id="modes">
+                <label class="net-mode"><input type="radio" name="mode" value="schedule">Agendado<small>Regras por dia e horário: limitar ou pausar.</small></label>
+                <label class="net-mode"><input type="radio" name="mode" value="auto">Automático<small>Mede a rede: reduz quando outros estão usando, pausa se congestionar.</small></label>
+                <label class="net-mode"><input type="radio" name="mode" value="both">Agendado + automático<small>Vale o mais restritivo dos dois.</small></label>
+                <label class="net-mode"><input type="radio" name="mode" value="off">Desligado<small>Sem limite de rede (a proteção da máquina continua, se ligada).</small></label>
+            </div>
+        </div>
+
+        <div class="panel" style="margin-top:20px">
+            <div class="panel-header">
+                <h3><i class="fas fa-calendar-alt" style="color:var(--primary)"></i> Regras agendadas</h3>
+                <button class="btn btn-secondary" onclick="addRule()"><i class="fas fa-plus"></i> Adicionar regra</button>
+            </div>
+            <table class="net-rules">
+                <thead><tr><th>Dias</th><th>Início</th><th>Fim</th><th>Ação</th><th>Limite (Mbps)</th><th></th></tr></thead>
+                <tbody id="rules"></tbody>
+            </table>
+            <div class="net-form" style="margin-top:14px">
+                <label>Limite fora das regras (Mbps, 0 = sem limite)<input type="number" min="0" step="0.5" id="bw-default"></label>
+            </div>
+            <p style="font-size:0.78em;color:var(--text-muted);margin-top:8px">Horários que cruzam a meia-noite valem a partir do dia de início. Backups agendados que caem numa regra de pausa iniciam e ficam aguardando o fim do horário.</p>
+        </div>
+
+        <div class="net-grid">
+            <div class="panel">
+                <div class="panel-header"><h3><i class="fas fa-magic" style="color:var(--primary)"></i> Automático</h3></div>
+                <div class="net-form">
+                    <label>Reduzir quando outros usam (% do upload)<input type="number" min="1" max="100" id="a-busy"></label>
+                    <label>Pausar quando outros usam (% do upload)<input type="number" min="1" max="100" id="a-pause"></label>
+                    <label>Reduzir com latência acima do normal (ms)<input type="number" min="5" id="a-lat"></label>
+                    <label>Pausar com latência acima do normal (ms)<input type="number" min="5" id="a-latp"></label>
+                    <label>Velocidade mínima antes de pausar (Mbps)<input type="number" min="0.1" step="0.5" id="a-min"></label>
+                    <label>Upload do link (Mbps, 0 = aprender sozinho)<input type="number" min="0" step="1" id="a-link"></label>
+                    <label class="full">Hosts para medir a latência (host:porta, separados por vírgula)<input type="text" id="a-hosts"></label>
+                </div>
+                <div class="net-sig" id="auto-sig" style="margin-top:14px"></div>
+            </div>
+            <div class="panel">
+                <div class="panel-header"><h3><i class="fas fa-shield-alt" style="color:var(--primary)"></i> Proteção da máquina</h3></div>
+                <div class="net-form">
+                    <label class="net-check full"><input type="checkbox" id="r-on"> Pausar/limitar quando a máquina estiver sobrecarregada</label>
+                    <label>CPU alta / crítica (%)<span style="display:flex;gap:6px"><input type="number" id="r-cpuh" style="width:50%"><input type="number" id="r-cpuc" style="width:50%"></span></label>
+                    <label>Memória alta / crítica (%)<span style="display:flex;gap:6px"><input type="number" id="r-ramh" style="width:50%"><input type="number" id="r-ramc" style="width:50%"></span></label>
+                    <label>Disco ocupado alto / crítico (%)<span style="display:flex;gap:6px"><input type="number" id="r-diskh" style="width:50%"><input type="number" id="r-diskc" style="width:50%"></span></label>
+                    <label>Tempo sustentado antes de agir (s)<input type="number" min="10" max="600" id="r-sus"></label>
+                    <label>Limite quando "alta" (Mbps)<input type="number" min="0.5" step="0.5" id="r-lim"></label>
+                    <label class="net-check full"><input type="checkbox" id="r-low"> Motores de backup com prioridade baixa de CPU e disco</label>
+                    <label class="net-check full"><input type="checkbox" id="dup"> Pausar também o Duplicati Server (pausa com duração; volta sozinho se o Agente parar)</label>
+                </div>
+                <p style="font-size:0.78em;color:var(--text-muted);margin-top:8px">Crítico pausa os backups; alto limita a velocidade. A volta ao normal acontece depois do mesmo tempo sustentado abaixo do nível alto.</p>
+            </div>
+        </div>
+
+        <div class="panel" style="margin-top:20px">
+            <div class="panel-header"><h3><i class="fas fa-camera" style="color:var(--primary)"></i> Arquivos em uso (VSS)</h3></div>
+            <div class="net-form">
+                <label>Cópia de sombra do Windows (VSS)
+                    <select id="c-vss" class="btn btn-secondary">
+                        <option value="auto">Usar quando disponível (recomendado)</option>
+                        <option value="off">Desligado</option>
+                    </select></label>
+                <label>Fechar arquivos abertos no compartilhamento
+                    <select id="c-close" class="btn btn-secondary">
+                        <option value="never">Nunca (recomendado com VSS)</option>
+                        <option value="on_vss_failure">Só se o VSS falhar</option>
+                        <option value="always">Sempre antes do backup</option>
+                    </select></label>
+            </div>
+            <p style="font-size:0.78em;color:var(--text-muted);margin-top:8px" id="c-info">Com VSS o backup lê uma cópia congelada do disco: arquivos abertos (Excel, Word, PST, bancos em arquivo) são copiados sem erro e sem derrubar ninguém. Vale para discos locais; caminhos de rede (UNC) não têm VSS a partir deste computador. Fechar arquivos abertos faz o usuário perder o que não salvou e, em computadores Windows atuais, o arquivo costuma ser reaberto na hora - o registro mostra quando isso acontece.</p>
+        </div>
+
+        <div class="panel" style="margin-top:20px">
+            <div class="panel-header"><h3><i class="fas fa-history" style="color:var(--primary)"></i> Eventos recentes</h3></div>
+            <div class="net-events" id="events"></div>
+        </div>
+    </main>
+</div>
+<script src="/static/sidebar.js?v=14.8.2"></script>
+<script>
+const API = '/api/network';
+function notify(msg) { if (window.gbocAlert) window.gbocAlert(msg); else alert(msg); }
+// o cabeçalho padronizado força display com !important: só inline !important esconde
+function showEl(e, on) { if (on) e.style.removeProperty('display'); else e.style.setProperty('display', 'none', 'important'); }
+const DAYS = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
+let dirty = false;
+
+function el(tag, attrs, text) {
+    const e = document.createElement(tag);
+    Object.entries(attrs || {}).forEach(([k, v]) => { if (k === 'class') e.className = v; else e.setAttribute(k, v); });
+    if (text !== undefined) e.textContent = text;
+    return e;
+}
+
+function ruleRow(r) {
+    const tr = el('tr');
+    const tdD = el('td'); const days = el('div', {class: 'net-days'});
+    DAYS.forEach((d, i) => {
+        const l = el('label'); const c = el('input', {type: 'checkbox', 'data-day': i});
+        c.checked = (r.days || []).includes(i); l.appendChild(c); l.appendChild(document.createTextNode(d)); days.appendChild(l);
+    });
+    tdD.appendChild(days); tr.appendChild(tdD);
+    const s = el('input', {type: 'time', class: 'r-start'}); s.value = r.start || '08:00';
+    const e = el('input', {type: 'time', class: 'r-end'}); e.value = r.end || '18:00';
+    const a = el('select', {class: 'r-action'});
+    a.appendChild(el('option', {value: 'limit'}, 'Limitar')); a.appendChild(el('option', {value: 'pause'}, 'Pausar'));
+    a.value = r.action === 'pause' ? 'pause' : 'limit';
+    const m = el('input', {type: 'number', min: '0', step: '0.5', class: 'r-mbps', style: 'width:90px'}); m.value = r.mbps || 10;
+    const sync = () => { m.disabled = a.value === 'pause'; };
+    a.onchange = () => { sync(); dirty = true; }; sync();
+    const del = el('button', {class: 'btn btn-secondary', title: 'Remover'}); del.innerHTML = '<i class="fas fa-trash"></i>';
+    del.onclick = () => { tr.remove(); dirty = true; };
+    [s, e, a, m, del].forEach(x => { const td = el('td'); td.appendChild(x); tr.appendChild(td); });
+    tr.addEventListener('input', () => dirty = true);
+    return tr;
+}
+
+function addRule() {
+    document.getElementById('rules').appendChild(ruleRow({days: [0, 1, 2, 3, 4], start: '08:00', end: '18:00', mbps: 10}));
+    dirty = true;
+}
+
+function setVal(id, v) { const e = document.getElementById(id); if (e.type === 'checkbox') e.checked = !!v; else e.value = v; }
+function num(id) { return parseFloat(document.getElementById(id).value); }
+
+function fillForm(d) {
+    const c = d.config, a = c.auto, r = c.resource;
+    document.querySelectorAll('input[name=mode]').forEach(x => { x.checked = x.value === c.mode; });
+    markMode();
+    setVal('a-busy', a.busy_pct); setVal('a-pause', a.pause_pct); setVal('a-lat', a.latency_extra_ms); setVal('a-latp', a.latency_pause_ms);
+    setVal('a-min', a.min_mbps); setVal('a-link', a.link_upload_mbps); setVal('a-hosts', (a.probe_hosts || []).join(', '));
+    setVal('r-on', r.enabled); setVal('r-cpuh', r.cpu_high); setVal('r-cpuc', r.cpu_critical); setVal('r-ramh', r.ram_high);
+    setVal('r-ramc', r.ram_critical); setVal('r-diskh', r.disk_high); setVal('r-diskc', r.disk_critical);
+    setVal('r-sus', r.sustain_seconds); setVal('r-lim', r.high_limit_mbps); setVal('r-low', r.low_priority); setVal('dup', c.include_duplicati_server);
+    const tb = document.getElementById('rules'); tb.innerHTML = '';
+    (d.bandwidth.rules || []).forEach(x => tb.appendChild(ruleRow(x)));
+    setVal('bw-default', d.bandwidth.default_mbps || 0);
+    if (d.consistency) {
+        setVal('c-vss', d.consistency.vss); setVal('c-close', d.consistency.close_open_share_files);
+        if (!d.consistency.admin) document.getElementById('c-info').textContent = 'Atenção: o Agente não está rodando como serviço/administrador - o VSS só funciona com o serviço GBOCAgent. ' + document.getElementById('c-info').textContent;
+    }
+    dirty = false;
+}
+
+function fmt(v, suf) { return (v === null || v === undefined) ? '—' : `${v}${suf || ''}`; }
+
+function fillStatus(d) {
+    const g = d.governor, s = g.signals || {};
+    const act = document.getElementById('st-action');
+    act.className = 'val net-state ' + g.action;
+    act.textContent = g.action === 'pause' ? 'Pausados' : g.action === 'limit' ? `Limitados a ${g.limit_mbps} Mbps` : 'Velocidade normal';
+    document.getElementById('st-reason').textContent = (g.reasons || []).join(' · ') || `desde ${g.since}`;
+    const link = s.link_upload_mbps || g.link_capacity_learned_mbps;
+    document.getElementById('st-link').textContent = link ? link : '—';
+    document.getElementById('st-link-src').textContent = (d.config.auto.link_upload_mbps ? 'informado' : `aprendido: ${g.link_capacity_learned_mbps || 0} Mbps`) +
+        (s.others_upload_mbps !== undefined && s.others_upload_mbps !== null ? ` · outros usando ${s.others_upload_mbps} Mbps` : '');
+    document.getElementById('st-lat').textContent = fmt(s.latency_ms);
+    document.getElementById('st-lat-base').textContent = s.latency_base_ms ? `normal ${s.latency_base_ms} ms (+${s.latency_extra_ms})` : 'medida no modo automático';
+    document.getElementById('st-load').textContent = `${fmt(s.cpu_pct, '%')} / ${fmt(s.ram_pct, '%')} / ${fmt(s.disk_busy_pct, '%')}`;
+    const w = d.watchdog;
+    document.getElementById('st-watch').textContent = w ? (w.stalls ? `vigia: ${w.stalls} travamento(s), último ${w.last_stall && w.last_stall.at}` : 'vigia: nenhum travamento') : '';
+    const manual = !!g.manual_pause_until;
+    showEl(document.getElementById('btn-resume'), manual);
+    document.getElementById('btn-pause').innerHTML = manual ? `<i class="fas fa-pause"></i> Pausado até ${g.manual_pause_until.slice(11, 16)}` : '<i class="fas fa-pause"></i> Pausar backups';
+    const sig = document.getElementById('auto-sig'); sig.innerHTML = '';
+    [['Upload total da placa', fmt(s.nic_upload_mbps, ' Mbps')], ['Upload do GBOC', fmt(s.gboc_upload_mbps, ' Mbps')],
+     ['Outros programas', s.others_upload_pct !== undefined ? `${fmt(s.others_upload_mbps, ' Mbps')} (${s.others_upload_pct}%)` : '—'],
+     ['Processos pausados', (g.suspended_processes || []).map(p => `${p.name} (${p.pid})`).join(', ') || 'nenhum'],
+     ['Duplicati Server', g.duplicati_server_paused ? 'pausado pelo GBOC' : 'normal']].forEach(([k, v]) => {
+        sig.appendChild(el('span', {}, k)); sig.appendChild(el('span', {}, v));
+    });
+    const ev = document.getElementById('events'); ev.innerHTML = '';
+    (g.events || []).forEach(e => { const r = el('div'); r.appendChild(el('time', {}, e.at)); r.appendChild(document.createTextNode(e.message)); ev.appendChild(r); });
+    if (!(g.events || []).length) ev.appendChild(el('div', {style: 'color:var(--text-muted)'}, 'Nenhuma mudança desde que o Agente iniciou.'));
+}
+
+function markMode() { document.querySelectorAll('.net-mode').forEach(l => l.classList.toggle('sel', l.querySelector('input').checked)); }
+document.querySelectorAll('input[name=mode]').forEach(x => x.addEventListener('change', () => { markMode(); dirty = true; }));
+document.querySelectorAll('.net-form input, .net-form select').forEach(x => { x.addEventListener('input', () => dirty = true); x.addEventListener('change', () => dirty = true); });
+
+function collect() {
+    const rules = [...document.querySelectorAll('#rules tr')].map(tr => {
+        const days = [...tr.querySelectorAll('[data-day]')].filter(c => c.checked).map(c => parseInt(c.dataset.day));
+        const action = tr.querySelector('.r-action').value;
+        const r = {days, start: tr.querySelector('.r-start').value, end: tr.querySelector('.r-end').value, mbps: parseFloat(tr.querySelector('.r-mbps').value) || 0};
+        if (action === 'pause') r.action = 'pause';
+        return r;
+    });
+    return {
+        bandwidth: {default_mbps: num('bw-default') || 0, rules},
+        config: {
+            mode: (document.querySelector('input[name=mode]:checked') || {}).value || 'schedule',
+            auto: {busy_pct: num('a-busy'), pause_pct: num('a-pause'), latency_extra_ms: num('a-lat'), latency_pause_ms: num('a-latp'),
+                   min_mbps: num('a-min'), link_upload_mbps: num('a-link') || 0,
+                   probe_hosts: document.getElementById('a-hosts').value.split(',').map(x => x.trim()).filter(Boolean)},
+            resource: {enabled: document.getElementById('r-on').checked, cpu_high: num('r-cpuh'), cpu_critical: num('r-cpuc'),
+                       ram_high: num('r-ramh'), ram_critical: num('r-ramc'), disk_high: num('r-diskh'), disk_critical: num('r-diskc'),
+                       sustain_seconds: num('r-sus'), high_limit_mbps: num('r-lim'), low_priority: document.getElementById('r-low').checked},
+            include_duplicati_server: document.getElementById('dup').checked,
+        },
+        consistency: {vss: document.getElementById('c-vss').value, close_open_share_files: document.getElementById('c-close').value},
+    };
+}
+
+async function call(method, path, body) {
+    const r = await fetch(API + path, {method, headers: {'Content-Type': 'application/json'}, body: body ? JSON.stringify(body) : undefined});
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || `HTTP ${r.status}`);
+    return d;
+}
+
+async function saveAll() {
+    try {
+        const d = await call('PUT', '/config', collect());
+        fillForm(d); fillStatus(d);
+        notify('Controle de rede salvo.');
+    } catch (e) { notify('Não foi possível salvar: ' + e.message); }
+}
+
+async function manualPause() {
+    try { fillStatus(await call('POST', '/pause', {minutes: parseInt(document.getElementById('pause-min').value)})); }
+    catch (e) { notify('Erro: ' + e.message); }
+}
+async function manualResume() {
+    try { fillStatus(await call('POST', '/resume')); } catch (e) { notify('Erro: ' + e.message); }
+}
+
+async function refresh(first) {
+    try {
+        const d = await call('GET', '/status');
+        if (first || !dirty) fillForm(d);
+        fillStatus(d);
+    } catch (e) {
+        document.getElementById('st-reason').textContent = 'Status indisponível: ' + e.message;
+    }
+}
+refresh(true);
+setInterval(() => refresh(false), 5000);
+</script>
+</body>
+</html>

@@ -1,9 +1,0 @@
-# ==============================================================================
-# GBOC System v14.8.2 - Dependencias Opcionais de Alta Performance
-# ==============================================================================
-# Pacotes com extensoes nativas em C/C++ que oferecem aceleracao de hardware.
-# O GBOC possui fallback automatico e transparente para modulos nativos da biblioteca
-# padrao do Python (ex.: zlib) caso extensoes em C nao possuam wheel binaria para
-# a versao do interpretador ou compilador MSVC nao esteja configurado no host.
-# ==============================================================================
-zstandard>=0.22

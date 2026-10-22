@@ -73,7 +73,13 @@ def validate_bandwidth(bw: Any) -> Dict[str, Any]:
             raise ValueError("Limite inválido em uma regra")
         if not days or not _HHMM.match(start) or not _HHMM.match(end) or start == end:
             raise ValueError("Regra de banda inválida: informe dias e horários HH:MM")
-        rules.append({"days": days, "start": start, "end": end, "mbps": mbps})
+        action = str(r.get("action") or "limit").lower()
+        if action not in ("limit", "pause"):
+            raise ValueError("Ação da regra inválida (limit ou pause)")
+        rule = {"days": days, "start": start, "end": end, "mbps": mbps}
+        if action == "pause":
+            rule.update(action="pause", mbps=0.0)       # pausa os backups em andamento no horário
+        rules.append(rule)
     return {"default_mbps": default, "rules": rules}
 
 
@@ -157,6 +163,23 @@ def current_upload_mbps(now: Optional[datetime] = None) -> float:
         except Exception:
             continue
     return float(bw.get("default_mbps") or 0)
+
+
+def current_schedule_action(now: Optional[datetime] = None) -> Tuple[str, float, Optional[Dict[str, Any]]]:
+    """("pause" | "limit" | "none", mbps, regra) vigente agora - usado AO VIVO pelo controle de rede."""
+    now = now or datetime.now()
+    bw = load().get(KEY_BANDWIDTH) or {}
+    for r in bw.get("rules") or []:
+        try:
+            if _active(r, now):
+                if r.get("action") == "pause":
+                    return "pause", 0.0, r
+                mbps = float(r.get("mbps") or 0)
+                return ("limit", mbps, r) if mbps > 0 else ("none", 0.0, r)
+        except Exception:
+            continue
+    d = float(bw.get("default_mbps") or 0)
+    return ("limit", d, None) if d > 0 else ("none", 0.0, None)
 
 
 def mbps_to_kib(mbps: float) -> int:

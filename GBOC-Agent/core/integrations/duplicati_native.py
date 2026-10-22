@@ -277,6 +277,14 @@ class DuplicatiNativeService:
             logger.warning(f"Falha ao carregar config do Duplicati: {e}")
             return DuplicatiConfig()
 
+    def _load_extra(self) -> Dict[str, Any]:
+        try:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                raw = json.load(f)
+            return {k: raw[k] for k in ("password_managed", "password_set_at", "server_datafolder") if k in raw}
+        except Exception:
+            return {}
+
     def save_config(self, payload: Dict[str, Any]) -> DuplicatiConfig:
         current = self.load_config()
         next_cfg = DuplicatiConfig(
@@ -286,6 +294,13 @@ class DuplicatiNativeService:
             verify_tls=bool(payload.get("verify_tls", current.verify_tls)),
             timeout_seconds=max(2, int(payload.get("timeout_seconds", current.timeout_seconds))),
         )
+        extra = self._load_extra()
+        if "password" in payload and str(payload.get("password")) != current.password:
+            # senha trocada: gerenciada pelo GBOC só se veio do próprio GBOC
+            extra["password_managed"] = bool(payload.get("password_managed", False))
+            extra["password_set_at"] = str(payload.get("password_set_at", ""))
+        if "server_datafolder" in payload:
+            extra["server_datafolder"] = str(payload.get("server_datafolder") or "")
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump({
                 "base_url": next_cfg.base_url,
@@ -293,12 +308,184 @@ class DuplicatiNativeService:
                 "password": next_cfg.password,
                 "verify_tls": next_cfg.verify_tls,
                 "timeout_seconds": next_cfg.timeout_seconds,
+                **extra,
             }, f, ensure_ascii=False, indent=2)
         # Invalidar sessão ao salvar nova config
         self._authenticated = False
         self._xsrf_token = None
         self._session = requests.Session()
         return next_cfg
+
+    # ──────────────────────────────────────────────
+    # ServerUtil (CLI do Duplicati) e senha definida pelo GBOC
+    # ──────────────────────────────────────────────
+
+    SERVERUTIL_SETTINGS = os.path.join(DATA_DIR, "duplicati_serverutil.json")   # sessão do ServerUtil (dentro do Agente)
+
+    def find_serverutil(self) -> Optional[str]:
+        """Duplicati.CommandLine.ServerUtil(.exe): instalação padrão, perfil do usuário, pasta do motor do GBOC
+        (Tools\\Duplicati, onde o instalador do GBOC coloca o Duplicati) ou PATH."""
+        import glob
+        import shutil
+        names = ["Duplicati.CommandLine.ServerUtil.exe", "duplicati-server-util", "duplicati-serverutil"]
+        cands = [
+            r"C:\Program Files\Duplicati 2\Duplicati.CommandLine.ServerUtil.exe",
+            r"C:\Program Files (x86)\Duplicati 2\Duplicati.CommandLine.ServerUtil.exe",
+            os.path.expandvars(r"%LOCALAPPDATA%\Programs\Duplicati 2\Duplicati.CommandLine.ServerUtil.exe"),
+        ]
+        try:
+            eng = get_engine_path("duplicati")
+            if eng:
+                d = os.path.dirname(eng)
+                cands += [os.path.join(d, n) for n in names]
+        except Exception:
+            pass
+        for root in (r"C:\GBOC\Tools\Duplicati", os.path.join(os.path.dirname(BASE_DIR), "Tools", "Duplicati")):
+            cands += glob.glob(os.path.join(root, "**", "Duplicati.CommandLine.ServerUtil.exe"), recursive=True)
+        if os.name == "nt":
+            cands += glob.glob(os.path.join(os.environ.get("SystemDrive", "C:") + os.sep, "Users", "*", "AppData", "Local",
+                                            "Programs", "Duplicati 2", "Duplicati.CommandLine.ServerUtil.exe"))
+        cands += [shutil.which(n) or "" for n in names]
+        cands.append("/usr/lib/duplicati/Duplicati.CommandLine.ServerUtil.exe")
+        return next((c for c in cands if c and os.path.isfile(c)), None)
+
+    def server_datafolders(self) -> List[str]:
+        """Pastas de dados do Duplicati Server encontradas (a do perfil deste processo primeiro).
+        Como serviço (LocalSystem) o ServerUtil procuraria no perfil do sistema; o Duplicati do usuário
+        só é alcançado informando --server-datafolder."""
+        own = [
+            os.path.expandvars(r"%LOCALAPPDATA%\Duplicati\Duplicati-server.sqlite"),
+            os.path.expandvars(r"%APPDATA%\Duplicati\Duplicati-server.sqlite"),
+            r"C:\ProgramData\Duplicati\Duplicati-server.sqlite",
+        ]
+        out: List[str] = []
+        for db in [p for p in own if os.path.isfile(p)] + _other_profile_duplicati_dbs(own):
+            d = os.path.dirname(db)
+            if d not in out:
+                out.append(d)
+        return out
+
+    def run_serverutil(self, args: List[str], datafolder: Optional[str] = None, password: Optional[str] = None,
+                       timeout: int = 45) -> Dict[str, Any]:
+        """Executa o ServerUtil. Sem senha ele entra pelo banco local do Duplicati (precisa de acesso à pasta de dados)."""
+        import subprocess
+        exe = self.find_serverutil()
+        if not exe:
+            return {"ok": False, "error": "Duplicati.CommandLine.ServerUtil não encontrado"}
+        cfg = self.load_config()
+        cmd = [exe] + list(args) + ["--hosturl", cfg.base_url.rstrip("/") + "/", "--settings-file", self.SERVERUTIL_SETTINGS]
+        if datafolder:
+            cmd += ["--server-datafolder", datafolder]
+        if password:
+            cmd += ["--password", password]
+        try:
+            # stdin fechado: sem acesso ao banco o ServerUtil pediria a senha no teclado e travaria o Agente
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, stdin=subprocess.DEVNULL,
+                                  encoding="utf-8", errors="replace")
+            out = (proc.stdout or "") + (proc.stderr or "")
+            return {"ok": proc.returncode == 0, "code": proc.returncode, "output": out}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    @staticmethod
+    def _running_as_system() -> bool:
+        if os.name != "nt":
+            return False
+        import getpass
+        u = (getpass.getuser() or "").upper()
+        return u.endswith("$") or u in ("SYSTEM", "SISTEMA")
+
+    def _change_password_in_owner_session(self, new_pwd: str, datafolder: Optional[str] = None) -> bool:
+        """Agente como serviço (SYSTEM) e Duplicati rodando no perfil do usuário: o banco do Duplicati é
+        criptografado com uma chave DO USUÁRIO, então o ServerUtil como SYSTEM não entra. A troca de senha
+        roda numa tarefa agendada de uso único na sessão do dono do processo do Duplicati (logon interativo,
+        sem senha do Windows) e a tarefa é apagada em seguida."""
+        import subprocess
+        exe = self.find_serverutil()
+        if not exe:
+            return False
+        cfg = self.load_config()
+        ps = r"""
+$ErrorActionPreference = 'Stop'
+$owners = @(Get-CimInstance Win32_Process | Where-Object { $_.Name -match '^Duplicati\.(GUI\.TrayIcon|Server)\.exe$' } |
+    ForEach-Object { $o = Invoke-CimMethod -InputObject $_ -MethodName GetOwner; if ($o.User) { "$($o.Domain)\$($o.User)" } } |
+    Where-Object { $_ -and $_ -notmatch '\\(SYSTEM|SISTEMA|LOCAL SERVICE|NETWORK SERVICE)$' } | Select-Object -Unique)
+if ($owners.Count -eq 0) { 'NO_OWNER'; exit 3 }
+$su = $env:GBOC_SU; $url = $env:GBOC_URL; $pw = $env:GBOC_PW -replace "'", "''"
+$df = if ($env:GBOC_DF) { " --server-datafolder '" + ($env:GBOC_DF -replace "'", "''") + "'" } else { "" }
+foreach ($owner in $owners) {
+    $name = 'GBOC_DuplicatiSenha_' + [guid]::NewGuid().ToString('N')
+    $cmd = "`$f = Join-Path `$env:TEMP ('gboc_su_' + [guid]::NewGuid().ToString('N') + '.json'); " +
+           "& '$su' change-password '$pw' --hosturl '$url'$df --settings-file `$f; `$c = `$LASTEXITCODE; " +
+           "Remove-Item `$f -ErrorAction SilentlyContinue; exit `$c"
+    $act = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -NonInteractive -WindowStyle Hidden -Command `"$cmd`""
+    $pri = New-ScheduledTaskPrincipal -UserId $owner -LogonType Interactive -RunLevel Limited
+    $set = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 2)
+    try {
+        Register-ScheduledTask -TaskName $name -Action $act -Principal $pri -Settings $set -Force | Out-Null
+        Start-ScheduledTask -TaskName $name
+        $res = $null
+        for ($i = 0; $i -lt 90; $i++) {
+            Start-Sleep -Seconds 1
+            $t = Get-ScheduledTask -TaskName $name
+            if ($t.State -ne 'Running' -and $i -ge 2) { $res = (Get-ScheduledTaskInfo -TaskName $name).LastTaskResult; break }
+        }
+    } finally {
+        Unregister-ScheduledTask -TaskName $name -Confirm:$false -ErrorAction SilentlyContinue
+    }
+    if ($res -eq 0) { "OK $owner"; exit 0 }
+    "FAIL $owner $res"
+}
+exit 4
+"""
+        try:
+            env = dict(os.environ, GBOC_SU=exe, GBOC_URL=cfg.base_url.rstrip("/") + "/", GBOC_PW=new_pwd,
+                       GBOC_DF=datafolder or "")
+            r = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", ps], capture_output=True,
+                               text=True, timeout=150, stdin=subprocess.DEVNULL, env=env, encoding="utf-8", errors="replace")
+            out = (r.stdout or "").strip()
+            if r.returncode == 0:
+                logger.info(f"🔐 Duplicati: senha do GBOC aplicada na sessão do usuário dono do Duplicati ({out[3:]})")
+                return True
+            logger.warning(f"Duplicati: troca de senha na sessão do usuário não concluída ({out or r.stderr.strip()[-300:]})")
+        except Exception as e:
+            logger.warning(f"Duplicati: troca de senha na sessão do usuário falhou: {e}")
+        return False
+
+    def ensure_managed_password(self) -> bool:
+        """Sem senha do Duplicati informada no GBOC: o GBOC define uma senha forte no Duplicati Server
+        (ServerUtil change-password, entrando pelo banco local) e passa a usá-la. Senha informada pelo
+        usuário nunca é substituída."""
+        import secrets
+        from datetime import datetime
+        cfg = self.load_config()
+        if cfg.password:
+            return False
+        if getattr(self, "_managed_attempted", False):
+            return False
+        self._managed_attempted = True
+        new_pwd = secrets.token_urlsafe(24)
+        folders = self.server_datafolders() or [None]
+        last = ""
+        for folder in folders:
+            r = self.run_serverutil(["change-password", new_pwd], datafolder=folder)
+            if r.get("ok"):
+                self.save_config({"password": new_pwd, "password_managed": True,
+                                  "password_set_at": datetime.now().isoformat(timespec="seconds"),
+                                  "server_datafolder": folder or ""})
+                logger.info(f"🔐 Duplicati: senha definida pelo GBOC aplicada no servidor ({folder or 'pasta padrão'}); "
+                            f"guardada em {CONFIG_FILE}")
+                return True
+            last = (r.get("error") or r.get("output") or "").strip().splitlines()[-1:] or [""]
+            last = last[0]
+        if self._running_as_system() and any(self._change_password_in_owner_session(new_pwd, f)
+                                             for f in ([f for f in folders if f] or [None])):
+            self.save_config({"password": new_pwd, "password_managed": True,
+                              "password_set_at": datetime.now().isoformat(timespec="seconds"),
+                              "server_datafolder": ""})
+            return True
+        logger.warning(f"Duplicati: não foi possível definir a senha do GBOC no servidor ({last})")
+        return False
 
     # ──────────────────────────────────────────────
     # Autenticação por sessão + XSRF (Duplicati v2.x)
@@ -382,6 +569,11 @@ class DuplicatiNativeService:
                 self._authenticated = True
                 logger.info("✅ Conexão Duplicati estabelecida com sucesso")
                 return True
+
+            if not cfg.password and self.ensure_managed_password():
+                self._session = requests.Session()
+                self._xsrf_token = None
+                return self._login(self.load_config())
 
             logger.warning("Falha no login Duplicati com as credenciais fornecidas.")
             return False
@@ -480,6 +672,8 @@ class DuplicatiNativeService:
             "timeout_seconds": cfg.timeout_seconds,
             "config_file": CONFIG_FILE,
             "authenticated": self._authenticated,
+            "password_managed_by_gboc": bool(self._load_extra().get("password_managed")),
+            "password_set_at": self._load_extra().get("password_set_at", ""),
         }
 
     def detect_local_installation(self) -> Dict[str, Any]:
@@ -718,24 +912,32 @@ class DuplicatiNativeService:
         import shutil
         from pathlib import Path
 
-        candidates = [
-            r"C:\Program Files\Duplicati 2\Duplicati.CommandLine.ServerUtil.exe",
-            r"C:\Program Files (x86)\Duplicati 2\Duplicati.CommandLine.ServerUtil.exe",
-            os.path.expandvars(r"%LOCALAPPDATA%\Programs\Duplicati 2\Duplicati.CommandLine.ServerUtil.exe"),
-            shutil.which("Duplicati.CommandLine.ServerUtil.exe") or "",
-            shutil.which("duplicati-serverutil") or "",
-            "/usr/lib/duplicati/Duplicati.CommandLine.ServerUtil.exe",
-        ]
-        serverutil_path = next((c for c in candidates if c and os.path.isfile(c)), None)
+        serverutil_path = self.find_serverutil()
 
         backups: List[Dict[str, Any]] = []
 
         if serverutil_path:
             tmp_dir = tempfile.mkdtemp(prefix="gboc_dup_exp_")
             try:
-                cmd = [serverutil_path, "export", "all", "--unencrypted", "--export-passwords", "--destination", tmp_dir, "--overwrite", "--json"]
-                proc = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
-                if proc.returncode == 0:
+                cfg_x = self.load_config()
+                folders = ([self._load_extra().get("server_datafolder")] if self._load_extra().get("server_datafolder") else []) \
+                    + self.server_datafolders()
+                folders = [f for i, f in enumerate(folders) if f and f not in folders[:i]] or [None]
+                proc = None
+                for folder in folders:
+                    r = self.run_serverutil(["export", "all", "--unencrypted", "--export-passwords", "--destination", tmp_dir,
+                                             "--overwrite", "--json"], datafolder=folder, password=cfg_x.password or None)
+                    if not r.get("ok") and cfg_x.password:
+                        # senha do GBOC desatualizada: entra pelo banco local
+                        r = self.run_serverutil(["export", "all", "--unencrypted", "--export-passwords", "--destination",
+                                                 tmp_dir, "--overwrite", "--json"], datafolder=folder)
+                    if r.get("ok") and any(Path(tmp_dir).glob("*.json")):
+                        proc = r
+                        break
+                    if not r.get("ok"):
+                        logger.warning(f"ServerUtil export ({folder or 'pasta padrão'}): "
+                                       f"{(r.get('error') or r.get('output') or '').strip()[-300:]}")
+                if proc:
                     for json_file in Path(tmp_dir).glob("*.json"):
                         try:
                             with open(json_file, "r", encoding="utf-8") as f:
@@ -924,7 +1126,9 @@ class DuplicatiNativeService:
                             "hostname": "Duplicati",
                             "username": "Duplicati",
                             "paths": [f"{filecount} arquivos {size_str}".strip()],
-                            "engine": "duplicati"
+                            "engine": "duplicati",
+                            "size_bytes": int(size or 0),
+                            "files_count": int(filecount or 0),
                         })
                     if snapshots:
                         return snapshots
@@ -1520,149 +1724,174 @@ class DuplicatiNativeService:
             with core.get_db_connection() as conn:
                 cur = conn.cursor()
 
+                failures = []
                 for item in items:
-                    b_obj = item.get("Backup", {}) if isinstance(item.get("Backup"), dict) else item
-                    b_id = str(item.get("id") or b_obj.get("ID") or "")
-                    b_name = item.get("name") or b_obj.get("Name") or f"Duplicati #{b_id}"
-                    meta = item.get("metadata") or b_obj.get("Metadata") or {}
-                    schedule = item.get("schedule") or item.get("Schedule") or b_obj.get("Schedule") or {}
-                    raw_target = str(item.get("target_url") or b_obj.get("TargetURL") or "")
-                    passphrase = str(item.get("passphrase") or "")
-                    settings = item.get("settings") or {}
-                    sources = item.get("sources") or b_obj.get("Sources") or []
+                    try:
+                        b_obj = item.get("Backup", {}) if isinstance(item.get("Backup"), dict) else item
+                        b_id = str(item.get("id") or b_obj.get("ID") or "")
+                        b_name = item.get("name") or b_obj.get("Name") or f"Duplicati #{b_id}"
+                        meta = item.get("metadata") or b_obj.get("Metadata") or {}
+                        schedule = item.get("schedule") or item.get("Schedule") or b_obj.get("Schedule") or {}
+                        raw_target = str(item.get("target_url") or b_obj.get("TargetURL") or "")
+                        passphrase = str(item.get("passphrase") or "")
+                        settings = item.get("settings") or {}
+                        sources = item.get("sources") or b_obj.get("Sources") or []
 
-                    creds_info = parse_duplicati_target_and_creds(raw_target, passphrase, settings)
-                    repo_type = creds_info["repo_type"]
-                    clean_path = creds_info["clean_path"]
-                    config_json = json.dumps(creds_info["config"])
-                    pwd = creds_info["password"] or None
-                    m_pwd = creds_info["motor_password"] or None
-                    enc_pwd = creds_info["encryption_password"] or None
-                    c_pwd = creds_info["cloud_password"] or None
+                        creds_info = parse_duplicati_target_and_creds(raw_target, passphrase, settings)
+                        repo_type = creds_info["repo_type"]
+                        clean_path = creds_info["clean_path"]
+                        config_json = json.dumps(creds_info["config"])
+                        pwd = creds_info["password"] or None
+                        m_pwd = creds_info["motor_password"] or None
+                        enc_pwd = creds_info["encryption_password"] or None
+                        c_pwd = creds_info["cloud_password"] or None
 
-                    repo_name = f"Repo_Duplicati_{b_name}"
-                    now_str = datetime.now().isoformat()
+                        repo_name = f"Repo_Duplicati_{b_name}"
+                        now_str = datetime.now().isoformat()
 
-                    # Criar ou atualizar repositório com credenciais e configs 100% completas
-                    cur.execute("""
-                        SELECT id FROM repositories 
-                        WHERE name = %s OR path = %s OR path = %s OR id = (
-                            SELECT repository_id FROM tasks WHERE name IN (%s, %s, %s) LIMIT 1
-                        )
-                    """, (repo_name, clean_path, raw_target, f"Nativo_Duplicati_{b_name}", b_name, f"Duplicati_{b_name}"))
-                    r_row = cur.fetchone()
-
-                    if r_row:
-                        repo_id = r_row[0]
+                        # Criar ou atualizar repositório com credenciais e configs 100% completas
                         cur.execute("""
-                            UPDATE repositories 
-                            SET name = %s, type = %s, path = %s, engine = 'duplicati',
-                                status = 'active', enabled = true, initialized = true,
-                                password = COALESCE(%s, password),
-                                motor_password = COALESCE(%s, motor_password),
-                                encryption_password = COALESCE(%s, encryption_password),
-                                cloud_password = COALESCE(%s, cloud_password),
-                                config = %s, updated_at = %s
-                            WHERE id = %s
-                        """, (repo_name, repo_type, clean_path, pwd, m_pwd, enc_pwd, c_pwd, config_json, now_str, repo_id))
-                    else:
-                        cur.execute("""
-                            INSERT INTO repositories (name, type, path, engine, status, enabled, initialized, password, motor_password, encryption_password, cloud_password, config, created_at, updated_at)
-                            VALUES (%s, %s, %s, 'duplicati', 'active', true, true, %s, %s, %s, %s, %s, %s, %s)
-                            RETURNING id
-                        """, (repo_name, repo_type, clean_path, pwd, m_pwd, enc_pwd, c_pwd, config_json, now_str, now_str))
-                        repo_id = cur.fetchone()[0]
-
-                    clean_sources = normalize_sources_list(sources)
-                    sources_json = json.dumps(clean_sources)
-
-                    repeat = str(schedule.get("Repeat") or schedule.get("repeat") or "2h")
-                    time_val = str(schedule.get("Time") or schedule.get("time") or "")
-                    cron = convert_duplicati_repeat_to_cron(repeat, time_val)
-                    retention_days = parse_duplicati_retention(settings)
-
-                    last_run_dt = _parse_time(meta.get("LastBackupDate") or meta.get("LastBackupFinished") or item.get("last_run"))
-
-                    # Buscar ou criar tarefa correspondente
-                    cur.execute("""
-                        SELECT id FROM tasks 
-                        WHERE name IN (%s, %s, %s) OR repository_id = %s
-                    """, (f"Nativo_Duplicati_{b_name}", b_name, f"Duplicati_{b_name}", repo_id))
-                    task_row = cur.fetchone()
-
-                    if task_row:
-                        task_id = task_row[0]
-                        cur.execute("""
-                            UPDATE tasks 
-                            SET repository_id = %s,
-                                engine = 'duplicati', 
-                                source_paths = %s, 
-                                status = 'idle', 
-                                enabled = true, 
-                                schedule_enabled = true, 
-                                schedule_cron = %s, 
-                                retention_days = %s,
-                                last_run = %s, 
-                                last_status = 'completed',
-                                updated_at = %s
-                            WHERE id = %s
-                        """, (repo_id, sources_json, cron, retention_days, last_run_dt or now_str, now_str, task_id))
-                    else:
-                        task_name = f"Nativo_Duplicati_{b_name}"
-                        cur.execute("""
-                            INSERT INTO tasks (name, repository_id, engine, source_paths, status, enabled, schedule_enabled, schedule_cron, retention_days, last_run, last_status, created_at, updated_at)
-                            VALUES (%s, %s, 'duplicati', %s, 'idle', true, true, %s, %s, %s, 'completed', %s, %s)
-                            RETURNING id
-                        """, (task_name, repo_id, sources_json, cron, retention_days, last_run_dt or now_str, now_str, now_str))
-                        task_id = cur.fetchone()[0]
-
-                    conn.commit()
-                    synced_tasks += 1
-
-                    # Sincronizar snapshots reais como task_executions
-                    snapshots = self.list_filesets(b_id)
-                    cur.execute("SELECT snapshot_id FROM task_executions WHERE task_id = %s AND snapshot_id IS NOT NULL", (task_id,))
-                    existing_snaps = set(r[0] for r in cur.fetchall())
-
-                    for s in snapshots:
-                        s_id = s.get("id") or s.get("version")
-                        full_snap_id = f"dup_{b_id}_{s_id}"
-                        if full_snap_id in existing_snaps:
-                            continue
-
-                        snap_time = _parse_time(s.get("time"))
-                        if not snap_time:
-                            continue
-
-                        cur.execute("""
-                            INSERT INTO task_executions (
-                                task_id, status, started_at, completed_at, duration_seconds,
-                                bytes_processed, files_processed, progress, snapshot_id, created_at
-                            ) VALUES (
-                                %s, 'completed', %s, %s, %s,
-                                %s, %s, 100, %s, %s
+                            SELECT id FROM repositories 
+                            WHERE name = %s OR path = %s OR path = %s OR id = (
+                                SELECT repository_id FROM tasks WHERE name IN (%s, %s, %s) LIMIT 1
                             )
-                        """, (
-                            task_id,
-                            snap_time,
-                            snap_time + timedelta(seconds=36),
-                            36,
-                            bytes_size,
-                            files_count,
-                            full_snap_id,
-                            snap_time
-                        ))
-                        existing_snaps.add(full_snap_id)
-                        total_new_executions += 1
+                        """, (repo_name, clean_path, raw_target, f"Nativo_Duplicati_{b_name}", b_name, f"Duplicati_{b_name}"))
+                        r_row = cur.fetchone()
 
-                    conn.commit()
+                        if r_row:
+                            repo_id = r_row[0]
+                            cur.execute("""
+                                UPDATE repositories 
+                                SET name = %s, type = %s, path = %s, engine = 'duplicati',
+                                    status = 'active', enabled = true, initialized = true,
+                                    password = COALESCE(%s, password),
+                                    motor_password = COALESCE(%s, motor_password),
+                                    encryption_password = COALESCE(%s, encryption_password),
+                                    cloud_password = COALESCE(%s, cloud_password),
+                                    config = %s, updated_at = %s
+                                WHERE id = %s
+                            """, (repo_name, repo_type, clean_path, pwd, m_pwd, enc_pwd, c_pwd, config_json, now_str, repo_id))
+                        else:
+                            cur.execute("""
+                                INSERT INTO repositories (name, type, path, engine, status, enabled, initialized, password, motor_password, encryption_password, cloud_password, config, created_at, updated_at)
+                                VALUES (%s, %s, %s, 'duplicati', 'active', true, true, %s, %s, %s, %s, %s, %s, %s)
+                                RETURNING id
+                            """, (repo_name, repo_type, clean_path, pwd, m_pwd, enc_pwd, c_pwd, config_json, now_str, now_str))
+                            repo_id = cur.fetchone()[0]
+
+                        clean_sources = normalize_sources_list(sources)
+                        sources_json = json.dumps(clean_sources)
+
+                        repeat = str(schedule.get("Repeat") or schedule.get("repeat") or "2h")
+                        time_val = str(schedule.get("Time") or schedule.get("time") or "")
+                        cron = convert_duplicati_repeat_to_cron(repeat, time_val)
+                        retention_days = parse_duplicati_retention(settings)
+
+                        last_run_dt = _parse_time(meta.get("LastBackupDate") or meta.get("LastBackupFinished") or item.get("last_run"))
+
+                        # Buscar ou criar tarefa correspondente
+                        cur.execute("""
+                            SELECT id FROM tasks 
+                            WHERE name IN (%s, %s, %s) OR repository_id = %s
+                        """, (f"Nativo_Duplicati_{b_name}", b_name, f"Duplicati_{b_name}", repo_id))
+                        task_row = cur.fetchone()
+
+                        if task_row:
+                            task_id = task_row[0]
+                            cur.execute("""
+                                UPDATE tasks 
+                                SET repository_id = %s,
+                                    engine = 'duplicati', 
+                                    source_paths = %s, 
+                                    status = 'idle', 
+                                    enabled = true, 
+                                    schedule_enabled = true, 
+                                    schedule_cron = %s, 
+                                    retention_days = %s,
+                                    last_run = %s, 
+                                    last_status = 'completed',
+                                    updated_at = %s
+                                WHERE id = %s
+                            """, (repo_id, sources_json, cron, retention_days, last_run_dt or now_str, now_str, task_id))
+                        else:
+                            task_name = f"Nativo_Duplicati_{b_name}"
+                            cur.execute("""
+                                INSERT INTO tasks (name, repository_id, engine, source_paths, status, enabled, schedule_enabled, schedule_cron, retention_days, last_run, last_status, created_at, updated_at)
+                                VALUES (%s, %s, 'duplicati', %s, 'idle', true, true, %s, %s, %s, 'completed', %s, %s)
+                                RETURNING id
+                            """, (task_name, repo_id, sources_json, cron, retention_days, last_run_dt or now_str, now_str, now_str))
+                            task_id = cur.fetchone()[0]
+
+                        conn.commit()
+                        synced_tasks += 1
+
+                        # Sincronizar snapshots reais como task_executions
+                        snapshots = self.list_filesets(b_id)
+                        cur.execute("SELECT snapshot_id FROM task_executions WHERE task_id = %s AND snapshot_id IS NOT NULL", (task_id,))
+                        existing_snaps = set(r[0] for r in cur.fetchall())
+
+                        for s in snapshots:
+                            s_id = s.get("id") or s.get("version")
+                            full_snap_id = f"dup_{b_id}_{s_id}"
+                            if full_snap_id in existing_snaps:
+                                continue
+
+                            snap_time = _parse_time(s.get("time"))
+                            if not snap_time:
+                                continue
+                            # antes eram nomes inexistentes (NameError na 1ª versão nova: a sincronização inteira abortava)
+                            try:
+                                bytes_size = int(s.get("size_bytes") or 0)
+                            except (TypeError, ValueError):
+                                bytes_size = 0
+                            try:
+                                files_count = int(s.get("files_count") or 0)
+                            except (TypeError, ValueError):
+                                files_count = 0
+                            # Duplicati devolve -1 quando não calculou: na versão mais recente usa os totais do backup
+                            _latest = str(s.get("version")) == "0"
+                            if bytes_size < 0:
+                                bytes_size = int(meta.get("SourceFilesSize") or 0) if _latest else 0
+                            if files_count < 0:
+                                files_count = int(meta.get("SourceFilesCount") or 0) if _latest else 0
+
+                            cur.execute("""
+                                INSERT INTO task_executions (
+                                    task_id, status, started_at, completed_at, duration_seconds,
+                                    bytes_processed, files_processed, progress, snapshot_id, created_at
+                                ) VALUES (
+                                    %s, 'completed', %s, %s, %s,
+                                    %s, %s, 100, %s, %s
+                                )
+                            """, (
+                                task_id,
+                                snap_time,
+                                snap_time + timedelta(seconds=36),
+                                36,
+                                bytes_size,
+                                files_count,
+                                full_snap_id,
+                                snap_time
+                            ))
+                            existing_snaps.add(full_snap_id)
+                            total_new_executions += 1
+
+                        conn.commit()
+                    except Exception as _item_err:
+                        conn.rollback()
+                        _nm = (item.get("name") or (item.get("Backup") or {}).get("Name") or "?") if isinstance(item, dict) else "?"
+                        failures.append(f"{_nm}: {_item_err}")
+                        logger.error(f"Sync Duplicati: falha no backup '{_nm}': {_item_err}", exc_info=True)
 
             res = {
-                "status": "success",
+                "status": "success" if not failures else ("partial" if synced_tasks else "error"),
                 "synced_tasks": synced_tasks,
                 "synced_executions": total_new_executions,
                 "message": f"Sincronização Duplicati concluída com sucesso ({synced_tasks} tarefa(s), {total_new_executions} nova(s) execução(ões))."
+                if not failures else f"Sincronização Duplicati: {synced_tasks} tarefa(s) ok, {len(failures)} com falha.",
             }
+            if failures:
+                res["failures"] = failures
             self._last_sync_ts = _py_time.time()
             self._last_sync_result = res
             return res
