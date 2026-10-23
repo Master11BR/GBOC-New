@@ -23,6 +23,28 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* Cargas Protegidas — proporções compactas (blocos próprios; não reaproveitam .card dentro de .card) */
+.pw-tabs { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 18px; padding-bottom:10px; border-bottom:1px solid var(--border); }
+.pw-tabs .tab-btn { font-size:.85em; padding:6px 14px; border-radius:999px; }
+.pw-tabs .pw-mode { margin-left:auto; align-self:center; font-size:.78em; }
+.pw-section { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:16px 18px; margin-bottom:20px; }
+.pw-section-title { display:flex; align-items:center; gap:8px; margin:0 0 14px; font-size:1em; font-weight:700; color:var(--text); }
+.pw-section-title i { color:var(--primary); }
+.pw-section p.text-muted { font-size:.88em; margin:0; }
+.pw-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:12px; }
+.pw-item { display:flex; flex-direction:column; gap:8px; min-width:0; padding:14px; border-radius:10px;
+  background:var(--bg-input, rgba(255,255,255,.03)); border:1px solid var(--border); border-left:3px solid var(--pw-c, var(--primary)); }
+.pw-item-head { display:flex; align-items:center; gap:10px; }
+.pw-ico { width:32px; height:32px; flex-shrink:0; display:grid; place-items:center; border-radius:8px; font-size:.95em;
+  color:var(--pw-c, var(--primary)); background:color-mix(in srgb, var(--pw-c, #4fa3e8) 16%, transparent); }
+.pw-item h4 { margin:0; font-size:.95em; font-weight:700; color:var(--text); line-height:1.25; }
+.pw-item p { margin:0; font-size:.82em; line-height:1.45; color:var(--text-muted); flex:1; }
+.pw-item code { white-space:nowrap; font-size:.95em; padding:0 4px; border-radius:4px; background:rgba(127,127,127,.15); }
+.pw-item .btn { align-self:flex-start; font-size:.8em; padding:5px 12px; margin-top:4px; }
+.pw-actions { margin-top:14px; display:flex; flex-wrap:wrap; gap:10px; }
+.pw-actions .btn { font-size:.85em; padding:7px 14px; }
+</style>
 </head>
 <body class="gboc-body layout-vertical">
     <div id="gboc-topbar-root"></div>
@@ -34,13 +56,10 @@
                 <h1 class="page-title"><i class="fas fa-cubes-stacked" style="color:var(--primary);margin-right:10px"></i> Cargas Protegidas</h1>
                 <p class="text-muted">Proteção e orquestração de Bancos de Dados, Active Directory, Fita LTO e Workloads Enterprise.</p>
             </div>
-            <div class="header-actions">
-                <span class="badge badge-success"><i class="fas fa-shield-halved"></i> Modo Consistente Ativo</span>
-            </div>
         </div>
 
         <!-- TAB NAVIGATION -->
-        <div class="tabs-container" style="margin-bottom: 20px; display:flex; gap:10px; border-bottom:1px solid var(--border); padding-bottom:10px;">
+        <div class="tabs-container pw-tabs">
             <button class="btn btn-primary tab-btn active" id="tab-btn-database" onclick="switchWorkloadTab('database')">
                 <i class="fas fa-database"></i> Bancos de Dados
             </button>
@@ -53,92 +72,89 @@
             <button class="btn btn-secondary tab-btn" id="tab-btn-enterprise" onclick="switchWorkloadTab('enterprise')">
                 <i class="fas fa-gem"></i> Enterprise (Oracle/SAP/CDP)
             </button>
+            <span class="badge pw-mode" id="pw-vss-badge" style="background:rgba(148,163,184,.15);color:var(--text-muted)"><i class="fas fa-shield-halved"></i> Verificando VSS...</span>
         </div>
 
         <!-- TAB 1: BANCOS DE DADOS -->
         <div class="tab-pane" id="pane-database">
-            <div class="card" style="margin-bottom:20px">
-                <div class="card-header">
-                    <h3 class="card-title"><i class="fas fa-server" style="color:var(--primary)"></i> Bancos de Dados Suportados</h3>
-                </div>
-                <div class="card-body">
-                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:16px;">
-                        <div class="card" style="padding:16px; border:1px solid var(--border);">
-                            <h4><i class="fas fa-database" style="color:#336791"></i> PostgreSQL</h4>
-                            <p class="text-muted" style="font-size:0.9em">Dump transacional consistente via `pg_dump` e validação com `pg_restore` em banco temporário.</p>
-                            <a href="/database-backup.html" class="btn btn-outline-primary btn-sm"><i class="fas fa-gear"></i> Gerenciar Conexões</a>
-                        </div>
-                        <div class="card" style="padding:16px; border:1px solid var(--border);">
-                            <h4><i class="fas fa-database" style="color:#00758f"></i> MySQL & MariaDB</h4>
-                            <p class="text-muted" style="font-size:0.9em">Snapshot com `--single-transaction` e bloqueio consistente de tabelas.</p>
-                            <a href="/database-backup.html" class="btn btn-outline-primary btn-sm"><i class="fas fa-gear"></i> Gerenciar Conexões</a>
-                        </div>
-                        <div class="card" style="padding:16px; border:1px solid var(--border);">
-                            <h4><i class="fas fa-database" style="color:#005c8a"></i> SQLite</h4>
-                            <p class="text-muted" style="font-size:0.9em">Cópia consistente via VACUUM INTO e verificação com PRAGMA integrity_check.</p>
-                            <a href="/database-backup.html" class="btn btn-outline-primary btn-sm"><i class="fas fa-gear"></i> Gerenciar Conexões</a>
-                        </div>
-                        <div class="card" style="padding:16px; border:1px solid var(--border);">
-                            <h4><i class="fas fa-database" style="color:#cc292b"></i> Microsoft SQL Server</h4>
-                            <p class="text-muted" style="font-size:0.9em">Backup VSS nativo via SQL VSS Writer com suporte a logs transacionais.</p>
-                            <a href="/database-backup.html" class="btn btn-outline-primary btn-sm"><i class="fas fa-gear"></i> Gerenciar Conexões</a>
-                        </div>
+            <section class="pw-section">
+                <h3 class="pw-section-title"><i class="fas fa-server"></i> Bancos de Dados Suportados</h3>
+                <div class="pw-grid">
+                    <div class="pw-item" style="--pw-c:#336791">
+                        <div class="pw-item-head"><span class="pw-ico"><i class="fas fa-database"></i></span><h4>PostgreSQL</h4></div>
+                        <p>Dump transacional consistente via <code>pg_dump</code> e validação com <code>pg_restore</code> em banco temporário.</p>
+                        <a href="/database-backup.html" class="btn btn-outline-primary btn-sm"><i class="fas fa-gear"></i> Gerenciar Conexões</a>
+                    </div>
+                    <div class="pw-item" style="--pw-c:#00758f">
+                        <div class="pw-item-head"><span class="pw-ico"><i class="fas fa-database"></i></span><h4>MySQL &amp; MariaDB</h4></div>
+                        <p>Snapshot com <code>--single-transaction</code> e bloqueio consistente de tabelas.</p>
+                        <a href="/database-backup.html" class="btn btn-outline-primary btn-sm"><i class="fas fa-gear"></i> Gerenciar Conexões</a>
+                    </div>
+                    <div class="pw-item" style="--pw-c:#2f9fd8">
+                        <div class="pw-item-head"><span class="pw-ico"><i class="fas fa-database"></i></span><h4>SQLite</h4></div>
+                        <p>Cópia consistente via <code>VACUUM INTO</code> e verificação com <code>PRAGMA integrity_check</code>.</p>
+                        <a href="/database-backup.html" class="btn btn-outline-primary btn-sm"><i class="fas fa-gear"></i> Gerenciar Conexões</a>
+                    </div>
+                    <div class="pw-item" style="--pw-c:#cc292b">
+                        <div class="pw-item-head"><span class="pw-ico"><i class="fas fa-database"></i></span><h4>Microsoft SQL Server</h4></div>
+                        <p>Backup VSS nativo via SQL VSS Writer com suporte a logs transacionais.</p>
+                        <a href="/database-backup.html" class="btn btn-outline-primary btn-sm"><i class="fas fa-gear"></i> Gerenciar Conexões</a>
                     </div>
                 </div>
-            </div>
+            </section>
         </div>
 
         <!-- TAB 2: ACTIVE DIRECTORY -->
         <div class="tab-pane" id="pane-activedirectory" style="display:none">
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title"><i class="fas fa-sitemap" style="color:var(--primary)"></i> Active Directory Domain Services</h3>
-                </div>
-                <div class="card-body">
+            <section class="pw-section">
+                <h3 class="pw-section-title"><i class="fas fa-sitemap"></i> Active Directory Domain Services</h3>
                     <p class="text-muted">Backup consistente de Domain Controllers, base NTDS.dit, políticas de grupo SYSVOL e recuperação granular de objetos.</p>
-                    <div style="margin-top:16px; display:flex; gap:12px;">
+                    <div class="pw-actions">
                         <a href="/active-directory.html" class="btn btn-primary"><i class="fas fa-external-link-alt"></i> Abrir Console Active Directory</a>
                         <a href="/disaster-recovery.html?tab=sysstate" class="btn btn-secondary"><i class="fas fa-box-archive"></i> Backup de System State & AD</a>
                     </div>
-                </div>
-            </div>
+            </section>
         </div>
 
         <!-- TAB 3: FITA LTO -->
         <div class="tab-pane" id="pane-tape" style="display:none">
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title"><i class="fas fa-tape" style="color:var(--primary)"></i> Backup em Fita LTO (Linear Tape-Open)</h3>
-                </div>
-                <div class="card-body">
+            <section class="pw-section">
+                <h3 class="pw-section-title"><i class="fas fa-tape"></i> Backup em Fita LTO (Linear Tape-Open)</h3>
                     <p class="text-muted">Automação de bibliotecas de fita LTO-6/7/8/9, gravação LTFS e retenção de longo prazo offline imutável (Air-Gap).</p>
-                    <div style="margin-top:16px;">
+                    <div class="pw-actions">
                         <a href="/tape-backup.html" class="btn btn-primary"><i class="fas fa-external-link-alt"></i> Abrir Console de Fita LTO</a>
                     </div>
-                </div>
-            </div>
+            </section>
         </div>
 
         <!-- TAB 4: ENTERPRISE -->
         <div class="tab-pane" id="pane-enterprise" style="display:none">
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title"><i class="fas fa-gem" style="color:var(--primary)"></i> Workloads Enterprise Avançados</h3>
-                </div>
-                <div class="card-body">
+            <section class="pw-section">
+                <h3 class="pw-section-title"><i class="fas fa-gem"></i> Workloads Enterprise Avançados</h3>
                     <p class="text-muted">Integração corporativa para Oracle RMAN, SAP HANA Backint e Continuous Data Protection (CDP).</p>
-                    <div style="margin-top:16px;">
+                    <div class="pw-actions">
                         <a href="/enterprise-features.html" class="btn btn-primary"><i class="fas fa-external-link-alt"></i> Abrir Módulos Enterprise</a>
                     </div>
-                </div>
-            </div>
+            </section>
         </div>
     </main>
 
     <!-- Universal JS Stack -->
-    <script src="/static/gboc-perf.js"></script>
-    <script src="/static/gboc-layout-manager.js"></script>
     <script src="/static/gboc-motion.js"></script>
     <script src="/static/protected-workloads.js"></script>
+    <script>
+    // Selo reflete a configuração REAL de cópia consistente (VSS) do Agente (antes: "Modo Consistente Ativo" fixo)
+    (async () => {
+        const el = document.getElementById('pw-vss-badge'); if (!el) return;
+        const set = (txt, fg, bg, title) => { el.innerHTML = '<i class="fas fa-shield-halved"></i> ' + txt; el.style.color = fg; el.style.background = bg; el.title = title || ''; };
+        try {
+            const r = await fetch('/api/network/status'); const c = (await r.json()).consistency;
+            if (!c) return set('VSS: estado indisponível', 'var(--text-muted)', 'rgba(148,163,184,.15)');
+            if (c.vss === 'off') return set('Cópia consistente (VSS) desligada', '#f87171', 'rgba(239,68,68,.12)', 'Ative em Configuração > Rede e Carga');
+            if (!c.admin) return set('VSS ativo, sem privilégio de administrador', '#f59e0b', 'rgba(245,158,11,.12)', 'O VSS exige que o Agente rode como administrador/serviço');
+            set('Cópia consistente (VSS) ativa', '#10b981', 'rgba(16,185,129,.12)');
+        } catch (e) { set('VSS: estado indisponível', 'var(--text-muted)', 'rgba(148,163,184,.15)', e.message); }
+    })();
+    </script>
 </body>
 </html>

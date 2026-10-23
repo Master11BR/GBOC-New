@@ -134,7 +134,7 @@ def _extract_user(request: Request) -> Dict:
 # ─── API endpoints ────────────────────────────────────────────────
 
 @router.get("/")
-async def get_audit_log(
+def get_audit_log(
     limit: int = 50,
     offset: int = 0,
     action: Optional[str] = None,
@@ -193,7 +193,7 @@ async def get_audit_log(
 
 
 @router.get("/summary")
-async def audit_summary(days: int = 30):
+def audit_summary(days: int = 30):
     """Get a summary of audit activity for the last N days."""
     ensure_tables()
 
@@ -248,7 +248,7 @@ async def audit_summary(days: int = 30):
 
 
 @router.get("/export")
-async def export_audit(days: int = 90, format: str = "json"):
+def export_audit(days: int = 90, format: str = "json"):
     """Export audit log entries for compliance."""
     ensure_tables()
     entries = _query("""
@@ -283,7 +283,7 @@ async def export_audit(days: int = 90, format: str = "json"):
 
 
 @router.get("/actions")
-async def list_audit_actions():
+def list_audit_actions():
     """List all distinct actions recorded in the audit log."""
     ensure_tables()
     actions = _query("SELECT DISTINCT action FROM audit_log ORDER BY action")

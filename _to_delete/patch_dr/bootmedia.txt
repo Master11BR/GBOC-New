@@ -1,0 +1,122 @@
+    @staticmethod
+    def _find_adk():
+        """Retorna (DandISetEnv.bat ou None, complemento WinPE instalado?)."""
+        base = Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")) / "Windows Kits" / "10" / "Assessment and Deployment Kit"
+        env_bat = base / "Deployment Tools" / "DandISetEnv.bat"
+        winpe = base / "Windows Preinstallation Environment" / "amd64"
+        return (str(env_bat) if env_bat.exists() else None), winpe.exists()
+
+    def _boot_media_worker(self, job_id: str, target_iso: str, media_type: str, embed_drivers: bool):
+        self._append_log(job_id, f"Iniciando construção da mídia de recuperação ({media_type.upper()})")
+        try:
+            if sys.platform != "win32":
+                raise RuntimeError("Construção de mídia WinPE disponível apenas no Windows.")
+            staging_dir = str(self.dr_exports_dir / "WinPE_Recovery_Staging")
+            drivers_dir = os.path.join(staging_dir, "Drivers")
+            os.makedirs(drivers_dir, exist_ok=True)
+
+            # 1. Exportacao real dos drivers de terceiros instalados no host
+            driver_count = 0
+            drivers_failed = False
+            if embed_drivers:
+                self._append_log(job_id, "Exportando drivers de terceiros instalados no host (Export-WindowsDriver)...")
+                ps = f"Export-WindowsDriver -Online -Destination '{drivers_dir}' | Out-Null"
+                try:
+                    rc, out = self._run_console(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps], timeout=1800)
+                except (OSError, subprocess.TimeoutExpired) as ex:
+                    rc, out = -1, str(ex)
+                driver_count = len(list(Path(drivers_dir).rglob("*.inf")))
+                if rc == 0:
+                    self._append_log(job_id, f"✅ {driver_count} driver(s) exportado(s) para {drivers_dir}")
+                else:
+                    drivers_failed = True
+                    self._append_log(job_id, f"❌ Exportação de drivers falhou (código {rc}): {out[:300] or 'sem mensagem'}")
+            self._set_progress(job_id, 30)
+            if self._is_cancelled(job_id):
+                return
+
+            # 2. ISO bootavel real: precisa do Windows ADK + complemento WinPE
+            dandi, has_winpe = self._find_adk()
+            if not dandi or not has_winpe:
+                what = "o Windows ADK" if not dandi else "o complemento WinPE do Windows ADK"
+                msg = f"ISO não gerada: {what} não está instalado neste servidor."
+                if driver_count:
+                    msg += f" Os drivers exportados estão em {drivers_dir}."
+                self._append_log(job_id, f"⚠️ {msg}")
+                self._finish_job(job_id, "partial" if driver_count else "failed", msg)
+                return
+
+            work_dir = os.path.join(staging_dir, "WinPE_amd64")
+            mount_dir = os.path.join(work_dir, "mount")
+            subprocess.run(["dism", "/Cleanup-Mountpoints"], capture_output=True, timeout=300)
+            if os.path.exists(work_dir):
+                shutil.rmtree(work_dir, ignore_errors=True)
+            startnet = os.path.join(staging_dir, "startnet.cmd")
+            with open(startnet, "w", encoding="ascii") as f:
+                f.write("@echo off\r\nwpeinit\r\necho GBOC Recovery Environment (WinPE)\r\n")
+
+            bat_lines = [
+                "@echo off",
+                f'call "{dandi}"',
+                f'call copype amd64 "{work_dir}" || exit /b 10',
+                f'dism /Mount-Image /ImageFile:"{work_dir}\\media\\sources\\boot.wim" /Index:1 /MountDir:"{mount_dir}" || exit /b 11',
+            ]
+            if embed_drivers and driver_count:
+                bat_lines.append(f'dism /Image:"{mount_dir}" /Add-Driver /Driver:"{drivers_dir}" /Recurse /ForceUnsigned || set GBOC_DRV_ERR=1')
+            bat_lines += [
+                f'copy /y "{startnet}" "{mount_dir}\\Windows\\System32\\startnet.cmd" >nul',
+                f'dism /Unmount-Image /MountDir:"{mount_dir}" /Commit || (dism /Unmount-Image /MountDir:"{mount_dir}" /Discard & exit /b 12)',
+                f'call MakeWinPEMedia /ISO /F "{work_dir}" "{target_iso}" || exit /b 13',
+                "if defined GBOC_DRV_ERR exit /b 2",
+                "exit /b 0",
+            ]
+            bat = os.path.join(staging_dir, "build_winpe.cmd")
+            with open(bat, "w", encoding="mbcs" if sys.platform == "win32" else "utf-8") as f:
+                f.write("\r\n".join(bat_lines) + "\r\n")
+
+            self._append_log(job_id, "Gerando WinPE com o Windows ADK (copype, DISM e MakeWinPEMedia)...")
+            self._set_progress(job_id, 45)
+            try:
+                rc, out = self._run_console(["cmd", "/c", bat], timeout=3600)
+            except subprocess.TimeoutExpired:
+                rc, out = -1, "tempo esgotado (1 h)"
+                subprocess.run(["dism", "/Unmount-Image", f"/MountDir:{mount_dir}", "/Discard"], capture_output=True, timeout=600)
+            iso_size = os.path.getsize(target_iso) if os.path.exists(target_iso) else 0
+            steps = {10: "copype", 11: "montagem do boot.wim", 12: "gravação do boot.wim", 13: "MakeWinPEMedia"}
+
+            manifest_pe = {
+                "environment": "WinPE (Windows ADK)",
+                "iso": target_iso if iso_size else None,
+                "iso_bytes": iso_size,
+                "iso_sha256": self._sha256(target_iso) if iso_size else None,
+                "drivers_exported": driver_count,
+                "drivers_injected": bool(embed_drivers and driver_count and rc == 0),
+                "build_exit_code": rc,
+                "created_at": datetime.now().isoformat()
+            }
+            with open(os.path.join(staging_dir, "winpe_manifest.json"), "w", encoding="utf-8") as f:
+                json.dump(manifest_pe, f, indent=2, ensure_ascii=False)
+
+            if rc in (0, 2) and iso_size > 0:
+                shutil.rmtree(work_dir, ignore_errors=True)
+                self._append_log(job_id, f"✅ ISO WinPE gerada: {target_iso} ({self._fmt_size(iso_size)})")
+                problems = []
+                if rc == 2:
+                    problems.append("parte dos drivers não foi injetada no WinPE")
+                if drivers_failed:
+                    problems.append("a exportação de drivers falhou")
+                if problems:
+                    msg = "ISO gerada, mas " + " e ".join(problems) + "."
+                    self._append_log(job_id, f"⚠️ {msg}")
+                    self._finish_job(job_id, "partial", msg)
+                else:
+                    self._finish_job(job_id, "completed")
+            else:
+                tail = " | ".join(l.strip() for l in out.splitlines()[-6:] if l.strip())
+                raise RuntimeError(f"Falha na etapa '{steps.get(rc, 'build')}' (código {rc}): {tail[:400] or 'sem mensagem'}")
+
+        except Exception as e:
+            logger.error(f"Erro na construção da mídia de boot {job_id}: {e}", exc_info=True)
+            self._append_log(job_id, f"❌ Mídia de boot não gerada: {e}")
+            self._finish_job(job_id, "failed", str(e))
+

@@ -1,0 +1,137 @@
+    def _find_disk2vhd(self) -> Optional[str]:
+        """Localiza o Sysinternals Disk2vhd (PATH ou pasta tools do Agente)."""
+        names = ("disk2vhd64.exe", "disk2vhd.exe")
+        for n in names:
+            p = shutil.which(n)
+            if p:
+                return p
+        bases = [Path(__file__).resolve().parent.parent / "tools"]
+        try:
+            from core.gboc_paths import data_dir as _gboc_data_dir
+            bases.insert(0, _gboc_data_dir("tools", create=False))
+        except Exception:
+            pass
+        for base in bases:
+            for n in names:
+                c = Path(base) / n
+                if c.exists():
+                    return str(c)
+        return None
+
+    def _p2v_worker(self, job_id: str, disk_number: int, target_path: str, is_dynamic: bool):
+        start_time = time.time()
+        self._append_log(job_id, f"Iniciando conversão P2V do disco físico #{disk_number}")
+        self._append_log(job_id, f"Destino da imagem virtual: {target_path}")
+        try:
+            if sys.platform != "win32":
+                raise RuntimeError("Conversão P2V disponível apenas no Windows.")
+            if not self._is_admin():
+                raise RuntimeError("O Agente precisa de privilégio administrativo para ler o disco físico. Nenhum dado foi copiado.")
+            tool = self._find_disk2vhd()
+            if not tool:
+                raise RuntimeError(
+                    "Nenhum dado foi copiado: a conversão P2V usa o Sysinternals Disk2vhd (disk2vhd64.exe), "
+                    "que não foi encontrado. Coloque o disk2vhd64.exe na pasta 'tools' do Agente ou no PATH e tente novamente."
+                )
+            if os.path.exists(target_path):
+                raise RuntimeError("O arquivo de destino já existe; escolha outro nome para não sobrescrever uma imagem existente.")
+
+            # Volumes (com letra) do disco escolhido e espaco realmente ocupado
+            ps = (
+                f"Get-Partition -DiskNumber {int(disk_number)} -ErrorAction Stop | Where-Object DriveLetter | "
+                "ForEach-Object { $v = Get-Volume -DriveLetter $_.DriveLetter; \"$($_.DriveLetter)|$($v.Size - $v.SizeRemaining)\" }"
+            )
+            rc, out = self._run_console(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps], timeout=60)
+            letters, used_bytes = [], 0
+            for line in out.splitlines():
+                parts = line.strip().split("|")
+                if len(parts) == 2 and len(parts[0]) == 1 and parts[0].isalpha():
+                    letters.append(parts[0].upper() + ":")
+                    try:
+                        used_bytes += int(parts[1])
+                    except ValueError:
+                        pass
+            if rc != 0 or not letters:
+                raise RuntimeError(f"Não foi possível identificar volumes com letra no disco #{disk_number}: {out[:300] or 'sem saída'}")
+
+            target_dir = os.path.dirname(target_path)
+            if target_dir:
+                os.makedirs(target_dir, exist_ok=True)
+            with self.lock:
+                if job_id in self.active_jobs:
+                    self.active_jobs[job_id]["total_bytes"] = used_bytes
+
+            # Aceite da EULA pelo mecanismo padrao da Sysinternals (evita janela bloqueando o servico)
+            try:
+                import winreg
+                with winreg.CreateKey(winreg.HKEY_CURRENT_USER, r"Software\Sysinternals\Disk2Vhd") as k:
+                    winreg.SetValueEx(k, "EulaAccepted", 0, winreg.REG_DWORD, 1)
+            except Exception:
+                pass
+
+            if not is_dynamic:
+                self._append_log(job_id, "ℹ️ O Disk2vhd sempre gera disco de tamanho dinâmico; a opção 'fixo' não se aplica.")
+            self._append_log(job_id, f"Copiando {', '.join(letters)} ({self._fmt_size(used_bytes)} em uso) com Disk2vhd (snapshot VSS)...")
+            proc = subprocess.Popen([tool, *letters, target_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            last_size, last_log = 0, 0.0
+            while proc.poll() is None:
+                if self._is_cancelled(job_id):
+                    proc.kill()
+                    proc.wait(timeout=30)
+                    try:
+                        if os.path.exists(target_path):
+                            os.remove(target_path)
+                    except OSError:
+                        pass
+                    self._append_log(job_id, "🛑 Conversão cancelada; o arquivo parcial foi removido.")
+                    return
+                size = os.path.getsize(target_path) if os.path.exists(target_path) else 0
+                elapsed = max(0.1, time.time() - start_time)
+                if size == 0 and elapsed > 120:
+                    proc.kill()
+                    raise RuntimeError("O Disk2vhd não começou a gravar a imagem em 120 s (possível erro de parâmetros ou bloqueio). Nenhum dado foi copiado.")
+                pct = min(99, int(size * 100 / used_bytes)) if used_bytes else 0
+                with self.lock:
+                    if job_id in self.active_jobs:
+                        self.active_jobs[job_id]["progress"] = pct
+                        self.active_jobs[job_id]["bytes_processed"] = size
+                        self.active_jobs[job_id]["speed_mbps"] = round(size / (1024 * 1024) / elapsed, 1)
+                if size != last_size and time.time() - last_log > 30:
+                    self._append_log(job_id, f"Gravado: {self._fmt_size(size)} de ~{self._fmt_size(used_bytes)} ({pct}%)")
+                    last_log = time.time()
+                last_size = size
+                time.sleep(2)
+
+            enc = self._console_encoding()
+            so, se = proc.communicate()
+            msg = ((so or b"").decode(enc, errors="replace") + (se or b"").decode(enc, errors="replace")).strip()
+            size = os.path.getsize(target_path) if os.path.exists(target_path) else 0
+            if proc.returncode != 0 or size == 0:
+                raise RuntimeError(f"Disk2vhd terminou com código {proc.returncode} e {size} bytes gravados: {msg[:400] or 'sem mensagem'}")
+
+            disks = self.get_physical_disks()
+            disk_info = next((d for d in disks if d["disk_number"] == disk_number), {})
+            vm_meta_path = Path(target_path).with_suffix(".vmconfig.json")
+            vm_config = {
+                "vm_name": f"P2V-Clone-Disk{disk_number}-{int(time.time())}",
+                "virtual_disk": os.path.basename(target_path),
+                "virtual_disk_bytes": size,
+                "volumes": letters,
+                "generation": 2 if disk_info.get("partition_style") == "GPT" else 1,
+                "firmware": "UEFI" if disk_info.get("partition_style") == "GPT" else "BIOS",
+                "tool": "Sysinternals Disk2vhd",
+                "created_at": datetime.now().isoformat()
+            }
+            with open(vm_meta_path, "w", encoding="utf-8") as f:
+                json.dump(vm_config, f, indent=2)
+            with self.lock:
+                if job_id in self.active_jobs:
+                    self.active_jobs[job_id]["bytes_processed"] = size
+            self._append_log(job_id, f"✅ Imagem gerada: {os.path.basename(target_path)} ({self._fmt_size(size)}) em {round(time.time() - start_time)} s")
+            self._append_log(job_id, f"Perfil de VM salvo em {vm_meta_path.name}. Teste o boot da imagem antes de considerá-la pronta para recuperação.")
+            self._finish_job(job_id, "completed")
+        except Exception as e:
+            logger.error(f"Erro no worker P2V {job_id}: {e}", exc_info=True)
+            self._append_log(job_id, f"❌ Conversão P2V falhou: {e}")
+            self._finish_job(job_id, "failed", str(e))
+

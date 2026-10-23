@@ -33,9 +33,14 @@ async def create_vss_snapshot(request: Request):
     except Exception:
         body = {}
 
-    drive = body.get("drive", "C:").strip()
+    drive = str(body.get("drive", "C:")).strip().rstrip("\\/")
     if not drive.endswith(":"):
         drive = f"{drive}:"
+    # So letra de unidade: o valor entra no script PowerShell
+    import re as _re
+    if not _re.fullmatch(r"[A-Za-z]:", drive):
+        return JSONResponse(status_code=400, content={"status": "error", "error": {
+            "code": "INVALID_DRIVE", "message": f"Unidade inválida: {drive!r} (use o formato C:)"}})
 
     if sys.platform != "win32":
         return JSONResponse(
@@ -80,7 +85,7 @@ async def create_vss_snapshot(request: Request):
     try:
         res = await asyncio.to_thread(subprocess.run, 
             ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd],
-            capture_output=True, text=True, timeout=25
+            capture_output=True, text=True, timeout=180
         )
         if res.returncode == 0 and res.stdout.strip():
             result = json.loads(res.stdout.strip())

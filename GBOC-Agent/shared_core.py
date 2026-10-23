@@ -657,7 +657,11 @@ class SharedCore:
                         "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS resolved BOOLEAN DEFAULT FALSE",
                         "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS details TEXT",
                     ]
+                    from core.database_migrator import column_already_exists
+                    _cols_cache = {}
                     for sql in defensive_alters:
+                        if column_already_exists(cur, sql, _cols_cache):
+                            continue   # coluna já existe: não pede trava exclusiva na tabela
                         try:
                             cur.execute("SAVEPOINT defensive_alter")
                             cur.execute(sql)

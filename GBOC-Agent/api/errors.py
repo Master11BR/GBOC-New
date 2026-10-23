@@ -26,4 +26,4 @@ def get_errors(limit: int = 50):
 
         return {"status": "success", "errors": errors, "count": len(errors)}
     except Exception as e:
-        return {"status": "success", "errors": [], "count": 0}
+        return {"status": "error", "message": str(e), "errors": [], "count": 0}

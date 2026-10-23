@@ -91,21 +91,8 @@ class RansomwareGuardian:
                 if result and result.get('threat_detected'):
                     self._handle_threat(result)
 
-                # 2. Execução automática da Stack de 7 Ferramentas de Segurança (Piloto Automático)
-                try:
-                    from engines.ransomware_detector import run_integrated_multi_tool_scan
-                    data_dir = os.environ.get('AGENT_DATA_DIR', os.path.join(os.getcwd(), 'data'))
-                    if os.path.exists(data_dir):
-                        multi_res = run_integrated_multi_tool_scan(data_dir)
-                        if multi_res and multi_res.get('threat_level') in ('high', 'critical'):
-                            logger.critical(f"[Guardian] Ameaca detectada pela Stack de 7 Ferramentas: {multi_res.get('threat_level').upper()}")
-                            self._handle_threat({
-                                'threat_detected': True,
-                                'multi_tool_summary': multi_res,
-                                'detected_at': datetime.now().isoformat()
-                            })
-                except Exception as m_err:
-                    logger.debug(f"[Guardian] Erro na varredura automatica de 7 ferramentas: {m_err}")
+                # (Varredura automática da "Stack de 7 Ferramentas" removida: era papel do antivírus e
+                #  rodava hash/entropia sobre a pasta data inteira a cada ciclo, dentro do processo da API.)
 
             except Exception as e:
                 logger.error(f"[Guardian] Erro no piloto automatico de seguranca: {e}", exc_info=True)
@@ -250,6 +237,12 @@ class RansomwareGuardian:
                     return
             self._last_incident_time = datetime.now()
 
+        # Mesmo comprometimento ja registrado em incidente ativo: nao repetir a resposta a cada ciclo
+        dup_id = self._active_incident_same_threat(threat_info)
+        if dup_id:
+            logger.warning(f"[Guardian] Ameaça já registrada no incidente ativo #{dup_id} (mesmos arquivos e hashes) - resposta não repetida")
+            return
+
         logger.critical("[Guardian] === INICIANDO RESPOSTA AUTOMATICA ===")
         response_actions = []
 
@@ -284,6 +277,31 @@ class RansomwareGuardian:
             f"[Guardian] === RESPOSTA CONCLUIDA === "
             f"Incidente #{incident_id} | {len(response_actions)} acoes executadas"
         )
+
+    @staticmethod
+    def _threat_signature(threat_info: Dict) -> set:
+        info = threat_info or {}
+        if isinstance(info, str):
+            try:
+                info = json.loads(info)
+            except Exception:
+                return set()
+        return {(d.get('file_path'), d.get('status'), d.get('current_hash')) for d in (info.get('details') or [])
+                if isinstance(d, dict) and d.get('status') != 'intact'}
+
+    def _active_incident_same_threat(self, threat_info: Dict) -> Optional[int]:
+        sig = self._threat_signature(threat_info)
+        if not sig:
+            return None
+        try:
+            from engines.ransomware_detector import _query
+            rows = _query("SELECT id, threat_info FROM ransomware_incidents WHERE status = 'active' ORDER BY id DESC LIMIT 20")
+            for r in rows:
+                if self._threat_signature(r.get('threat_info')) == sig:
+                    return r.get('id')
+        except Exception as e:
+            logger.debug(f"[Guardian] Consulta de incidente ativo falhou: {e}")
+        return None
 
     # ------------------------------------------------------------------
     # 1. Registrar incidente
@@ -474,10 +492,10 @@ class RansomwareGuardian:
 
     def _lock_repositories(self) -> Dict[str, Any]:
         """Tenta bloquear repositorios para impedir sobrescrita por ransomware."""
-        result = {'locked': 0, 'errors': []}
+        result = {'locked': 0, 'errors': [], 'repos': []}
         try:
             from engines.ransomware_detector import _query, _execute
-            repos = _query("SELECT id, name, path, engine FROM repositories ORDER BY name LIMIT 20")
+            repos = _query("SELECT id, name, path, engine, status FROM repositories WHERE COALESCE(status, '') <> 'locked_ransomware' ORDER BY name LIMIT 20")
             for repo in repos:
                 repo_path = repo.get('path', '')
                 repo_name = repo.get('name', '')
@@ -494,11 +512,12 @@ class RansomwareGuardian:
                         result['locked'] += 1
                         logger.info(f"[Guardian] Repo bloqueado: {repo_name}")
 
-                    # Marcar no banco como locked
+                    # Marcar no banco como locked (guardando o status anterior para a resolucao do incidente)
                     _execute(
                         "UPDATE repositories SET status = 'locked_ransomware' WHERE id = %s",
                         (repo.get('id'),)
                     )
+                    result['repos'].append({'id': repo.get('id'), 'previous_status': repo.get('status')})
                 except Exception as e:
                     result['errors'].append({'repo': repo_name, 'error': str(e)})
         except Exception as e:
@@ -526,6 +545,7 @@ class RansomwareGuardian:
                         (task['id'],)
                     )
                     result['paused'] += 1
+                    result.setdefault('tasks', []).append({'id': task['id'], 'previous_status': task.get('status')})
                     logger.info(f"[Guardian] Tarefa pausada: {task.get('name', task['id'])}")
                 except Exception as e:
                     result['errors'].append({'task': task.get('name'), 'error': str(e)})
@@ -721,7 +741,7 @@ class RansomwareGuardian:
             import socket
             return socket.gethostname()
         except Exception:
-            return 'unknown'
+            return os.environ.get('COMPUTERNAME') or os.environ.get('HOSTNAME') or 'host sem nome' 
 
     # ------------------------------------------------------------------
     # API de consulta (para a UI)

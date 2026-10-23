@@ -138,7 +138,7 @@ class EngineImporter:
             
         except Exception as e:
             logger.warning(f"⚠️ Não foi possível obter versão de {engine}: {e}")
-            return "unknown"
+            return f"não obtida ({str(e)[:80]})"
     
     def _import_restic_configs(self) -> List[Dict]:
         """Importa configurações REAIS do Restic"""

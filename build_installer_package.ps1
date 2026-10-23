@@ -137,6 +137,7 @@ function Add-GbocBundleItem([System.Collections.IDictionary]$Entry, [string]$Roo
 function Build-GbocMissingWheels([string]$BuildPython, [string]$MM, [string]$WheelDir, [string]$Requirements) {
     <# Monta (pip wheel) as bibliotecas sem wheel pronta para Python $MM, usando um Python $MM instalado
        nesta maquina. Retorna $true se montou todas as que faltavam. #>
+    $env:PYYAML_FORCE_LIBYAML = "0"   # PyYAML sem wheel (ex.: Python 3.15): monta em Python puro, sem exigir compilador C++
     $ErrorActionPreference = "Continue"
     $localPy = Get-GbocInstalledPythons | Where-Object { ("{0}.{1}" -f $_.Version.Major, $_.Version.Minor) -eq $MM } | Select-Object -First 1
     if (-not $localPy) {

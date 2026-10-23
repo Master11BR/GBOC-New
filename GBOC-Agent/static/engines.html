@@ -452,7 +452,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                         this.updateSystemHealth();
                         this.loadDetailedReport();
                     } else {
-                        this.showNotification('Erro ao carregar motores: ' + (data.message || 'Desconhecido'), 'error');
+                        this.showNotification('Erro ao carregar motores: ' + (data.message || 'resposta sem mensagem do servidor'), 'error');
                     }
                 } catch (error) {
                     this.showNotification('Erro de rede: ' + error.message, 'error');
@@ -477,7 +477,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                         this.loadDetailedReport();
                         this.showNotification('Validação de motores concluída com sucesso!', 'success');
                     } else {
-                        this.showNotification('Erro na validação: ' + (data.message || 'Desconhecido'), 'error');
+                        this.showNotification('Erro na validação: ' + (data.message || 'resposta sem mensagem do servidor'), 'error');
                     }
                 } catch (error) {
                     this.showNotification('Erro de rede: ' + error.message, 'error');

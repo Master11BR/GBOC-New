@@ -107,7 +107,7 @@ async function loadK8sInventory() {
 
         if (clusterEl) {
             if (k8s.available) {
-                clusterEl.textContent = `${k8s.cluster_name} (${k8s.server_version})`;
+                clusterEl.textContent = k8s.server_version ? `${k8s.cluster_name} (${k8s.server_version})` : `${k8s.cluster_name} — ${k8s.distribution || 'sem versão do servidor'}`;
             } else {
                 clusterEl.textContent = 'kubectl não disponível no host';
                 clusterEl.className = 'badge badge-warning';

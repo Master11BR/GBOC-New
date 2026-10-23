@@ -299,7 +299,7 @@ def compliance_score():
 # ─── Rules endpoint ──────────────────────────────────────────────
 
 @router.get("/rules")
-async def get_compliance_rules():
+def get_compliance_rules():
     """Evaluate and list all compliance rules, ordered: FAIL > WARN > PASS."""
     rules = _evaluate_rules()
     status_order = {'fail': 0, 'warn': 1, 'pass': 2}

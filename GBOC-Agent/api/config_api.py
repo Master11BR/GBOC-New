@@ -53,7 +53,7 @@ class DiffRequest(BaseModel):
 # ─── Export ───────────────────────────────────────────────────────
 
 @router.get("/export")
-async def export_config(include_sensitive: bool = False):
+def export_config(include_sensitive: bool = False):
     """Export the full system configuration as JSON."""
     from engines.config_manager import export_config as _export
     config = _export(include_sensitive=include_sensitive)
@@ -61,7 +61,7 @@ async def export_config(include_sensitive: bool = False):
 
 
 @router.get("/export/download")
-async def export_config_download(include_sensitive: bool = False):
+def export_config_download(include_sensitive: bool = False):
     """Download configuration as a JSON file."""
     from engines.config_manager import export_config as _export
     config = _export(include_sensitive=include_sensitive)
@@ -104,14 +104,14 @@ async def import_config_upload(file: UploadFile = File(...), dry_run: bool = Tru
 # ─── Snapshots ────────────────────────────────────────────────────
 
 @router.get("/snapshots")
-async def list_snapshots():
+def list_snapshots():
     """List all configuration snapshots."""
     from engines.config_manager import list_snapshots
     return {"snapshots": _clean(list_snapshots())}
 
 
 @router.post("/snapshots")
-async def create_snapshot(body: SnapshotCreate):
+def create_snapshot(body: SnapshotCreate):
     """Create a new configuration snapshot (point-in-time backup of config)."""
     from engines.config_manager import save_snapshot
     result = save_snapshot(body.name, body.description)
@@ -119,7 +119,7 @@ async def create_snapshot(body: SnapshotCreate):
 
 
 @router.get("/snapshots/{snapshot_id}")
-async def get_snapshot(snapshot_id: int):
+def get_snapshot(snapshot_id: int):
     """Get a specific snapshot with full configuration data."""
     from engines.config_manager import get_snapshot as _get
     snap = _get(snapshot_id)
@@ -129,7 +129,7 @@ async def get_snapshot(snapshot_id: int):
 
 
 @router.delete("/snapshots/{snapshot_id}")
-async def delete_snapshot(snapshot_id: int):
+def delete_snapshot(snapshot_id: int):
     """Delete a configuration snapshot."""
     from engines.config_manager import get_snapshot as _get, delete_snapshot as _del
     if not _get(snapshot_id):
@@ -139,7 +139,7 @@ async def delete_snapshot(snapshot_id: int):
 
 
 @router.get("/snapshots/{snapshot_id}/download")
-async def download_snapshot(snapshot_id: int):
+def download_snapshot(snapshot_id: int):
     """Download a snapshot as a JSON file."""
     from engines.config_manager import get_snapshot as _get
     snap = _get(snapshot_id)
@@ -157,7 +157,7 @@ async def download_snapshot(snapshot_id: int):
 # ─── Diff ─────────────────────────────────────────────────────────
 
 @router.post("/diff")
-async def diff_snapshots(body: DiffRequest):
+def diff_snapshots(body: DiffRequest):
     """Compare two configuration snapshots."""
     from engines.config_manager import get_snapshot as _get, diff_configs
     snap_a = _get(body.snapshot_a_id)
@@ -174,7 +174,7 @@ async def diff_snapshots(body: DiffRequest):
 
 
 @router.get("/diff/current/{snapshot_id}")
-async def diff_current_vs_snapshot(snapshot_id: int):
+def diff_current_vs_snapshot(snapshot_id: int):
     """Compare current configuration against a saved snapshot."""
     from engines.config_manager import get_snapshot as _get, export_config as _export, diff_configs
     snap = _get(snapshot_id)

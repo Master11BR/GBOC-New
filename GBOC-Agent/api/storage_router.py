@@ -8,21 +8,21 @@ from typing import Optional
 router = APIRouter(prefix="/api/v1/storage", tags=["Storage Monitor"])
 
 @router.get("/usage")
-async def get_current_usage():
+def get_current_usage():
     """Retorna o uso atual de todos os repositórios ativos com dados reais do sistema de arquivos."""
     from engines.storage_monitor import collect_repository_sizes
     data = collect_repository_sizes()
     return JSONResponse({"status": "success", "repositories": data})
 
 @router.get("/history")
-async def get_history(days: int = 30, repository_id: Optional[str] = None):
+def get_history(days: int = 30, repository_id: Optional[str] = None):
     """Retorna o histórico de crescimento de armazenamento (até 90 dias)."""
     from engines.storage_monitor import get_storage_history
     history = get_storage_history(repository_id=repository_id, days=min(days, 90))
     return JSONResponse({"status": "success", "history": history, "days": days})
 
 @router.get("/config")
-async def get_config():
+def get_config():
     """Retorna configuração atual de alertas de armazenamento."""
     from engines.storage_monitor import get_storage_config
     return JSONResponse({"status": "success", "config": get_storage_config()})
@@ -36,7 +36,7 @@ async def save_config(request: Request):
     return JSONResponse({"status": "success", "config": saved})
 
 @router.post("/scan")
-async def trigger_scan():
+def trigger_scan():
     """Força um scan imediato dos tamanhos de repositório."""
     from engines.storage_monitor import collect_repository_sizes
     data = collect_repository_sizes()

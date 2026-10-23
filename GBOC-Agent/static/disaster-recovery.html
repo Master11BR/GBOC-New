@@ -33,7 +33,7 @@ Copyright (c) 2026 Master11BR - Todos os direitos reservados.
             border-bottom: 2px solid var(--border);
             padding-bottom: 12px;
             margin-bottom: 24px;
-            overflow-x: auto;
+            flex-wrap: wrap;
         }
         .dr-tab-btn {
             background: var(--bg-card);
@@ -48,7 +48,8 @@ Copyright (c) 2026 Master11BR - Todos os direitos reservados.
             align-items: center;
             gap: 8px;
             transition: all 0.25s ease;
-            white-space: nowrap;
+            white-space: nowrap !important;
+            flex: 0 0 auto;
         }
         .dr-tab-btn:hover {
             color: var(--text);
@@ -497,12 +498,12 @@ Copyright (c) 2026 Master11BR - Todos os direitos reservados.
                             </p>
                         </div>
                         <div style="text-align:right;">
-                            <div style="font-size:2em; font-weight:800; color:var(--primary);" id="dr-score-val">100%</div>
+                            <div style="font-size:2em; font-weight:800; color:var(--primary);" id="dr-score-val">—</div>
                             <div style="font-size:0.75em; color:var(--text-muted); text-transform:uppercase;">Score de Conformidade</div>
                         </div>
                     </div>
                     <div style="background:var(--bg-input); height:10px; border-radius:5px; overflow:hidden; border:1px solid var(--border); margin-bottom:20px;">
-                        <div id="dr-score-fill" style="height:100%; background:linear-gradient(90deg, var(--primary), var(--success)); width:100%; transition:width 0.4s ease;"></div>
+                        <div id="dr-score-fill" style="height:100%; background:linear-gradient(90deg, var(--primary), var(--success)); width:0%; transition:width 0.4s ease;"></div>
                     </div>
                     <div id="dr-checklist-items" style="display:flex; flex-direction:column; gap:10px;">
                         <!-- Dinâmico via loadDrReadiness() -->

@@ -5,6 +5,7 @@ API de Logs - Lê do banco de dados system_logs
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from typing import Dict, Any, List, Optional
+import time
 import logging
 from datetime import datetime, timedelta
 
@@ -159,10 +160,39 @@ def get_logs(
         }
 
 
+_STATS_CACHE: Dict[Any, Any] = {}
+_STATS_TTL = 30  # s — a tela de Logs atualiza a cada 15 s; contar 400 mil+ linhas a cada vez pesava no banco
+
+# Mesma classificação do antigo CASE ... ILIKE (ordem importa: a primeira regra que casar vence)
+_MODULE_RULES = [
+    ("Backup", ("backup", "task", "engine")),
+    ("Repositório", ("repo", "storage")),
+    ("Agendamento", ("scheduler", "cron")),
+    ("API", ("api", "route")),
+    ("Sistema", ("system", "core", "shared")),
+    ("Servidor", ("server", "sync", "websocket")),
+    ("Diagnóstico", ("diagnostic", "stats", "preemptive")),
+]
+
+
+def _module_of(source: Optional[str]) -> str:
+    s = (source or "").lower()
+    if source is not None:
+        for name, keys in _MODULE_RULES:
+            if any(k in s for k in keys):
+                return name
+    return "Outro"
+
+
 @router.get("/stats")
 def get_log_stats(hours: int = Query(24, ge=0, le=87600), start: Optional[str] = None,
                         end: Optional[str] = None) -> Dict[str, Any]:
-    """Estatísticas de logs no período (hours=0 = todo o período; start/end por datas)."""
+    """Estatísticas de logs no período (hours=0 = todo o período; start/end por datas).
+    Uma única leitura agrupada por (source, level); totais por nível/fonte/módulo calculados em Python."""
+    key = (hours, start, end)
+    hit = _STATS_CACHE.get(key)
+    if hit and time.time() - hit[0] < _STATS_TTL:
+        return hit[1]
     try:
         core = get_shared_core()
         tconds, tparams = _time_conditions(hours, start, end)
@@ -170,65 +200,36 @@ def get_log_stats(hours: int = Query(24, ge=0, le=87600), start: Optional[str] =
 
         with core.get_db_connection() as conn:
             cursor = conn.cursor()
-
-            # Contar por nível
-            cursor.execute("""
-                SELECT level, COUNT(*) as count
-                FROM system_logs
-                WHERE {where}
-                GROUP BY level
-                ORDER BY count DESC
-            """.format(where=where), tparams)
-
-            by_level = {row[0]: row[1] for row in cursor.fetchall()}
-
-            # Contar por fonte
-            cursor.execute("""
-                SELECT source, COUNT(*) as count
-                FROM system_logs
-                WHERE {where}
-                GROUP BY source
-                ORDER BY count DESC
-                LIMIT 10
-            """.format(where=where), tparams)
-
-            by_source = {row[0]: row[1] for row in cursor.fetchall()}
-
-            # Contar por módulo (extrair módulo do source)
-            cursor.execute("""
-                SELECT 
-                    CASE 
-                        WHEN source ILIKE '%%backup%%' OR source ILIKE '%%task%%' OR source ILIKE '%%engine%%' THEN 'Backup'
-                        WHEN source ILIKE '%%repo%%' OR source ILIKE '%%storage%%' THEN 'Repositório'
-                        WHEN source ILIKE '%%scheduler%%' OR source ILIKE '%%cron%%' THEN 'Agendamento'
-                        WHEN source ILIKE '%%api%%' OR source ILIKE '%%route%%' THEN 'API'
-                        WHEN source ILIKE '%%system%%' OR source ILIKE '%%core%%' OR source ILIKE '%%shared%%' THEN 'Sistema'
-                        WHEN source ILIKE '%%server%%' OR source ILIKE '%%sync%%' OR source ILIKE '%%websocket%%' THEN 'Servidor'
-                        WHEN source ILIKE '%%diagnostic%%' OR source ILIKE '%%stats%%' OR source ILIKE '%%preemptive%%' THEN 'Diagnóstico'
-                        ELSE 'Outro'
-                    END as module,
-                    COUNT(*) as count
-                FROM system_logs
-                WHERE {where}
-                GROUP BY module
-                ORDER BY count DESC
-            """.format(where=where), tparams)
-
-            by_module = {row[0]: row[1] for row in cursor.fetchall()}
-
+            cursor.execute(f"SELECT source, level, COUNT(*) FROM system_logs WHERE {where} GROUP BY source, level", tparams)
+            rows = cursor.fetchall()
             cursor.execute(f"SELECT MIN(timestamp), MAX(timestamp) FROM system_logs WHERE {where}", tparams)
             oldest, newest = cursor.fetchone()
 
-            return {
-                "status": "success",
-                "period_hours": hours,
-                "oldest": str(oldest) if oldest else None,
-                "newest": str(newest) if newest else None,
-                "by_level": by_level,
-                "by_source": by_source,
-                "by_module": by_module,
-                "total": sum(by_level.values())
-            }
+        lv, src, mod = {}, {}, {}
+        for source, level, cnt in rows:
+            cnt = int(cnt)
+            lv[level] = lv.get(level, 0) + cnt
+            src[source] = src.get(source, 0) + cnt
+            m = _module_of(source)
+            mod[m] = mod.get(m, 0) + cnt
+        by_level = dict(sorted(lv.items(), key=lambda x: -x[1]))
+        by_source = dict(sorted(src.items(), key=lambda x: -x[1])[:10])
+        by_module = dict(sorted(mod.items(), key=lambda x: -x[1]))
+
+        result = {
+            "status": "success",
+            "period_hours": hours,
+            "oldest": str(oldest) if oldest else None,
+            "newest": str(newest) if newest else None,
+            "by_level": by_level,
+            "by_source": by_source,
+            "by_module": by_module,
+            "total": sum(by_level.values())
+        }
+        if len(_STATS_CACHE) > 64:
+            _STATS_CACHE.clear()
+        _STATS_CACHE[key] = (time.time(), result)
+        return result
 
     except Exception as e:
         logger.error(f"Erro ao buscar estatísticas: {e}")
@@ -236,7 +237,7 @@ def get_log_stats(hours: int = Query(24, ge=0, le=87600), start: Optional[str] =
 
 
 @router.get("/modules")
-async def get_log_modules() -> Dict[str, Any]:
+def get_log_modules() -> Dict[str, Any]:
     """Lista módulos disponíveis para filtro"""
     return {
         "status": "success",
@@ -260,6 +261,7 @@ def clear_old_logs(days: int = Query(30, ge=1, le=365)) -> Dict[str, Any]:
     Args:
         days: Manter apenas logs dos últimos N dias
     """
+    _STATS_CACHE.clear()  # totais mudam ao limpar
     try:
         core = get_shared_core()
 
@@ -373,6 +375,7 @@ async def put_retention(request: Request) -> Dict[str, Any]:
 
 @router.post("/cleanup")
 async def cleanup_now() -> Dict[str, Any]:
+    _STATS_CACHE.clear()  # totais mudam ao limpar
     import asyncio
     res = await asyncio.to_thread(apply_retention)
     return {"status": "success", **res}

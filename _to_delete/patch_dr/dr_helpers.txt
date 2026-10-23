@@ -1,0 +1,71 @@
+    # ------------------------------------------------------------------
+    # Utilitarios reais (sem simulacao): execucao, status e verificacao
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _console_encoding() -> str:
+        """Ferramentas de console do Windows (reg, ntdsutil, dism) escrevem na pagina OEM (ex.: cp850)."""
+        if sys.platform == "win32":
+            try:
+                import ctypes
+                return f"cp{ctypes.windll.kernel32.GetOEMCP()}"
+            except Exception:
+                pass
+        return "utf-8"
+
+    def _run_console(self, cmd: List[str], timeout: int):
+        """Executa a ferramenta e devolve (codigo_de_saida, saida_decodificada)."""
+        res = subprocess.run(cmd, capture_output=True, timeout=timeout)
+        enc = self._console_encoding()
+        out = (res.stdout or b"").decode(enc, errors="replace")
+        err = (res.stderr or b"").decode(enc, errors="replace")
+        return res.returncode, (out + ("\n" + err if err.strip() else "")).strip()
+
+    @staticmethod
+    def _is_admin() -> bool:
+        if sys.platform != "win32":
+            return hasattr(os, "geteuid") and os.geteuid() == 0
+        try:
+            import ctypes
+            return bool(ctypes.windll.shell32.IsUserAnAdmin())
+        except Exception:
+            return False
+
+    @staticmethod
+    def _fmt_size(n: int) -> str:
+        for unit in ("B", "KB", "MB", "GB", "TB"):
+            if n < 1024 or unit == "TB":
+                return f"{n:.1f} {unit}" if unit != "B" else f"{n} B"
+            n /= 1024.0
+        return f"{n:.1f} TB"
+
+    @staticmethod
+    def _sha256(path: str, chunk: int = 4 * 1024 * 1024) -> str:
+        import hashlib
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            for block in iter(lambda: f.read(chunk), b""):
+                h.update(block)
+        return h.hexdigest()
+
+    def _set_progress(self, job_id: str, pct: int):
+        with self.lock:
+            if job_id in self.active_jobs:
+                self.active_jobs[job_id]["progress"] = pct
+
+    def _is_cancelled(self, job_id: str) -> bool:
+        with self.lock:
+            return self.active_jobs.get(job_id, {}).get("status") == "cancelled"
+
+    def _finish_job(self, job_id: str, status: str, error: Optional[str] = None):
+        """Fecha o job com o status real; nunca sobrescreve um cancelamento do operador."""
+        with self.lock:
+            job = self.active_jobs.get(job_id)
+            if not job or job.get("status") == "cancelled":
+                return
+            job["status"] = status
+            if status in ("completed", "partial"):
+                job["progress"] = 100
+            job["completed_at"] = datetime.now().isoformat()
+            if error:
+                job["error"] = error
+

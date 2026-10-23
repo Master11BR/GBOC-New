@@ -357,7 +357,7 @@ def reset_category_settings(category: str) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/schema")
-async def get_settings_schema() -> Dict[str, Any]:
+def get_settings_schema() -> Dict[str, Any]:
     """Obtém esquema das configurações disponíveis"""
     try:
         defaults = _get_default_settings()

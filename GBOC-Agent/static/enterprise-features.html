@@ -176,12 +176,12 @@ Copyright (c) 2026 Master11BR - Todos os direitos reservados.
                     <div class="ent-hud-card">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                             <h3 style="font-size:1.05em; margin:0; display:flex; align-items:center; gap:8px;">
-                                <i class="fas fa-memory" style="color:#38b2ac"></i> SAP HANA (Backint)
+                                <i class="fas fa-memory" style="color:#38b2ac"></i> SAP HANA (hdbsql)
                             </h3>
                             <span id="sap-status-badge" class="badge badge-secondary">Verificando...</span>
                         </div>
                         <p style="font-size:0.8em; color:var(--text-muted); margin-bottom:14px;">
-                            Conector via interface Backint API e hdbsql para backup em streaming de dados colunares in-memory e redo logs.
+                            Backup completo do tenant via hdbsql (BACKUP DATA USING FILE) gravado na pasta de destino do Agente.
                         </p>
                         <div class="form-group" style="margin-bottom:10px;">
                             <label style="font-size:0.8em; font-weight:600; display:block; margin-bottom:4px;">Instância SAP HANA</label>
@@ -192,7 +192,7 @@ Copyright (c) 2026 Master11BR - Todos os direitos reservados.
                             <input type="text" id="saphana-tenant-input" class="form-control" value="SYSTEMDB" style="width:100%; padding:8px; border-radius:6px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
                         </div>
                         <button class="btn btn-success" onclick="startSapHanaAction()" style="width:100%; padding:10px; font-weight:700; margin-top:8px;">
-                            <i class="fas fa-play"></i> Disparar SAP Backint
+                            <i class="fas fa-play"></i> Disparar Backup SAP HANA
                         </button>
                     </div>
 
@@ -224,16 +224,16 @@ Copyright (c) 2026 Master11BR - Todos os direitos reservados.
                     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:16px;">
                         <div>
                             <h3 style="font-size:1.15em; margin:0; display:flex; align-items:center; gap:8px;">
-                                <i class="fas fa-satellite-dish" style="color:var(--primary)"></i> Continuous Data Protection (CDP - RPO &lt; 15s)
+                                <i class="fas fa-satellite-dish" style="color:var(--primary)"></i> Continuous Data Protection (CDP)
                             </h3>
                             <p style="font-size:0.82em; color:var(--text-muted); margin:4px 0 0 0;">
-                                Micro-journaling contínuo de deltas de I/O em nível de bloco. Permite restaurar o estado de arquivos e bancos para qualquer segundo do dia.
+                                Captura contínua de alterações (journaling de I/O) para restauração em qualquer ponto do tempo. Disponibilidade conforme o status ao lado.
                             </p>
                         </div>
                         <div style="display:flex; align-items:center; gap:14px;">
                             <div style="text-align:right;">
-                                <div style="font-size:1.6em; font-weight:800; color:var(--success);" id="cdp-rpo-val">8s</div>
-                                <div style="font-size:0.7em; color:var(--text-muted); text-transform:uppercase;">RPO em Tempo Real</div>
+                                <div style="font-size:1.6em; font-weight:800; color:var(--success);" id="cdp-rpo-val">—</div>
+                                <div style="font-size:0.7em; color:var(--text-muted); text-transform:uppercase;">RPO medido</div>
                             </div>
                             <span id="cdp-state-badge" class="badge badge-success"><i class="fas fa-check-circle"></i> CDP Ativo</span>
                             <button id="cdp-toggle-btn" class="btn btn-warning" onclick="toggleCdpDaemon()">
@@ -318,13 +318,13 @@ Copyright (c) 2026 Master11BR - Todos os direitos reservados.
                     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:16px;">
                         <div>
                             <h3 style="font-size:1.15em; margin:0; display:flex; align-items:center; gap:8px;">
-                                <i class="fas fa-award" style="color:#ecc94b"></i> Certificado de Conformidade Regulatória Internacional
+                                <i class="fas fa-award" style="color:#ecc94b"></i> Autoavaliação de Conformidade (ISO 27001, SOC 2, HIPAA, LGPD, PCI-DSS)
                             </h3>
                             <p style="font-size:0.82em; color:var(--text-muted); margin:4px 0 0 0;">
-                                Prova pericial criptográfica de imutabilidade e resiliência de dados para auditorias formais (SOX, BACEN, ISO 27001, SOC 2, HIPAA, LGPD).
+                                Controles de backup verificados nos dados reais deste Agente, com evidências e hash SHA-256 do laudo. Não substitui certificação por auditoria independente.
                             </p>
                         </div>
-                        <span class="badge badge-success" style="font-size:0.85em; padding:8px 14px;"><i class="fas fa-check-double"></i> 100% COMPLIANT</span>
+                        <span class="badge badge-secondary" id="cert-overall-badge" style="font-size:0.85em; padding:8px 14px;"><i class="fas fa-spinner fa-spin"></i> Avaliando...</span>
                     </div>
 
                     <div style="background:var(--bg-input); padding:16px; border-radius:10px; border:1px solid var(--border); margin-bottom:20px;">

@@ -394,7 +394,7 @@ class HyperVHypervisorEngine:
         """
         ps_snap = f"""
             $ErrorActionPreference = 'Stop'
-            $vm = Get-VM -Name '{vm_name}'
+            $vm = Get-VM -Name $env:GBOC_VM_NAME
             $snap = Checkpoint-VM -VM $vm -SnapshotType Production -Passthru
             [PSCustomObject]@{{
                 Status = 'success'
@@ -406,7 +406,7 @@ class HyperVHypervisorEngine:
         try:
             res = subprocess.run(
                 ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_snap],
-                capture_output=True, text=True, timeout=30
+                capture_output=True, text=True, timeout=120, env=dict(os.environ, GBOC_VM_NAME=str(vm_name or ""))
             )
             if res.returncode == 0 and res.stdout.strip():
                 data = json.loads(res.stdout.strip())

@@ -324,7 +324,7 @@ def get_process_uptime() -> dict:
         }
     except Exception as e:
         logger.warning(f"[REPORTS] psutil.Process falhou: {e}")
-        return {"pid": os.getpid(), "uptime_hours": 24, "uptime_str": "24h 0m", "memory_mb": 45.0, "status": "running"}
+        return {"pid": os.getpid(), "uptime_hours": None, "uptime_str": "—", "memory_mb": None, "status": f"erro ao ler o processo: {str(e)[:120]}"}
 
 
 def collect_health_from_analyzer() -> dict:

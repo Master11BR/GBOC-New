@@ -155,14 +155,40 @@ class SaaSProtectionEngine:
         return self.base_saas_dir / "saas_config.json"
 
     def load_config(self) -> Dict[str, Any]:
+        """Lê a configuração SaaS. O Client Secret do M365 fica CIFRADO no disco (client_secret_enc);
+        em memória é devolvido em client_secret. Arquivo antigo com o segredo em texto puro é migrado."""
         cfg_file = self._get_config_file()
         if cfg_file.exists():
             try:
                 with open(cfg_file, "r", encoding="utf-8") as f:
-                    return json.load(f)
+                    cfg = json.load(f)
             except Exception as e:
                 logger.warning(f"[SaaS] Erro ao ler saas_config.json: {e}")
+                return {}
+            m = cfg.get("microsoft_365") or {}
+            if m.get("client_secret") and not m.get("client_secret_enc"):
+                self._write_config(cfg)          # migra o segredo em texto puro para cifrado
+            elif m.get("client_secret_enc"):
+                try:
+                    from engines import repo_secrets
+                    m["client_secret"] = repo_secrets.decrypt(m["client_secret_enc"]) or ""
+                except Exception as e:
+                    logger.warning(f"[SaaS] Client Secret M365 não pôde ser decifrado: {e}")
+                    m["client_secret"] = ""
+            return cfg
         return {}
+
+    def _write_config(self, cfg: Dict[str, Any]) -> None:
+        """Grava saas_config.json sem segredo em texto puro."""
+        import copy
+        out = copy.deepcopy(cfg)
+        m = out.get("microsoft_365") or {}
+        plain = m.pop("client_secret", None)
+        if plain:
+            from engines import repo_secrets
+            m["client_secret_enc"] = repo_secrets.encrypt(plain)
+        with open(self._get_config_file(), "w", encoding="utf-8") as f:
+            json.dump(out, f, indent=2)
 
     def save_m365_credentials(
         self,
@@ -184,8 +210,8 @@ class SaaSProtectionEngine:
             "verified_domains": test_res.get("verified_domains", []),
             "updated_at": datetime.now().isoformat()
         }
-        with open(self._get_config_file(), "w", encoding="utf-8") as f:
-            json.dump(cfg, f, indent=2)
+        cfg["microsoft_365"].pop("client_secret_enc", None)   # novo segredo substitui o anterior
+        self._write_config(cfg)
 
         return {
             "status": "success",

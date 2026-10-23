@@ -309,6 +309,7 @@ function Get-GbocWheelDir([string]$Exe) {
 
 function Install-GbocPipRequirements([string]$Exe, [string]$Req, [switch]$UpgradePip) {
     <# pip install -r: primeiro so com as wheels do pacote (sem internet); se faltar algo, completa online. #>
+    $env:PYYAML_FORCE_LIBYAML = "0"   # PyYAML sem wheel (ex.: Python 3.15): monta em Python puro, sem exigir compilador C++
     $ErrorActionPreference = "Continue"     # avisos do pip no stderr nao podem abortar o instalador
     $wd = Get-GbocWheelDir $Exe
     $optReq = if ($Req) { Join-Path (Split-Path $Req) "requirements-optional.txt" } else { "" }

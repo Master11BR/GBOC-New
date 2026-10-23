@@ -310,7 +310,15 @@ def calculate_health_score_auto() -> Dict[str, Any]:
             # Repositórios
             cur.execute("SELECT COUNT(*) FROM repositories")
             total_repos = cur.fetchone()[0] or 0
-            active_repos = total_repos  # Todos são considerados ativos por padrão
+            # Ativos de verdade: habilitados e sem estado de erro (antes: todos contados como ativos -> 100% sempre)
+            try:
+                cur.execute("""SELECT COUNT(*) FROM repositories
+                               WHERE COALESCE(enabled, TRUE)
+                                 AND LOWER(COALESCE(status, 'active')) NOT IN ('error', 'failed', 'inactive', 'disabled', 'offline')""")
+                active_repos = cur.fetchone()[0] or 0
+            except Exception:
+                conn.rollback()
+                active_repos = total_repos
 
             # Tarefas
             cur.execute("SELECT COUNT(*) FROM tasks WHERE enabled = true")

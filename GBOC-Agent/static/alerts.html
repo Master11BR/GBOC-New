@@ -445,7 +445,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         const configObj=type==='email'?{to_email:configVal}:type==='telegram'?{chat_id:configVal}:{url:configVal};
         try{
             const r=await fetch('/api/notification-channels',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,channel_type:type,config:configObj})});
-            if(!r.ok){const d=await r.json();alert('Erro: '+(d.detail||'Desconhecido'));return}
+            if(!r.ok){const d=await r.json();alert('Erro: '+(d.detail||('HTTP '+r.status)));return}
             loadAll();
         }catch(e){alert('Erro: '+e.message)}
     }

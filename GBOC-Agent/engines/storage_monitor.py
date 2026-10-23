@@ -238,6 +238,10 @@ def collect_repository_sizes() -> List[Dict[str, Any]]:
             src_bytes = int(meta.get("SourceFilesSize") or item.get("source_size") or 0)
             tgt_bytes = int(meta.get("TargetFilesSize") or item.get("target_size") or 0)
             target_url = str(b_obj.get("TargetURL") or item.get("target_url") or "")
+            # Mesmo destino de um repositorio ja cadastrado = mesmo backup (nao somar duas vezes)
+            tgt_base = target_url.split("?")[0].rstrip("/").lower()
+            if tgt_base and any((r.get("path") or "").split("?")[0].rstrip("/").lower() == tgt_base for r in results):
+                continue
             
             dest_type = "Destino Remoto"
             if "wasabi" in target_url.lower():
@@ -276,35 +280,8 @@ def collect_repository_sizes() -> List[Dict[str, Any]]:
     except Exception as e_dup:
         logger.warning(f"[StorageMonitor] Descoberta de backups do Duplicati ignorada: {e_dup}")
 
-    # 3. Descoberta Automática de Discos do Sistema para o Motor Nativo (Se nenhum outro for encontrado)
-    try:
-        import psutil
-        for part in psutil.disk_partitions(all=False):
-            mount = part.mountpoint
-            if any(r.get("path") == mount for r in results):
-                continue
-            try:
-                usage = shutil.disk_usage(mount)
-                results.append({
-                    "repository_id": f"disk_{part.device.replace(':', '').replace('\\\\', '').replace('/', '')}",
-                    "repository_name": f"Volume Nativo ({part.device})",
-                    "engine": "native",
-                    "path": mount,
-                    "size_bytes": usage.used,
-                    "size_gb": round(usage.used / (1024 ** 3), 3),
-                    "local_bytes": usage.used,
-                    "local_gb": round(usage.used / (1024 ** 3), 3),
-                    "destination_type": "Volume Local",
-                    "destination_path": mount,
-                    "destination_bytes": usage.used,
-                    "destination_gb": round(usage.used / (1024 ** 3), 3),
-                    "snapshot_count": 1,
-                    "recorded_at": datetime.now().isoformat()
-                })
-            except Exception:
-                pass
-    except Exception:
-        pass
+    # (Removido: volumes inteiros do servidor eram listados como 'repositórios do Motor Nativo',
+    #  somando o espaço usado do disco como se fosse backup. Só entram repositórios e jobs reais.)
 
     # Persistir entradas reais no histórico
     for entry in results:
@@ -319,8 +296,6 @@ def collect_repository_sizes() -> List[Dict[str, Any]]:
                 conn.commit()
         except Exception:
             pass
-
-    return results
 
     return results
 

@@ -13,7 +13,7 @@ logger = logging.getLogger("gboc_agent_config")
 router = APIRouter(prefix="/api/v1/agent/config", tags=["Agent Config"])
 
 @router.get("")
-async def get_agent_config():
+def get_agent_config():
     """Retorna as configurações locais do agente."""
     return {
         "status": "success",

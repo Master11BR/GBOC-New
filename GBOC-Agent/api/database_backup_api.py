@@ -58,20 +58,20 @@ class ConnectionUpdate(BaseModel):
 # ─── Connections ───────────────────────────────────────────────────
 
 @router.get("/connections")
-async def list_connections():
+def list_connections():
     from engines.database_backup import list_connections
     return {"connections": _clean(list_connections())}
 
 
 @router.post("/connections")
-async def create_connection(body: ConnectionCreate):
+def create_connection(body: ConnectionCreate):
     from engines.database_backup import create_connection
     result = create_connection(body.dict())
     return {"connection": _clean(result)}
 
 
 @router.put("/connections/{conn_id}")
-async def update_connection(conn_id: int, body: ConnectionUpdate):
+def update_connection(conn_id: int, body: ConnectionUpdate):
     from engines.database_backup import get_connection, update_connection
     existing = get_connection(conn_id)
     if not existing:
@@ -82,14 +82,14 @@ async def update_connection(conn_id: int, body: ConnectionUpdate):
 
 
 @router.delete("/connections/{conn_id}")
-async def delete_connection(conn_id: int):
+def delete_connection(conn_id: int):
     from engines.database_backup import delete_connection
     delete_connection(conn_id)
     return {"deleted": True}
 
 
 @router.post("/connections/{conn_id}/test")
-async def test_connection(conn_id: int):
+def test_connection(conn_id: int):
     from engines.database_backup import test_connection
     return _clean(test_connection(conn_id))
 
@@ -97,7 +97,7 @@ async def test_connection(conn_id: int):
 # ─── Backup Operations ────────────────────────────────────────────
 
 @router.post("/connections/{conn_id}/backup")
-async def trigger_backup(conn_id: int, output_dir: Optional[str] = None):
+def trigger_backup(conn_id: int, output_dir: Optional[str] = None):
     from engines.database_backup import run_database_backup
     result = run_database_backup(conn_id, output_dir)
     if not result.get('success'):
@@ -106,13 +106,13 @@ async def trigger_backup(conn_id: int, output_dir: Optional[str] = None):
 
 
 @router.get("/backups")
-async def list_backups(connection_id: Optional[int] = None, limit: int = 50):
+def list_backups(connection_id: Optional[int] = None, limit: int = 50):
     from engines.database_backup import list_backups
     return {"backups": _clean(list_backups(connection_id, limit))}
 
 
 @router.delete("/backups/{backup_id}")
-async def delete_backup(backup_id: int):
+def delete_backup(backup_id: int):
     from engines.database_backup import delete_backup
     return delete_backup(backup_id)
 
@@ -120,7 +120,7 @@ async def delete_backup(backup_id: int):
 # ─── Restore Operations ───────────────────────────────────────────
 
 @router.post("/backups/{backup_id}/restore")
-async def restore_backup(backup_id: int, target_conn_id: Optional[int] = None):
+def restore_backup(backup_id: int, target_conn_id: Optional[int] = None):
     from engines.database_backup import restore_database
     result = restore_database(backup_id, target_conn_id)
     if not result.get('success'):
@@ -129,7 +129,7 @@ async def restore_backup(backup_id: int, target_conn_id: Optional[int] = None):
 
 
 @router.post("/backups/{backup_id}/test-restore")
-async def test_restore(backup_id: int):
+def test_restore(backup_id: int):
     from engines.database_backup import test_restore
     result = test_restore(backup_id)
     return _clean(result)
@@ -142,7 +142,7 @@ class ReplicateRequest(BaseModel):
 
 
 @router.post("/backups/{backup_id}/replicate")
-async def replicate_backup(backup_id: int, body: ReplicateRequest):
+def replicate_backup(backup_id: int, body: ReplicateRequest):
     from engines.database_backup import replicate_backup
     result = replicate_backup(backup_id, body.target_dir)
     if not result.get('success'):
@@ -153,7 +153,7 @@ async def replicate_backup(backup_id: int, body: ReplicateRequest):
 # ─── Statistics ────────────────────────────────────────────────────
 
 @router.get("/statistics")
-async def backup_statistics():
+def backup_statistics():
     from engines.database_backup import _query
     total = _query("SELECT count(*) as cnt FROM database_backups")[0]['cnt']
     ok = _query("SELECT count(*) as cnt FROM database_backups WHERE status='completed'")[0]['cnt']

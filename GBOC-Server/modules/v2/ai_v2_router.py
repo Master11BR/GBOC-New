@@ -90,7 +90,7 @@ async def server_chat_ai_v2(body: ServerQueryRequestV2, request: Request):
 
 
 @router.get("/config")
-async def get_server_ai_config_v2(request: Request):
+def get_server_ai_config_v2(request: Request):
     """Retorna configuração de IA do servidor central (chaves mascaradas)."""
     t0 = time.perf_counter()
     _require_auth(request)
@@ -98,7 +98,7 @@ async def get_server_ai_config_v2(request: Request):
 
 
 @router.post("/config")
-async def update_server_ai_config_v2(body: ServerConfigRequestV2, request: Request):
+def update_server_ai_config_v2(body: ServerConfigRequestV2, request: Request):
     """Atualiza as configurações de IA do Servidor Central (somente administradores)."""
     t0 = time.perf_counter()
     _require_admin(request)

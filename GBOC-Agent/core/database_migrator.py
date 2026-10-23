@@ -59,6 +59,32 @@ def _missing_column_statements(create_sql):
     return out
 
 
+_ADD_COL_RE = _re.compile(r'^\s*ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:ONLY\s+)?"?(\w+)"?\s+ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+"?(\w+)"?', _re.I)
+
+
+def column_already_exists(cur, sql, cache) -> bool:
+    """True se o comando é "ALTER TABLE t ADD COLUMN IF NOT EXISTS c" e a coluna JÁ existe.
+    O PostgreSQL pede trava ACCESS EXCLUSIVE na tabela antes de ver que a coluna existe: a cada inicialização
+    o Agente travava tasks/repositories/... e esperava qualquer transação aberta de outro processo (Agendador,
+    tela) — a subida podia ficar minutos parada. Consultar information_schema não trava nada.
+    Em qualquer dúvida (SQLite, erro, vários ADD no mesmo comando) devolve False e o comando roda como antes."""
+    try:
+        m = _ADD_COL_RE.match(sql or "")
+        if not m or (sql or "").upper().count(" ADD ") > 1:
+            return False
+        table, col = m.group(1).lower(), m.group(2).lower()
+        if table not in cache:
+            cur.execute("SELECT column_name FROM information_schema.columns "
+                        "WHERE table_schema = current_schema() AND table_name = %s", (table,))
+            cache[table] = {(r["column_name"] if isinstance(r, dict) else r[0]).lower() for r in cur.fetchall()}
+        if col in cache[table]:
+            return True
+        cache[table].add(col)
+        return False
+    except Exception:
+        return False
+
+
 class _SafeMigrationCursor:
     """Executa cada comando da migração no seu próprio SAVEPOINT.
     Antes, uma falha qualquer (ex.: CREATE INDEX numa coluna que a base antiga não tem) abortava a transação
@@ -73,10 +99,15 @@ class _SafeMigrationCursor:
         self._rows = None
         self.rowcount = -1
         self._explicit = 0   # savepoints abertos pelo próprio código da migração
+        self._cols = {}      # cache de colunas existentes (evita ALTER/trava exclusiva desnecessários)
 
     def execute(self, sql, params=None):
         head = sql.lstrip().upper()
         self._rows = None
+        if params is None and head.startswith('ALTER') and column_already_exists(self._cur, sql, self._cols):
+            self._ok = True
+            self.rowcount = 0
+            return None
         if head.startswith(('SAVEPOINT', 'RELEASE', 'ROLLBACK')):
             self._ok = True
             if head.startswith('SAVEPOINT'):
@@ -107,6 +138,8 @@ class _SafeMigrationCursor:
         self._cur.execute(f"RELEASE SAVEPOINT {sp}")
         if self._ok:
             for stmt in _missing_column_statements(sql):
+                if column_already_exists(self._cur, stmt, self._cols):
+                    continue
                 self._n += 1
                 sp2 = f"gboc_mig_{self._n}"
                 self._cur.execute(f"SAVEPOINT {sp2}")

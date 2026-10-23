@@ -1,0 +1,211 @@
+{
+  "version": "14.8.2",
+  "timestamp": "2026-10-22T21:50:07.272005",
+  "system_info": {
+    "platform": "Windows",
+    "platform_release": "2025Server",
+    "platform_version": "10.0.26100",
+    "architecture": "AMD64",
+    "hostname": "Servidor-2025",
+    "processor": "AMD64 Family 23 Model 17 Stepping 0, AuthenticAMD",
+    "cpu_count": 8,
+    "cpu_percent": 33.9,
+    "memory_total_gb": 21.91,
+    "memory_used_gb": 12.02,
+    "memory_percent": 54.9,
+    "disk_total_gb": 931.51,
+    "disk_used_gb": 313.39,
+    "disk_percent": 33.6,
+    "python_version": "3.15.0",
+    "status": "OK"
+  },
+  "agent_status": {
+    "installed": false,
+    "version": null,
+    "database": null,
+    "config": null,
+    "engines": [],
+    "issues": [
+      "Agent not installed"
+    ]
+  },
+  "server_status": {
+    "installed": false,
+    "version": null,
+    "database_config": null,
+    "issues": [
+      "Server not installed"
+    ]
+  },
+  "database_status": {
+    "agent_db": {
+      "status": "NOT_FOUND"
+    },
+    "server_db": {
+      "type": "PostgreSQL",
+      "status": "Not checked (remote)"
+    },
+    "issues": []
+  },
+  "file_structure": {
+    "agent": {
+      "root": "D:\\GBOC-New\\GBOC-New\\GBOC-Agent\\utils",
+      "directories": {
+        "data": {
+          "exists": true,
+          "path": "D:\\GBOC-New\\GBOC-New\\GBOC-Agent\\utils\\data"
+        },
+        "logs": {
+          "exists": true,
+          "path": "D:\\GBOC-New\\GBOC-New\\GBOC-Agent\\utils\\logs"
+        },
+        "static": {
+          "exists": true,
+          "path": "D:\\GBOC-New\\GBOC-New\\GBOC-Agent\\utils\\static"
+        },
+        "api": {
+          "exists": true,
+          "path": "D:\\GBOC-New\\GBOC-New\\GBOC-Agent\\utils\\api"
+        },
+        "engines": {
+          "exists": true,
+          "path": "D:\\GBOC-New\\GBOC-New\\GBOC-Agent\\utils\\engines"
+        },
+        "storage_backends": {
+          "exists": false,
+          "path": "D:\\GBOC-New\\GBOC-New\\GBOC-Agent\\utils\\storage_backends"
+        }
+      },
+      "critical_files": {
+        "agent_server.py": {
+          "exists": false,
+          "path": "D:\\GBOC-New\\GBOC-New\\GBOC-Agent\\utils\\agent_server.py"
+        },
+        "start_server.py": {
+          "exists": false,
+          "path": "D:\\GBOC-New\\GBOC-New\\GBOC-Agent\\utils\\start_server.py"
+        },
+        "models.py": {
+          "exists": false,
+          "path": "D:\\GBOC-New\\GBOC-New\\GBOC-Agent\\utils\\models.py"
+        },
+        "shared_core.py": {
+          "exists": false,
+          "path": "D:\\GBOC-New\\GBOC-New\\GBOC-Agent\\utils\\shared_core.py"
+        },
+        "server_client.py": {
+          "exists": false,
+          "path": "D:\\GBOC-New\\GBOC-New\\GBOC-Agent\\utils\\server_client.py"
+        },
+        "server_config.py": {
+          "exists": false,
+          "path": "D:\\GBOC-New\\GBOC-New\\GBOC-Agent\\utils\\server_config.py"
+        }
+      }
+    },
+    "server": {
+      "root": "D:\\GBOC-New\\GBOC-New\\GBOC-Agent\\GBOC-Server",
+      "critical_files": {
+        "gboc_server.py": {
+          "exists": false,
+          "path": "D:\\GBOC-New\\GBOC-New\\GBOC-Agent\\GBOC-Server\\gboc_server.py"
+        }
+      }
+    }
+  },
+  "orphan_files": [
+    {
+      "file": "copyright_injector.py",
+      "size_kb": 0.0,
+      "modified": "2026-08-03T21:48:48.595874",
+      "type": "python_module"
+    },
+    {
+      "file": "get_health_report.py",
+      "size_kb": 1.58,
+      "modified": "2026-08-03T22:37:43.051532",
+      "type": "python_module"
+    },
+    {
+      "file": "kill_port.py",
+      "size_kb": 2.08,
+      "modified": "2026-10-20T20:09:31.136577",
+      "type": "python_module"
+    },
+    {
+      "file": "run_complete_diagnostic.py",
+      "size_kb": 5.94,
+      "modified": "2026-10-20T20:09:31.148835",
+      "type": "python_module"
+    },
+    {
+      "file": "ssl_manager.py",
+      "size_kb": 0.0,
+      "modified": "2026-08-03T21:48:48.598877",
+      "type": "python_module"
+    },
+    {
+      "file": "tls_cert.py",
+      "size_kb": 4.16,
+      "modified": "2026-08-03T22:37:43.054532",
+      "type": "python_module"
+    }
+  ],
+  "version_consistency": {
+    "target_version": "14.8.2",
+    "agent_version": null,
+    "server_version": null,
+    "mismatches": []
+  },
+  "performance": {
+    "recommendations": [],
+    "metrics": {
+      "cpu_percent": 33.9,
+      "memory_percent": 54.9,
+      "memory_available_gb": 9.89
+    },
+    "duplicati_inspired_improvements": [
+      "Add compression support (like Duplicati's)",
+      "Implement deduplication for storage optimization",
+      "Add encryption for backup data",
+      "Implement incremental backups",
+      "Add backup verification system",
+      "Implement auto-throttling for network operations",
+      "Add retention policies for old backups",
+      "Implement backup chain management"
+    ]
+  },
+  "issues": [
+    "Agent server not found",
+    "Central server not found",
+    "Agent database not found",
+    "Directory missing: storage_backends",
+    "Critical file missing: agent_server.py",
+    "Critical file missing: start_server.py",
+    "Critical file missing: models.py",
+    "Critical file missing: shared_core.py",
+    "Critical file missing: server_client.py",
+    "Critical file missing: server_config.py"
+  ],
+  "warnings": [
+    "Agent version: None (should be 14.8.2)",
+    "Server version: None (should be 14.8.2)"
+  ],
+  "improvements": [
+    "Consider integrating: copyright_injector.py",
+    "Consider integrating: get_health_report.py",
+    "Consider integrating: kill_port.py",
+    "Consider integrating: run_complete_diagnostic.py",
+    "Consider integrating: ssl_manager.py",
+    "Consider integrating: tls_cert.py",
+    "Feature: Add compression support (like Duplicati's)",
+    "Feature: Implement deduplication for storage optimization",
+    "Feature: Add encryption for backup data",
+    "Feature: Implement incremental backups",
+    "Feature: Add backup verification system",
+    "Feature: Implement auto-throttling for network operations",
+    "Feature: Add retention policies for old backups",
+    "Feature: Implement backup chain management"
+  ],
+  "auto_fixes": []
+}

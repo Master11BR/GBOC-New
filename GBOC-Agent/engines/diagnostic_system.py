@@ -436,10 +436,11 @@ class DiagnosticSystem:
             
         except Exception as e:
             logger.warning(f"Erro no cálculo de health detalhado: {e}")
+            # Sem nota inventada quando o calculo falha
             return {
-                "score": 75,
-                "breakdown": {"cpu": 75, "memory": 75, "storage": 75, "engines": 75},
-                "warnings": ["Error calculating detailed health"],
+                "score": None,
+                "breakdown": {"cpu": None, "memory": None, "storage": None, "engines": None},
+                "warnings": [f"Não foi possível calcular a saúde: {e}"],
                 "recommendations": ["System check recommended"]
             }
 

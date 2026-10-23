@@ -76,7 +76,7 @@ def _get_agent_telemetry():
     }
 
 @router.get("/ui-config")
-async def get_agent_ui_config_v2(request: Request):
+def get_agent_ui_config_v2(request: Request):
     """Retorna a configuração oficial estrita do Modelo UI/UX Moderno (API v2)."""
     t0 = time.perf_counter()
     ui_data = {
@@ -93,7 +93,7 @@ async def get_agent_ui_config_v2(request: Request):
     return build_v2_response(data=ui_data, execution_time_ms=elapsed)
 
 @router.get("/version")
-async def get_agent_version_v2():
+def get_agent_version_v2():
     """Retorna metadados completos de versão SemVer 2.0 do Agente."""
     t0 = time.perf_counter()
     try:
@@ -106,7 +106,7 @@ async def get_agent_version_v2():
     return build_v2_response(data=v_info, execution_time_ms=elapsed)
 
 @router.get("/info")
-async def get_agent_info_v2():
+def get_agent_info_v2():
     """Retorna a telemetria completa de hardware e ambiente operacional do agente."""
     t0 = time.perf_counter()
     telemetry = _get_agent_telemetry()

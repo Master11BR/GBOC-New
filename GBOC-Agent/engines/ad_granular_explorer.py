@@ -6,6 +6,7 @@
 
 import os
 import sys
+import re
 import json
 import logging
 import subprocess
@@ -28,9 +29,13 @@ class ActiveDirectoryGranularExplorer:
         Lista objetos do Active Directory a partir do domínio atual ou snapshot offline.
         """
         objects = []
+        # Entradas vao para dentro do script PowerShell: whitelist (evita injecao de comandos no DC)
+        filter_type = filter_type if filter_type in ("all", "user", "group", "gpo") else "all"
+        search_query = re.sub(r"[^\w\s.@-]", "", search_query or "", flags=re.UNICODE)[:64]
         if sys.platform == "win32":
             ps_script = f"""
                 $ErrorActionPreference = 'SilentlyContinue'
+                if (-not (Get-Module -ListAvailable ActiveDirectory)) {{ Write-Output 'GBOC_NO_AD_MODULE'; exit 3 }}
                 Import-Module ActiveDirectory -ErrorAction SilentlyContinue
                 
                 $results = @()
@@ -97,7 +102,15 @@ class ActiveDirectoryGranularExplorer:
                     ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_script],
                     capture_output=True, text=True, timeout=12
                 )
-                if res.returncode == 0 and res.stdout.strip():
+                if "GBOC_NO_AD_MODULE" in (res.stdout or ""):
+                    return {"status": "error", "message": "Módulo PowerShell ActiveDirectory (RSAT AD) não está disponível neste servidor.",
+                            "count": 0, "objects": [], "filter": filter_type, "search": search_query,
+                            "timestamp": datetime.now().isoformat()}
+                if res.returncode != 0:
+                    return {"status": "error", "message": f"Consulta ao AD falhou (código {res.returncode}): {(res.stderr or '').strip()[:300]}",
+                            "count": 0, "objects": [], "filter": filter_type, "search": search_query,
+                            "timestamp": datetime.now().isoformat()}
+                if res.stdout.strip():
                     raw = json.loads(res.stdout.strip())
                     items = raw if isinstance(raw, list) else [raw]
                     for item in items:
@@ -126,47 +139,83 @@ class ActiveDirectoryGranularExplorer:
 
     def restore_granular_ad_object(self, object_dn: str, object_type: str = "User", password_reset: Optional[str] = None) -> Dict[str, Any]:
         """
-        Restaura um objeto específico no Active Directory (Item-Level Restore).
+        Restaura um objeto EXCLUIDO do Active Directory a partir da Lixeira do AD (Restore-ADObject).
+        Objetos ativos nao sao alterados. O DN e a senha vao por variavel de ambiente (sem injecao no script).
         """
-        logs = []
-        logs.append(f"Iniciando restauração granular do objeto '{object_dn}' (Tipo: {object_type})")
+        logs = [f"Iniciando restauração granular do objeto '{object_dn}' (Tipo: {object_type})"]
+        base = {"object_dn": object_dn, "object_type": object_type, "timestamp": datetime.now().isoformat()}
+        if sys.platform != "win32":
+            return {**base, "success": False, "restored": False, "error": "Disponível apenas no Windows.", "logs": logs}
 
-        if sys.platform == "win32":
-            # 1. Tentar ressuscitar objeto se estiver no Recycle Bin
-            ps_cmd = f"""
-                $ErrorActionPreference = 'Stop'
-                Import-Module ActiveDirectory
-                
-                $obj = Get-ADObject -Filter "DistinguishedName -eq '{object_dn}'" -IncludeDeletedObjects
-                if ($obj -and $obj.Deleted) {{
-                    Restore-ADObject -Identity $obj.ObjectGUID
-                    Write-Output "RESTORED_FROM_RECYCLE_BIN"
-                }} else {{
-                    Write-Output "OBJECT_ACTIVE_OR_RECONSTRUCTED"
-                }}
-            """
-            try:
-                res = subprocess.run(
-                    ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd],
-                    capture_output=True, text=True, timeout=15
-                )
-                output_str = res.stdout.strip()
-                if "RESTORED_FROM_RECYCLE_BIN" in output_str:
-                    logs.append("✅ Objeto desenterrado e restaurado diretamente da lixeira do Active Directory (AD Recycle Bin)!")
-                else:
-                    logs.append("Objeto já presente ou verificado no diretório. Reaplicando atributos essenciais de segurança...")
-            except Exception as e:
-                logs.append(f"Nota na operação PowerShell: {e}")
+        ps_cmd = r"""
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$ErrorActionPreference = 'Stop'
+Import-Module ActiveDirectory
+$dn = $env:GBOC_AD_DN
+$out = [ordered]@{ result = 'NOT_FOUND' }
+$live = $null
+try { $live = Get-ADObject -Identity $dn } catch { $live = $null }
+if ($live) {
+    $out.result = 'ALREADY_ACTIVE'; $out.guid = $live.ObjectGUID.ToString()
+} else {
+    $parts = $dn -split '(?<!\\),', 2
+    $rdn = ($parts[0] -replace '^[^=]+=', '') -replace '\\(.)', '$1'
+    $parent = if ($parts.Count -gt 1) { $parts[1] } else { '' }
+    $del = Get-ADObject -Filter 'isDeleted -eq $true' -IncludeDeletedObjects -Properties 'msDS-LastKnownRDN','LastKnownParent','whenChanged' |
+           Where-Object { $_.'msDS-LastKnownRDN' -eq $rdn -and $_.LastKnownParent -eq $parent } |
+           Sort-Object whenChanged -Descending | Select-Object -First 1
+    if ($del) {
+        Restore-ADObject -Identity $del.ObjectGUID
+        $out.result = 'RESTORED'; $out.guid = $del.ObjectGUID.ToString()
+    }
+}
+if ($env:GBOC_AD_PWD -and $out.result -eq 'RESTORED' -and $env:GBOC_AD_TYPE -eq 'User') {
+    try {
+        Set-ADAccountPassword -Identity $out.guid -Reset -NewPassword (ConvertTo-SecureString $env:GBOC_AD_PWD -AsPlainText -Force)
+        $out.password_reset = 'OK'
+    } catch { $out.password_reset = $_.Exception.Message }
+}
+$out | ConvertTo-Json -Compress
+"""
+        env = dict(os.environ, GBOC_AD_DN=object_dn or "", GBOC_AD_TYPE=object_type or "", GBOC_AD_PWD=password_reset or "")
+        try:
+            res = subprocess.run(
+                ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd],
+                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=180, env=env
+            )
+        except Exception as e:
+            logs.append(f"❌ Erro ao executar o PowerShell: {e}")
+            return {**base, "success": False, "restored": False, "error": str(e), "logs": logs}
 
-        logs.append(f"✅ Restauração granular de '{object_dn}' concluída com integridade.")
-        
-        return {
-            "success": True,
-            "object_dn": object_dn,
-            "object_type": object_type,
-            "timestamp": datetime.now().isoformat(),
-            "logs": logs
-        }
+        data = {}
+        for line in reversed((res.stdout or "").splitlines()):
+            line = line.strip()
+            if line.startswith("{"):
+                try:
+                    data = json.loads(line)
+                except ValueError:
+                    pass
+                break
+        result = data.get("result")
+        if res.returncode != 0 or not result:
+            err = (res.stderr or res.stdout or "").strip()[:400] or f"código {res.returncode}"
+            logs.append(f"❌ Restauração falhou: {err}")
+            return {**base, "success": False, "restored": False, "error": err, "logs": logs}
+
+        if result == "RESTORED":
+            logs.append("✅ Objeto restaurado da Lixeira do Active Directory (Restore-ADObject).")
+            pr = data.get("password_reset")
+            if pr == "OK":
+                logs.append("✅ Senha redefinida.")
+            elif pr:
+                logs.append(f"⚠️ Objeto restaurado, mas a redefinição de senha falhou: {pr}")
+            return {**base, "success": True, "restored": True, "object_guid": data.get("guid"), "logs": logs}
+        if result == "ALREADY_ACTIVE":
+            msg = "O objeto está ativo no AD; nada foi restaurado (a restauração granular recupera objetos excluídos da Lixeira do AD)."
+        else:
+            msg = "Objeto não encontrado na Lixeira do AD (a Lixeira pode estar desativada ou o objeto já expirou)."
+        logs.append(f"ℹ️ {msg}")
+        return {**base, "success": False, "restored": False, "error": msg, "logs": logs}
 
 
 # Singleton global

@@ -111,13 +111,13 @@ app.add_exception_handler(HTTPException, http_exception_handler)
 # ===========================
 
 @app.get("/health", response_model=HealthCheckResponse, tags=["Monitoramento"])
-async def health_status():
+def health_status():
     """Verificar saúde do servidor"""
     status = health_check.check_system()
     return status
 
 @app.get("/metrics", response_model=MetricsResponse, tags=["Monitoramento"])
-async def server_metrics():
+def server_metrics():
     """Obter métricas do servidor"""
     metrics = metrics_collector.get_metrics()
     return metrics
@@ -125,7 +125,7 @@ async def server_metrics():
 @app.get("/api/{api_version}/health/detailed", tags=["Monitoramento"])
 @require_auth
 @require_role("admin")
-async def health_detailed(request: Request):
+def health_detailed(request: Request):
     """Health check detalhado (admin only)"""
     checks = {
         "database": health_check.check_database(),
@@ -139,7 +139,7 @@ async def health_detailed(request: Request):
 # ===========================
 
 @app.post("/api/v1/auth/login", response_model=AuthResponse, tags=["Autenticação"])
-async def login(request: Request, credentials: LoginRequest):
+def login(request: Request, credentials: LoginRequest):
     """Login com JWT tokens"""
 
     # Verificar rate limit
@@ -183,7 +183,7 @@ async def login(request: Request, credentials: LoginRequest):
     )
 
 @app.post("/api/v1/auth/refresh", response_model=AuthResponse, tags=["Autenticação"])
-async def refresh_token(refresh_token: str):
+def refresh_token(refresh_token: str):
     """Renovar access token usando refresh token"""
 
     new_access_token = JWTHandler.refresh_access_token(refresh_token)
@@ -198,7 +198,7 @@ async def refresh_token(refresh_token: str):
 
 @app.post("/api/v1/auth/logout", tags=["Autenticação"])
 @require_auth
-async def logout(request: Request):
+def logout(request: Request):
     """Logout (revoga token)"""
     token = request.state.token
     TokenManager.revoke_token(token)
@@ -290,7 +290,7 @@ async def get_agent(agent_id: str):
 @app.get("/api/v1/dlq/stats", tags=["Dead Letter Queue"])
 @require_auth
 @require_role("admin")
-async def dlq_stats():
+def dlq_stats():
     """Estatísticas da Dead Letter Queue"""
     stats = dlq.get_stats()
     return StandardResponse(status="success", data=stats)
@@ -298,7 +298,7 @@ async def dlq_stats():
 @app.get("/api/v1/dlq/pending", tags=["Dead Letter Queue"])
 @require_auth
 @require_role("admin")
-async def dlq_pending(limit: int = 10):
+def dlq_pending(limit: int = 10):
     """Recuperar mensagens pendentes na DLQ"""
     pending = dlq.get_pending(limit=limit)
     return StandardResponse(status="success", data={"pending": pending})
@@ -306,7 +306,7 @@ async def dlq_pending(limit: int = 10):
 @app.post("/api/v1/dlq/reprocess/{timestamp}", tags=["Dead Letter Queue"])
 @require_auth
 @require_role("admin")
-async def dlq_reprocess(timestamp: str):
+def dlq_reprocess(timestamp: str):
     """Reprocessar uma mensagem da DLQ manualmente"""
     # Implementar lógica de reprocessamento
     return StandardResponse(status="success", message="Reprocessamento iniciado")

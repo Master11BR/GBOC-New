@@ -128,16 +128,10 @@ def collect_agent_operational_data(limit: int = 5) -> dict[str, Any]:
         from engines.ransomware_detector import get_protection_status
         status = get_protection_status()
         canaries = status.get("canaries", {})
-        tools = status.get("integrated_tools", {})
         data["ransomware"] = {
             "available": True,
             "canaries_total": canaries.get("total", 0),
             "canaries_compromised": canaries.get("compromised", 0),
-            "last_scan_threat": None if (status.get("last_scan") or {}).get("threat_level") in (None, "never_scanned")
-                                else (status.get("last_scan") or {}).get("threat_level"),
-            "last_scan_date": (status.get("last_scan") or {}).get("date"),
-            "tools_installed": sorted(k for k, v in tools.items() if isinstance(v, dict) and v.get("installed")),
-            "tools_total": len(tools),
         }
     except Exception as e:
         logger.warning(f"[AI] Status ransomware indisponível: {e}")
@@ -164,11 +158,7 @@ def _format_context(data: dict[str, Any]) -> str:
             canary_txt = "nenhum arquivo canário implantado"
         else:
             canary_txt = f"{rw['canaries_total']} canários, {rw['canaries_compromised']} comprometidos"
-        lines.append(
-            f"Ransomware: {canary_txt}; último scan: {rw['last_scan_threat'] or 'nunca executado'} "
-            f"({rw['last_scan_date'] or 'sem data'}); ferramentas de segurança instaladas "
-            f"{len(rw['tools_installed'])}/{rw['tools_total']}: {', '.join(rw['tools_installed']) or 'nenhuma'}"
-        )
+        lines.append(f"Ransomware (Guardian): {canary_txt}; detecção de malware fica com o antivírus/EDR do host.")
     else:
         lines.append("Ransomware: status indisponível.")
     return "\n".join(lines)
@@ -197,8 +187,7 @@ def _native_report(data: dict[str, Any]) -> str:
     rw = data.get("ransomware", {})
     if rw.get("available"):
         parts.append(
-            f"• Ransomware: {rw['canaries_compromised']} de {rw['canaries_total']} canários comprometidos; "
-            f"último scan: {rw['last_scan_threat'] or 'nunca executado'}."
+            f"• Ransomware: {rw['canaries_compromised']} de {rw['canaries_total']} canários comprometidos."
         )
     parts.append(
         "\n📍 Detalhes: **Tarefas** (`/tasks.html`) → Histórico/Logs, **Falhas** (`/failed-jobs.html`) "

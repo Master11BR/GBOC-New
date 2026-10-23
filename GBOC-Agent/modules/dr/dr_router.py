@@ -122,7 +122,7 @@ async def get_dr_readiness(refresh: bool = False):
 # ── P2V, System State & Mídia de Boot ─────────────────────────────────────────
 
 @router.post("/p2v/start")
-async def start_p2v(req: P2VRequest):
+def start_p2v(req: P2VRequest):
     """Inicia processo de conversão P2V (Physical-to-Virtual) para VHDX."""
     try:
         res = dr_engine.start_p2v_conversion(
@@ -139,7 +139,7 @@ async def start_p2v(req: P2VRequest):
 
 @router.get("/p2v/status/{job_id}")
 @router.get("/job/status/{job_id}")
-async def get_dr_job_status(job_id: str):
+def get_dr_job_status(job_id: str):
     """Retorna status, progresso e streaming de logs de uma tarefa de DR."""
     status = dr_engine.get_job_status(job_id)
     if not status:
@@ -148,7 +148,7 @@ async def get_dr_job_status(job_id: str):
 
 
 @router.post("/job/cancel/{job_id}")
-async def cancel_dr_job(job_id: str):
+def cancel_dr_job(job_id: str):
     """Cancela uma operação ativa de DR."""
     success = dr_engine.cancel_job(job_id)
     if success:
@@ -157,7 +157,7 @@ async def cancel_dr_job(job_id: str):
 
 
 @router.post("/system-state/start")
-async def start_system_state_backup(req: SystemStateRequest):
+def start_system_state_backup(req: SystemStateRequest):
     """Inicia backup a quente do System State e Active Directory."""
     try:
         res = dr_engine.start_system_state_backup(
@@ -171,7 +171,7 @@ async def start_system_state_backup(req: SystemStateRequest):
 
 
 @router.post("/boot-media/build")
-async def build_boot_media(req: BootMediaRequest):
+def build_boot_media(req: BootMediaRequest):
     """Inicia criação do GBOC Recovery Environment ISO e extração de drivers nativos."""
     try:
         res = dr_engine.start_boot_media_build(
@@ -187,7 +187,7 @@ async def build_boot_media(req: BootMediaRequest):
 # ── Universal Hardware Restore ───────────────────────────────────────────────
 
 @router.post("/universal-restore/inject")
-async def inject_universal_restore(req: UniversalRestoreRequest):
+def inject_universal_restore(req: UniversalRestoreRequest):
     """Injeta drivers e ativa serviços críticos de boot na hive de registro offline."""
     try:
         res = universal_restore_engine.inject_drivers_and_fix_hal(
@@ -203,7 +203,7 @@ async def inject_universal_restore(req: UniversalRestoreRequest):
 # ── Active Directory Granular Explorer ───────────────────────────────────────
 
 @router.get("/ad-explorer/objects")
-async def list_ad_objects(filter: str = Query("all"), search: str = Query("")):
+def list_ad_objects(filter: str = Query("all"), search: str = Query("")):
     """Pesquisa objetos granulares do Active Directory (Usuários, Grupos, GPOs)."""
     try:
         res = ad_granular_explorer.list_ad_objects_from_live_or_snapshot(
@@ -217,7 +217,7 @@ async def list_ad_objects(filter: str = Query("all"), search: str = Query("")):
 
 
 @router.post("/ad-explorer/restore-object")
-async def restore_ad_object(req: AdRestoreObjectRequest):
+def restore_ad_object(req: AdRestoreObjectRequest):
     """Restaura granularmente um objeto no Active Directory (Item-Level Restore)."""
     try:
         res = ad_granular_explorer.restore_granular_ad_object(
@@ -234,7 +234,7 @@ async def restore_ad_object(req: AdRestoreObjectRequest):
 # ── Instant VM Boot ──────────────────────────────────────────────────────────
 
 @router.post("/instant-vm/start")
-async def start_instant_vm(req: InstantVmStartRequest):
+def start_instant_vm(req: InstantVmStartRequest):
     """Inicializa instantaneamente uma VM a partir de um arquivo VHDX com camada CoW."""
     try:
         res = instant_vm_boot_engine.start_instant_vm(
@@ -251,14 +251,14 @@ async def start_instant_vm(req: InstantVmStartRequest):
 
 
 @router.get("/instant-vm/list")
-async def list_instant_vms():
+def list_instant_vms():
     """Lista todas as VMs instantâneas ativas."""
     vms = instant_vm_boot_engine.list_instant_vms()
     return JSONResponse({"status": "success", "instances": vms, "count": len(vms)})
 
 
 @router.post("/instant-vm/stop/{instance_id}")
-async def stop_instant_vm(instance_id: str):
+def stop_instant_vm(instance_id: str):
     """Para e desaloca uma VM instantânea."""
     success = instant_vm_boot_engine.stop_instant_vm(instance_id)
     if success:
@@ -269,7 +269,7 @@ async def stop_instant_vm(instance_id: str):
 # ── Instant Recovery Datastore (SMB / NFS) ───────────────────────────────────
 
 @router.post("/datastore/start")
-async def start_datastore_share(req: DatastoreShareRequest):
+def start_datastore_share(req: DatastoreShareRequest):
     """Exporta pasta de backup como Datastore SMB temporário para o Hypervisor."""
     try:
         res = instant_recovery_engine.start_datastore_share(
@@ -286,14 +286,14 @@ async def start_datastore_share(req: DatastoreShareRequest):
 
 
 @router.post("/datastore/stop/{share_name}")
-async def stop_datastore_share(share_name: str):
+def stop_datastore_share(share_name: str):
     """Remove o compartilhamento de Datastore do sistema."""
     res = instant_recovery_engine.stop_datastore_share(share_name)
     return JSONResponse(res)
 
 
 @router.post("/instant-recovery/start")
-async def start_instant_vm_recovery(req: InstantRecoveryVmRequest):
+def start_instant_vm_recovery(req: InstantRecoveryVmRequest):
     """Inicia Instant VM Recovery completo com montagem de Datastore, disco CoW e boot no Hyper-V."""
     try:
         res = instant_recovery_engine.start_instant_vm_recovery(
@@ -311,14 +311,14 @@ async def start_instant_vm_recovery(req: InstantRecoveryVmRequest):
 
 
 @router.get("/instant-recovery/list")
-async def list_instant_recovery_vms():
+def list_instant_recovery_vms():
     """Lista todas as instâncias ativas de Instant VM Recovery."""
     vms = instant_recovery_engine.list_active_vms()
     return JSONResponse({"status": "success", "vms": vms, "count": len(vms)})
 
 
 @router.post("/instant-recovery/stop/{vm_id}")
-async def stop_instant_vm_recovery(vm_id: str):
+def stop_instant_vm_recovery(vm_id: str):
     """Desliga a VM instantânea e limpa os recursos de Datastore."""
     res = instant_recovery_engine.stop_instant_vm_recovery(vm_id)
     return JSONResponse(res)
@@ -327,7 +327,7 @@ async def stop_instant_vm_recovery(vm_id: str):
 # ── Virtual Lab Sandbox ──────────────────────────────────────────────────────
 
 @router.post("/virtual-lab/test")
-async def run_virtual_lab_test(req: VirtualLabTestRequest):
+def run_virtual_lab_test(req: VirtualLabTestRequest):
     """Executa verificação automatizada de boot em Virtual Lab com rede isolada anti-colisão."""
     try:
         res = virtual_lab_engine.run_isolated_boot_verification(

@@ -164,7 +164,7 @@ def get_roles_matrix():
     return JSONResponse({"status": "success", "roles": roles})
 
 @router.get("/status")
-async def get_current_user_status(request: Request):
+def get_current_user_status(request: Request):
     """Retorna as informações do perfil do usuário atualmente autenticado."""
     u = _get_current_user_from_req(request)
     if not u:
@@ -183,7 +183,7 @@ async def get_current_user_status(request: Request):
     })
 
 @router.get("/permissions")
-async def get_permissions_catalog():
+def get_permissions_catalog():
     """Retorna o catálogo de permissões disponíveis no sistema."""
     perms = [
         {"id": "ALL", "name": "Acesso Total"},

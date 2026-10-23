@@ -48,9 +48,17 @@ class CloudFailoverEngine:
                 "logs": logs
             }
 
+        ok, ident = _cli_identity([aws_bin, "sts", "get-caller-identity", "--output", "json"])
+        if not ok:
+            logs.append(f"❌ Credenciais da AWS CLI não funcionam: {ident}")
+            return {"success": False, "error": f"Credenciais da AWS CLI inválidas ou ausentes ('aws configure'): {ident}",
+                    "cloud_provider": "AWS", "region": region, "logs": logs}
+        logs.append(f"✅ AWS CLI autenticada ({ident}).")
+        logs.append("ℹ️ O provisionamento automático da instância (importação da imagem e criação da EC2) ainda não está implementado no GBOC.")
         return {
             "success": False,
-            "error": "Credenciais da AWS CLI não configuradas (execute 'aws configure' no terminal do host).",
+            "implemented": False,
+            "error": "Failover automático para AWS ainda não implementado (credenciais verificadas e válidas).",
             "cloud_provider": "AWS",
             "region": region,
             "logs": logs
@@ -82,13 +90,37 @@ class CloudFailoverEngine:
                 "logs": logs
             }
 
+        ok, ident = _cli_identity([az_bin, "account", "show", "--output", "json"])
+        if not ok:
+            logs.append(f"❌ Azure CLI não autenticada: {ident}")
+            return {"success": False, "error": f"Azure CLI não autenticada ('az login'): {ident}",
+                    "cloud_provider": "Azure", "region": region, "logs": logs}
+        logs.append(f"✅ Azure CLI autenticada ({ident}).")
+        logs.append("ℹ️ O provisionamento automático da VM (upload do VHD e criação da VM) ainda não está implementado no GBOC.")
         return {
             "success": False,
-            "error": "Credenciais da Azure CLI não autenticadas (execute 'az login' no terminal do host).",
+            "implemented": False,
+            "error": "Failover automático para Azure ainda não implementado (credenciais verificadas e válidas).",
             "cloud_provider": "Azure",
             "region": region,
             "logs": logs
         }
+
+
+def _cli_identity(cmd):
+    """Executa o comando de identidade da CLI de nuvem; retorna (ok, conta_ou_erro)."""
+    import json as _json, subprocess as _sp
+    try:
+        r = _sp.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
+    except Exception as e:
+        return False, str(e)
+    if r.returncode != 0:
+        return False, (r.stderr or r.stdout or f"código {r.returncode}").strip()[:300]
+    try:
+        d = _json.loads(r.stdout or "{}")
+        return True, d.get("Arn") or d.get("user", {}).get("name") or d.get("name") or "conta ativa"
+    except ValueError:
+        return True, "conta ativa"
 
 
 # Singleton global

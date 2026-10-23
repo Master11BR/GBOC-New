@@ -296,7 +296,7 @@ def start_integrity_check(repository_id: int):
 
 
 @router.get("/check/{repository_id}/status")
-async def get_integrity_check_status(repository_id: int):
+def get_integrity_check_status(repository_id: int):
     """Obtém status da verificação de integridade"""
     if repository_id in _running_checks:
         return {"status": "success", "check": _running_checks[repository_id]}
@@ -359,7 +359,7 @@ def get_integrity_history():
         return {"status": "success", "history": history}
     except Exception as e:
         logger.error(f"Erro ao obter histórico de integridade: {e}", exc_info=True)
-        return {"status": "success", "history": []}
+        return {"status": "error", "message": str(e), "history": []}
 
 
 @router.get("/history/{check_id}")
@@ -404,7 +404,7 @@ def get_integrity_history_detail(check_id: int):
 
 
 @router.get("/status-all")
-async def get_all_checks_status():
+def get_all_checks_status():
     """Obtém status de todas as verificações em andamento"""
     return {"status": "success", "checks": _running_checks}
 

@@ -367,12 +367,9 @@ def security(data: dict) -> dict:
     canaries = data["canaries"]
     comp = sum(1 for c in canaries if c["compromised"])
     open_inc = [i for i in data["incidents"] if i["status"] != "resolved"]
-    tools = (data["protection"] or {}).get("integrated_tools", {}) or {}
-    installed = [k for k, v in tools.items() if isinstance(v, dict) and v.get("installed")]
-    scan = data["last_scan"]
-    has_signal = bool(canaries or data["incidents"] or scan or tools)
-    threat = min(100, comp * 30 + len(open_inc) * 20 + (0 if canaries else 10)
-                 + (20 if scan and scan["threat"] not in ("none", "low") else 0)) if has_signal else None
+    # Varredura/"7 ferramentas" removidas (papel do antivírus): o score usa canaries e incidentes do Guardian.
+    has_signal = bool(canaries or data["incidents"])
+    threat = min(100, comp * 30 + len(open_inc) * 20 + (0 if canaries else 10)) if has_signal else None
     encrypted = sum(1 for r in data["repositories"] if r["encrypted"])
     return {
         "threat_score": threat,
@@ -384,11 +381,9 @@ def security(data: dict) -> dict:
             {"label": "Incidentes Abertos", "value": str(len(open_inc)), "target": "0", "status": "CRÍTICO" if open_inc else "OK"},
             {"label": "Repositórios Criptografados", "value": f"{encrypted}/{len(data['repositories'])}", "target": "100%",
              "status": _st(_pct(encrypted, len(data["repositories"])), 100, 80)},
-            {"label": "Último Scan", "value": f"{scan['threat']} ({_dt(scan['at'])})" if scan else "Nunca executado", "target": "Semanal", "status": "OK" if scan else "ATENÇÃO"},
         ],
-        "delta": [_d("down" if comp or open_inc else "up", f"{comp} canário(s) comprometido(s), {len(open_inc)} incidente(s) aberto(s)."),
-                  _d("neutral", f"Ferramentas de segurança detectadas: {', '.join(installed) or 'nenhuma'}.")],
-        "analytical_summary": "Threat score = 30 por canário comprometido + 20 por incidente aberto + 10 sem canários + 20 se o último scan indicou ameaça.",
+        "delta": [_d("down" if comp or open_inc else "up", f"{comp} canário(s) comprometido(s), {len(open_inc)} incidente(s) aberto(s).")],
+        "analytical_summary": "Threat score = 30 por canário comprometido + 20 por incidente aberto + 10 sem canários. Detecção de malware: antivírus/EDR do host.",
         "tables": [
             {"title": "Canários", "headers": ["Arquivo", "Situação", "Última Verificação"],
              "rows": [[c["path"], "CRÍTICO" if c["compromised"] else "OK", _dt(c["verified"])] for c in canaries]},

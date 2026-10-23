@@ -2139,7 +2139,7 @@ def rep_anomalies(ctx: ReportContext) -> Dict[str, Any]:
     if spikes:
         findings.append({"tone": "bad", "text": f"{len(spikes)} pico(s) de dados novos: confirme com o responsável se houve carga legítima; caso contrário, investigue ransomware."})
     return {"kpis": kpis, "charts": charts, "tables": tables, "findings": findings,
-            "recommendations": ["Para picos não explicados: comparar snapshots, verificar extensões de arquivo alteradas e eventos do Ransomware Shield (REP-11)."] if spikes else []}
+            "recommendations": ["Para picos não explicados: comparar snapshots, verificar extensões de arquivo alteradas e incidentes do Ransomware Guardian (REP-11)."] if spikes else []}
 
 
 def rep_retention(ctx: ReportContext) -> Dict[str, Any]:
@@ -2200,7 +2200,7 @@ CATALOG: List[Dict[str, Any]] = [
     {"id": 10, "code": "REP-10", "name": "Prontidão para Recuperação de Desastres", "category": "Risco", "builder": rep_dr_readiness,
      "description": "Pontuação por agente: backup recente, RPO, cópia externa (3-2-1), testes e pendências.", "audience": "Diretoria / Cliente"},
     {"id": 11, "code": "REP-11", "name": "Segurança e Ransomware", "category": "Segurança", "builder": rep_security,
-     "description": "Incidentes, tempo de resposta e eventos do Ransomware Shield por agente.", "audience": "Segurança"},
+     "description": "Incidentes, tempo de resposta e eventos do Ransomware Guardian por agente.", "audience": "Segurança"},
     {"id": 12, "code": "REP-12", "name": "Auditoria de Acessos", "category": "Segurança", "builder": rep_access_audit,
      "description": "Logins, falhas por usuário e IP e trilha de ações administrativas.", "audience": "Auditoria"},
     {"id": 13, "code": "REP-13", "name": "Consumo por Cliente e Faturamento", "category": "Comercial", "builder": rep_tenant_billing,

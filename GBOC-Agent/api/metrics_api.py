@@ -59,7 +59,7 @@ def _metric(name, help_text, mtype, lines):
 @router.get("/metrics", response_class=PlainTextResponse,
             summary="Prometheus metrics endpoint",
             description="Returns all GBOC metrics in Prometheus text exposition format.")
-async def prometheus_metrics():
+def prometheus_metrics():
     """
     Prometheus scrape endpoint.
     Configure in prometheus.yml:

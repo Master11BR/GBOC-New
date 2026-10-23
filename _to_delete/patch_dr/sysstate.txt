@@ -1,0 +1,183 @@
+    def _system_state_worker(self, job_id: str, target_folder: str, include_ad: bool):
+        self._append_log(job_id, "Iniciando backup do System State (registro, BCD e, em controlador de domínio, NTDS/SYSVOL)")
+        self._append_log(job_id, f"Diretório de destino: {target_folder}")
+        captured: List[str] = []
+        missing: List[str] = []
+        try:
+            if sys.platform != "win32":
+                raise RuntimeError("Backup de System State disponível apenas no Windows.")
+            os.makedirs(target_folder, exist_ok=True)
+            sys_info = self.get_system_dr_info(force_refresh=True)
+
+            if not self._is_admin():
+                self._append_log(job_id, "⚠️ O Agente não está com privilégio administrativo: hives protegidos e o NTDS não poderão ser copiados.")
+
+            n_writers = sys_info.get("vss_writer_count", 0)
+            if n_writers:
+                bad = sys_info.get("unhealthy_writers") or []
+                if bad:
+                    names = ", ".join(f"{w.get('name')} ({w.get('state', '?')})" for w in bad[:5])
+                    self._append_log(job_id, f"⚠️ VSS writers com problema: {names}")
+                else:
+                    self._append_log(job_id, f"VSS: {n_writers} writer(s) estáveis.")
+            else:
+                self._append_log(job_id, "⚠️ Não foi possível consultar os VSS writers (vssadmin list writers).")
+            self._set_progress(job_id, 10)
+
+            # 1. Hives do registro - cada um conferido (codigo de saida + arquivo nao vazio)
+            reg_dir = os.path.join(target_folder, "Registry_Hives")
+            os.makedirs(reg_dir, exist_ok=True)
+            self._append_log(job_id, "Exportando hives do registro (SAM, SECURITY, SYSTEM, SOFTWARE)...")
+            for idx, hive in enumerate(["SAM", "SECURITY", "SYSTEM", "SOFTWARE"]):
+                if self._is_cancelled(job_id):
+                    return
+                hive_path = os.path.join(reg_dir, f"{hive}.hiv")
+                try:
+                    rc, out = self._run_console(["reg", "save", f"HKLM\\{hive}", hive_path, "/y"], timeout=600)
+                except subprocess.TimeoutExpired:
+                    rc, out = -1, "tempo esgotado (600 s)"
+                except OSError as ex:
+                    rc, out = -1, (f"{ex}. O Windows ou o antivírus/EDR bloqueou a execução do reg.exe "
+                                   "(a proteção contra extração de credenciais costuma bloquear a cópia de SAM/SECURITY).")
+                size = os.path.getsize(hive_path) if os.path.exists(hive_path) else 0
+                if rc == 0 and size > 0:
+                    captured.append(f"hive {hive}")
+                    self._append_log(job_id, f"✅ Hive {hive} salvo ({self._fmt_size(size)})")
+                else:
+                    missing.append(f"hive {hive}")
+                    self._append_log(job_id, f"❌ Hive {hive} NÃO foi salvo (código {rc}, {size} bytes): {out[:300] or 'sem mensagem'}")
+                    if os.path.exists(hive_path) and size == 0:
+                        try:
+                            os.remove(hive_path)
+                        except OSError:
+                            pass
+                self._set_progress(job_id, 10 + (idx + 1) * 8)
+
+            # 2. Banco de configuracao de boot (BCD)
+            bcd_path = os.path.join(target_folder, "BCD_export")
+            try:
+                rc, out = self._run_console(["bcdedit", "/export", bcd_path], timeout=120)
+            except (OSError, subprocess.TimeoutExpired) as ex:
+                rc, out = -1, str(ex)
+            size = os.path.getsize(bcd_path) if os.path.exists(bcd_path) else 0
+            if rc == 0 and size > 0:
+                captured.append("BCD")
+                self._append_log(job_id, f"✅ BCD exportado ({self._fmt_size(size)})")
+            else:
+                missing.append("BCD")
+                self._append_log(job_id, f"❌ BCD NÃO foi exportado (código {rc}): {out[:300] or 'sem mensagem'}")
+            self._set_progress(job_id, 50)
+
+            # 3. Active Directory (somente em controlador de dominio)
+            ad_info: Dict[str, Any] = {"included": False}
+            if sys_info.get("is_domain_controller"):
+                if include_ad:
+                    ad_info = self._backup_ntds_ifm(job_id, target_folder, captured, missing)
+                else:
+                    self._append_log(job_id, "ℹ️ Controlador de domínio detectado, mas a opção de incluir o Active Directory está desmarcada.")
+            elif include_ad:
+                self._append_log(job_id, "ℹ️ Este servidor não é controlador de domínio: não há base NTDS para copiar.")
+            if self._is_cancelled(job_id):
+                return
+            self._set_progress(job_id, 85)
+
+            # 4. Manifesto com SHA-256 real de cada arquivo capturado
+            self._append_log(job_id, "Calculando SHA-256 dos arquivos capturados...")
+            manifest_file = os.path.join(target_folder, "dr_manifest.json")
+            files = []
+            for root, _dirs, names in os.walk(target_folder):
+                for n in names:
+                    p = os.path.join(root, n)
+                    if os.path.abspath(p) == os.path.abspath(manifest_file):
+                        continue
+                    rel = os.path.relpath(p, target_folder)
+                    try:
+                        files.append({"path": rel, "size_bytes": os.path.getsize(p), "sha256": self._sha256(p)})
+                    except OSError as ex:
+                        files.append({"path": rel, "error": str(ex)})
+            manifest = {
+                "gboc_version": f"{AGENT_VERSION} Enterprise",
+                "backup_type": "SYSTEM_STATE_EXPORT",
+                "hostname": sys_info.get("hostname"),
+                "domain": sys_info.get("domain_name"),
+                "is_domain_controller": sys_info.get("is_domain_controller"),
+                "vss_writers_checked": n_writers,
+                "vss_healthy": sys_info.get("vss_healthy"),
+                "captured": captured,
+                "missing": missing,
+                "active_directory": ad_info,
+                "files": files,
+                "wbadmin_available": shutil.which("wbadmin") is not None,
+                "created_at": datetime.now().isoformat()
+            }
+            with open(manifest_file, "w", encoding="utf-8") as f:
+                json.dump(manifest, f, indent=2, ensure_ascii=False)
+            self._append_log(job_id, f"Manifesto gerado: dr_manifest.json ({len(files)} arquivo(s) com SHA-256)")
+
+            if not captured:
+                raise RuntimeError("Nenhum item do System State foi capturado. " + ("Faltaram: " + ", ".join(missing) if missing else ""))
+            if missing:
+                msg = "Itens não capturados: " + ", ".join(missing)
+                self._append_log(job_id, f"⚠️ Backup do System State concluído PARCIALMENTE. {msg}")
+                self._finish_job(job_id, "partial", msg)
+            else:
+                self._append_log(job_id, f"✅ Backup do System State concluído: {len(captured)} item(ns) capturado(s) e registrados no manifesto.")
+                self._finish_job(job_id, "completed")
+
+        except Exception as e:
+            logger.error(f"Erro no backup de System State {job_id}: {e}", exc_info=True)
+            self._append_log(job_id, f"❌ Falha no backup do System State: {e}")
+            self._finish_job(job_id, "failed", str(e))
+
+    def _backup_ntds_ifm(self, job_id: str, target_folder: str, captured: List[str], missing: List[str]) -> Dict[str, Any]:
+        """Copia NTDS + SYSVOL com ntdsutil IFM (usa snapshot VSS) e confere a consistencia ESE com esentutl."""
+        info: Dict[str, Any] = {"included": True, "method": "ntdsutil ifm (create sysvol full)"}
+        ifm_dir = os.path.join(target_folder, "AD_IFM")
+        self._append_log(job_id, "Controlador de domínio: gerando cópia IFM do NTDS e do SYSVOL com ntdsutil (snapshot VSS)...")
+        try:
+            rc, out = self._run_console(
+                ["ntdsutil", "activate instance ntds", "ifm", f'create sysvol full "{ifm_dir}"', "quit", "quit"],
+                timeout=7200
+            )
+        except subprocess.TimeoutExpired:
+            rc, out = -1, "tempo esgotado (2 h)"
+        except OSError as ex:
+            rc, out = -1, f"{ex} (execução do ntdsutil bloqueada)"
+        info["ntdsutil_exit_code"] = rc
+        ntds = os.path.join(ifm_dir, "Active Directory", "ntds.dit")
+        size = os.path.getsize(ntds) if os.path.exists(ntds) else 0
+        if rc != 0 or size == 0:
+            missing.append("NTDS (Active Directory)")
+            tail = " | ".join(l.strip() for l in out.splitlines()[-6:] if l.strip())
+            self._append_log(job_id, f"❌ Cópia IFM do NTDS falhou (código {rc}): {tail[:400] or 'sem mensagem'}")
+            info["ok"] = False
+            return info
+        captured.append("NTDS")
+        self._append_log(job_id, f"✅ NTDS copiado ({self._fmt_size(size)})")
+        if os.path.isdir(os.path.join(ifm_dir, "SYSVOL")):
+            captured.append("SYSVOL")
+            self._append_log(job_id, "✅ SYSVOL copiado")
+        else:
+            missing.append("SYSVOL")
+            self._append_log(job_id, "❌ SYSVOL não foi encontrado na cópia IFM")
+
+        try:
+            rc2, out2 = self._run_console(["esentutl", "/mh", ntds], timeout=600)
+        except (OSError, subprocess.TimeoutExpired) as ex:
+            rc2, out2 = -1, str(ex)
+        state = None
+        for line in out2.splitlines():
+            s = line.strip()
+            if s.lower().startswith(("state:", "estado:")):
+                state = s.split(":", 1)[1].strip()
+                break
+        info["ese_state"] = state
+        if rc2 == 0 and state and ("clean" in state.lower() or "limp" in state.lower()):
+            info["ok"] = True
+            self._append_log(job_id, f"✅ Consistência ESE do NTDS verificada (esentutl /mh: {state})")
+        else:
+            info["ok"] = False
+            missing.append("verificação de consistência do NTDS")
+            self._append_log(job_id, f"⚠️ Consistência do NTDS não confirmada (esentutl código {rc2}, estado: {state or 'não identificado'})")
+        return info
+

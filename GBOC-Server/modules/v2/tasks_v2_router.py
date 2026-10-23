@@ -111,7 +111,7 @@ def list_tasks_v2(
     return build_v2_response(data=tasks, meta=meta, execution_time_ms=elapsed)
 
 @router.post("/bulk-run")
-async def bulk_run_tasks_v2(payload: BulkRunTasksRequest):
+def bulk_run_tasks_v2(payload: BulkRunTasksRequest):
     """Dispara a execução de múltiplas tarefas de backup simultâneas."""
     t0 = time.perf_counter()
     results = []

@@ -263,7 +263,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         closePolicyModal();
         try{
             const r=await fetch(API+'/policies',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,type,description:desc})});
-            if(!r.ok){const d=await r.json();alert('Erro: '+(d.detail||'Desconhecido'));return}
+            if(!r.ok){const d=await r.json();alert('Erro: '+(d.detail||('HTTP '+r.status)));return}
             loadAll();
         }catch(e){alert('Erro: '+e.message)}
     }

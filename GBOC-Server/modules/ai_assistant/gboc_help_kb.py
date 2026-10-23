@@ -113,7 +113,7 @@ TOPICS: List[Dict] = [
     },
     {
         "id": "ransomware",
-        "title": "Proteção contra ransomware (Guardian, varreduras e arquivos-isca)",
+        "title": "Proteção contra ransomware (Guardian e arquivos-isca)",
         "keywords": ["ransomware", "guardian", "canary", "isca", "varredura", "scan", "ameaca", "virus", "malware",
                      "criptografado", "incidente", "shield"],
         "agent": {"menu": "Proteção > Ransomware Guardian", "url": "/ransomware.html"},
@@ -121,10 +121,11 @@ TOPICS: List[Dict] = [
         "steps": [
             "Abra **Proteção > Ransomware Guardian**.",
             "Crie arquivos-isca em **Criar Canary** (informe o caminho); qualquer alteração neles gera incidente.",
-            "Use **Nova Varredura** para analisar uma pasta com as ferramentas integradas.",
-            "Acompanhe *Incidentes de Ransomware* e *Histórico de Varreduras*; no Server você vê todos os agentes.",
+            "Ao detectar adulteração, o Guardian cria snapshot de emergência, bloqueia escrita nos repositórios e notifica.",
+            "Acompanhe *Incidentes de Ransomware*; no Server você vê todos os agentes.",
         ],
-        "tips": [],
+        "tips": ["O GBOC não faz varredura de vírus: detecção de malware é do antivírus/EDR do host. "
+                 "O card *Status da Proteção Integrada* mostra se o antivírus está instalado e ativo."],
     },
     {
         "id": "alerts",

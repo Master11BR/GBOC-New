@@ -65,7 +65,7 @@ def get_reports_config() -> Dict[str, Any]:
 
 
 @router.get("")
-async def get_server_settings():
+def get_server_settings():
     """Retorna as configurações globais do GBOC Server, incluindo a aba Relatórios."""
     rate = get_usd_to_brl_rate()
     usd_per_tb = _REPORTS_CONFIG_CACHE["cloud_storage_cost_usd_per_tb"]

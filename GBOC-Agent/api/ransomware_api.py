@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """
 GBOC 14.8.2 - Ransomware Detection API
-Endpoints for scanning, canary management, and threat status.
+Canaries, Guardian (resposta automática) e status do antivírus local.
+Varredura/"7 ferramentas" e Shield removidos (out/2026): detecção de malware é papel do antivírus/EDR.
+Rotas síncronas (def): o FastAPI as executa em threadpool, sem travar o event loop.
 """
 
 from fastapi import APIRouter, HTTPException
@@ -31,85 +33,21 @@ def _clean(obj):
     return json.loads(json.dumps(obj, cls=_Enc))
 
 
-class ScanRequest(BaseModel):
-    target_path: str
-
-
 class CanaryRequest(BaseModel):
     file_path: str
 
 
-# ─── Scan endpoints ───────────────────────────────────────────────
-
-@router.post("/scan")
-async def trigger_scan(body: ScanRequest):
-    """Run a full ransomware detection scan on a directory."""
-    import os
-    if not os.path.isdir(body.target_path):
-        raise HTTPException(400, f"Path not found or not a directory: {body.target_path}")
-    from engines.ransomware_detector import run_full_scan
-    result = run_full_scan(body.target_path)
-    return _clean(result)
-
-
-@router.get("/scan/history")
-async def scan_history(limit: int = 20):
-    """Get recent ransomware scan history."""
-    from engines.ransomware_detector import get_scan_history
-    return {"scans": _clean(get_scan_history(limit))}
-
-
 @router.get("/status")
-async def protection_status():
+def protection_status():
     """Get overall ransomware protection status and integrated 7-tool stack."""
     from engines.ransomware_detector import get_protection_status
     return _clean(get_protection_status())
 
 
-@router.get("/tools")
-async def integrated_tools_status():
-    """Get status and availability of the 7 integrated open-source security tools."""
-    from engines.ransomware_detector import get_integrated_tools_status
-    return {"status": "success", "tools": _clean(get_integrated_tools_status())}
-
-
-@router.post("/tools/scan/{tool_id}")
-async def run_tool_scan(tool_id: str, body: ScanRequest):
-    """Run dedicated scan with one of the 7 tools or multi-tool integrated stack."""
-    import os
-    if not os.path.isdir(body.target_path):
-        raise HTTPException(400, f"Caminho não encontrado ou inválido: {body.target_path}")
-
-    from engines.ransomware_detector import (
-        scan_with_clamav, scan_with_armadito, scan_with_clamwin_clamtk,
-        scan_with_hypatia, scan_with_wazuh_hids, scan_with_yara, scan_with_rkhunter,
-        run_integrated_multi_tool_scan
-    )
-
-    t = tool_id.lower().strip()
-    if t == "clamav":
-        return _clean(scan_with_clamav(body.target_path))
-    elif t == "armadito":
-        return _clean(scan_with_armadito(body.target_path))
-    elif t in ("clamwin", "clamtk", "clamwin_clamtk"):
-        return _clean(scan_with_clamwin_clamtk(body.target_path))
-    elif t == "hypatia":
-        return _clean(scan_with_hypatia(body.target_path))
-    elif t in ("wazuh", "ossec", "wazuh_hids"):
-        return _clean(scan_with_wazuh_hids())
-    elif t == "yara":
-        return _clean(scan_with_yara(body.target_path))
-    elif t == "rkhunter":
-        return _clean(scan_with_rkhunter())
-    else:
-        # Executa todas as 7 ferramentas de forma integrada
-        return _clean(run_integrated_multi_tool_scan(body.target_path))
-
-
 # ─── Canary endpoints ─────────────────────────────────────────────
 
 @router.post("/canary")
-async def create_canary_file(body: CanaryRequest):
+def create_canary_file(body: CanaryRequest):
     """Create a canary/honeypot file for ransomware detection."""
     from engines.ransomware_detector import create_canary
     try:
@@ -120,14 +58,14 @@ async def create_canary_file(body: CanaryRequest):
 
 
 @router.get("/canary/verify")
-async def verify_canary_files():
+def verify_canary_files():
     """Verify all registered canary files for tampering."""
     from engines.ransomware_detector import verify_canaries
     return _clean(verify_canaries())
 
 
 @router.get("/canary/list")
-async def list_canaries():
+def list_canaries():
     """List all registered canary files."""
     from engines.ransomware_detector import _query, ensure_tables
     ensure_tables()
@@ -136,7 +74,7 @@ async def list_canaries():
 
 
 @router.delete("/canary/{canary_id}")
-async def delete_canary(canary_id: int):
+def delete_canary(canary_id: int):
     """Remove a canary file registration."""
     from engines.ransomware_detector import _query, _execute
     existing = _query("SELECT file_path FROM ransomware_canaries WHERE id = %s", (canary_id,))
@@ -144,19 +82,6 @@ async def delete_canary(canary_id: int):
         raise HTTPException(404, "Canary not found")
     _execute("DELETE FROM ransomware_canaries WHERE id = %s", (canary_id,))
     return {"deleted": True, "file_path": existing[0].get('file_path')}
-
-
-# ─── Quick entropy check ──────────────────────────────────────────
-
-@router.post("/entropy")
-async def check_entropy(body: ScanRequest):
-    """Quick entropy analysis of a directory (no DB record)."""
-    import os
-    if not os.path.isdir(body.target_path):
-        raise HTTPException(400, f"Path not found: {body.target_path}")
-    from engines.ransomware_detector import calculate_directory_entropy
-    result = calculate_directory_entropy(body.target_path)
-    return _clean(result)
 
 
 # ─── Guardian (Auto-Response Watchdog) ────────────────────────────
@@ -167,7 +92,7 @@ class GuardianConfigRequest(BaseModel):
 
 
 @router.get("/guardian/status")
-async def guardian_status():
+def guardian_status():
     """Get Ransomware Guardian watchdog status and recent incidents."""
     from engines.ransomware_guardian import get_guardian
     guardian = get_guardian()
@@ -175,7 +100,7 @@ async def guardian_status():
 
 
 @router.post("/guardian/start")
-async def guardian_start():
+def guardian_start():
     """Start the Ransomware Guardian watchdog."""
     from engines.ransomware_guardian import get_guardian
     guardian = get_guardian()
@@ -187,7 +112,7 @@ async def guardian_start():
 
 
 @router.post("/guardian/stop")
-async def guardian_stop():
+def guardian_stop():
     """Stop the Ransomware Guardian watchdog."""
     from engines.ransomware_guardian import get_guardian
     guardian = get_guardian()
@@ -198,7 +123,7 @@ async def guardian_stop():
 
 
 @router.put("/guardian/config")
-async def guardian_config(body: GuardianConfigRequest):
+def guardian_config(body: GuardianConfigRequest):
     """Update Guardian configuration (interval, enabled)."""
     from engines.ransomware_guardian import get_guardian
     guardian = get_guardian()
@@ -223,7 +148,7 @@ async def guardian_config(body: GuardianConfigRequest):
 
 
 @router.get("/guardian/incidents")
-async def guardian_incidents(limit: int = 20):
+def guardian_incidents(limit: int = 20):
     """List ransomware incidents detected by Guardian."""
     try:
         from engines.ransomware_detector import _query
@@ -237,9 +162,52 @@ async def guardian_incidents(limit: int = 20):
         return {"incidents": []}
 
 
+def _release_guardian_locks() -> dict:
+    """
+    Sem incidente ativo, devolve repositorios/tarefas travados pelo Guardian ao status anterior
+    registrado na resposta do incidente (incidentes antigos nao registravam: volta para 'active').
+    """
+    from engines.ransomware_detector import _query, _execute
+    active = _query("SELECT COUNT(*) AS n FROM ransomware_incidents WHERE status = 'active'")
+    n_active = int((active[0] or {}).get("n", 0)) if active else 0
+    if n_active:
+        return {"restored_repositories": 0, "restored_tasks": 0,
+                "note": f"{n_active} incidente(s) ainda ativo(s): repositórios e tarefas continuam bloqueados até o último ser resolvido."}
+    prev_repo, prev_task = {}, {}
+    for row in _query("SELECT response_actions FROM ransomware_incidents ORDER BY id ASC"):
+        acts = row.get("response_actions") or []
+        if isinstance(acts, str):
+            try:
+                acts = json.loads(acts)
+            except ValueError:
+                acts = []
+        for a in acts if isinstance(acts, list) else []:
+            res = (a or {}).get("result") or {}
+            if a.get("action") == "repositories_locked":
+                for r in res.get("repos") or []:
+                    if r.get("previous_status") and r.get("previous_status") != "locked_ransomware":
+                        prev_repo[r.get("id")] = r["previous_status"]
+            elif a.get("action") == "backups_paused":
+                for t in res.get("tasks") or []:
+                    if t.get("previous_status") and t.get("previous_status") != "paused_ransomware":
+                        prev_task[t.get("id")] = t["previous_status"]
+    n_repo = n_task = 0
+    for r in _query("SELECT id FROM repositories WHERE status = 'locked_ransomware'"):
+        _execute("UPDATE repositories SET status = %s WHERE id = %s AND status = 'locked_ransomware'",
+                 (prev_repo.get(r["id"], "active"), r["id"]))
+        n_repo += 1
+    for t in _query("SELECT id FROM tasks WHERE status = 'paused_ransomware'"):
+        _execute("UPDATE tasks SET status = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s AND status = 'paused_ransomware'",
+                 (prev_task.get(t["id"], "active"), t["id"]))
+        n_task += 1
+    if n_repo or n_task:
+        logger.info(f"[Guardian] Incidentes resolvidos: {n_repo} repositório(s) e {n_task} tarefa(s) desbloqueados")
+    return {"restored_repositories": n_repo, "restored_tasks": n_task}
+
+
 @router.put("/guardian/incidents/{incident_id}/resolve")
-async def resolve_incident(incident_id: int):
-    """Mark a ransomware incident as resolved."""
+def resolve_incident(incident_id: int):
+    """Marca o incidente como resolvido; ao resolver o ultimo ativo, desfaz os bloqueios do Guardian."""
     from engines.ransomware_detector import _query, _execute
     existing = _query("SELECT id FROM ransomware_incidents WHERE id = %s", (incident_id,))
     if not existing:
@@ -249,11 +217,21 @@ async def resolve_incident(incident_id: int):
         SET status = 'resolved', resolved_at = CURRENT_TIMESTAMP
         WHERE id = %s
     """, (incident_id,))
-    return {"resolved": True, "incident_id": incident_id}
+    return {"resolved": True, "incident_id": incident_id, **_release_guardian_locks()}
+
+
+@router.put("/guardian/incidents/resolve-active")
+def resolve_all_active_incidents():
+    """Resolve todos os incidentes ativos (ex.: alarmes falsos repetidos) e desfaz os bloqueios do Guardian."""
+    from engines.ransomware_detector import _query, _execute
+    rows = _query("SELECT COUNT(*) AS n FROM ransomware_incidents WHERE status = 'active'")
+    n = int((rows[0] or {}).get("n", 0)) if rows else 0
+    _execute("UPDATE ransomware_incidents SET status = 'resolved', resolved_at = CURRENT_TIMESTAMP WHERE status = 'active'")
+    return {"resolved": n, **_release_guardian_locks()}
 
 
 @router.post("/guardian/test")
-async def guardian_test_response():
+def guardian_test_response():
     """Simulate a threat detection to test the Guardian auto-response chain.
     This does NOT create real locks or snapshots - just tests notifications."""
     from engines.ransomware_guardian import get_guardian
@@ -368,98 +346,8 @@ async def guardian_ai_diagnostic(include_llm: bool = True):
     })
 
 
-# ─── Shield (Real-time Prevention) ───────────────────────────────
-
-class ShieldConfigRequest(BaseModel):
-    monitored_paths: Optional[list] = None
-    burst_threshold: Optional[int] = None
-    burst_window_seconds: Optional[int] = None
-    auto_kill_process: Optional[bool] = None
-    auto_isolate_network: Optional[bool] = None
-    entropy_threshold: Optional[float] = None
-    vss_guard_enabled: Optional[bool] = None
-    simulation_mode: Optional[bool] = None
-
-
-class ShieldPathRequest(BaseModel):
-    path: str
-
-
-@router.get("/shield/status")
-async def shield_status():
-    """Get real-time protection status."""
-    from engines.ransomware_shield import get_shield
-    shield = get_shield()
-    metrics = shield.get_metrics()
-    return _clean({
-        "running": shield.running,
-        "metrics": metrics.__dict__ if hasattr(metrics, '__dict__') else {},
-        "config": dict(shield.config._config),
-        "recent_threats": shield.get_recent_threats(10),
-        "components": {
-            "watchdog_available": shield.observer is not None,
-            "vss_guard_alive": shield.vss_guard.is_alive() if shield.vss_guard else False,
-            "entropy_worker_alive": shield.entropy_thread.is_alive() if shield.entropy_thread else False,
-        }
-    })
-
-
-@router.post("/shield/start")
-async def shield_start():
-    """Start real-time ransomware prevention."""
-    from engines.ransomware_shield import get_shield
-    shield = get_shield()
-    if shield.running:
-        return {"status": "already_running"}
-    metrics = shield.start()
-    return _clean({
-        "status": "started",
-        "metrics": metrics.__dict__ if hasattr(metrics, '__dict__') else {},
-    })
-
-
-@router.post("/shield/stop")
-async def shield_stop():
-    """Stop real-time ransomware prevention."""
-    from engines.ransomware_shield import get_shield
-    shield = get_shield()
-    if not shield.running:
-        return {"status": "already_stopped"}
-    shield.stop()
-    return {"status": "stopped"}
-
-
-@router.put("/shield/config")
-async def shield_config(body: ShieldConfigRequest):
-    """Update Shield configuration."""
-    from engines.ransomware_shield import get_shield
-    shield = get_shield()
-    updates = {k: v for k, v in body.dict().items() if v is not None}
-    shield.config.update(updates)
-    return _clean({"status": "updated", "changes": list(updates.keys())})
-
-
-@router.post("/shield/path/add")
-async def shield_add_path(body: ShieldPathRequest):
-    """Add a directory to real-time monitoring."""
-    from engines.ransomware_shield import get_shield
-    shield = get_shield()
-    success = shield.add_monitored_path(body.path)
-    if not success:
-        raise HTTPException(400, f"Falha ao adicionar path: {body.path} (não existe ou watchdog indisponível)")
-    return {"status": "added", "path": body.path}
-
-
-@router.get("/shield/threats")
-async def shield_threats(limit: int = 50):
-    """Get recent threats detected by shield."""
-    from engines.ransomware_shield import get_shield
-    shield = get_shield()
-    return {"threats": _clean(shield.get_recent_threats(limit))}
-
-
 @router.get("/local_protection")
-async def local_protection_status():
+def local_protection_status():
     """Get local antivirus and event log protection status."""
     from engines.ransomware_detector import get_local_protection_status
     return _clean(get_local_protection_status())

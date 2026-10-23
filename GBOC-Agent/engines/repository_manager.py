@@ -50,6 +50,23 @@ class RepositoryManager:
         self.core = core
         logger.info("✅ RepositoryManager (v2) inicializado")
 
+    def _secure_windows_directory(self, path: str) -> None:
+        """Garante acesso explícito ao repositório local para SYSTEM (serviços GBOC), Administradores e a conta
+        que executa o Agente. Mantém as permissões herdadas (não remove herança): restringir demais trancaria
+        o serviço ou o Duplicati fora do próprio repositório. Falha aqui nunca impede a criação do repositório."""
+        try:
+            import getpass
+            user = os.environ.get("USERDOMAIN", "")
+            user = f"{user}\\{getpass.getuser()}" if user else getpass.getuser()
+            grants = ["*S-1-5-18:(OI)(CI)F", "*S-1-5-32-544:(OI)(CI)F", f"{user}:(OI)(CI)F"]
+            r = subprocess.run(["icacls", path, "/grant", *grants, "/T", "/C", "/Q"],
+                               capture_output=True, text=True, timeout=60)
+            if r.returncode != 0:
+                logger.warning(f"[REPO] Permissões do repositório local não ajustadas ({path}): "
+                               f"{(r.stderr or r.stdout or '').strip()[:200]}")
+        except Exception as e:
+            logger.warning(f"[REPO] Permissões do repositório local não ajustadas ({path}): {e}")
+
     def _is_sqlite(self, conn) -> bool:
         """Verifica se a conexão é SQLite."""
         import sqlite3

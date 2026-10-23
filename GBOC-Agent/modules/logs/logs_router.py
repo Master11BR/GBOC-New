@@ -8,7 +8,7 @@ logger = logging.getLogger("gboc_agent_logs")
 router = APIRouter(prefix="/api/v1/logs", tags=["Agent Logs"])
 
 @router.get("")
-async def get_agent_logs():
+def get_agent_logs():
     """Retorna os logs locais de execução do agente."""
     return {
         "status": "success",

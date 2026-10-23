@@ -190,18 +190,18 @@ def _run_check(force: bool = False):
 
 
 @router.get("/check")
-async def run_preemptive_check():
+def run_preemptive_check():
     """Executa verificação preemptiva"""
     try:
         report = _run_check()
         return {"status": "success", "data": report}
     except Exception as e:
         logger.warning(f"Preemptive fallback: {e}")
-        return {"status": "success", "data": {"alerts": [], "warnings": [], "risk_level": "unknown", "recommendations": []}}
+        return {"status": "error", "message": str(e), "data": {"alerts": [], "warnings": [], "risk_level": None, "recommendations": []}}
 
 
 @router.get("/alerts")
-async def get_alerts():
+def get_alerts():
     """Obtém alertas do sistema"""
     try:
         report = _run_check()
@@ -209,32 +209,33 @@ async def get_alerts():
             "status": "success",
             "alerts": report.get("alerts", []),
             "warnings": report.get("warnings", []),
-            "risk_level": report.get("risk_level", "unknown")
+            # nivel de risco calculado dos proprios alertas quando o relatorio nao traz (antes: 'unknown')
+            "risk_level": report.get("risk_level") or ("high" if report.get("alerts") else "medium" if report.get("warnings") else "low")
         }
     except Exception as e:
         logger.warning(f"Alerts fallback: {e}")
-        return {"status": "success", "alerts": [], "warnings": [], "risk_level": "unknown"}
+        return {"status": "error", "message": str(e), "alerts": [], "warnings": [], "risk_level": None}
 
 
 @router.get("/recommendations")
-async def get_recommendations():
+def get_recommendations():
     """Obtém recomendações do sistema"""
     try:
         report = _run_check()
         return {"status": "success", "recommendations": report.get("recommendations", [])}
     except Exception as e:
-        return {"status": "success", "recommendations": []}
+        return {"status": "error", "message": str(e), "recommendations": []}
 
 
 @router.get("/storage-forecast")
-async def get_storage_forecast():
+def get_storage_forecast():
     """Obtém previsão de armazenamento"""
     try:
         report = _run_check()
         storage = report.get("checks", {}).get("storage_capacity", {})
         return {"status": "success", "storage": storage}
     except Exception as e:
-        return {"status": "success", "storage": {}}
+        return {"status": "error", "message": str(e), "storage": {}}
 
 
 @router.get("/sla-compliance")
@@ -307,7 +308,7 @@ def get_sla_compliance(days: int = 30):
             compliant = sum(1 for t in tasks_sla if t['compliance'] == 'compliant')
             at_risk = sum(1 for t in tasks_sla if t['compliance'] == 'at_risk')
             non_compliant = sum(1 for t in tasks_sla if t['compliance'] == 'non_compliant')
-            overall_pct = (compliant / total_tasks * 100) if total_tasks > 0 else 100
+            overall_pct = (compliant / total_tasks * 100) if total_tasks > 0 else None  # sem tarefas: sem dado (antes 100%)
 
             return {
                 "status": "success",
@@ -316,13 +317,13 @@ def get_sla_compliance(days: int = 30):
                     "compliant": compliant,
                     "at_risk": at_risk,
                     "non_compliant": non_compliant,
-                    "compliance_pct": round(overall_pct, 1)
+                    "compliance_pct": round(overall_pct, 1) if overall_pct is not None else None
                 },
                 "tasks": tasks_sla
             }
     except Exception as e:
         logger.error(f"Erro no SLA compliance: {e}", exc_info=True)
-        return {"status": "success", "summary": {"total_tasks": 0, "compliant": 0, "at_risk": 0, "non_compliant": 0, "compliance_pct": 100}, "tasks": []}
+        return {"status": "error", "message": str(e), "summary": {"total_tasks": 0, "compliant": 0, "at_risk": 0, "non_compliant": 0, "compliance_pct": None}, "tasks": []}
 
 
 @router.get("/tasks-at-risk")
@@ -386,7 +387,7 @@ def get_tasks_at_risk():
             return {"status": "success", "tasks_at_risk": risks, "total": len(risks)}
     except Exception as e:
         logger.error(f"Erro tasks-at-risk: {e}", exc_info=True)
-        return {"status": "success", "tasks_at_risk": [], "total": 0}
+        return {"status": "error", "message": str(e), "tasks_at_risk": [], "total": 0}
 
 
 @router.get("/error-classification")
@@ -436,7 +437,7 @@ def get_error_classification(days: int = 30):
             }
     except Exception as e:
         logger.error(f"Erro na classificação: {e}", exc_info=True)
-        return {"status": "success", "errors": [], "categories": {}, "total_errors": 0}
+        return {"status": "error", "message": str(e), "errors": [], "categories": {}, "total_errors": 0}
 
 
 def _classify_error(error_msg: str) -> str:

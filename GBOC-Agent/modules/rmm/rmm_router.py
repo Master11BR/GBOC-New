@@ -107,7 +107,7 @@ async def rmm_execute_command(request: Request):
 # ─── GERENCIADOR DE PROCESSOS ───────────────────────────────────────────────
 
 @router.get("/processes")
-async def rmm_get_processes():
+def rmm_get_processes():
     """Retorna lista detalhada de processos ativos no agente."""
     if not PSUTIL_AVAILABLE:
         return {"status": "success", "processes": [
@@ -212,25 +212,33 @@ async def rmm_control_service(request: Request):
         if not sname:
             return {"status": "error", "message": "Nome do serviço é obrigatório"}
 
+        if action not in ("start", "stop", "restart"):
+            return {"status": "error", "message": f"Ação inválida: {action}"}
+        env = None
         if os.name == 'nt':
-            if action == 'start':
-                cmd = ["sc.exe", "start", sname]
-            elif action == 'stop':
-                cmd = ["sc.exe", "stop", sname]
-            else:
-                cmd = ["powershell", "-Command", f"Restart-Service -Name '{sname}' -Force"]
+            # Nome do servico por variavel de ambiente (antes: interpolado no script -> injecao)
+            env = dict(os.environ, GBOC_SVC=str(sname))
+            verb = {"start": "Start-Service", "stop": "Stop-Service", "restart": "Restart-Service"}[action]
+            cmd = ["powershell", "-NoProfile", "-Command",
+                   "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; $ErrorActionPreference='Stop'; "
+                   f"{verb} -Name $env:GBOC_SVC -Force; (Get-Service -Name $env:GBOC_SVC).Status.ToString()"]
         else:
             cmd = ["systemctl", action, sname]
 
-        res = await asyncio.to_thread(subprocess.run, cmd, capture_output=True, text=True, timeout=15)
-        _log_audit_rmm("service_control", {"service": sname, "action": action})
-
+        res = await asyncio.to_thread(subprocess.run, cmd, capture_output=True, text=True,
+                                      encoding="utf-8", errors="replace", timeout=60, env=env)
+        ok = res.returncode == 0
+        _log_audit_rmm("service_control", {"service": sname, "action": action, "ok": ok})
+        out = (res.stdout or "").strip()
+        if not ok:
+            return {"status": "error", "service": sname, "action": action,
+                    "message": f"Falha ao executar '{action}' no serviço '{sname}': {(res.stderr or out).strip()[:300]}"}
         return {
             "status": "success",
             "service": sname,
             "action": action,
-            "message": f"Comando '{action}' enviado para o serviço '{sname}'.",
-            "output": res.stdout or res.stderr
+            "message": f"'{action}' executado no serviço '{sname}'" + (f" (estado atual: {out.splitlines()[-1]})" if out else "."),
+            "output": out
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
@@ -289,7 +297,7 @@ async def rmm_system_info():
         return {"status": "error", "message": str(e)}
 
 @router.get("/network")
-async def rmm_network_connections():
+def rmm_network_connections():
     """Retorna soquetes de rede ativos e conexões estabelecidas."""
     try:
         connections = []
@@ -363,7 +371,7 @@ async def rmm_get_agent_mirror():
         return {"status": "error", "message": str(e)}
 
 @router.post("/isolation")
-async def rmm_toggle_isolation(request: Request):
+def rmm_toggle_isolation(request: Request):
     """Ativa isolamento de rede de emergência no agente."""
     _log_audit_rmm("emergency_isolation", {"status": "activated"})
     return {"status": "success", "message": "Isolamento de Rede de Emergência ativado no Agente com sucesso."}

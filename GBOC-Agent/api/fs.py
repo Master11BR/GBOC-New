@@ -44,7 +44,7 @@ def _list_windows_drives() -> List[Dict[str, Any]]:
 
 
 @router.get("/browse")
-async def browse(path: Optional[str] = Query(default=None)) -> Dict[str, Any]:
+def browse(path: Optional[str] = Query(default=None)) -> Dict[str, Any]:
     """
     Lista diretórios do servidor.
     - Se path não for informado:

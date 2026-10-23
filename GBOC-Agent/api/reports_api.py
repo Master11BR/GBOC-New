@@ -170,7 +170,7 @@ def _agent_report_response(rep: Dict[str, Any], format: str):
 
 @router.get("/api/reports/catalog")
 @router.get("/api/v1/reports/catalog")
-async def get_reports_catalog():
+def get_reports_catalog():
     """Catálogo dos relatórios reais disponíveis no Agente."""
     items = rc.catalog("agent")
     return {"status": "success", "total": len(items), "engine_version": rc.REPORT_ENGINE_VERSION,
@@ -266,7 +266,7 @@ from fastapi.responses import Response
 
 @router.get("/api/reports/flagships")
 @router.get("/api/v1/reports/flagships")
-async def list_agent_flagship_reports():
+def list_agent_flagship_reports():
     """Retorna o catálogo dos 8 relatórios flagship executivos no GBOC Agent (Schema v4.0.0)."""
     return JSONResponse({
         "status": "success",
@@ -414,7 +414,7 @@ async def get_compare_periods_endpoint(periods: str = Query("7,30,90")):
 
 @router.get("/api/reports/schema")
 @router.get("/api/v1/reports/schema")
-async def get_reports_schema():
+def get_reports_schema():
     """Retorna a especificação normativa Schema v4.0.0 para integrações de BI e API."""
     return JSONResponse({
         "schema_version": "4.0.0",
@@ -451,18 +451,21 @@ def get_system_health():
     }
 
     core = _get_core()
-    summary = {"total": 0, "ok": 0, "failed": 0, "success_rate": 100.0}
+    # success_rate None = sem execucoes no periodo (antes: 100% fixo, e a tabela consultada nem existia)
+    summary = {"total": 0, "ok": 0, "failed": 0, "success_rate": None}
     engines = []
+    db_ok = False
     try:
         with core.get_db_connection() as conn:
             cur = conn.cursor()
             cur.execute("""
                 SELECT COUNT(*),
-                       SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END),
-                       SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END)
-                FROM backups WHERE start_time >= datetime('now', '-1 day')
+                       SUM(CASE WHEN status IN ('completed','success','warning') THEN 1 ELSE 0 END),
+                       SUM(CASE WHEN status IN ('failed','error','interrupted') THEN 1 ELSE 0 END)
+                FROM task_executions WHERE started_at >= NOW() - INTERVAL '1 day'
             """)
             r = cur.fetchone()
+            db_ok = True
             if r and r[0]:
                 tot = int(r[0] or 0)
                 ok = int(r[1] or 0)
@@ -470,15 +473,21 @@ def get_system_health():
                     "total": tot,
                     "ok": ok,
                     "failed": int(r[2] or 0),
-                    "success_rate": round(ok / tot * 100, 1) if tot else 100.0
+                    "success_rate": round(ok / tot * 100, 1) if tot else None
                 }
             cur.execute("SELECT engine, path, detected FROM detected_engines LIMIT 10")
             for erow in cur.fetchall():
                 engines.append({"engine": erow[0], "path": erow[1], "detected": bool(erow[2])})
     except Exception as db_err:
         logger.warning(f"Erro ao consultar DB para healthcheck: {db_err}")
+        summary["error"] = f"Banco de dados indisponível: {str(db_err)[:200]}"
 
-    status_str = "healthy" if summary["failed"] == 0 else ("degraded" if summary["success_rate"] >= 80 else "unhealthy")
+    if not db_ok:
+        status_str = "error"
+    elif summary["failed"] == 0:
+        status_str = "healthy"
+    else:
+        status_str = "degraded" if (summary["success_rate"] or 0) >= 80 else "unhealthy"
 
     return JSONResponse({
         "status": status_str,
@@ -493,7 +502,7 @@ def get_system_health():
 
 @router.get("/api/system/version")
 @router.get("/api/v1/system/version")
-async def get_system_version():
+def get_system_version():
     """Retorna versão oficial, build e metadados de release da plataforma."""
     try:
         from version import GBOC_VERSION, GBOC_BUILD, GBOC_EDITION, GBOC_RELEASE_DATE, GBOC_PLATFORM, version_string

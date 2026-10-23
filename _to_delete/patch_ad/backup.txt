@@ -1,0 +1,160 @@
+    def _ad_backup_worker(
+        self,
+        job_id: str,
+        target_dir: str,
+        include_sysvol: bool,
+        include_registry: bool,
+        include_dns: bool
+    ):
+        """Backup real do AD: NTDS+SYSVOL via ntdsutil IFM (snapshot VSS), hives conferidos, zonas DNS e SHA-256."""
+        from engines.disaster_recovery_engine import dr_engine as _dr
+        start_time = time.time()
+        captured: List[str] = []
+        missing: List[str] = []
+        self._append_log(job_id, f"Iniciando backup do Active Directory em: {target_dir}")
+        try:
+            if sys.platform != "win32":
+                raise RuntimeError("Backup do Active Directory disponível apenas no Windows.")
+            info = _dr.get_system_dr_info(force_refresh=True)
+            if not info.get("is_domain_controller"):
+                raise RuntimeError("Este servidor não é controlador de domínio: não há base NTDS para copiar. Nenhum backup foi gerado.")
+            os.makedirs(target_dir, exist_ok=True)
+            top = self.get_ad_topology()
+            self._update_progress(job_id, 5)
+
+            # 1. NTDS (+ SYSVOL) via IFM - reaproveita a rotina verificada do motor de DR (esentutl incluso)
+            ad_info = _dr._backup_ntds_ifm(job_id, target_dir, captured, missing) if include_sysvol else None
+            if not include_sysvol:
+                ifm_dir = os.path.join(target_dir, "AD_IFM")
+                self._append_log(job_id, "Gerando cópia IFM do NTDS (sem SYSVOL) com ntdsutil...")
+                try:
+                    rc, out = _dr._run_console(["ntdsutil", "activate instance ntds", "ifm", f'create full "{ifm_dir}"', "quit", "quit"], timeout=7200)
+                except (OSError, subprocess.TimeoutExpired) as ex:
+                    rc, out = -1, str(ex)
+                ntds = os.path.join(ifm_dir, "Active Directory", "ntds.dit")
+                if rc == 0 and os.path.exists(ntds) and os.path.getsize(ntds) > 0:
+                    captured.append("NTDS")
+                    self._append_log(job_id, f"✅ NTDS copiado ({_dr._fmt_size(os.path.getsize(ntds))})")
+                else:
+                    missing.append("NTDS (Active Directory)")
+                    self._append_log(job_id, f"❌ Cópia IFM do NTDS falhou (código {rc}): {out[-400:] or 'sem mensagem'}")
+                ad_info = {"included": True, "method": "ntdsutil ifm (create full)", "ntdsutil_exit_code": rc}
+            # Mensagens do helper sao gravadas no job do motor de DR: replicar para este job
+            for entry in (_dr.active_jobs.get(job_id, {}) or {}).get("logs", []):
+                self._append_log(job_id, entry.get("message", ""))
+            self._update_progress(job_id, 60)
+
+            # 2. Hives do registro, cada um conferido
+            if include_registry:
+                reg_dir = os.path.join(target_dir, "Registry_Hives")
+                os.makedirs(reg_dir, exist_ok=True)
+                self._append_log(job_id, "Exportando hives do registro (SAM, SECURITY, SYSTEM, SOFTWARE)...")
+                for hive in ["SAM", "SECURITY", "SYSTEM", "SOFTWARE"]:
+                    hive_path = os.path.join(reg_dir, f"{hive}.hiv")
+                    try:
+                        rc, out = _dr._run_console(["reg", "save", f"HKLM\\{hive}", hive_path, "/y"], timeout=600)
+                    except subprocess.TimeoutExpired:
+                        rc, out = -1, "tempo esgotado (600 s)"
+                    except OSError as ex:
+                        rc, out = -1, f"{ex}. O Windows ou o antivírus/EDR bloqueou o reg.exe."
+                    size = os.path.getsize(hive_path) if os.path.exists(hive_path) else 0
+                    if rc == 0 and size > 0:
+                        captured.append(f"hive {hive}")
+                        self._append_log(job_id, f"✅ Hive {hive} salvo ({_dr._fmt_size(size)})")
+                    else:
+                        missing.append(f"hive {hive}")
+                        self._append_log(job_id, f"❌ Hive {hive} NÃO foi salvo (código {rc}): {out[:300] or 'sem mensagem'}")
+            self._update_progress(job_id, 75)
+
+            # 3. Zonas DNS integradas ao AD (Export-DnsServerZone grava em %windir%\System32\dns)
+            if include_dns:
+                dns_dir = os.path.join(target_dir, "DNS_Zones")
+                os.makedirs(dns_dir, exist_ok=True)
+                self._append_log(job_id, "Exportando zonas DNS integradas ao AD (Export-DnsServerZone)...")
+                stamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                ps = (
+                    "$ErrorActionPreference='Stop'; Import-Module DnsServer; "
+                    "$z = Get-DnsServerZone | Where-Object { $_.IsDsIntegrated -and -not $_.IsAutoCreated -and $_.ZoneName -ne 'TrustAnchors' }; "
+                    f"foreach ($i in $z) {{ $f = 'gboc_{stamp}_' + ($i.ZoneName -replace '[^\\w.-]','_') + '.dns'; "
+                    "Export-DnsServerZone -Name $i.ZoneName -FileName $f; Write-Output \"$($i.ZoneName)|$f\" }"
+                )
+                try:
+                    rc, out = _dr._run_console(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps], timeout=600)
+                except (OSError, subprocess.TimeoutExpired) as ex:
+                    rc, out = -1, str(ex)
+                dns_src = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32", "dns")
+                zones = 0
+                for line in out.splitlines():
+                    if "|" not in line:
+                        continue
+                    zname, fname = line.strip().split("|", 1)
+                    src = os.path.join(dns_src, fname)
+                    if os.path.exists(src):
+                        shutil.move(src, os.path.join(dns_dir, f"{zname}.dns"))
+                        zones += 1
+                if rc == 0 and zones:
+                    captured.append(f"DNS ({zones} zona(s))")
+                    self._append_log(job_id, f"✅ {zones} zona(s) DNS exportada(s)")
+                elif rc == 0:
+                    self._append_log(job_id, "ℹ️ Nenhuma zona DNS integrada ao AD encontrada neste servidor.")
+                else:
+                    missing.append("zonas DNS")
+                    self._append_log(job_id, f"❌ Exportação das zonas DNS falhou (código {rc}): {out[-300:] or 'sem mensagem'}")
+            self._update_progress(job_id, 85)
+
+            # 4. Manifesto com SHA-256 real
+            self._append_log(job_id, "Calculando SHA-256 dos arquivos capturados...")
+            manifest_file = os.path.join(target_dir, "ad_backup_manifest.json")
+            files = []
+            for root, _d, names in os.walk(target_dir):
+                for n in names:
+                    p = os.path.join(root, n)
+                    if os.path.abspath(p) == os.path.abspath(manifest_file):
+                        continue
+                    try:
+                        files.append({"path": os.path.relpath(p, target_dir), "size_bytes": os.path.getsize(p), "sha256": _dr._sha256(p)})
+                    except OSError as ex:
+                        files.append({"path": os.path.relpath(p, target_dir), "error": str(ex)})
+            manifest = {
+                "gboc_version": f"{AGENT_VERSION} Enterprise",
+                "backup_type": "ACTIVE_DIRECTORY_IFM",
+                "forest": top.get("forest_name"),
+                "domain": top.get("domain_name"),
+                "fsmo_roles": top.get("fsmo_roles"),
+                "active_directory": ad_info,
+                "captured": captured,
+                "missing": missing,
+                "files": files,
+                "created_at": datetime.now().isoformat(),
+                "duration_seconds": round(time.time() - start_time, 2)
+            }
+            with open(manifest_file, "w", encoding="utf-8") as f:
+                json.dump(manifest, f, indent=2, ensure_ascii=False)
+            self._append_log(job_id, f"Manifesto gerado: {len(files)} arquivo(s) com SHA-256")
+
+            if not any(c == "NTDS" for c in captured):
+                raise RuntimeError("A base NTDS não foi copiada; o backup do AD não é utilizável. " + ("Faltaram: " + ", ".join(missing) if missing else ""))
+            if missing:
+                msg = "Itens não capturados: " + ", ".join(missing)
+                self._append_log(job_id, f"⚠️ Backup do AD concluído PARCIALMENTE. {msg}")
+                self._finish(job_id, "partial", msg)
+            else:
+                self._append_log(job_id, f"✅ Backup do Active Directory concluído: {', '.join(captured)}.")
+                self._finish(job_id, "completed")
+        except Exception as e:
+            logger.error(f"Erro no backup do AD {job_id}: {e}", exc_info=True)
+            self._append_log(job_id, f"❌ Backup do Active Directory falhou: {e}")
+            self._finish(job_id, "failed", str(e))
+
+    def _finish(self, job_id: str, status: str, error: Optional[str] = None):
+        with self.lock:
+            job = self.active_jobs.get(job_id)
+            if not job or job.get("status") == "cancelled":
+                return
+            job["status"] = status
+            if status in ("completed", "partial"):
+                job["progress"] = 100
+            job["completed_at"] = datetime.now().isoformat()
+            if error:
+                job["error"] = error
+

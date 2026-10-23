@@ -209,6 +209,7 @@ function Save-State($chosen, $failed) {
 }
 
 function Install-Deps($cand) {
+    $env:PYYAML_FORCE_LIBYAML = "0"   # PyYAML sem wheel (ex.: Python 3.15): monta em Python puro, sem exigir compilador C++
     if (-not (Test-Path $Requirements)) { return $false }
     Write-Log "Instalando dependencias no Python $($cand.Version) ($($cand.Path)) - pode levar alguns minutos..."
     $r = Invoke-Exe $cand.Path "-m pip install --disable-pip-version-check -q -r `"$Requirements`"" 1800

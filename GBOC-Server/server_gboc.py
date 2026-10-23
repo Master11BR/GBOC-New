@@ -1139,7 +1139,7 @@ except Exception as _e:
 # Endpoints estáticos de Layout Manager (Vertical / Horizontal + Temas)
 @app.get("/static/gboc-layout-manager.js", include_in_schema=False)
 @app.get("/gboc-layout-manager.js", include_in_schema=False)
-async def get_layout_manager():
+def get_layout_manager():
     # Mesma ordem das demais rotas estáticas: static/ (sincronizada por tools/sync_css.py) primeiro, raiz como reserva.
     # Antes servia só a cópia da raiz, que o sync não atualiza — correções do layout manager não chegavam ao Server.
     found = _find_asset("gboc-layout-manager.js") or os.path.join(os.path.dirname(__file__), "gboc-layout-manager.js")
@@ -1147,12 +1147,12 @@ async def get_layout_manager():
 
 @app.get("/static/ai_assistant.js", include_in_schema=False)
 @app.get("/ai_assistant.js", include_in_schema=False)
-async def get_ai_assistant_js():
+def get_ai_assistant_js():
     return FileResponse(os.path.join(os.path.dirname(__file__), "ai_assistant.js"), media_type="application/javascript")
 
 @app.get("/static/_topbar.html", include_in_schema=False)
 @app.get("/_topbar.html", include_in_schema=False)
-async def get_topbar_html():
+def get_topbar_html():
     return FileResponse(os.path.join(os.path.dirname(__file__), "_topbar.html"), media_type="text/html")
 
 # ==============================================================================
@@ -1171,7 +1171,7 @@ async def get_topbar_html():
 @app.get("/api/v1/system/version", tags=["System"])
 @app.get("/api/system/info", tags=["System"])
 @app.get("/api/system/version", tags=["System"])
-async def get_server_version_endpoint():
+def get_server_version_endpoint():
     """Retorna informações detalhadas do versionamento semântico 2.0 e contrato de UI Model."""
     info = get_version_info()
     if isinstance(info, dict):
@@ -1185,7 +1185,7 @@ async def get_server_version_endpoint():
     return info
 
 @app.get("/api/v1/system/ui-config", tags=["System"])
-async def get_ui_config_endpoint():
+def get_ui_config_endpoint():
     """Retorna a configuração oficial estrita do Modelo UI/UX Moderno."""
     return {
         "UI_MODEL": "modern",
@@ -1260,7 +1260,7 @@ async def list_failed_jobs_alias(limit: int = 50):
 #   2. GBOC-Server/           <- Fallback de seguranca (somente se arquivo nao existir em static/)
 #   3. GBOC-Agent/static/     <- Fallback de desenvolvimento (DevTools); NAO DEVE ativar em prod
 @app.get("/static/{filename:path}", include_in_schema=False)
-async def serve_static_asset(filename: str):
+def serve_static_asset(filename: str):
     clean_fn = (filename or '').lstrip("/\\")
     if clean_fn.startswith("static/") or clean_fn.startswith("static\\"):
         clean_fn = clean_fn[7:]
@@ -1272,7 +1272,7 @@ async def serve_static_asset(filename: str):
 # Rota dinamica universal para arquivos JavaScript (URLs sem prefixo /static/)
 # Segue a MESMA ordem de serve_static_asset() para consistencia.
 @app.get("/{file:path}.js", include_in_schema=False)
-async def serve_any_js_page(file: str):
+def serve_any_js_page(file: str):
     clean_p = (file or '').lstrip("/\\")
     if clean_p.startswith("static/") or clean_p.startswith("static\\"):
         clean_p = clean_p[7:]
@@ -1285,7 +1285,7 @@ async def serve_any_js_page(file: str):
 # Rota dinamica universal para arquivos CSS (URLs sem prefixo /static/: ex: /style.css)
 # Segue a MESMA ordem de serve_static_asset() para consistencia.
 @app.get("/{file:path}.css", include_in_schema=False)
-async def serve_any_css_page(file: str):
+def serve_any_css_page(file: str):
     clean_p = (file or '').lstrip("/\\")
     if clean_p.startswith("static/") or clean_p.startswith("static\\"):
         clean_p = clean_p[7:]
@@ -1325,7 +1325,7 @@ async def serve_any_html_page(page_name: str, request: Request):
 
 @app.get("/login", include_in_schema=False)
 @app.get("/login.html", include_in_schema=False)
-async def login_page():
+def login_page():
     candidates = [
         os.path.join(os.path.dirname(__file__), "login.html"),
         os.path.join(os.path.dirname(__file__), "static", "login.html"),
@@ -1356,7 +1356,7 @@ async def server_auth_status(request: Request):
     }
 
 @app.get("/api/v1/auth/oauth/{provider}")
-async def server_auth_oauth_provider(provider: str):
+def server_auth_oauth_provider(provider: str):
     prov = provider.lower().strip()
     if prov == "google":
         enabled = os.getenv("AUTH_GOOGLE_ENABLED", "false").lower() in ("true", "1", "yes")
@@ -2114,7 +2114,7 @@ async def manual_sync_request(data: ManualSyncRequest):
     return await handle_manual_sync(data.agent_id, payload)
 
 @app.get("/api/v1/agents/{agent_id}/realtime-data")
-async def get_agent_realtime_data(agent_id: str):
+def get_agent_realtime_data(agent_id: str):
     """Obtém dados em tempo real de um agente específico"""
     data = manager.get_agent_data(agent_id)
     def sanitize_value(value):
@@ -2136,7 +2136,7 @@ async def get_agent_realtime_data(agent_id: str):
     return sanitized_data
 
 @app.get("/api/v1/agents/realtime-status")
-async def get_all_agents_realtime_status():
+def get_all_agents_realtime_status():
     """Obtém status em tempo real de todos os agentes conectados"""
     return {
         "connected_agents": list(manager.active_connections.keys()),
@@ -2421,7 +2421,7 @@ async def push_sync_agents():
 # ===========================
 
 @app.get("/api/v1/version")
-async def get_version():
+def get_version():
     """Endpoint de versão — usado pelo agente para testar conexão com o servidor"""
     return {
         "version": SERVER_VERSION,
@@ -2839,7 +2839,7 @@ def get_comprehensive_analytics():
         total_all = exec_stats['total'] or 1
         success_rate_all = round((exec_stats['success'] / total_all) * 100, 1) if total_all > 0 else 0
         total_24h = last_24h['total'] or 1
-        success_rate_24h = round((last_24h['success'] / total_24h) * 100, 1) if last_24h['total'] > 0 else 100
+        success_rate_24h = round((last_24h['success'] / total_24h) * 100, 1) if last_24h['total'] > 0 else None   # sem execuções: sem taxa
 
         # ── 2. Tendência de Desempenho (últimos 7 dias vs anteriores) ──
         cur.execute("""
@@ -3345,7 +3345,7 @@ def stats(request: Request):
             "total_agents": agt['total'], "online_agents": agt['online'],
             "offline_agents": agt['total'] - agt['online'], "backups_24h": bkp['total'], 
             "failed_24h": bkp['failed'],
-            "success_rate_24h": int((bkp['success']/bkp['total']*100) if bkp['total']>0 else 100),
+            "success_rate_24h": int(bkp['success']/bkp['total']*100) if bkp['total'] > 0 else None,   # None = sem backups (não 100%)
             "total_gb_7d": round(vol7d['bytes'] / (1024**3), 2),
             "total_alerts": alerts['cnt']
         }
@@ -3355,6 +3355,61 @@ def stats(request: Request):
     finally:
         if 'cur' in locals() and cur: cur.close()
         release_db(conn)
+
+@app.get("/api/v1/dr/kpis")
+def dr_kpis(request: Request):
+    """KPIs de Disaster Recovery calculados dos dados REAIS sincronizados pelos agentes (antes eram texto fixo
+    na tela: "RTO < 5 min", "RPO < 15 min", "100% OK"). Sem dados -> null; a tela mostra "Sem dados".
+      readiness : % de backups bem-sucedidos nas últimas 24 h
+      rto       : duração média das restaurações concluídas (90 dias)
+      rpo       : pior idade do último backup bem-sucedido entre as tarefas ativas (30 dias)
+      tests     : testes de restauração aprovados / executados (30 dias)"""
+    conn = None
+    try:
+        user = _get_server_user_from_request(request)
+        tenant_id = user.get('tenant_id') if user else None
+        conn = get_db(); cur = conn.cursor(cursor_factory=RealDictCursor)
+        tj = "JOIN agents a ON a.agent_id = x.agent_id" + (" AND a.tenant_id = %(t)s" if tenant_id else "")
+        p = {"t": tenant_id}
+        cur.execute(f"""SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE x.status IN ('completed','success')) AS ok
+                        FROM agent_task_executions x {tj}
+                        WHERE x.started_at >= LOCALTIMESTAMP - INTERVAL '24 hours'""", p)
+        r24 = cur.fetchone()
+        cur.execute(f"""SELECT COUNT(*) AS n, AVG(x.duration_seconds) AS avg_s
+                        FROM agent_restore_history x {tj}
+                        WHERE x.status IN ('completed','success') AND x.duration_seconds > 0
+                          AND COALESCE(x.created_at, x.synced_at) >= LOCALTIMESTAMP - INTERVAL '90 days'""", p)
+        rto = cur.fetchone()
+        cur.execute(f"""SELECT x.agent_id, x.task_id,
+                               MAX(COALESCE(x.completed_at, x.started_at)) FILTER (WHERE x.status IN ('completed','success')) AS last_ok
+                        FROM agent_task_executions x {tj}
+                        WHERE x.started_at >= LOCALTIMESTAMP - INTERVAL '30 days'
+                        GROUP BY x.agent_id, x.task_id""", p)
+        tasks = cur.fetchall()
+        cur.execute("SELECT LOCALTIMESTAMP AS now")
+        now = cur.fetchone()['now']
+        ages = [(now - t['last_ok']).total_seconds() for t in tasks if t['last_ok']]
+        never = sum(1 for t in tasks if not t['last_ok'])
+        cur.execute(f"""SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE x.status = 'passed') AS passed
+                        FROM agent_restore_tests x {tj}
+                        WHERE COALESCE(x.completed_at, x.started_at) >= LOCALTIMESTAMP - INTERVAL '30 days'""", p)
+        tst = cur.fetchone()
+        return {
+            "status": "success",
+            "readiness": {"percent": round(r24['ok'] * 100.0 / r24['total'], 1) if r24['total'] else None,
+                          "ok": r24['ok'], "total": r24['total']},
+            "rto": {"avg_seconds": round(float(rto['avg_s'])) if rto['avg_s'] else None, "restores": rto['n']},
+            "rpo": {"worst_seconds": round(max(ages)) if ages else None, "tasks": len(tasks), "tasks_without_success": never},
+            "tests": {"passed": tst['passed'], "total": tst['total'],
+                      "percent": round(tst['passed'] * 100.0 / tst['total'], 1) if tst['total'] else None},
+        }
+    except Exception as e:
+        logger.error(f"Erro ao calcular KPIs de DR: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if 'cur' in locals() and cur: cur.close()
+        release_db(conn)
+
 
 @app.get("/api/v1/agents")
 def list_agents(request: Request):
@@ -3599,7 +3654,7 @@ except Exception as _e: logger.warning(f"Active Directory router: {_e}")
 # --- SERVER AI CONFIG API (compatibilidade) ---
 # Fonte única da configuração de IA: modules.ai_assistant (data/server_ai_config.json).
 @app.get("/api/v1/server/ai-config")
-async def get_server_ai_config(request: Request):
+def get_server_ai_config(request: Request):
     """Retorna as configurações globais de IA/LLM do Servidor (chaves mascaradas)."""
     from modules.ai_assistant.ai_assistant_router import _require_auth, load_server_ai_config
     from modules.ai_assistant.ai_providers import mask_config
@@ -3630,7 +3685,7 @@ async def get_agent_logs_compat(agent_id: str, level: Optional[str] = None, limi
     return await get_agent_logs_by_id(agent_id=agent_id, level=level, limit=limit, hours=hours)
 
 @app.get("/")
-async def index(request: Request):
+def index(request: Request):
     # Sempre exigir autenticação — se não há usuários, login.html mostra setup
     user = _get_server_user_from_request(request)
     if not user:

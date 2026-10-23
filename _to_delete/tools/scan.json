@@ -1,0 +1,51 @@
+{
+ "unchecked_success": [
+  "engines/ad_backup_engine.py:244 _ad_backup_worker",
+  "engines/disaster_recovery_engine.py:831 _boot_media_worker",
+  "engines/instant_recovery_engine.py:167 stop_datastore_share",
+  "engines/instant_recovery_engine.py:273 stop_instant_vm_recovery",
+  "engines/k8s_engine.py:81 backup_docker_volumes",
+  "engines/virtual_drive_mount_engine.py:51 mount_virtual_drive",
+  "engines/virtual_lab_engine.py:30 run_isolated_boot_verification"
+ ],
+ "fake_progress": [
+  "engines/ad_backup_engine.py:395 _ad_restore_worker",
+  "engines/realtime_backup_monitor.py:222 _save_to_database",
+  "engines/realtime_backup_monitor.py:257 _finalize_in_database"
+ ],
+ "random": [],
+ "english_parse": [],
+ "ps_inject": [
+  "engines/ad_granular_explorer.py:36 list_ad_objects_from_live_or_snapshot: ['filter_type', 'search_query']",
+  "engines/instant_recovery_engine.py:126 start_datastore_share: ['folder_path']",
+  "engines/sql_granular_explorer.py:237 list_mssql_tables: ['database', 'password', 'server', 'trusted_connection', 'user']",
+  "engines/vmware_hypervisor_engine.py:395 create_agentless_rct_checkpoint: ['vm_name']"
+ ],
+ "text_console": [
+  "engines/ad_backup_engine.py:175 get_ad_health: net_share = subprocess.run([\"net\", \"share\"], capture_output=True, text=True, timeout=8)",
+  "engines/diagnostic_module.py:919 _get_default_gateway: result = subprocess.run(",
+  "engines/hermes_self_heal_engine.py:362 _check_service: proc = subprocess.run(",
+  "engines/repository_manager.py:62 _secure_windows_directory: r = subprocess.run([\"icacls\", path, \"/grant\", *grants, \"/T\", \"/C\", \"/Q\"],",
+  "engines/virtual_lab_engine.py:82 run_isolated_boot_verification: net_res = subprocess.run(",
+  "engines/vmware_hypervisor_engine.py:251 check_hyperv_installed: sc_res = subprocess.run([\"sc.exe\", \"query\", \"vmms\"], capture_output=True, text=True, timeout=5)"
+ ],
+ "fixed_success": [
+  "api/advanced_stats_api.py:219 get_comprehensive_stats",
+  "api/advanced_stats_api.py:236 get_health_score",
+  "api/advanced_stats_api.py:249 get_predictions",
+  "api/advanced_stats_api.py:286 get_trends",
+  "api/errors.py:28 get_errors",
+  "api/integrity_api.py:360 get_integrity_history",
+  "api/preemptive_api.py:198 run_preemptive_check",
+  "api/preemptive_api.py:214 get_alerts",
+  "api/preemptive_api.py:225 get_recommendations",
+  "api/preemptive_api.py:236 get_storage_forecast",
+  "api/preemptive_api.py:323 get_sla_compliance",
+  "api/preemptive_api.py:387 get_tasks_at_risk",
+  "api/preemptive_api.py:437 get_error_classification",
+  "api/system_api.py:29 get_system_version_info",
+  "api/tasks.py:339 get_tasks_status",
+  "api/tasks.py:466 get_running_tasks_detailed",
+  "api/tasks.py:802 get_task_history"
+ ]
+}

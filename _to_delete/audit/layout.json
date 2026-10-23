@@ -1,0 +1,192 @@
+{
+ "_sidebar.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "_topbar.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "active-directory.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "alerts.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "audit.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "auth-diagnostic.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "changelog.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "compliance.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "config-manager.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "database-backup.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "diagnostic.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "disaster-recovery.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "duplicati-native.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "engines.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "enterprise-features.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "failed-jobs.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "hermes-agent.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "import.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "integrity.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "logs.html": {
+  "1600": {
+   "overflow": [
+    "cortado .toast \"i INFO CORE.SERVER_CONFIG 22/10/2026, 21\"",
+    "cortado .toast \"i INFO API.REPOSITORIES 22/10/2026, 21:5\"",
+    "cortado .toast \"! WARNING AGENT_GBOC 22/10/2026, 21:52:3\"",
+    "cortado .toast \"✓ SUCCESS DUPLICATINATIVE 22/10/2026, 21\"",
+    "cortado .toast \"i INFO ENGINES.BACKUP_IMPORTER 22/10/202\"",
+    "cortado .toast \"i INFO API.IMPORT_API 22/10/2026, 21:52:\"",
+    "cortado .toast \"! WARNING AGENT_GBOC 22/10/2026, 21:52:1\"",
+    "cortado .toast \"! WARNING AGENT_GBOC 22/10/2026, 21:52:0\""
+   ]
+  },
+  "1280": {
+   "overflow": [
+    "cortado .toast \"i INFO CORE.SERVER_CONFIG 22/10/2026, 21\"",
+    "cortado .toast \"i INFO API.REPOSITORIES 22/10/2026, 21:5\"",
+    "cortado .toast \"! WARNING AGENT_GBOC 22/10/2026, 21:56:2\"",
+    "cortado .toast \"✓ SUCCESS DUPLICATINATIVE 22/10/2026, 21\"",
+    "cortado .toast \"i INFO ENGINES.BACKUP_IMPORTER 22/10/202\"",
+    "cortado .toast \"i INFO API.IMPORT_API 22/10/2026, 21:56:\"",
+    "cortado .toast \"! WARNING AGENT_GBOC 22/10/2026, 21:56:0\"",
+    "cortado .toast \"✓ SUCCESS ENGINES.ENGINE_PATHS 22/10/202\""
+   ]
+  }
+ },
+ "m365-exchange.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "network.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "notification-channels.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "onboarding.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "overview.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "power-tools.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "protected-workloads.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "ransomware.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "replication.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "reports.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "repositories.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "restore.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "saas-cloud-enterprise.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "schema-check.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "settings.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "statistics.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "storage-usage.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "tape-backup.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "tasks.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "ui-style-selector.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "users.html": {
+  "1600": {},
+  "1280": {}
+ },
+ "virtualization.html": {
+  "1600": {},
+  "1280": {}
+ }
+}

@@ -461,7 +461,7 @@ code { font-family: "Consolas", monospace; background: var(--bg-input); color: v
 .sys-text strong { display: block; font-size: 0.8em; color: var(--text-muted); }
 .sys-text span { font-weight: 600; font-size: 0.95em; color: var(--text); }
 .overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 30px; }
-.stat-card { background: var(--bg-card); padding: 20px; border-radius: 10px; border: 1px solid var(--border); border-left: 5px solid var(--primary); color: var(--text); transition: transform 0.2s; min-height: 140px; }
+.stat-card { background: var(--bg-card); padding: 20px; border-radius: 10px; border: 1px solid var(--border); border-left: 5px solid var(--primary); color: var(--text); transition: transform 0.2s; min-height: 0; }
 .stat-card:hover { transform: translateY(-2px); background: var(--card-hover); }
 .stat-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 .stat-header h3 { margin: 0; font-size: 0.9em; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }

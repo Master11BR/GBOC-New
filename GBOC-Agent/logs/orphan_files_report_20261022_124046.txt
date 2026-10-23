@@ -1,0 +1,1319 @@
+================================================================================
+GBOC 14.8.2 - RELATÓRIO DE ARQUIVOS ÓRFÃOS
+================================================================================
+
+Data: 2026-10-22T12:40:46.107558
+
+Total de arquivos Python: 241
+Módulos importados: 407
+Arquivos órfãos: 144
+
+================================================================================
+ARQUIVOS ÓRFÃOS DETECTADOS
+================================================================================
+
+Arquivo: start_scheduler.py
+  Propósito: script
+  Tamanho: 6.48 KB
+  Linhas: 178
+  Modificado: 2026-10-20T20:09:30.109948
+  É script principal: True
+  Sugestões de integração:
+    - document_as_tool: Documentar como ferramenta/script auxiliar
+
+Arquivo: start_server.py
+  Propósito: client/server
+  Tamanho: 5.91 KB
+  Linhas: 162
+  Modificado: 2026-10-20T20:09:30.112062
+  É script principal: True
+  Sugestões de integração:
+    - review_manually: Revisar manualmente para determinar utilidade
+
+Arquivo: api\advanced_stats_api.py
+  Propósito: api
+  Tamanho: 16.88 KB
+  Linhas: 407
+  Modificado: 2026-10-22T12:38:36.637519
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_api: Adicionar ao roteador de APIs
+
+Arquivo: api\agent_ops_api.py
+  Propósito: test
+  Tamanho: 9.67 KB
+  Linhas: 238
+  Modificado: 2026-10-04T22:08:09.748492
+  É script principal: False
+  Sugestões de integração:
+    - organize_tests: Organizar na estrutura de testes
+
+Arquivo: api\ai_api.py
+  Propósito: api
+  Tamanho: 7.92 KB
+  Linhas: 190
+  Modificado: 2026-10-22T12:38:36.647522
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_api: Adicionar ao roteador de APIs
+
+Arquivo: api\alerts.py
+  Propósito: api
+  Tamanho: 26.5 KB
+  Linhas: 753
+  Modificado: 2026-10-20T20:09:30.144396
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_api: Adicionar ao roteador de APIs
+
+Arquivo: api\api_migrator.py
+  Propósito: api
+  Tamanho: 1.61 KB
+  Linhas: 36
+  Modificado: 2026-10-22T12:38:36.655518
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_api: Adicionar ao roteador de APIs
+
+Arquivo: api\api_restore.py
+  Propósito: engine/module
+  Tamanho: 14.77 KB
+  Linhas: 413
+  Modificado: 2026-10-20T20:09:30.149410
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: api\audit_api.py
+  Propósito: engine/module
+  Tamanho: 11.5 KB
+  Linhas: 331
+  Modificado: 2026-10-22T12:38:36.664036
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: api\auth.py
+  Propósito: model
+  Tamanho: 47.13 KB
+  Linhas: 1094
+  Modificado: 2026-10-22T12:38:36.679562
+  É script principal: False
+  Sugestões de integração:
+    - review_manually: Revisar manualmente para determinar utilidade
+
+Arquivo: api\auth_middleware.py
+  Propósito: model
+  Tamanho: 7.44 KB
+  Linhas: 181
+  Modificado: 2026-10-21T16:08:34.121134
+  É script principal: False
+  Sugestões de integração:
+    - review_manually: Revisar manualmente para determinar utilidade
+
+Arquivo: api\backup_control.py
+  Propósito: api
+  Tamanho: 2.89 KB
+  Linhas: 79
+  Modificado: 2026-10-05T13:24:45.277452
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_api: Adicionar ao roteador de APIs
+
+Arquivo: api\compliance_api.py
+  Propósito: engine/module
+  Tamanho: 16.79 KB
+  Linhas: 412
+  Modificado: 2026-10-22T12:38:36.690559
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: api\config_api.py
+  Propósito: configuration
+  Tamanho: 12.32 KB
+  Linhas: 313
+  Modificado: 2026-10-22T12:38:36.700565
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_config: Integrar ao sistema de configuração
+
+Arquivo: api\database_backup_api.py
+  Propósito: test
+  Tamanho: 6.25 KB
+  Linhas: 172
+  Modificado: 2026-10-22T12:38:36.714098
+  É script principal: False
+  Sugestões de integração:
+    - organize_tests: Organizar na estrutura de testes
+
+Arquivo: api\diagnostics.py
+  Propósito: api
+  Tamanho: 41.69 KB
+  Linhas: 1093
+  Modificado: 2026-10-22T12:38:36.736088
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_api: Adicionar ao roteador de APIs
+
+Arquivo: api\duplicati_native_api.py
+  Propósito: api
+  Tamanho: 11.41 KB
+  Linhas: 313
+  Modificado: 2026-10-22T12:38:36.748581
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_api: Adicionar ao roteador de APIs
+
+Arquivo: api\errors.py
+  Propósito: api
+  Tamanho: 0.89 KB
+  Linhas: 29
+  Modificado: 2026-10-05T13:24:47.351615
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_api: Adicionar ao roteador de APIs
+
+Arquivo: api\export_api.py
+  Propósito: engine/module
+  Tamanho: 7.92 KB
+  Linhas: 206
+  Modificado: 2026-10-20T20:09:30.169076
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: api\fs.py
+  Propósito: api
+  Tamanho: 3.19 KB
+  Linhas: 92
+  Modificado: 2026-10-22T12:38:36.757930
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_api: Adicionar ao roteador de APIs
+
+Arquivo: api\hardware_api.py
+  Propósito: api
+  Tamanho: 15.31 KB
+  Linhas: 351
+  Modificado: 2026-10-22T12:38:36.772098
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_api: Adicionar ao roteador de APIs
+
+Arquivo: api\import_api.py
+  Propósito: api
+  Tamanho: 2.88 KB
+  Linhas: 84
+  Modificado: 2026-10-20T20:09:30.173649
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_api: Adicionar ao roteador de APIs
+
+Arquivo: api\job_alert_router.py
+  Propósito: api
+  Tamanho: 3.24 KB
+  Linhas: 71
+  Modificado: 2026-10-22T12:38:36.797722
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_api: Adicionar ao roteador de APIs
+
+Arquivo: api\logs.py
+  Propósito: api
+  Tamanho: 14.81 KB
+  Linhas: 396
+  Modificado: 2026-10-22T12:38:36.810243
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_api: Adicionar ao roteador de APIs
+
+Arquivo: api\metrics_api.py
+  Propósito: api
+  Tamanho: 11.1 KB
+  Linhas: 239
+  Modificado: 2026-10-22T12:38:36.821630
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_api: Adicionar ao roteador de APIs
+
+Arquivo: api\network_governor_api.py
+  Propósito: api
+  Tamanho: 2.95 KB
+  Linhas: 81
+  Modificado: 2026-10-21T16:55:31.601876
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_api: Adicionar ao roteador de APIs
+
+Arquivo: api\notification_channels_api.py
+  Propósito: test
+  Tamanho: 4.21 KB
+  Linhas: 120
+  Modificado: 2026-10-22T12:38:36.830251
+  É script principal: False
+  Sugestões de integração:
+    - organize_tests: Organizar na estrutura de testes
+
+Arquivo: api\overview.py
+  Propósito: api
+  Tamanho: 7.58 KB
+  Linhas: 188
+  Modificado: 2026-10-20T20:09:30.185667
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_api: Adicionar ao roteador de APIs
+
+Arquivo: api\preemptive_api.py
+  Propósito: api
+  Tamanho: 20.99 KB
+  Linhas: 495
+  Modificado: 2026-10-22T12:38:36.844239
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_api: Adicionar ao roteador de APIs
+
+Arquivo: api\ransomware_api.py
+  Propósito: engine/module
+  Tamanho: 10.76 KB
+  Linhas: 300
+  Modificado: 2026-10-22T12:17:37.074887
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: api\replication_api.py
+  Propósito: engine/module
+  Tamanho: 8.19 KB
+  Linhas: 236
+  Modificado: 2026-10-22T12:38:36.855662
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: api\reports_api.py
+  Propósito: api
+  Tamanho: 19.33 KB
+  Linhas: 511
+  Modificado: 2026-10-22T12:38:36.867810
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_api: Adicionar ao roteador de APIs
+
+Arquivo: api\repositories.py
+  Propósito: engine/module
+  Tamanho: 28.35 KB
+  Linhas: 716
+  Modificado: 2026-10-20T20:09:30.206262
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: api\schema_check_api.py
+  Propósito: api
+  Tamanho: 8.72 KB
+  Linhas: 185
+  Modificado: 2026-10-05T13:24:51.931965
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_api: Adicionar ao roteador de APIs
+
+Arquivo: api\settings.py
+  Propósito: api
+  Tamanho: 27.92 KB
+  Linhas: 741
+  Modificado: 2026-10-22T12:38:36.881322
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_api: Adicionar ao roteador de APIs
+
+Arquivo: api\smtp.py
+  Propósito: test
+  Tamanho: 5.85 KB
+  Linhas: 157
+  Modificado: 2026-10-13T23:44:14.641654
+  É script principal: False
+  Sugestões de integração:
+    - organize_tests: Organizar na estrutura de testes
+
+Arquivo: api\storage_router.py
+  Propósito: api
+  Tamanho: 1.9 KB
+  Linhas: 43
+  Modificado: 2026-10-22T12:38:36.892797
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_api: Adicionar ao roteador de APIs
+
+Arquivo: api\system_api.py
+  Propósito: api
+  Tamanho: 13.11 KB
+  Linhas: 356
+  Modificado: 2026-10-22T12:38:36.905629
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_api: Adicionar ao roteador de APIs
+
+Arquivo: api\tasks.py
+  Propósito: engine/module
+  Tamanho: 36.76 KB
+  Linhas: 869
+  Modificado: 2026-10-15T18:37:03.708360
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: api\tasks_ops.py
+  Propósito: engine/module
+  Tamanho: 0.91 KB
+  Linhas: 26
+  Modificado: 2026-10-05T13:24:54.841103
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: api\websocket_api.py
+  Propósito: engine/module
+  Tamanho: 5.99 KB
+  Linhas: 178
+  Modificado: 2026-10-22T12:38:37.144621
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: core\agent_dr_sync.py
+  Propósito: unknown
+  Tamanho: 0.0 KB
+  Linhas: 0
+  Modificado: 2026-08-03T21:48:48.569882
+  É script principal: False
+  Sugestões de integração:
+    - review_manually: Revisar manualmente para determinar utilidade
+
+Arquivo: core\agent_pairing.py
+  Propósito: unknown
+  Tamanho: 2.01 KB
+  Linhas: 61
+  Modificado: 2026-10-02T09:02:24.383796
+  É script principal: False
+  Sugestões de integração:
+    - review_manually: Revisar manualmente para determinar utilidade
+
+Arquivo: core\agent_updater.py
+  Propósito: unknown
+  Tamanho: 10.07 KB
+  Linhas: 247
+  Modificado: 2026-10-04T18:41:41.982874
+  É script principal: False
+  Sugestões de integração:
+    - review_manually: Revisar manualmente para determinar utilidade
+
+Arquivo: core\cbt_vss.py
+  Propósito: unknown
+  Tamanho: 0.0 KB
+  Linhas: 0
+  Modificado: 2026-08-03T21:48:48.569882
+  É script principal: False
+  Sugestões de integração:
+    - review_manually: Revisar manualmente para determinar utilidade
+
+Arquivo: core\central_inventory.py
+  Propósito: unknown
+  Tamanho: 12.96 KB
+  Linhas: 287
+  Modificado: 2026-10-04T21:49:57.984020
+  É script principal: False
+  Sugestões de integração:
+    - review_manually: Revisar manualmente para determinar utilidade
+
+Arquivo: core\db_wrapper.py
+  Propósito: engine/module
+  Tamanho: 4.08 KB
+  Linhas: 148
+  Modificado: 2026-10-20T20:09:30.222812
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: core\dr_restore_manager.py
+  Propósito: unknown
+  Tamanho: 0.0 KB
+  Linhas: 0
+  Modificado: 2026-08-03T21:48:48.571876
+  É script principal: False
+  Sugestões de integração:
+    - review_manually: Revisar manualmente para determinar utilidade
+
+Arquivo: core\enrollment.py
+  Propósito: script
+  Tamanho: 7.76 KB
+  Linhas: 193
+  Modificado: 2026-10-18T15:09:02.065616
+  É script principal: True
+  Sugestões de integração:
+    - document_as_tool: Documentar como ferramenta/script auxiliar
+
+Arquivo: core\fast_metrics.py
+  Propósito: unknown
+  Tamanho: 2.25 KB
+  Linhas: 62
+  Modificado: 2026-10-05T16:50:04.314793
+  É script principal: False
+  Sugestões de integração:
+    - review_manually: Revisar manualmente para determinar utilidade
+
+Arquivo: core\http_client.py
+  Propósito: engine/module
+  Tamanho: 0.99 KB
+  Linhas: 34
+  Modificado: 2026-10-20T20:09:30.224303
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: core\link_state.py
+  Propósito: unknown
+  Tamanho: 2.37 KB
+  Linhas: 42
+  Modificado: 2026-10-05T19:13:54.074950
+  É script principal: False
+  Sugestões de integração:
+    - review_manually: Revisar manualmente para determinar utilidade
+
+Arquivo: core\logstash_handler.py
+  Propósito: engine/module
+  Tamanho: 1.98 KB
+  Linhas: 65
+  Modificado: 2026-08-03T22:37:42.879561
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: core\log_redact.py
+  Propósito: unknown
+  Tamanho: 2.0 KB
+  Linhas: 56
+  Modificado: 2026-10-21T17:02:47.779756
+  É script principal: False
+  Sugestões de integração:
+    - review_manually: Revisar manualmente para determinar utilidade
+
+Arquivo: core\monitoring.py
+  Propósito: test
+  Tamanho: 4.59 KB
+  Linhas: 149
+  Modificado: 2026-08-03T22:37:42.879561
+  É script principal: False
+  Sugestões de integração:
+    - organize_tests: Organizar na estrutura de testes
+
+Arquivo: core\rmm_engine.py
+  Propósito: engine/module
+  Tamanho: 0.0 KB
+  Linhas: 0
+  Modificado: 2026-08-03T21:48:48.572877
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\advanced_statistics.py
+  Propósito: engine/module
+  Tamanho: 13.22 KB
+  Linhas: 321
+  Modificado: 2026-10-20T20:09:30.258256
+  É script principal: True
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\ai_assistant.py
+  Propósito: unknown
+  Tamanho: 12.65 KB
+  Linhas: 270
+  Modificado: 2026-10-22T12:18:15.773367
+  É script principal: False
+  Sugestões de integração:
+    - review_manually: Revisar manualmente para determinar utilidade
+
+Arquivo: engines\analytics.py
+  Propósito: engine/module
+  Tamanho: 24.2 KB
+  Linhas: 583
+  Modificado: 2026-10-20T20:09:30.282845
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\auto_healer.py
+  Propósito: engine/module
+  Tamanho: 8.08 KB
+  Linhas: 258
+  Modificado: 2026-08-03T22:37:42.887924
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\auto_verify_engine.py
+  Propósito: engine/module
+  Tamanho: 13.2 KB
+  Linhas: 264
+  Modificado: 2026-10-20T20:09:30.286847
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\backup_controller.py
+  Propósito: engine/module
+  Tamanho: 8.7 KB
+  Linhas: 219
+  Modificado: 2026-08-03T22:37:42.888557
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\backup_engine.py
+  Propósito: engine/module
+  Tamanho: 0.11 KB
+  Linhas: 4
+  Modificado: 2026-08-03T22:37:42.889557
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\backup_engine_manager.py
+  Propósito: engine/module
+  Tamanho: 29.08 KB
+  Linhas: 696
+  Modificado: 2026-10-20T20:09:30.292376
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\backup_importer.py
+  Propósito: engine/module
+  Tamanho: 14.76 KB
+  Linhas: 294
+  Modificado: 2026-10-20T23:27:36.862488
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\backup_replicator.py
+  Propósito: unknown
+  Tamanho: 16.13 KB
+  Linhas: 433
+  Modificado: 2026-10-20T20:09:30.295330
+  É script principal: False
+  Sugestões de integração:
+    - review_manually: Revisar manualmente para determinar utilidade
+
+Arquivo: engines\backup_synchronizer.py
+  Propósito: engine/module
+  Tamanho: 2.69 KB
+  Linhas: 75
+  Modificado: 2026-08-03T22:37:42.895555
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\backup_verifier.py
+  Propósito: engine/module
+  Tamanho: 8.98 KB
+  Linhas: 206
+  Modificado: 2026-10-20T20:09:30.297832
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\database_backup.py
+  Propósito: test
+  Tamanho: 19.66 KB
+  Linhas: 515
+  Modificado: 2026-10-20T20:09:30.319183
+  É script principal: False
+  Sugestões de integração:
+    - organize_tests: Organizar na estrutura de testes
+
+Arquivo: engines\database_cross_migrator.py
+  Propósito: engine/module
+  Tamanho: 7.52 KB
+  Linhas: 174
+  Modificado: 2026-10-20T20:09:30.321022
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\diagnostic_module.py
+  Propósito: engine/module
+  Tamanho: 42.18 KB
+  Linhas: 1121
+  Modificado: 2026-10-20T20:09:30.326425
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\diagnostic_system.py
+  Propósito: engine/module
+  Tamanho: 18.28 KB
+  Linhas: 445
+  Modificado: 2026-10-20T20:09:30.329533
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\disaster_recovery_engine.py
+  Propósito: engine/module
+  Tamanho: 35.37 KB
+  Linhas: 721
+  Modificado: 2026-10-20T20:09:30.334531
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\engine_migrator.py
+  Propósito: engine/module
+  Tamanho: 9.91 KB
+  Linhas: 205
+  Modificado: 2026-10-20T20:09:30.336498
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\engine_paths.py
+  Propósito: engine/module
+  Tamanho: 9.68 KB
+  Linhas: 306
+  Modificado: 2026-08-03T22:37:42.901893
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\engine_validator.py
+  Propósito: engine/module
+  Tamanho: 15.34 KB
+  Linhas: 447
+  Modificado: 2026-10-06T09:19:08.876488
+  É script principal: True
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\enterprise_database_connectors.py
+  Propósito: engine/module
+  Tamanho: 15.29 KB
+  Linhas: 354
+  Modificado: 2026-10-20T20:09:30.339682
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\error_analyzer.py
+  Propósito: engine/module
+  Tamanho: 13.59 KB
+  Linhas: 356
+  Modificado: 2026-09-24T01:49:42.729177
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\error_capture.py
+  Propósito: engine/module
+  Tamanho: 13.23 KB
+  Linhas: 341
+  Modificado: 2026-08-03T22:37:42.906894
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\healer_engine.py
+  Propósito: engine/module
+  Tamanho: 25.39 KB
+  Linhas: 621
+  Modificado: 2026-10-20T20:09:30.357565
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\health_score.py
+  Propósito: unknown
+  Tamanho: 10.85 KB
+  Linhas: 341
+  Modificado: 2026-10-20T20:09:30.359568
+  É script principal: False
+  Sugestões de integração:
+    - review_manually: Revisar manualmente para determinar utilidade
+
+Arquivo: engines\history_importer.py
+  Propósito: engine/module
+  Tamanho: 28.08 KB
+  Linhas: 707
+  Modificado: 2026-10-18T15:09:06.485980
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\instant_vm_boot.py
+  Propósito: engine/module
+  Tamanho: 6.39 KB
+  Linhas: 156
+  Modificado: 2026-10-20T20:09:30.376266
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\job_alert_monitor.py
+  Propósito: unknown
+  Tamanho: 16.66 KB
+  Linhas: 387
+  Modificado: 2026-10-20T20:09:30.381342
+  É script principal: False
+  Sugestões de integração:
+    - review_manually: Revisar manualmente para determinar utilidade
+
+Arquivo: engines\k8s_engine.py
+  Propósito: engine/module
+  Tamanho: 3.86 KB
+  Linhas: 103
+  Modificado: 2026-10-20T20:09:30.382874
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\kubernetes_backup_engine.py
+  Propósito: engine/module
+  Tamanho: 6.04 KB
+  Linhas: 152
+  Modificado: 2026-10-20T20:09:30.384904
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\metrics_collector.py
+  Propósito: engine/module
+  Tamanho: 15.56 KB
+  Linhas: 359
+  Modificado: 2026-08-03T22:37:43.020979
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\notification_channels.py
+  Propósito: unknown
+  Tamanho: 13.83 KB
+  Linhas: 370
+  Modificado: 2026-10-20T20:09:30.389988
+  É script principal: False
+  Sugestões de integração:
+    - review_manually: Revisar manualmente para determinar utilidade
+
+Arquivo: engines\notification_service.py
+  Propósito: unknown
+  Tamanho: 10.87 KB
+  Linhas: 206
+  Modificado: 2026-10-13T23:44:15.691476
+  É script principal: False
+  Sugestões de integração:
+    - review_manually: Revisar manualmente para determinar utilidade
+
+Arquivo: engines\preemptive_diagnostic.py
+  Propósito: engine/module
+  Tamanho: 15.36 KB
+  Linhas: 396
+  Modificado: 2026-10-20T20:09:30.393019
+  É script principal: True
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\ransomware_detector.py
+  Propósito: unknown
+  Tamanho: 33.15 KB
+  Linhas: 866
+  Modificado: 2026-10-22T12:17:53.278686
+  É script principal: False
+  Sugestões de integração:
+    - review_manually: Revisar manualmente para determinar utilidade
+
+Arquivo: engines\ransomware_guardian.py
+  Propósito: engine/module
+  Tamanho: 32.5 KB
+  Linhas: 750
+  Modificado: 2026-10-22T12:17:22.096785
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\realtime_backup_monitor.py
+  Propósito: engine/module
+  Tamanho: 11.64 KB
+  Linhas: 314
+  Modificado: 2026-10-15T12:37:11.270307
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\real_backup_executor.py
+  Propósito: unknown
+  Tamanho: 0.2 KB
+  Linhas: 6
+  Modificado: 2026-08-03T22:37:43.027012
+  É script principal: False
+  Sugestões de integração:
+    - review_manually: Revisar manualmente para determinar utilidade
+
+Arquivo: engines\real_engine_importer.py
+  Propósito: engine/module
+  Tamanho: 17.23 KB
+  Linhas: 461
+  Modificado: 2026-08-03T22:37:43.028028
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\real_restore_manager.py
+  Propósito: engine/module
+  Tamanho: 98.09 KB
+  Linhas: 2201
+  Modificado: 2026-10-13T23:33:11.377639
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\report_catalog.py
+  Propósito: unknown
+  Tamanho: 0.0 KB
+  Linhas: 0
+  Modificado: 2026-08-03T21:48:48.589874
+  É script principal: False
+  Sugestões de integração:
+    - review_manually: Revisar manualmente para determinar utilidade
+
+Arquivo: engines\report_generator.py
+  Propósito: unknown
+  Tamanho: 36.1 KB
+  Linhas: 803
+  Modificado: 2026-10-20T20:09:30.453186
+  É script principal: False
+  Sugestões de integração:
+    - review_manually: Revisar manualmente para determinar utilidade
+
+Arquivo: engines\report_source_agent.py
+  Propósito: engine/module
+  Tamanho: 11.84 KB
+  Linhas: 247
+  Modificado: 2026-10-04T21:50:02.479820
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\repository_manager.py
+  Propósito: unknown
+  Tamanho: 74.0 KB
+  Linhas: 1543
+  Modificado: 2026-10-20T20:09:30.469210
+  É script principal: False
+  Sugestões de integração:
+    - review_manually: Revisar manualmente para determinar utilidade
+
+Arquivo: engines\restic_lock.py
+  Propósito: unknown
+  Tamanho: 1.97 KB
+  Linhas: 43
+  Modificado: 2026-10-13T18:35:35.873448
+  É script principal: False
+  Sugestões de integração:
+    - review_manually: Revisar manualmente para determinar utilidade
+
+Arquivo: engines\restore_test.py
+  Propósito: test
+  Tamanho: 16.92 KB
+  Linhas: 378
+  Modificado: 2026-10-04T18:41:44.546456
+  É script principal: False
+  Sugestões de integração:
+    - organize_tests: Organizar na estrutura de testes
+
+Arquivo: engines\s3_endpoint.py
+  Propósito: unknown
+  Tamanho: 1.13 KB
+  Linhas: 28
+  Modificado: 2026-10-13T23:33:16.664703
+  É script principal: False
+  Sugestões de integração:
+    - review_manually: Revisar manualmente para determinar utilidade
+
+Arquivo: engines\scheduler.py
+  Propósito: unknown
+  Tamanho: 9.0 KB
+  Linhas: 214
+  Modificado: 2026-10-20T23:34:32.810846
+  É script principal: False
+  Sugestões de integração:
+    - review_manually: Revisar manualmente para determinar utilidade
+
+Arquivo: engines\storage_monitor.py
+  Propósito: unknown
+  Tamanho: 20.88 KB
+  Linhas: 488
+  Modificado: 2026-10-20T20:09:30.486733
+  É script principal: False
+  Sugestões de integração:
+    - review_manually: Revisar manualmente para determinar utilidade
+
+Arquivo: engines\surebackup_engine.py
+  Propósito: engine/module
+  Tamanho: 7.97 KB
+  Linhas: 210
+  Modificado: 2026-10-20T20:09:30.488742
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\task_manager.py
+  Propósito: engine/module
+  Tamanho: 86.92 KB
+  Linhas: 1732
+  Modificado: 2026-10-21T17:02:58.600632
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\telemetry_engine.py
+  Propósito: engine/module
+  Tamanho: 3.71 KB
+  Linhas: 98
+  Modificado: 2026-10-20T20:09:30.504490
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\universal_restore.py
+  Propósito: engine/module
+  Tamanho: 5.53 KB
+  Linhas: 124
+  Modificado: 2026-10-20T20:09:30.505874
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: engines\vmware_hypervisor_engine.py
+  Propósito: engine/module
+  Tamanho: 17.51 KB
+  Linhas: 431
+  Modificado: 2026-10-20T20:09:30.524400
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: native_engine\engine.py
+  Propósito: engine/module
+  Tamanho: 38.3 KB
+  Linhas: 841
+  Modificado: 2026-10-21T16:47:07.034266
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: native_engine\native_engine_v4.py
+  Propósito: engine/module
+  Tamanho: 0.0 KB
+  Linhas: 0
+  Modificado: 2026-08-03T21:48:48.591875
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: storage_backends\base.py
+  Propósito: engine/module
+  Tamanho: 3.07 KB
+  Linhas: 101
+  Modificado: 2026-08-03T22:37:43.045533
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: storage_backends\cloud.py
+  Propósito: unknown
+  Tamanho: 25.87 KB
+  Linhas: 588
+  Modificado: 2026-10-21T16:02:08.144456
+  É script principal: False
+  Sugestões de integração:
+    - review_manually: Revisar manualmente para determinar utilidade
+
+Arquivo: storage_backends\local.py
+  Propósito: engine/module
+  Tamanho: 8.14 KB
+  Linhas: 203
+  Modificado: 2026-10-18T15:09:10.877575
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: tests\fix_repo.py
+  Propósito: unknown
+  Tamanho: 0.72 KB
+  Linhas: 24
+  Modificado: 2026-08-03T22:37:43.048536
+  É script principal: False
+  Sugestões de integração:
+    - review_manually: Revisar manualmente para determinar utilidade
+
+Arquivo: utils\copyright_injector.py
+  Propósito: unknown
+  Tamanho: 0.0 KB
+  Linhas: 0
+  Modificado: 2026-08-03T21:48:48.595874
+  É script principal: False
+  Sugestões de integração:
+    - review_manually: Revisar manualmente para determinar utilidade
+
+Arquivo: utils\get_health_report.py
+  Propósito: script
+  Tamanho: 1.58 KB
+  Linhas: 43
+  Modificado: 2026-08-03T22:37:43.051532
+  É script principal: True
+  Sugestões de integração:
+    - document_as_tool: Documentar como ferramenta/script auxiliar
+
+Arquivo: utils\kill_port.py
+  Propósito: script
+  Tamanho: 2.08 KB
+  Linhas: 64
+  Modificado: 2026-10-20T20:09:31.136577
+  É script principal: True
+  Sugestões de integração:
+    - document_as_tool: Documentar como ferramenta/script auxiliar
+
+Arquivo: utils\run_complete_diagnostic.py
+  Propósito: script
+  Tamanho: 5.94 KB
+  Linhas: 159
+  Modificado: 2026-10-20T20:09:31.148835
+  É script principal: True
+  Sugestões de integração:
+    - document_as_tool: Documentar como ferramenta/script auxiliar
+
+Arquivo: utils\ssl_manager.py
+  Propósito: unknown
+  Tamanho: 0.0 KB
+  Linhas: 0
+  Modificado: 2026-08-03T21:48:48.598877
+  É script principal: False
+  Sugestões de integração:
+    - review_manually: Revisar manualmente para determinar utilidade
+
+Arquivo: utils\tls_cert.py
+  Propósito: unknown
+  Tamanho: 4.16 KB
+  Linhas: 126
+  Modificado: 2026-08-03T22:37:43.054532
+  É script principal: False
+  Sugestões de integração:
+    - review_manually: Revisar manualmente para determinar utilidade
+
+Arquivo: modules\active_directory\ad_router.py
+  Propósito: engine/module
+  Tamanho: 6.78 KB
+  Linhas: 165
+  Modificado: 2026-10-22T12:38:37.210299
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: modules\cbt\cbt_router.py
+  Propósito: api
+  Tamanho: 7.93 KB
+  Linhas: 201
+  Modificado: 2026-10-20T20:09:30.528541
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_api: Adicionar ao roteador de APIs
+
+Arquivo: modules\config\config_router.py
+  Propósito: configuration
+  Tamanho: 0.64 KB
+  Linhas: 23
+  Modificado: 2026-10-22T12:38:37.222414
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_config: Integrar ao sistema de configuração
+
+Arquivo: modules\dr\dr_router.py
+  Propósito: api
+  Tamanho: 14.71 KB
+  Linhas: 361
+  Modificado: 2026-10-22T12:38:37.236419
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_api: Adicionar ao roteador de APIs
+
+Arquivo: modules\enterprise_connectors\enterprise_connectors_router.py
+  Propósito: engine/module
+  Tamanho: 6.82 KB
+  Linhas: 179
+  Modificado: 2026-10-22T12:38:37.247270
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: modules\freemium_power_tools\power_tools_router.py
+  Propósito: api
+  Tamanho: 5.6 KB
+  Linhas: 141
+  Modificado: 2026-10-22T12:38:37.257928
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_api: Adicionar ao roteador de APIs
+
+Arquivo: modules\granular_recovery\granular_recovery_router.py
+  Propósito: engine/module
+  Tamanho: 5.86 KB
+  Linhas: 153
+  Modificado: 2026-10-22T12:38:37.269957
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: modules\hermes\hermes_router.py
+  Propósito: api
+  Tamanho: 8.73 KB
+  Linhas: 251
+  Modificado: 2026-10-22T12:38:37.283473
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_api: Adicionar ao roteador de APIs
+
+Arquivo: modules\job_alert\job_alert_router.py
+  Propósito: api
+  Tamanho: 3.26 KB
+  Linhas: 71
+  Modificado: 2026-10-22T12:38:37.294886
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_api: Adicionar ao roteador de APIs
+
+Arquivo: modules\logs\logs_router.py
+  Propósito: api
+  Tamanho: 0.51 KB
+  Linhas: 18
+  Modificado: 2026-10-22T12:38:37.305475
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_api: Adicionar ao roteador de APIs
+
+Arquivo: modules\reports\reports_router.py
+  Propósito: unknown
+  Tamanho: 0.13 KB
+  Linhas: 6
+  Modificado: 2026-10-20T20:09:30.547601
+  É script principal: False
+  Sugestões de integração:
+    - review_manually: Revisar manualmente para determinar utilidade
+
+Arquivo: modules\rmm\rmm_router.py
+  Propósito: api
+  Tamanho: 15.57 KB
+  Linhas: 369
+  Modificado: 2026-10-22T12:38:37.320514
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_api: Adicionar ao roteador de APIs
+
+Arquivo: modules\saas_cloud\saas_cloud_router.py
+  Propósito: api
+  Tamanho: 8.29 KB
+  Linhas: 207
+  Modificado: 2026-10-22T12:38:37.334014
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_api: Adicionar ao roteador de APIs
+
+Arquivo: modules\security\security_router.py
+  Propósito: api
+  Tamanho: 0.61 KB
+  Linhas: 19
+  Modificado: 2026-10-22T12:38:37.347019
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_api: Adicionar ao roteador de APIs
+
+Arquivo: modules\storage\storage_router.py
+  Propósito: api
+  Tamanho: 2.11 KB
+  Linhas: 44
+  Modificado: 2026-10-22T12:38:37.359043
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_api: Adicionar ao roteador de APIs
+
+Arquivo: modules\v2\ai_v2_router.py
+  Propósito: api
+  Tamanho: 4.11 KB
+  Linhas: 100
+  Modificado: 2026-10-22T12:38:37.373288
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_api: Adicionar ao roteador de APIs
+
+Arquivo: modules\v2\envelope.py
+  Propósito: engine/module
+  Tamanho: 2.43 KB
+  Linhas: 59
+  Modificado: 2026-10-20T20:09:30.558141
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: modules\v2\repositories_v2_router.py
+  Propósito: api
+  Tamanho: 2.24 KB
+  Linhas: 61
+  Modificado: 2026-10-20T20:09:30.559140
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_api: Adicionar ao roteador de APIs
+
+Arquivo: modules\v2\tasks_v2_router.py
+  Propósito: engine/module
+  Tamanho: 3.17 KB
+  Linhas: 87
+  Modificado: 2026-10-20T20:09:30.560765
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: modules\v2\telemetry_v2_router.py
+  Propósito: api
+  Tamanho: 4.74 KB
+  Linhas: 135
+  Modificado: 2026-10-22T12:38:37.386286
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_api: Adicionar ao roteador de APIs
+
+Arquivo: modules\virtualization\virtualization_router.py
+  Propósito: engine/module
+  Tamanho: 4.18 KB
+  Linhas: 115
+  Modificado: 2026-10-20T20:09:30.565151
+  É script principal: False
+  Sugestões de integração:
+    - integrate_as_engine: Integrar como engine no sistema de engines
+
+Arquivo: core\integrations\duplicati_native.py
+  Propósito: unknown
+  Tamanho: 91.03 KB
+  Linhas: 1910
+  Modificado: 2026-10-21T01:18:13.007768
+  É script principal: False
+  Sugestões de integração:
+    - review_manually: Revisar manualmente para determinar utilidade
+
+================================================================================
+RECOMENDAÇÕES
+================================================================================
+
+• Alto número de arquivos órfãos - considere reorganização do projeto
+• Integrar 61 engine(s) ao sistema
+• Adicionar 35 API(s) ao roteador
+• Organizar testes em estrutura adequada
+• Revisar 31 arquivo(s) de propósito desconhecido

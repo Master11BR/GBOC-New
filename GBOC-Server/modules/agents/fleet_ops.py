@@ -239,7 +239,7 @@ def current_package() -> Optional[Dict[str, Any]]:
 
 
 @router.get("/api/v1/sync/agent-update/package")
-async def download_package(sha256: str):
+def download_package(sha256: str):
     """Download do pacote pelo agente (rota de sincronização: exige a chave de pareamento)."""
     if len(sha256) != 64 or not all(c in "0123456789abcdefABCDEF" for c in sha256):
         raise HTTPException(400, "sha256 inválido")

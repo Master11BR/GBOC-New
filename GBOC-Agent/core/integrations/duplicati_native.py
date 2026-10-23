@@ -249,6 +249,96 @@ def parse_duplicati_retention(settings: Optional[Dict[str, Any]] = None) -> int:
     return 30
 
 
+_DUP_UNIT_DAYS = {"s": 1 / 86400, "m": 1 / 1440, "h": 1 / 24, "D": 1, "W": 7, "M": 30, "Y": 365}
+
+
+def _dup_dt(value: Any):
+    """Converte datas do Duplicati ('20261022T230014Z', '2026-10-22T23:00:14Z', '2026-10-22 23:00:14') em datetime UTC."""
+    import re as _re
+    from datetime import datetime as _dt
+    digits = _re.sub(r"\D", "", str(value or ""))[:14]
+    if len(digits) < 14:
+        return None
+    try:
+        return _dt.strptime(digits, "%Y%m%d%H%M%S")
+    except ValueError:
+        return None
+
+
+def dup_last_status(meta: Dict[str, Any], fallback: Optional[str] = None) -> str:
+    """
+    Status real da ultima execucao. O Duplicati mantem LastErrorDate para sempre;
+    so e 'Erro' se o erro for MAIS RECENTE que o ultimo backup concluido.
+    """
+    meta = meta or {}
+    err = _dup_dt(meta.get("LastErrorDate"))
+    ok = _dup_dt(meta.get("LastBackupFinished")) or _dup_dt(meta.get("LastBackupDate"))
+    if err and (not ok or err > ok):
+        return "Erro"
+    if meta.get("LastBackupResult"):
+        return str(meta["LastBackupResult"])
+    if ok:
+        return "OK"
+    return fallback or "Pendente"
+
+
+def _dup_span_days(txt: str) -> Optional[float]:
+    """Intervalo do Duplicati ("1W", "12M", "1Y1D", "0s", "U") em dias. "U" (ilimitado) = 100 anos."""
+    import re
+    txt = (txt or "").strip()
+    if txt.upper() == "U":
+        return 36500.0
+    parts = re.findall(r"(\d+)\s*([smhDWMY])", txt)
+    if not parts:
+        return None
+    return sum(int(n) * _DUP_UNIT_DAYS[u] for n, u in parts)
+
+
+def map_duplicati_retention(settings: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Retenção do job original do Duplicati -> campos do GBOC (dias, semanais, mensais, anuais).
+    Antes só "dias" era importado (keep-versions virava dias) e semanal/mensal/anual ficavam no padrão do banco
+    (4/6/1): um job que GUARDAVA TUDO no Duplicati passava a ter versões apagadas pelo GBOC.
+      * retention-policy "JANELA:INTERVALO,..." (inclui a "inteligente" 1W:1D,4W:1W,12M:1M) -> buckets equivalentes
+        (intervalo <= 3 dias -> dias; <= 15 -> semanas; <= 180 -> meses; maior -> anos), sempre arredondando para MAIS
+      * keep-time -> só dias
+      * keep-versions (o GBOC não tem "manter as N últimas") e sem retenção -> retenção do GBOC DESLIGADA
+        (nada é apagado; mais seguro que apagar o que o original mantinha)"""
+    import math
+    settings = settings or {}
+    out = {"days": 0, "weekly": 0, "monthly": 0, "yearly": 0, "source": "nenhuma (guarda todas as versões)"}
+    get = lambda k: str(settings.get(k) or settings.get("--" + k) or "").strip()
+    pol = get("retention-policy")
+    if pol:
+        for part in pol.split(","):
+            if ":" not in part:
+                continue
+            tf, iv = (x.strip() for x in part.split(":", 1))
+            tf_d, iv_d = _dup_span_days(tf), _dup_span_days(iv)
+            if tf_d is None or iv_d is None:
+                continue
+            if iv_d <= 3:
+                out["days"] = max(out["days"], math.ceil(tf_d))
+            elif iv_d <= 15:
+                out["weekly"] = max(out["weekly"], math.ceil(tf_d / 7))
+            elif iv_d <= 180:
+                out["monthly"] = max(out["monthly"], math.ceil(tf_d / 30))
+            else:
+                out["yearly"] = max(out["yearly"], math.ceil(tf_d / 365))
+        out["source"] = f"retention-policy {pol}"
+        return out
+    kt = get("keep-time")
+    if kt:
+        d = _dup_span_days(kt)
+        if d:
+            out["days"] = math.ceil(d)
+            out["source"] = f"keep-time {kt}"
+        return out
+    kv = get("keep-versions")
+    if kv:
+        out["source"] = f"keep-versions {kv} (sem equivalente no GBOC: retenção desligada, nada é apagado)"
+    return out
+
+
 class DuplicatiNativeService:
     def __init__(self) -> None:
         os.makedirs(DATA_DIR, exist_ok=True)
@@ -856,7 +946,7 @@ exit 4
                                 passphrase = desc
 
                         last_backup_date = fix_iso_date(metadata.get("LastBackupDate"))
-                        last_result = metadata.get("LastBackupResult", "OK")
+                        last_result = dup_last_status(metadata, "OK")
                         source_size = metadata.get("SourceFilesSize", "0")
                         target_size = metadata.get("TargetFilesSize", "0")
                         versions_count = metadata.get("BackupListCount", "0")
@@ -983,7 +1073,7 @@ exit 4
                                 "settings": settings_dict,
                                 "metadata": meta,
                                 "last_run": last_run,
-                                "last_status": meta.get("LastBackupResult", "completed"),
+                                "last_status": dup_last_status(meta, "completed"),
                                 "source_origin": "serverutil_export",
                                 "Backup": b,
                                 "Schedule": s
@@ -1033,8 +1123,8 @@ exit 4
             return s
 
         last_run = fix_iso_date(meta.get("LastBackupDate") or raw_item.get("last_run")) or "Nunca"
-        last_error = meta.get("LastErrorMessage") or meta.get("LastErrorDate")
-        last_status = "Erro" if last_error else (meta.get("LastBackupResult") or raw_item.get("last_status") or ("OK" if last_run != "Nunca" else "Pendente"))
+        last_status = dup_last_status(meta, raw_item.get("last_status") or ("OK" if last_run != "Nunca" else "Pendente"))
+        last_error_msg = meta.get("LastErrorMessage") if last_status == "Erro" else None
 
         source_size = meta.get("SourceFilesSize") or raw_item.get("source_size") or 0
         target_size = meta.get("TargetFilesSize") or raw_item.get("target_size") or 0
@@ -1049,6 +1139,7 @@ exit 4
             "target_label": dest_label,
             "last_run": last_run,
             "last_status": last_status,
+            "last_error": last_error_msg,
             "source_size": source_size,
             "target_size": target_size,
             "versions_count": versions_count,
@@ -1369,14 +1460,14 @@ exit 4
                 return {"status": "success", "result": None, "message": "Sem execuções registradas"}
             entry = entries[0]
             msg_raw = entry.get("Message", "")
-            parsed_result = "Unknown"
+            parsed_result = None
             error_messages: List[str] = []
             test_result = None
             tested = 0
             try:
                 import json as _json
                 data = _json.loads(msg_raw)
-                parsed_result = data.get("ParsedResult", "Unknown")
+                parsed_result = data.get("ParsedResult")  # None = log sem resultado (o monitor trata como sem erro)
                 error_messages = data.get("Errors", []) or []
                 # Teste de amostras que o Duplicati faz ao fim do backup (backup-test-samples)
                 tr = data.get("TestResults") or {}
@@ -1785,7 +1876,9 @@ exit 4
                         repeat = str(schedule.get("Repeat") or schedule.get("repeat") or "2h")
                         time_val = str(schedule.get("Time") or schedule.get("time") or "")
                         cron = convert_duplicati_repeat_to_cron(repeat, time_val)
-                        retention_days = parse_duplicati_retention(settings)
+                        _ret = map_duplicati_retention(settings)
+                        logger.info(f"[Duplicati→GBOC] Retenção do job '{b_name}': {_ret['source']} -> "
+                                    f"dias={_ret['days']} semanais={_ret['weekly']} mensais={_ret['monthly']} anuais={_ret['yearly']}")
 
                         last_run_dt = _parse_time(meta.get("LastBackupDate") or meta.get("LastBackupFinished") or item.get("last_run"))
 
@@ -1807,19 +1900,22 @@ exit 4
                                     enabled = true, 
                                     schedule_enabled = true, 
                                     schedule_cron = %s, 
-                                    retention_days = %s,
+                                    retention_days = %s, retention_weekly = %s, retention_monthly = %s, retention_yearly = %s,
                                     last_run = %s, 
                                     last_status = 'completed',
                                     updated_at = %s
                                 WHERE id = %s
-                            """, (repo_id, sources_json, cron, retention_days, last_run_dt or now_str, now_str, task_id))
+                            """, (repo_id, sources_json, cron, _ret['days'], _ret['weekly'], _ret['monthly'], _ret['yearly'],
+                                  last_run_dt or now_str, now_str, task_id))
                         else:
                             task_name = f"Nativo_Duplicati_{b_name}"
                             cur.execute("""
-                                INSERT INTO tasks (name, repository_id, engine, source_paths, status, enabled, schedule_enabled, schedule_cron, retention_days, last_run, last_status, created_at, updated_at)
-                                VALUES (%s, %s, 'duplicati', %s, 'idle', true, true, %s, %s, %s, 'completed', %s, %s)
+                                INSERT INTO tasks (name, repository_id, engine, source_paths, status, enabled, schedule_enabled, schedule_cron,
+                                                   retention_days, retention_weekly, retention_monthly, retention_yearly, last_run, last_status, created_at, updated_at)
+                                VALUES (%s, %s, 'duplicati', %s, 'idle', true, true, %s, %s, %s, %s, %s, %s, 'completed', %s, %s)
                                 RETURNING id
-                            """, (task_name, repo_id, sources_json, cron, retention_days, last_run_dt or now_str, now_str, now_str))
+                            """, (task_name, repo_id, sources_json, cron, _ret['days'], _ret['weekly'], _ret['monthly'], _ret['yearly'],
+                                  last_run_dt or now_str, now_str, now_str))
                             task_id = cur.fetchone()[0]
 
                         conn.commit()

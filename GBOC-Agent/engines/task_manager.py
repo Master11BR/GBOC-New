@@ -111,6 +111,14 @@ class TaskManager:
             self.task_error_logger.setLevel(logging.ERROR)
             self.task_error_logger.propagate = False
 
+        # Guarda de execuções: dono + sinal de vida; trata backup interrompido e Auto-Retry
+        try:
+            from engines.execution_guard import ExecutionGuard
+            self.guard = ExecutionGuard(self)
+        except Exception as _g_err:
+            self.guard = None
+            logger.warning(f"Guarda de execuções indisponível: {_g_err}")
+
         self._cleanup_stale_tasks()
         logger.info("[OK] TaskManager inicializado")
 
@@ -295,11 +303,15 @@ class TaskManager:
         self._running = True
         self._worker_thread = threading.Thread(target=self._worker_loop, daemon=True)
         self._worker_thread.start()
+        if getattr(self, 'guard', None):
+            self.guard.start()
         logger.info("[OK] TaskManager worker iniciado")
 
     def stop(self):
         """Para o worker thread"""
         self._running = False
+        if getattr(self, 'guard', None):
+            self.guard.stop()
         if self._current_process:
             try:
                 self._current_process.terminate()
@@ -318,38 +330,43 @@ class TaskManager:
         try:
             with self.core.get_db_connection() as conn:
                 cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-                # Buscar execuções presas
-                cur.execute("SELECT id, task_id FROM task_executions WHERE status = 'running'")
-                stale_executions = cur.fetchall()
+                # Execuções presas: só as SEM dono vivo (processo encerrado / sem sinal de vida). Antes marcava
+                # toda 'running' — inclusive o backup que o outro processo (Agente x Agendador) estava fazendo.
+                if getattr(self, 'guard', None) and self.guard._schema_ok:
+                    self.guard.reap(startup=True)
+                else:
+                    # Buscar execuções presas
+                    cur.execute("SELECT id, task_id FROM task_executions WHERE status IN ('running', 'preparing')")  # preparing também fica órfão se o processo cai antes do 1º arquivo
+                    stale_executions = cur.fetchall()
 
-                if stale_executions:
-                    logger.warning(f"🧹 Encontradas {len(stale_executions)} execuções estagnadas. Limpando...")
+                    if stale_executions:
+                        logger.warning(f"🧹 Encontradas {len(stale_executions)} execuções estagnadas. Limpando...")
 
-                    now = datetime.now().isoformat()
-                    for exec_row in stale_executions:
-                        exec_id = exec_row['id']
-                        task_id = exec_row['task_id']
+                        now = datetime.now().isoformat()
+                        for exec_row in stale_executions:
+                            exec_id = exec_row['id']
+                            task_id = exec_row['task_id']
 
-                        # Atualizar execução
-                        cur.execute("""
-                            UPDATE task_executions 
-                            SET status = 'interrupted', 
-                                error_message = 'Sistema reiniciado durante execução (Stale)', 
-                                completed_at = %s 
-                            WHERE id = %s
-                        """, (now, exec_id))
+                            # Atualizar execução
+                            cur.execute("""
+                                UPDATE task_executions 
+                                SET status = 'interrupted', 
+                                    error_message = 'Sistema reiniciado durante execução (Stale)', 
+                                    completed_at = %s 
+                                WHERE id = %s
+                            """, (now, exec_id))
 
-                        # Atualizar tarefa
-                        cur.execute("""
-                            UPDATE tasks 
-                            SET status = 'idle', 
-                                last_status = 'interrupted',
-                                last_run = %s 
-                            WHERE id = %s AND status = 'running'
-                        """, (now, task_id))
+                            # Atualizar tarefa
+                            cur.execute("""
+                                UPDATE tasks 
+                                SET status = 'idle', 
+                                    last_status = 'interrupted',
+                                    last_run = %s 
+                                WHERE id = %s AND status = 'running'
+                            """, (now, task_id))
 
-                    conn.commit()
-                    logger.info("✅ Limpeza de execuções estagnadas concluída.")
+                        conn.commit()
+                        logger.info("✅ Limpeza de execuções estagnadas concluída.")
 
                 # Corrigir tarefas órfãs: tasks.status='running' sem execução ativa
                 now = datetime.now().isoformat()
@@ -358,7 +375,7 @@ class TaskManager:
                     SET status = 'idle', last_status = 'interrupted', last_run = %s
                     WHERE status = 'running' 
                     AND id NOT IN (
-                        SELECT DISTINCT task_id FROM task_executions WHERE status = 'running'
+                        SELECT DISTINCT task_id FROM task_executions WHERE status IN ('running', 'preparing', 'queued')
                     )
                 """, (now,))
                 orphan_count = cur.rowcount
@@ -650,6 +667,8 @@ class TaskManager:
 
     def queue_task(self, task_id: int, execution_id: int):
         """Adiciona tarefa à fila de execução"""
+        if getattr(self, 'guard', None):
+            self.guard.own(execution_id)
         self._task_queue.put((task_id, execution_id))
         logger.info(f"📋 Tarefa {task_id} adicionada à fila (exec: {execution_id})")
 
@@ -821,6 +840,8 @@ class TaskManager:
                 # Remover da lista de tarefas em execução
                 self._running_tasks.remove((task_id, execution_id))
                 self._current_execution_id = None
+                if getattr(self, 'guard', None):
+                    self.guard.release(execution_id)
 
             except Exception as e:
                 logger.error(f"❌ Erro no worker: {e}")
@@ -828,6 +849,8 @@ class TaskManager:
                 if (task_id, execution_id) in self._running_tasks:
                     self._running_tasks.remove((task_id, execution_id))
                 self._current_execution_id = None
+                if getattr(self, 'guard', None):
+                    self.guard.release(execution_id)
                 time.sleep(1)
 
         logger.info("🛑 TaskManager worker loop encerrado")
@@ -988,6 +1011,14 @@ class TaskManager:
             repo_type = (task.get('repo_type') or task.get('type') or 'local')
             self._configure_restic_repository(env, task)
 
+            _local_repo = (task.get('repo_path') or env.get('RESTIC_REPOSITORY') or '')
+            if repo_type == 'local' and _local_repo and not os.path.exists(os.path.join(_local_repo, 'config')):
+                # repositório local criado mas nunca inicializado: inicializa como já é feito nos remotos
+                logger.warning(f"[!] Repositório Restic local sem inicialização: {_local_repo} — executando restic init")
+                init_local = subprocess.run([restic, "init"], env=env, capture_output=True, text=True, timeout=60)
+                if init_local.returncode != 0 and 'already' not in (init_local.stderr or '').lower():
+                    return {"success": False, "error": f"Falha na inicialização: {(init_local.stderr or '').strip()}"}
+
             if repo_type != 'local':
                 check_result = subprocess.run([restic, "snapshots"], env=env, capture_output=True, text=True, timeout=30)
                 if check_result.returncode != 0:
@@ -1020,6 +1051,13 @@ class TaskManager:
             except Exception as _vss_err:
                 _vss_args = []
                 logger.debug(f"VSS restic: {_vss_err}")
+            if (task.get('last_status') or '').lower() == 'interrupted':
+                # backup anterior foi interrompido: a trava dele pode ter ficado no repositório
+                try:
+                    from engines.restic_lock import unlock_stale
+                    unlock_stale(restic, env)
+                except Exception as _ul_err:
+                    logger.debug(f"restic unlock: {_ul_err}")
             cmd = [restic, "backup", "--json"] + _vss_args + _tune.restic_args(_ts, repo_type) + source_paths
             _kib = self._upload_limit_kib(task)
             if _kib:

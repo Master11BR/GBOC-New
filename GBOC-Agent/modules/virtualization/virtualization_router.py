@@ -17,6 +17,46 @@ logger = logging.getLogger("gboc_virtualization_router")
 router = APIRouter(prefix="/api/v1/virtualization", tags=["Virtualization & Agentless Hypervisor"])
 
 
+class ProxmoxTestRequest(BaseModel):
+    url: str
+
+
+@router.post("/proxmox/test")
+def proxmox_test(req: ProxmoxTestRequest):
+    """Teste REAL de alcance da API Proxmox VE (GET /api2/json/version). Antes a tela dizia
+    "Conexão iniciada" sem contatar o servidor. 401 = API respondeu e exige token (ainda não configurado)."""
+    import requests, urllib3
+    from urllib.parse import urlparse
+    url = (req.url or "").strip().rstrip("/")
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+    u = urlparse(url)
+    if not u.hostname:
+        return JSONResponse(status_code=400, content={"status": "error", "message": "URL inválida."})
+    if not u.port:
+        url = f"{u.scheme}://{u.hostname}:8006"
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    try:
+        r = requests.get(url + "/api2/json/version", timeout=8, verify=False, proxies={"http": None, "https": None})
+    except requests.exceptions.ConnectTimeout:
+        return JSONResponse({"status": "error", "reachable": False, "message": f"Sem resposta de {url} em 8 s (host desligado, porta 8006 bloqueada ou rota inexistente)."})
+    except requests.exceptions.ConnectionError as e:
+        return JSONResponse({"status": "error", "reachable": False, "message": f"Não foi possível conectar a {url}: {str(e)[:160]}"})
+    if r.status_code == 200:
+        try:
+            v = (r.json() or {}).get("data") or {}
+        except ValueError:
+            v = {}
+        return JSONResponse({"status": "success", "reachable": True, "version": v,
+                             "message": f"API Proxmox VE respondeu em {url} — versão {v.get('version', '?')}."})
+    if r.status_code == 401:
+        return JSONResponse({"status": "success", "reachable": True, "auth_required": True,
+                             "message": f"API Proxmox VE alcançada em {url} (HTTP 401: exige token de API). "
+                                        "Backup de VMs/CTs Proxmox ainda não é orquestrado pelo GBOC: use vzdump ou o PBS."})
+    return JSONResponse({"status": "error", "reachable": True,
+                         "message": f"{url} respondeu HTTP {r.status_code} — não parece ser a API do Proxmox VE."})
+
+
 class VmwareConnectRequest(BaseModel):
     host: str
     user: str = "administrator@vsphere.local"

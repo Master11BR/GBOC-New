@@ -142,9 +142,10 @@ class ErrorAnalyzer:
             'error_message': error_message,
             'engine': engine,
             'matched_pattern': None,
-            'error_type': 'unknown',
+            'error_type': 'nao_classificado',
             'severity': 'medium',
-            'user_message': 'Erro desconhecido',
+            # sem padrao reconhecido: mostra a mensagem real do motor (antes: "Erro desconhecido")
+            'user_message': (str(error_message or '').strip().splitlines() or ['Motor não retornou mensagem de erro'])[0][:300],
             'solution': 'Verifique os logs para mais detalhes',
             'auto_fix_available': False,
             'auto_fix_action': None,
@@ -226,7 +227,7 @@ class ErrorAnalyzer:
             
             # Encontrar erro mais comum
             most_common_error = max(error_types, key=error_types.get) \
-                if error_types else 'unknown'
+                if error_types else 'nenhum erro registrado'
             
             # Severidade geral
             severities = [a['severity'] for a in analyses]

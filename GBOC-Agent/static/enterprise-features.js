@@ -46,7 +46,7 @@ async function detectEnterpriseDatabases() {
         }
         if (sapBadge) {
             sapBadge.className = `badge badge-${det.sap_hana?.installed ? 'success' : 'secondary'}`;
-            sapBadge.innerHTML = det.sap_hana?.installed ? '<i class="fas fa-check-circle"></i> SAP HANA Backint Pronto' : 'Não Detectado';
+            sapBadge.innerHTML = det.sap_hana?.installed ? '<i class="fas fa-check-circle"></i> SAP HANA (hdbsql) Pronto' : 'Não Detectado';
         }
         if (db2Badge) {
             db2Badge.className = `badge badge-${det.ibm_db2?.installed ? 'success' : 'secondary'}`;
@@ -86,7 +86,7 @@ async function startSapHanaAction() {
             body: JSON.stringify({ instance_id: inst, tenant_db: tenant })
         });
         const data = await res.json();
-        openEntMonitorModal(data.job_id, `SAP HANA Backint (${inst})`);
+        openEntMonitorModal(data.job_id, `SAP HANA (${inst})`);
     } catch (e) {
         alert('Erro ao disparar SAP HANA: ' + e.message);
     }
@@ -120,11 +120,18 @@ async function loadCdpStatus() {
         const rpoVal = document.getElementById('cdp-rpo-val');
         const btnToggle = document.getElementById('cdp-toggle-btn');
 
+        if (cdp.implemented === false) {
+            if (badge) { badge.className = 'badge badge-secondary'; badge.innerHTML = '<i class="fas fa-ban"></i> Não implementado'; badge.title = cdp.message || ''; }
+            if (rpoVal) rpoVal.textContent = '—';
+            if (btnToggle) { btnToggle.disabled = true; btnToggle.className = 'btn btn-secondary'; btnToggle.title = cdp.message || ''; btnToggle.innerHTML = '<i class="fas fa-ban"></i> CDP indisponível'; }
+            document.querySelectorAll('[onclick^="rollbackFromSlider"]').forEach(b => { b.disabled = true; b.title = cdp.message || ''; });
+            return;
+        }
         if (badge) {
             badge.className = `badge badge-${cdp.is_active ? 'success' : 'secondary'}`;
             badge.innerHTML = cdp.is_active ? '<i class="fas fa-satellite-dish fa-spin"></i> CDP Ativo (Streaming)' : '<i class="fas fa-pause"></i> CDP Pausado';
         }
-        if (rpoVal) rpoVal.textContent = `${cdp.current_rpo_seconds || 10}s`;
+        if (rpoVal) rpoVal.textContent = cdp.current_rpo_seconds == null ? '—' : `${cdp.current_rpo_seconds}s`;
         if (btnToggle) {
             btnToggle.innerHTML = cdp.is_active ? '<i class="fas fa-pause"></i> Pausar Daemon CDP' : '<i class="fas fa-play"></i> Iniciar Daemon CDP';
             btnToggle.className = `btn btn-${cdp.is_active ? 'warning' : 'success'}`;
@@ -312,18 +319,36 @@ async function loadComplianceCertificate() {
         const gridEl = document.getElementById('cert-standards-grid');
 
         if (certIdEl) certIdEl.textContent = cert.certificate_id;
+        const ovEl = document.getElementById('cert-overall-badge');
+        if (ovEl) {
+            const ov = { CONFORME: ['success', 'fa-check-double', 'Conforme'], CONFORME_PARCIAL: ['warning', 'fa-exclamation-triangle', 'Parcialmente conforme'],
+                         NAO_CONFORME: ['danger', 'fa-times-circle', 'Não conforme'] }[cert.overall_status] || ['secondary', 'fa-question', 'Sem dados'];
+            ovEl.className = `badge badge-${ov[0]}`;
+            ovEl.innerHTML = `<i class="fas ${ov[1]}"></i> ${ov[2]}`;
+        }
         if (hashEl) hashEl.textContent = cert.cryptographic_proof_sha256;
 
         if (gridEl && cert.standards_evaluated) {
+            const stCls = { CONFORME: 'success', CONFORME_PARCIAL: 'warning', NAO_CONFORME: 'danger' };
+            const stTxt = { CONFORME: 'Conforme', CONFORME_PARCIAL: 'Parcial', NAO_CONFORME: 'Não conforme', SEM_DADOS: 'Sem dados' };
+            const esc = v => String(v ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
             gridEl.innerHTML = Object.entries(cert.standards_evaluated).map(([k, s]) => `
                 <div style="background:var(--bg-input); padding:14px; border-radius:8px; border:1px solid var(--border);">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                        <strong style="font-size:0.88em; color:var(--text);">${s.name}</strong>
-                        <span class="badge badge-success" style="font-size:0.72em;">${s.status}</span>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; gap:8px;">
+                        <strong style="font-size:0.88em; color:var(--text);">${esc(s.name)}</strong>
+                        <span class="badge badge-${stCls[s.status] || 'secondary'}" style="font-size:0.72em; white-space:nowrap;">${stTxt[s.status] || esc(s.status)}</span>
                     </div>
-                    <div style="font-size:0.8em; color:var(--text-muted);">Índice de Conformidade: <strong>${s.compliance_score}%</strong></div>
+                    <div style="font-size:0.8em; color:var(--text-muted);">Controles aprovados: <strong>${s.compliance_score == null ? '—' : s.compliance_score + '%'}</strong>
+                        (${s.controls_passed ?? 0}/${s.controls_evaluated ?? 0}${s.controls_not_verified ? `, ${s.controls_not_verified} não verificado(s)` : ''})</div>
                 </div>
-            `).join('');
+            `).join('') + (Array.isArray(cert.audit_checks) ? `
+                <div style="grid-column:1/-1; background:var(--bg-input); padding:14px; border-radius:8px; border:1px solid var(--border); font-size:0.8em;">
+                    <strong style="color:var(--text);">Evidências verificadas</strong>
+                    ${cert.audit_checks.map(c => `<div style="display:flex; gap:8px; margin-top:6px;">
+                        <span class="badge badge-${c.status === 'PASS' ? 'success' : c.status === 'FAIL' ? 'danger' : 'secondary'}" style="font-size:0.72em; white-space:nowrap;">${c.status === 'PASS' ? 'OK' : c.status === 'FAIL' ? 'Falha' : 'Não verificado'}</span>
+                        <span><strong>${esc(c.rule)}</strong> — <span style="color:var(--text-muted);">${esc(c.evidence)}</span></span></div>`).join('')}
+                    <div style="margin-top:8px; color:var(--text-muted);">${esc(cert.issuer)}</div>
+                </div>` : '');
         }
     } catch (e) {
         console.error('Erro no certificado de conformidade:', e);

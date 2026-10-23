@@ -1,0 +1,4023 @@
+{
+  "timestamp": "2026-10-22T22:11:17.223476",
+  "total_python_files": 243,
+  "imported_modules": 410,
+  "orphan_files": 146,
+  "orphans": [
+    {
+      "file": "start_scheduler.py",
+      "name": "start_scheduler",
+      "size_kb": 6.48,
+      "modified": "2026-10-20T20:09:30.109948",
+      "is_main_script": true,
+      "purpose": "script",
+      "line_count": 178,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "document_as_tool",
+          "location": "tools/ (create if needed)",
+          "description": "Documentar como ferramenta/script auxiliar"
+        }
+      ]
+    },
+    {
+      "file": "start_server.py",
+      "name": "start_server",
+      "size_kb": 5.91,
+      "modified": "2026-10-20T20:09:30.112062",
+      "is_main_script": true,
+      "purpose": "client/server",
+      "line_count": 162,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "review_manually",
+          "description": "Revisar manualmente para determinar utilidade"
+        }
+      ]
+    },
+    {
+      "file": "api\\advanced_stats_api.py",
+      "name": "advanced_stats_api",
+      "size_kb": 16.95,
+      "modified": "2026-10-22T21:26:13.239669",
+      "is_main_script": false,
+      "purpose": "api",
+      "line_count": 407,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_api",
+          "location": "api/",
+          "import_in": [
+            "agent_server.py"
+          ],
+          "description": "Adicionar ao roteador de APIs"
+        }
+      ]
+    },
+    {
+      "file": "api\\agent_ops_api.py",
+      "name": "agent_ops_api",
+      "size_kb": 9.67,
+      "modified": "2026-10-04T22:08:09.748492",
+      "is_main_script": false,
+      "purpose": "test",
+      "line_count": 238,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "organize_tests",
+          "location": "tests/",
+          "description": "Organizar na estrutura de testes"
+        }
+      ]
+    },
+    {
+      "file": "api\\ai_api.py",
+      "name": "ai_api",
+      "size_kb": 7.92,
+      "modified": "2026-10-22T12:38:36.647522",
+      "is_main_script": false,
+      "purpose": "api",
+      "line_count": 190,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_api",
+          "location": "api/",
+          "import_in": [
+            "agent_server.py"
+          ],
+          "description": "Adicionar ao roteador de APIs"
+        }
+      ]
+    },
+    {
+      "file": "api\\alerts.py",
+      "name": "alerts",
+      "size_kb": 26.5,
+      "modified": "2026-10-20T20:09:30.144396",
+      "is_main_script": false,
+      "purpose": "api",
+      "line_count": 753,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_api",
+          "location": "api/",
+          "import_in": [
+            "agent_server.py"
+          ],
+          "description": "Adicionar ao roteador de APIs"
+        }
+      ]
+    },
+    {
+      "file": "api\\api_migrator.py",
+      "name": "api_migrator",
+      "size_kb": 1.61,
+      "modified": "2026-10-22T12:38:36.655518",
+      "is_main_script": false,
+      "purpose": "api",
+      "line_count": 36,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_api",
+          "location": "api/",
+          "import_in": [
+            "agent_server.py"
+          ],
+          "description": "Adicionar ao roteador de APIs"
+        }
+      ]
+    },
+    {
+      "file": "api\\api_restore.py",
+      "name": "api_restore",
+      "size_kb": 14.77,
+      "modified": "2026-10-20T20:09:30.149410",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 413,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "api\\audit_api.py",
+      "name": "audit_api",
+      "size_kb": 11.5,
+      "modified": "2026-10-22T12:38:36.664036",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 331,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "api\\auth.py",
+      "name": "auth",
+      "size_kb": 47.24,
+      "modified": "2026-10-22T17:07:10.197023",
+      "is_main_script": false,
+      "purpose": "model",
+      "line_count": 1094,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "review_manually",
+          "description": "Revisar manualmente para determinar utilidade"
+        }
+      ]
+    },
+    {
+      "file": "api\\auth_middleware.py",
+      "name": "auth_middleware",
+      "size_kb": 7.44,
+      "modified": "2026-10-21T16:08:34.121134",
+      "is_main_script": false,
+      "purpose": "model",
+      "line_count": 181,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "review_manually",
+          "description": "Revisar manualmente para determinar utilidade"
+        }
+      ]
+    },
+    {
+      "file": "api\\backup_control.py",
+      "name": "backup_control",
+      "size_kb": 2.89,
+      "modified": "2026-10-05T13:24:45.277452",
+      "is_main_script": false,
+      "purpose": "api",
+      "line_count": 79,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_api",
+          "location": "api/",
+          "import_in": [
+            "agent_server.py"
+          ],
+          "description": "Adicionar ao roteador de APIs"
+        }
+      ]
+    },
+    {
+      "file": "api\\compliance_api.py",
+      "name": "compliance_api",
+      "size_kb": 16.79,
+      "modified": "2026-10-22T12:38:36.690559",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 412,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "api\\config_api.py",
+      "name": "config_api",
+      "size_kb": 12.32,
+      "modified": "2026-10-22T12:38:36.700565",
+      "is_main_script": false,
+      "purpose": "configuration",
+      "line_count": 313,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_config",
+          "location": "config/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar ao sistema de configuração"
+        }
+      ]
+    },
+    {
+      "file": "api\\database_backup_api.py",
+      "name": "database_backup_api",
+      "size_kb": 6.25,
+      "modified": "2026-10-22T12:38:36.714098",
+      "is_main_script": false,
+      "purpose": "test",
+      "line_count": 172,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "organize_tests",
+          "location": "tests/",
+          "description": "Organizar na estrutura de testes"
+        }
+      ]
+    },
+    {
+      "file": "api\\diagnostics.py",
+      "name": "diagnostics",
+      "size_kb": 41.69,
+      "modified": "2026-10-22T12:38:36.736088",
+      "is_main_script": false,
+      "purpose": "api",
+      "line_count": 1093,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_api",
+          "location": "api/",
+          "import_in": [
+            "agent_server.py"
+          ],
+          "description": "Adicionar ao roteador de APIs"
+        }
+      ]
+    },
+    {
+      "file": "api\\duplicati_native_api.py",
+      "name": "duplicati_native_api",
+      "size_kb": 11.41,
+      "modified": "2026-10-22T12:38:36.748581",
+      "is_main_script": false,
+      "purpose": "api",
+      "line_count": 313,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_api",
+          "location": "api/",
+          "import_in": [
+            "agent_server.py"
+          ],
+          "description": "Adicionar ao roteador de APIs"
+        }
+      ]
+    },
+    {
+      "file": "api\\errors.py",
+      "name": "errors",
+      "size_kb": 0.88,
+      "modified": "2026-10-22T21:26:13.249667",
+      "is_main_script": false,
+      "purpose": "api",
+      "line_count": 29,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_api",
+          "location": "api/",
+          "import_in": [
+            "agent_server.py"
+          ],
+          "description": "Adicionar ao roteador de APIs"
+        }
+      ]
+    },
+    {
+      "file": "api\\export_api.py",
+      "name": "export_api",
+      "size_kb": 7.92,
+      "modified": "2026-10-20T20:09:30.169076",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 206,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "api\\fs.py",
+      "name": "fs",
+      "size_kb": 3.19,
+      "modified": "2026-10-22T12:38:36.757930",
+      "is_main_script": false,
+      "purpose": "api",
+      "line_count": 92,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_api",
+          "location": "api/",
+          "import_in": [
+            "agent_server.py"
+          ],
+          "description": "Adicionar ao roteador de APIs"
+        }
+      ]
+    },
+    {
+      "file": "api\\hardware_api.py",
+      "name": "hardware_api",
+      "size_kb": 15.87,
+      "modified": "2026-10-22T22:09:03.601188",
+      "is_main_script": false,
+      "purpose": "api",
+      "line_count": 367,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_api",
+          "location": "api/",
+          "import_in": [
+            "agent_server.py"
+          ],
+          "description": "Adicionar ao roteador de APIs"
+        }
+      ]
+    },
+    {
+      "file": "api\\import_api.py",
+      "name": "import_api",
+      "size_kb": 2.88,
+      "modified": "2026-10-20T20:09:30.173649",
+      "is_main_script": false,
+      "purpose": "api",
+      "line_count": 84,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_api",
+          "location": "api/",
+          "import_in": [
+            "agent_server.py"
+          ],
+          "description": "Adicionar ao roteador de APIs"
+        }
+      ]
+    },
+    {
+      "file": "api\\job_alert_router.py",
+      "name": "job_alert_router",
+      "size_kb": 3.24,
+      "modified": "2026-10-22T12:38:36.797722",
+      "is_main_script": false,
+      "purpose": "api",
+      "line_count": 71,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_api",
+          "location": "api/",
+          "import_in": [
+            "agent_server.py"
+          ],
+          "description": "Adicionar ao roteador de APIs"
+        }
+      ]
+    },
+    {
+      "file": "api\\logs.py",
+      "name": "logs",
+      "size_kb": 14.81,
+      "modified": "2026-10-22T12:38:36.810243",
+      "is_main_script": false,
+      "purpose": "api",
+      "line_count": 396,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_api",
+          "location": "api/",
+          "import_in": [
+            "agent_server.py"
+          ],
+          "description": "Adicionar ao roteador de APIs"
+        }
+      ]
+    },
+    {
+      "file": "api\\metrics_api.py",
+      "name": "metrics_api",
+      "size_kb": 11.1,
+      "modified": "2026-10-22T12:38:36.821630",
+      "is_main_script": false,
+      "purpose": "api",
+      "line_count": 239,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_api",
+          "location": "api/",
+          "import_in": [
+            "agent_server.py"
+          ],
+          "description": "Adicionar ao roteador de APIs"
+        }
+      ]
+    },
+    {
+      "file": "api\\network_governor_api.py",
+      "name": "network_governor_api",
+      "size_kb": 2.95,
+      "modified": "2026-10-21T16:55:31.601876",
+      "is_main_script": false,
+      "purpose": "api",
+      "line_count": 81,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_api",
+          "location": "api/",
+          "import_in": [
+            "agent_server.py"
+          ],
+          "description": "Adicionar ao roteador de APIs"
+        }
+      ]
+    },
+    {
+      "file": "api\\notification_channels_api.py",
+      "name": "notification_channels_api",
+      "size_kb": 4.21,
+      "modified": "2026-10-22T12:38:36.830251",
+      "is_main_script": false,
+      "purpose": "test",
+      "line_count": 120,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "organize_tests",
+          "location": "tests/",
+          "description": "Organizar na estrutura de testes"
+        }
+      ]
+    },
+    {
+      "file": "api\\overview.py",
+      "name": "overview",
+      "size_kb": 7.5,
+      "modified": "2026-10-22T22:06:14.073014",
+      "is_main_script": false,
+      "purpose": "api",
+      "line_count": 188,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_api",
+          "location": "api/",
+          "import_in": [
+            "agent_server.py"
+          ],
+          "description": "Adicionar ao roteador de APIs"
+        }
+      ]
+    },
+    {
+      "file": "api\\preemptive_api.py",
+      "name": "preemptive_api",
+      "size_kb": 20.87,
+      "modified": "2026-10-22T22:07:01.689368",
+      "is_main_script": false,
+      "purpose": "api",
+      "line_count": 496,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_api",
+          "location": "api/",
+          "import_in": [
+            "agent_server.py"
+          ],
+          "description": "Adicionar ao roteador de APIs"
+        }
+      ]
+    },
+    {
+      "file": "api\\ransomware_api.py",
+      "name": "ransomware_api",
+      "size_kb": 13.54,
+      "modified": "2026-10-22T20:31:11.144536",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 353,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "api\\replication_api.py",
+      "name": "replication_api",
+      "size_kb": 8.19,
+      "modified": "2026-10-22T12:38:36.855662",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 236,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "api\\reports_api.py",
+      "name": "reports_api",
+      "size_kb": 19.19,
+      "modified": "2026-10-22T22:06:14.091488",
+      "is_main_script": false,
+      "purpose": "api",
+      "line_count": 520,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_api",
+          "location": "api/",
+          "import_in": [
+            "agent_server.py"
+          ],
+          "description": "Adicionar ao roteador de APIs"
+        }
+      ]
+    },
+    {
+      "file": "api\\repositories.py",
+      "name": "repositories",
+      "size_kb": 28.35,
+      "modified": "2026-10-20T20:09:30.206262",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 716,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "api\\schema_check_api.py",
+      "name": "schema_check_api",
+      "size_kb": 8.72,
+      "modified": "2026-10-05T13:24:51.931965",
+      "is_main_script": false,
+      "purpose": "api",
+      "line_count": 185,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_api",
+          "location": "api/",
+          "import_in": [
+            "agent_server.py"
+          ],
+          "description": "Adicionar ao roteador de APIs"
+        }
+      ]
+    },
+    {
+      "file": "api\\settings.py",
+      "name": "settings",
+      "size_kb": 27.92,
+      "modified": "2026-10-22T12:38:36.881322",
+      "is_main_script": false,
+      "purpose": "api",
+      "line_count": 741,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_api",
+          "location": "api/",
+          "import_in": [
+            "agent_server.py"
+          ],
+          "description": "Adicionar ao roteador de APIs"
+        }
+      ]
+    },
+    {
+      "file": "api\\smtp.py",
+      "name": "smtp",
+      "size_kb": 5.85,
+      "modified": "2026-10-13T23:44:14.641654",
+      "is_main_script": false,
+      "purpose": "test",
+      "line_count": 157,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "organize_tests",
+          "location": "tests/",
+          "description": "Organizar na estrutura de testes"
+        }
+      ]
+    },
+    {
+      "file": "api\\storage_router.py",
+      "name": "storage_router",
+      "size_kb": 1.9,
+      "modified": "2026-10-22T12:38:36.892797",
+      "is_main_script": false,
+      "purpose": "api",
+      "line_count": 43,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_api",
+          "location": "api/",
+          "import_in": [
+            "agent_server.py"
+          ],
+          "description": "Adicionar ao roteador de APIs"
+        }
+      ]
+    },
+    {
+      "file": "api\\system_api.py",
+      "name": "system_api",
+      "size_kb": 13.11,
+      "modified": "2026-10-22T12:38:36.905629",
+      "is_main_script": false,
+      "purpose": "api",
+      "line_count": 356,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_api",
+          "location": "api/",
+          "import_in": [
+            "agent_server.py"
+          ],
+          "description": "Adicionar ao roteador de APIs"
+        }
+      ]
+    },
+    {
+      "file": "api\\tasks.py",
+      "name": "tasks",
+      "size_kb": 42.91,
+      "modified": "2026-10-22T22:09:03.618188",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 1014,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "api\\tasks_ops.py",
+      "name": "tasks_ops",
+      "size_kb": 0.91,
+      "modified": "2026-10-05T13:24:54.841103",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 26,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "api\\websocket_api.py",
+      "name": "websocket_api",
+      "size_kb": 5.99,
+      "modified": "2026-10-22T12:38:37.144621",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 178,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "core\\agent_dr_sync.py",
+      "name": "agent_dr_sync",
+      "size_kb": 0.0,
+      "modified": "2026-08-03T21:48:48.569882",
+      "is_main_script": false,
+      "purpose": "unknown",
+      "line_count": 0,
+      "has_classes": false,
+      "has_functions": false,
+      "integration_suggestions": [
+        {
+          "action": "review_manually",
+          "description": "Revisar manualmente para determinar utilidade"
+        }
+      ]
+    },
+    {
+      "file": "core\\agent_pairing.py",
+      "name": "agent_pairing",
+      "size_kb": 2.01,
+      "modified": "2026-10-02T09:02:24.383796",
+      "is_main_script": false,
+      "purpose": "unknown",
+      "line_count": 61,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "review_manually",
+          "description": "Revisar manualmente para determinar utilidade"
+        }
+      ]
+    },
+    {
+      "file": "core\\agent_updater.py",
+      "name": "agent_updater",
+      "size_kb": 10.07,
+      "modified": "2026-10-04T18:41:41.982874",
+      "is_main_script": false,
+      "purpose": "unknown",
+      "line_count": 247,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "review_manually",
+          "description": "Revisar manualmente para determinar utilidade"
+        }
+      ]
+    },
+    {
+      "file": "core\\cbt_vss.py",
+      "name": "cbt_vss",
+      "size_kb": 0.0,
+      "modified": "2026-08-03T21:48:48.569882",
+      "is_main_script": false,
+      "purpose": "unknown",
+      "line_count": 0,
+      "has_classes": false,
+      "has_functions": false,
+      "integration_suggestions": [
+        {
+          "action": "review_manually",
+          "description": "Revisar manualmente para determinar utilidade"
+        }
+      ]
+    },
+    {
+      "file": "core\\central_inventory.py",
+      "name": "central_inventory",
+      "size_kb": 12.96,
+      "modified": "2026-10-04T21:49:57.984020",
+      "is_main_script": false,
+      "purpose": "unknown",
+      "line_count": 287,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "review_manually",
+          "description": "Revisar manualmente para determinar utilidade"
+        }
+      ]
+    },
+    {
+      "file": "core\\db_wrapper.py",
+      "name": "db_wrapper",
+      "size_kb": 4.08,
+      "modified": "2026-10-20T20:09:30.222812",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 148,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "core\\dr_restore_manager.py",
+      "name": "dr_restore_manager",
+      "size_kb": 0.0,
+      "modified": "2026-08-03T21:48:48.571876",
+      "is_main_script": false,
+      "purpose": "unknown",
+      "line_count": 0,
+      "has_classes": false,
+      "has_functions": false,
+      "integration_suggestions": [
+        {
+          "action": "review_manually",
+          "description": "Revisar manualmente para determinar utilidade"
+        }
+      ]
+    },
+    {
+      "file": "core\\enrollment.py",
+      "name": "enrollment",
+      "size_kb": 7.76,
+      "modified": "2026-10-18T15:09:02.065616",
+      "is_main_script": true,
+      "purpose": "script",
+      "line_count": 193,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "document_as_tool",
+          "location": "tools/ (create if needed)",
+          "description": "Documentar como ferramenta/script auxiliar"
+        }
+      ]
+    },
+    {
+      "file": "core\\fast_metrics.py",
+      "name": "fast_metrics",
+      "size_kb": 2.25,
+      "modified": "2026-10-05T16:50:04.314793",
+      "is_main_script": false,
+      "purpose": "unknown",
+      "line_count": 62,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "review_manually",
+          "description": "Revisar manualmente para determinar utilidade"
+        }
+      ]
+    },
+    {
+      "file": "core\\http_client.py",
+      "name": "http_client",
+      "size_kb": 0.99,
+      "modified": "2026-10-20T20:09:30.224303",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 34,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "core\\link_state.py",
+      "name": "link_state",
+      "size_kb": 2.37,
+      "modified": "2026-10-05T19:13:54.074950",
+      "is_main_script": false,
+      "purpose": "unknown",
+      "line_count": 42,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "review_manually",
+          "description": "Revisar manualmente para determinar utilidade"
+        }
+      ]
+    },
+    {
+      "file": "core\\logstash_handler.py",
+      "name": "logstash_handler",
+      "size_kb": 1.98,
+      "modified": "2026-08-03T22:37:42.879561",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 65,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "core\\log_redact.py",
+      "name": "log_redact",
+      "size_kb": 2.0,
+      "modified": "2026-10-21T17:02:47.779756",
+      "is_main_script": false,
+      "purpose": "unknown",
+      "line_count": 56,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "review_manually",
+          "description": "Revisar manualmente para determinar utilidade"
+        }
+      ]
+    },
+    {
+      "file": "core\\monitoring.py",
+      "name": "monitoring",
+      "size_kb": 4.59,
+      "modified": "2026-08-03T22:37:42.879561",
+      "is_main_script": false,
+      "purpose": "test",
+      "line_count": 149,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "organize_tests",
+          "location": "tests/",
+          "description": "Organizar na estrutura de testes"
+        }
+      ]
+    },
+    {
+      "file": "core\\rmm_engine.py",
+      "name": "rmm_engine",
+      "size_kb": 0.0,
+      "modified": "2026-08-03T21:48:48.572877",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 0,
+      "has_classes": false,
+      "has_functions": false,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "engines\\advanced_statistics.py",
+      "name": "advanced_statistics",
+      "size_kb": 13.22,
+      "modified": "2026-10-20T20:09:30.258256",
+      "is_main_script": true,
+      "purpose": "engine/module",
+      "line_count": 321,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "engines\\ai_assistant.py",
+      "name": "ai_assistant",
+      "size_kb": 12.65,
+      "modified": "2026-10-22T12:18:15.773367",
+      "is_main_script": false,
+      "purpose": "unknown",
+      "line_count": 270,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "review_manually",
+          "description": "Revisar manualmente para determinar utilidade"
+        }
+      ]
+    },
+    {
+      "file": "engines\\analytics.py",
+      "name": "analytics",
+      "size_kb": 23.66,
+      "modified": "2026-10-22T22:06:14.020018",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 583,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "engines\\auto_healer.py",
+      "name": "auto_healer",
+      "size_kb": 8.08,
+      "modified": "2026-08-03T22:37:42.887924",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 258,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "engines\\auto_verify_engine.py",
+      "name": "auto_verify_engine",
+      "size_kb": 13.2,
+      "modified": "2026-10-20T20:09:30.286847",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 264,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "engines\\backup_controller.py",
+      "name": "backup_controller",
+      "size_kb": 8.7,
+      "modified": "2026-08-03T22:37:42.888557",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 219,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "engines\\backup_engine.py",
+      "name": "backup_engine",
+      "size_kb": 0.11,
+      "modified": "2026-08-03T22:37:42.889557",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 4,
+      "has_classes": false,
+      "has_functions": false,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "engines\\backup_engine_manager.py",
+      "name": "backup_engine_manager",
+      "size_kb": 29.08,
+      "modified": "2026-10-20T20:09:30.292376",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 696,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "engines\\backup_importer.py",
+      "name": "backup_importer",
+      "size_kb": 14.76,
+      "modified": "2026-10-20T23:27:36.862488",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 294,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "engines\\backup_replicator.py",
+      "name": "backup_replicator",
+      "size_kb": 16.13,
+      "modified": "2026-10-20T20:09:30.295330",
+      "is_main_script": false,
+      "purpose": "unknown",
+      "line_count": 433,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "review_manually",
+          "description": "Revisar manualmente para determinar utilidade"
+        }
+      ]
+    },
+    {
+      "file": "engines\\backup_synchronizer.py",
+      "name": "backup_synchronizer",
+      "size_kb": 2.69,
+      "modified": "2026-08-03T22:37:42.895555",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 75,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "engines\\backup_verifier.py",
+      "name": "backup_verifier",
+      "size_kb": 8.98,
+      "modified": "2026-10-20T20:09:30.297832",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 206,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "engines\\database_backup.py",
+      "name": "database_backup",
+      "size_kb": 19.66,
+      "modified": "2026-10-20T20:09:30.319183",
+      "is_main_script": false,
+      "purpose": "test",
+      "line_count": 515,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "organize_tests",
+          "location": "tests/",
+          "description": "Organizar na estrutura de testes"
+        }
+      ]
+    },
+    {
+      "file": "engines\\database_cross_migrator.py",
+      "name": "database_cross_migrator",
+      "size_kb": 7.52,
+      "modified": "2026-10-20T20:09:30.321022",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 174,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "engines\\diagnostic_module.py",
+      "name": "diagnostic_module",
+      "size_kb": 42.91,
+      "modified": "2026-10-22T22:06:26.538766",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 1147,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "engines\\diagnostic_system.py",
+      "name": "diagnostic_system",
+      "size_kb": 17.92,
+      "modified": "2026-10-22T21:33:05.896390",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 446,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "engines\\disaster_recovery_engine.py",
+      "name": "disaster_recovery_engine",
+      "size_kb": 47.89,
+      "modified": "2026-10-22T21:38:27.340864",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 965,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "engines\\engine_migrator.py",
+      "name": "engine_migrator",
+      "size_kb": 9.91,
+      "modified": "2026-10-20T20:09:30.336498",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 205,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "engines\\engine_paths.py",
+      "name": "engine_paths",
+      "size_kb": 9.68,
+      "modified": "2026-08-03T22:37:42.901893",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 306,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "engines\\engine_validator.py",
+      "name": "engine_validator",
+      "size_kb": 15.34,
+      "modified": "2026-10-06T09:19:08.876488",
+      "is_main_script": true,
+      "purpose": "engine/module",
+      "line_count": 447,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "engines\\enterprise_database_connectors.py",
+      "name": "enterprise_database_connectors",
+      "size_kb": 15.27,
+      "modified": "2026-10-22T21:33:42.262489",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 357,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "engines\\error_analyzer.py",
+      "name": "error_analyzer",
+      "size_kb": 13.44,
+      "modified": "2026-10-22T22:09:03.706184",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 357,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "engines\\error_capture.py",
+      "name": "error_capture",
+      "size_kb": 13.23,
+      "modified": "2026-08-03T22:37:42.906894",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 341,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "engines\\execution_guard.py",
+      "name": "execution_guard",
+      "size_kb": 15.78,
+      "modified": "2026-10-22T15:08:30.061672",
+      "is_main_script": false,
+      "purpose": "unknown",
+      "line_count": 324,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "review_manually",
+          "description": "Revisar manualmente para determinar utilidade"
+        }
+      ]
+    },
+    {
+      "file": "engines\\healer_engine.py",
+      "name": "healer_engine",
+      "size_kb": 25.54,
+      "modified": "2026-10-22T21:31:51.285189",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 632,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "engines\\health_score.py",
+      "name": "health_score",
+      "size_kb": 11.32,
+      "modified": "2026-10-22T17:24:36.891996",
+      "is_main_script": false,
+      "purpose": "unknown",
+      "line_count": 349,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "review_manually",
+          "description": "Revisar manualmente para determinar utilidade"
+        }
+      ]
+    },
+    {
+      "file": "engines\\history_importer.py",
+      "name": "history_importer",
+      "size_kb": 28.08,
+      "modified": "2026-10-18T15:09:06.485980",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 707,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "engines\\instant_vm_boot.py",
+      "name": "instant_vm_boot",
+      "size_kb": 6.9,
+      "modified": "2026-10-22T21:25:31.922280",
+      "is_main_script": false,
+      "purpose": "unknown",
+      "line_count": 174,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "review_manually",
+          "description": "Revisar manualmente para determinar utilidade"
+        }
+      ]
+    },
+    {
+      "file": "engines\\job_alert_monitor.py",
+      "name": "job_alert_monitor",
+      "size_kb": 16.66,
+      "modified": "2026-10-20T20:09:30.381342",
+      "is_main_script": false,
+      "purpose": "unknown",
+      "line_count": 387,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "review_manually",
+          "description": "Revisar manualmente para determinar utilidade"
+        }
+      ]
+    },
+    {
+      "file": "engines\\k8s_engine.py",
+      "name": "k8s_engine",
+      "size_kb": 3.86,
+      "modified": "2026-10-20T20:09:30.382874",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 103,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "engines\\kubernetes_backup_engine.py",
+      "name": "kubernetes_backup_engine",
+      "size_kb": 5.98,
+      "modified": "2026-10-22T22:09:03.660188",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 152,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "engines\\metrics_collector.py",
+      "name": "metrics_collector",
+      "size_kb": 15.56,
+      "modified": "2026-08-03T22:37:43.020979",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 359,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "engines\\notification_channels.py",
+      "name": "notification_channels",
+      "size_kb": 13.83,
+      "modified": "2026-10-20T20:09:30.389988",
+      "is_main_script": false,
+      "purpose": "unknown",
+      "line_count": 370,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "review_manually",
+          "description": "Revisar manualmente para determinar utilidade"
+        }
+      ]
+    },
+    {
+      "file": "engines\\notification_service.py",
+      "name": "notification_service",
+      "size_kb": 10.87,
+      "modified": "2026-10-13T23:44:15.691476",
+      "is_main_script": false,
+      "purpose": "unknown",
+      "line_count": 206,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "review_manually",
+          "description": "Revisar manualmente para determinar utilidade"
+        }
+      ]
+    },
+    {
+      "file": "engines\\preemptive_diagnostic.py",
+      "name": "preemptive_diagnostic",
+      "size_kb": 15.36,
+      "modified": "2026-10-20T20:09:30.393019",
+      "is_main_script": true,
+      "purpose": "engine/module",
+      "line_count": 396,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "engines\\ransomware_detector.py",
+      "name": "ransomware_detector",
+      "size_kb": 33.74,
+      "modified": "2026-10-22T20:30:24.431437",
+      "is_main_script": false,
+      "purpose": "unknown",
+      "line_count": 893,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "review_manually",
+          "description": "Revisar manualmente para determinar utilidade"
+        }
+      ]
+    },
+    {
+      "file": "engines\\ransomware_guardian.py",
+      "name": "ransomware_guardian",
+      "size_kb": 33.59,
+      "modified": "2026-10-22T22:06:14.039018",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 783,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "engines\\realtime_backup_monitor.py",
+      "name": "realtime_backup_monitor",
+      "size_kb": 11.64,
+      "modified": "2026-10-15T12:37:11.270307",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 314,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "engines\\real_backup_executor.py",
+      "name": "real_backup_executor",
+      "size_kb": 0.2,
+      "modified": "2026-08-03T22:37:43.027012",
+      "is_main_script": false,
+      "purpose": "unknown",
+      "line_count": 6,
+      "has_classes": false,
+      "has_functions": false,
+      "integration_suggestions": [
+        {
+          "action": "review_manually",
+          "description": "Revisar manualmente para determinar utilidade"
+        }
+      ]
+    },
+    {
+      "file": "engines\\real_engine_importer.py",
+      "name": "real_engine_importer",
+      "size_kb": 16.8,
+      "modified": "2026-10-22T22:06:14.057019",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 461,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "engines\\real_restore_manager.py",
+      "name": "real_restore_manager",
+      "size_kb": 96.19,
+      "modified": "2026-10-22T20:53:25.268117",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 2204,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "engines\\report_catalog.py",
+      "name": "report_catalog",
+      "size_kb": 0.0,
+      "modified": "2026-08-03T21:48:48.589874",
+      "is_main_script": false,
+      "purpose": "unknown",
+      "line_count": 0,
+      "has_classes": false,
+      "has_functions": false,
+      "integration_suggestions": [
+        {
+          "action": "review_manually",
+          "description": "Revisar manualmente para determinar utilidade"
+        }
+      ]
+    },
+    {
+      "file": "engines\\report_generator.py",
+      "name": "report_generator",
+      "size_kb": 36.1,
+      "modified": "2026-10-20T20:09:30.453186",
+      "is_main_script": false,
+      "purpose": "unknown",
+      "line_count": 803,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "review_manually",
+          "description": "Revisar manualmente para determinar utilidade"
+        }
+      ]
+    },
+    {
+      "file": "engines\\report_source_agent.py",
+      "name": "report_source_agent",
+      "size_kb": 11.84,
+      "modified": "2026-10-04T21:50:02.479820",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 247,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "engines\\repository_manager.py",
+      "name": "repository_manager",
+      "size_kb": 75.16,
+      "modified": "2026-10-22T14:58:00.305722",
+      "is_main_script": false,
+      "purpose": "unknown",
+      "line_count": 1560,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "review_manually",
+          "description": "Revisar manualmente para determinar utilidade"
+        }
+      ]
+    },
+    {
+      "file": "engines\\restic_lock.py",
+      "name": "restic_lock",
+      "size_kb": 1.97,
+      "modified": "2026-10-13T18:35:35.873448",
+      "is_main_script": false,
+      "purpose": "unknown",
+      "line_count": 43,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "review_manually",
+          "description": "Revisar manualmente para determinar utilidade"
+        }
+      ]
+    },
+    {
+      "file": "engines\\restore_test.py",
+      "name": "restore_test",
+      "size_kb": 16.92,
+      "modified": "2026-10-04T18:41:44.546456",
+      "is_main_script": false,
+      "purpose": "test",
+      "line_count": 378,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "organize_tests",
+          "location": "tests/",
+          "description": "Organizar na estrutura de testes"
+        }
+      ]
+    },
+    {
+      "file": "engines\\s3_endpoint.py",
+      "name": "s3_endpoint",
+      "size_kb": 1.13,
+      "modified": "2026-10-13T23:33:16.664703",
+      "is_main_script": false,
+      "purpose": "unknown",
+      "line_count": 28,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "review_manually",
+          "description": "Revisar manualmente para determinar utilidade"
+        }
+      ]
+    },
+    {
+      "file": "engines\\scheduler.py",
+      "name": "scheduler",
+      "size_kb": 9.0,
+      "modified": "2026-10-20T23:34:32.810846",
+      "is_main_script": false,
+      "purpose": "unknown",
+      "line_count": 214,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "review_manually",
+          "description": "Revisar manualmente para determinar utilidade"
+        }
+      ]
+    },
+    {
+      "file": "engines\\storage_monitor.py",
+      "name": "storage_monitor",
+      "size_kb": 19.58,
+      "modified": "2026-10-22T20:24:33.642726",
+      "is_main_script": false,
+      "purpose": "unknown",
+      "line_count": 463,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "review_manually",
+          "description": "Revisar manualmente para determinar utilidade"
+        }
+      ]
+    },
+    {
+      "file": "engines\\surebackup_engine.py",
+      "name": "surebackup_engine",
+      "size_kb": 7.77,
+      "modified": "2026-10-22T22:09:03.677188",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 210,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "engines\\task_manager.py",
+      "name": "task_manager",
+      "size_kb": 89.44,
+      "modified": "2026-10-22T14:59:02.103623",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 1770,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "engines\\telemetry_engine.py",
+      "name": "telemetry_engine",
+      "size_kb": 3.71,
+      "modified": "2026-10-20T20:09:30.504490",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 98,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "engines\\universal_restore.py",
+      "name": "universal_restore",
+      "size_kb": 7.15,
+      "modified": "2026-10-22T20:07:57.548075",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 147,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "engines\\vmware_hypervisor_engine.py",
+      "name": "vmware_hypervisor_engine",
+      "size_kb": 17.15,
+      "modified": "2026-10-22T21:24:36.867696",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 431,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "native_engine\\engine.py",
+      "name": "engine",
+      "size_kb": 38.89,
+      "modified": "2026-10-22T17:27:49.601197",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 849,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "native_engine\\native_engine_v4.py",
+      "name": "native_engine_v4",
+      "size_kb": 0.0,
+      "modified": "2026-08-03T21:48:48.591875",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 0,
+      "has_classes": false,
+      "has_functions": false,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "storage_backends\\base.py",
+      "name": "base",
+      "size_kb": 3.07,
+      "modified": "2026-08-03T22:37:43.045533",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 101,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "storage_backends\\cloud.py",
+      "name": "cloud",
+      "size_kb": 25.87,
+      "modified": "2026-10-21T16:02:08.144456",
+      "is_main_script": false,
+      "purpose": "unknown",
+      "line_count": 588,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "review_manually",
+          "description": "Revisar manualmente para determinar utilidade"
+        }
+      ]
+    },
+    {
+      "file": "storage_backends\\local.py",
+      "name": "local",
+      "size_kb": 8.14,
+      "modified": "2026-10-18T15:09:10.877575",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 203,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "tests\\conftest.py",
+      "name": "conftest",
+      "size_kb": 0.38,
+      "modified": "2026-10-22T17:32:37.396696",
+      "is_main_script": false,
+      "purpose": "test",
+      "line_count": 7,
+      "has_classes": false,
+      "has_functions": false,
+      "integration_suggestions": [
+        {
+          "action": "organize_tests",
+          "location": "tests/",
+          "description": "Organizar na estrutura de testes"
+        }
+      ]
+    },
+    {
+      "file": "tests\\fix_repo.py",
+      "name": "fix_repo",
+      "size_kb": 0.72,
+      "modified": "2026-08-03T22:37:43.048536",
+      "is_main_script": false,
+      "purpose": "unknown",
+      "line_count": 24,
+      "has_classes": false,
+      "has_functions": false,
+      "integration_suggestions": [
+        {
+          "action": "review_manually",
+          "description": "Revisar manualmente para determinar utilidade"
+        }
+      ]
+    },
+    {
+      "file": "utils\\copyright_injector.py",
+      "name": "copyright_injector",
+      "size_kb": 0.0,
+      "modified": "2026-08-03T21:48:48.595874",
+      "is_main_script": false,
+      "purpose": "unknown",
+      "line_count": 0,
+      "has_classes": false,
+      "has_functions": false,
+      "integration_suggestions": [
+        {
+          "action": "review_manually",
+          "description": "Revisar manualmente para determinar utilidade"
+        }
+      ]
+    },
+    {
+      "file": "utils\\get_health_report.py",
+      "name": "get_health_report",
+      "size_kb": 1.58,
+      "modified": "2026-08-03T22:37:43.051532",
+      "is_main_script": true,
+      "purpose": "script",
+      "line_count": 43,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "document_as_tool",
+          "location": "tools/ (create if needed)",
+          "description": "Documentar como ferramenta/script auxiliar"
+        }
+      ]
+    },
+    {
+      "file": "utils\\kill_port.py",
+      "name": "kill_port",
+      "size_kb": 2.08,
+      "modified": "2026-10-20T20:09:31.136577",
+      "is_main_script": true,
+      "purpose": "script",
+      "line_count": 64,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "document_as_tool",
+          "location": "tools/ (create if needed)",
+          "description": "Documentar como ferramenta/script auxiliar"
+        }
+      ]
+    },
+    {
+      "file": "utils\\run_complete_diagnostic.py",
+      "name": "run_complete_diagnostic",
+      "size_kb": 5.94,
+      "modified": "2026-10-20T20:09:31.148835",
+      "is_main_script": true,
+      "purpose": "script",
+      "line_count": 159,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "document_as_tool",
+          "location": "tools/ (create if needed)",
+          "description": "Documentar como ferramenta/script auxiliar"
+        }
+      ]
+    },
+    {
+      "file": "utils\\ssl_manager.py",
+      "name": "ssl_manager",
+      "size_kb": 0.0,
+      "modified": "2026-08-03T21:48:48.598877",
+      "is_main_script": false,
+      "purpose": "unknown",
+      "line_count": 0,
+      "has_classes": false,
+      "has_functions": false,
+      "integration_suggestions": [
+        {
+          "action": "review_manually",
+          "description": "Revisar manualmente para determinar utilidade"
+        }
+      ]
+    },
+    {
+      "file": "utils\\tls_cert.py",
+      "name": "tls_cert",
+      "size_kb": 4.16,
+      "modified": "2026-08-03T22:37:43.054532",
+      "is_main_script": false,
+      "purpose": "unknown",
+      "line_count": 126,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "review_manually",
+          "description": "Revisar manualmente para determinar utilidade"
+        }
+      ]
+    },
+    {
+      "file": "modules\\active_directory\\ad_router.py",
+      "name": "ad_router",
+      "size_kb": 6.78,
+      "modified": "2026-10-22T12:38:37.210299",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 165,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "modules\\cbt\\cbt_router.py",
+      "name": "cbt_router",
+      "size_kb": 8.07,
+      "modified": "2026-10-22T21:33:58.057410",
+      "is_main_script": false,
+      "purpose": "api",
+      "line_count": 206,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_api",
+          "location": "api/",
+          "import_in": [
+            "agent_server.py"
+          ],
+          "description": "Adicionar ao roteador de APIs"
+        }
+      ]
+    },
+    {
+      "file": "modules\\config\\config_router.py",
+      "name": "config_router",
+      "size_kb": 0.64,
+      "modified": "2026-10-22T12:38:37.222414",
+      "is_main_script": false,
+      "purpose": "configuration",
+      "line_count": 23,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_config",
+          "location": "config/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar ao sistema de configuração"
+        }
+      ]
+    },
+    {
+      "file": "modules\\dr\\dr_router.py",
+      "name": "dr_router",
+      "size_kb": 14.71,
+      "modified": "2026-10-22T12:38:37.236419",
+      "is_main_script": false,
+      "purpose": "api",
+      "line_count": 361,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_api",
+          "location": "api/",
+          "import_in": [
+            "agent_server.py"
+          ],
+          "description": "Adicionar ao roteador de APIs"
+        }
+      ]
+    },
+    {
+      "file": "modules\\enterprise_connectors\\enterprise_connectors_router.py",
+      "name": "enterprise_connectors_router",
+      "size_kb": 6.71,
+      "modified": "2026-10-22T21:30:17.687435",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 179,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "modules\\freemium_power_tools\\power_tools_router.py",
+      "name": "power_tools_router",
+      "size_kb": 5.6,
+      "modified": "2026-10-22T12:38:37.257928",
+      "is_main_script": false,
+      "purpose": "api",
+      "line_count": 141,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_api",
+          "location": "api/",
+          "import_in": [
+            "agent_server.py"
+          ],
+          "description": "Adicionar ao roteador de APIs"
+        }
+      ]
+    },
+    {
+      "file": "modules\\granular_recovery\\granular_recovery_router.py",
+      "name": "granular_recovery_router",
+      "size_kb": 5.86,
+      "modified": "2026-10-22T12:38:37.269957",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 153,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "modules\\hermes\\hermes_router.py",
+      "name": "hermes_router",
+      "size_kb": 8.73,
+      "modified": "2026-10-22T12:38:37.283473",
+      "is_main_script": false,
+      "purpose": "api",
+      "line_count": 251,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_api",
+          "location": "api/",
+          "import_in": [
+            "agent_server.py"
+          ],
+          "description": "Adicionar ao roteador de APIs"
+        }
+      ]
+    },
+    {
+      "file": "modules\\job_alert\\job_alert_router.py",
+      "name": "job_alert_router",
+      "size_kb": 3.26,
+      "modified": "2026-10-22T12:38:37.294886",
+      "is_main_script": false,
+      "purpose": "api",
+      "line_count": 71,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_api",
+          "location": "api/",
+          "import_in": [
+            "agent_server.py"
+          ],
+          "description": "Adicionar ao roteador de APIs"
+        }
+      ]
+    },
+    {
+      "file": "modules\\logs\\logs_router.py",
+      "name": "logs_router",
+      "size_kb": 0.51,
+      "modified": "2026-10-22T12:38:37.305475",
+      "is_main_script": false,
+      "purpose": "api",
+      "line_count": 18,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_api",
+          "location": "api/",
+          "import_in": [
+            "agent_server.py"
+          ],
+          "description": "Adicionar ao roteador de APIs"
+        }
+      ]
+    },
+    {
+      "file": "modules\\reports\\reports_router.py",
+      "name": "reports_router",
+      "size_kb": 0.13,
+      "modified": "2026-10-20T20:09:30.547601",
+      "is_main_script": false,
+      "purpose": "unknown",
+      "line_count": 6,
+      "has_classes": false,
+      "has_functions": false,
+      "integration_suggestions": [
+        {
+          "action": "review_manually",
+          "description": "Revisar manualmente para determinar utilidade"
+        }
+      ]
+    },
+    {
+      "file": "modules\\rmm\\rmm_router.py",
+      "name": "rmm_router",
+      "size_kb": 16.02,
+      "modified": "2026-10-22T21:25:31.909643",
+      "is_main_script": false,
+      "purpose": "api",
+      "line_count": 377,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_api",
+          "location": "api/",
+          "import_in": [
+            "agent_server.py"
+          ],
+          "description": "Adicionar ao roteador de APIs"
+        }
+      ]
+    },
+    {
+      "file": "modules\\saas_cloud\\saas_cloud_router.py",
+      "name": "saas_cloud_router",
+      "size_kb": 10.35,
+      "modified": "2026-10-22T21:27:46.659620",
+      "is_main_script": false,
+      "purpose": "api",
+      "line_count": 252,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_api",
+          "location": "api/",
+          "import_in": [
+            "agent_server.py"
+          ],
+          "description": "Adicionar ao roteador de APIs"
+        }
+      ]
+    },
+    {
+      "file": "modules\\security\\security_router.py",
+      "name": "security_router",
+      "size_kb": 0.61,
+      "modified": "2026-10-22T12:38:37.347019",
+      "is_main_script": false,
+      "purpose": "api",
+      "line_count": 19,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_api",
+          "location": "api/",
+          "import_in": [
+            "agent_server.py"
+          ],
+          "description": "Adicionar ao roteador de APIs"
+        }
+      ]
+    },
+    {
+      "file": "modules\\storage\\storage_router.py",
+      "name": "storage_router",
+      "size_kb": 2.24,
+      "modified": "2026-10-22T20:13:11.202723",
+      "is_main_script": false,
+      "purpose": "api",
+      "line_count": 47,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_api",
+          "location": "api/",
+          "import_in": [
+            "agent_server.py"
+          ],
+          "description": "Adicionar ao roteador de APIs"
+        }
+      ]
+    },
+    {
+      "file": "modules\\v2\\ai_v2_router.py",
+      "name": "ai_v2_router",
+      "size_kb": 4.11,
+      "modified": "2026-10-22T12:38:37.373288",
+      "is_main_script": false,
+      "purpose": "api",
+      "line_count": 100,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_api",
+          "location": "api/",
+          "import_in": [
+            "agent_server.py"
+          ],
+          "description": "Adicionar ao roteador de APIs"
+        }
+      ]
+    },
+    {
+      "file": "modules\\v2\\envelope.py",
+      "name": "envelope",
+      "size_kb": 2.43,
+      "modified": "2026-10-20T20:09:30.558141",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 59,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "modules\\v2\\repositories_v2_router.py",
+      "name": "repositories_v2_router",
+      "size_kb": 2.24,
+      "modified": "2026-10-20T20:09:30.559140",
+      "is_main_script": false,
+      "purpose": "api",
+      "line_count": 61,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_api",
+          "location": "api/",
+          "import_in": [
+            "agent_server.py"
+          ],
+          "description": "Adicionar ao roteador de APIs"
+        }
+      ]
+    },
+    {
+      "file": "modules\\v2\\tasks_v2_router.py",
+      "name": "tasks_v2_router",
+      "size_kb": 3.17,
+      "modified": "2026-10-20T20:09:30.560765",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 87,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "modules\\v2\\telemetry_v2_router.py",
+      "name": "telemetry_v2_router",
+      "size_kb": 4.74,
+      "modified": "2026-10-22T12:38:37.386286",
+      "is_main_script": false,
+      "purpose": "api",
+      "line_count": 135,
+      "has_classes": false,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_api",
+          "location": "api/",
+          "import_in": [
+            "agent_server.py"
+          ],
+          "description": "Adicionar ao roteador de APIs"
+        }
+      ]
+    },
+    {
+      "file": "modules\\virtualization\\virtualization_router.py",
+      "name": "virtualization_router",
+      "size_kb": 6.4,
+      "modified": "2026-10-22T17:19:16.187589",
+      "is_main_script": false,
+      "purpose": "engine/module",
+      "line_count": 155,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "integrate_as_engine",
+          "location": "engines/",
+          "import_in": [
+            "agent_server.py",
+            "shared_core.py"
+          ],
+          "description": "Integrar como engine no sistema de engines"
+        }
+      ]
+    },
+    {
+      "file": "core\\integrations\\duplicati_native.py",
+      "name": "duplicati_native",
+      "size_kb": 95.32,
+      "modified": "2026-10-22T22:09:30.804890",
+      "is_main_script": false,
+      "purpose": "unknown",
+      "line_count": 2006,
+      "has_classes": true,
+      "has_functions": true,
+      "integration_suggestions": [
+        {
+          "action": "review_manually",
+          "description": "Revisar manualmente para determinar utilidade"
+        }
+      ]
+    }
+  ],
+  "integration_suggestions": [
+    {
+      "action": "document_as_tool",
+      "location": "tools/ (create if needed)",
+      "description": "Documentar como ferramenta/script auxiliar"
+    },
+    {
+      "action": "review_manually",
+      "description": "Revisar manualmente para determinar utilidade"
+    },
+    {
+      "action": "integrate_as_api",
+      "location": "api/",
+      "import_in": [
+        "agent_server.py"
+      ],
+      "description": "Adicionar ao roteador de APIs"
+    },
+    {
+      "action": "organize_tests",
+      "location": "tests/",
+      "description": "Organizar na estrutura de testes"
+    },
+    {
+      "action": "integrate_as_api",
+      "location": "api/",
+      "import_in": [
+        "agent_server.py"
+      ],
+      "description": "Adicionar ao roteador de APIs"
+    },
+    {
+      "action": "integrate_as_api",
+      "location": "api/",
+      "import_in": [
+        "agent_server.py"
+      ],
+      "description": "Adicionar ao roteador de APIs"
+    },
+    {
+      "action": "integrate_as_api",
+      "location": "api/",
+      "import_in": [
+        "agent_server.py"
+      ],
+      "description": "Adicionar ao roteador de APIs"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "review_manually",
+      "description": "Revisar manualmente para determinar utilidade"
+    },
+    {
+      "action": "review_manually",
+      "description": "Revisar manualmente para determinar utilidade"
+    },
+    {
+      "action": "integrate_as_api",
+      "location": "api/",
+      "import_in": [
+        "agent_server.py"
+      ],
+      "description": "Adicionar ao roteador de APIs"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_config",
+      "location": "config/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar ao sistema de configuração"
+    },
+    {
+      "action": "organize_tests",
+      "location": "tests/",
+      "description": "Organizar na estrutura de testes"
+    },
+    {
+      "action": "integrate_as_api",
+      "location": "api/",
+      "import_in": [
+        "agent_server.py"
+      ],
+      "description": "Adicionar ao roteador de APIs"
+    },
+    {
+      "action": "integrate_as_api",
+      "location": "api/",
+      "import_in": [
+        "agent_server.py"
+      ],
+      "description": "Adicionar ao roteador de APIs"
+    },
+    {
+      "action": "integrate_as_api",
+      "location": "api/",
+      "import_in": [
+        "agent_server.py"
+      ],
+      "description": "Adicionar ao roteador de APIs"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_api",
+      "location": "api/",
+      "import_in": [
+        "agent_server.py"
+      ],
+      "description": "Adicionar ao roteador de APIs"
+    },
+    {
+      "action": "integrate_as_api",
+      "location": "api/",
+      "import_in": [
+        "agent_server.py"
+      ],
+      "description": "Adicionar ao roteador de APIs"
+    },
+    {
+      "action": "integrate_as_api",
+      "location": "api/",
+      "import_in": [
+        "agent_server.py"
+      ],
+      "description": "Adicionar ao roteador de APIs"
+    },
+    {
+      "action": "integrate_as_api",
+      "location": "api/",
+      "import_in": [
+        "agent_server.py"
+      ],
+      "description": "Adicionar ao roteador de APIs"
+    },
+    {
+      "action": "integrate_as_api",
+      "location": "api/",
+      "import_in": [
+        "agent_server.py"
+      ],
+      "description": "Adicionar ao roteador de APIs"
+    },
+    {
+      "action": "integrate_as_api",
+      "location": "api/",
+      "import_in": [
+        "agent_server.py"
+      ],
+      "description": "Adicionar ao roteador de APIs"
+    },
+    {
+      "action": "integrate_as_api",
+      "location": "api/",
+      "import_in": [
+        "agent_server.py"
+      ],
+      "description": "Adicionar ao roteador de APIs"
+    },
+    {
+      "action": "organize_tests",
+      "location": "tests/",
+      "description": "Organizar na estrutura de testes"
+    },
+    {
+      "action": "integrate_as_api",
+      "location": "api/",
+      "import_in": [
+        "agent_server.py"
+      ],
+      "description": "Adicionar ao roteador de APIs"
+    },
+    {
+      "action": "integrate_as_api",
+      "location": "api/",
+      "import_in": [
+        "agent_server.py"
+      ],
+      "description": "Adicionar ao roteador de APIs"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_api",
+      "location": "api/",
+      "import_in": [
+        "agent_server.py"
+      ],
+      "description": "Adicionar ao roteador de APIs"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_api",
+      "location": "api/",
+      "import_in": [
+        "agent_server.py"
+      ],
+      "description": "Adicionar ao roteador de APIs"
+    },
+    {
+      "action": "integrate_as_api",
+      "location": "api/",
+      "import_in": [
+        "agent_server.py"
+      ],
+      "description": "Adicionar ao roteador de APIs"
+    },
+    {
+      "action": "organize_tests",
+      "location": "tests/",
+      "description": "Organizar na estrutura de testes"
+    },
+    {
+      "action": "integrate_as_api",
+      "location": "api/",
+      "import_in": [
+        "agent_server.py"
+      ],
+      "description": "Adicionar ao roteador de APIs"
+    },
+    {
+      "action": "integrate_as_api",
+      "location": "api/",
+      "import_in": [
+        "agent_server.py"
+      ],
+      "description": "Adicionar ao roteador de APIs"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "review_manually",
+      "description": "Revisar manualmente para determinar utilidade"
+    },
+    {
+      "action": "review_manually",
+      "description": "Revisar manualmente para determinar utilidade"
+    },
+    {
+      "action": "review_manually",
+      "description": "Revisar manualmente para determinar utilidade"
+    },
+    {
+      "action": "review_manually",
+      "description": "Revisar manualmente para determinar utilidade"
+    },
+    {
+      "action": "review_manually",
+      "description": "Revisar manualmente para determinar utilidade"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "review_manually",
+      "description": "Revisar manualmente para determinar utilidade"
+    },
+    {
+      "action": "document_as_tool",
+      "location": "tools/ (create if needed)",
+      "description": "Documentar como ferramenta/script auxiliar"
+    },
+    {
+      "action": "review_manually",
+      "description": "Revisar manualmente para determinar utilidade"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "review_manually",
+      "description": "Revisar manualmente para determinar utilidade"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "review_manually",
+      "description": "Revisar manualmente para determinar utilidade"
+    },
+    {
+      "action": "organize_tests",
+      "location": "tests/",
+      "description": "Organizar na estrutura de testes"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "review_manually",
+      "description": "Revisar manualmente para determinar utilidade"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "review_manually",
+      "description": "Revisar manualmente para determinar utilidade"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "organize_tests",
+      "location": "tests/",
+      "description": "Organizar na estrutura de testes"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "review_manually",
+      "description": "Revisar manualmente para determinar utilidade"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "review_manually",
+      "description": "Revisar manualmente para determinar utilidade"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "review_manually",
+      "description": "Revisar manualmente para determinar utilidade"
+    },
+    {
+      "action": "review_manually",
+      "description": "Revisar manualmente para determinar utilidade"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "review_manually",
+      "description": "Revisar manualmente para determinar utilidade"
+    },
+    {
+      "action": "review_manually",
+      "description": "Revisar manualmente para determinar utilidade"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "review_manually",
+      "description": "Revisar manualmente para determinar utilidade"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "review_manually",
+      "description": "Revisar manualmente para determinar utilidade"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "review_manually",
+      "description": "Revisar manualmente para determinar utilidade"
+    },
+    {
+      "action": "review_manually",
+      "description": "Revisar manualmente para determinar utilidade"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "review_manually",
+      "description": "Revisar manualmente para determinar utilidade"
+    },
+    {
+      "action": "review_manually",
+      "description": "Revisar manualmente para determinar utilidade"
+    },
+    {
+      "action": "organize_tests",
+      "location": "tests/",
+      "description": "Organizar na estrutura de testes"
+    },
+    {
+      "action": "review_manually",
+      "description": "Revisar manualmente para determinar utilidade"
+    },
+    {
+      "action": "review_manually",
+      "description": "Revisar manualmente para determinar utilidade"
+    },
+    {
+      "action": "review_manually",
+      "description": "Revisar manualmente para determinar utilidade"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "review_manually",
+      "description": "Revisar manualmente para determinar utilidade"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "organize_tests",
+      "location": "tests/",
+      "description": "Organizar na estrutura de testes"
+    },
+    {
+      "action": "review_manually",
+      "description": "Revisar manualmente para determinar utilidade"
+    },
+    {
+      "action": "review_manually",
+      "description": "Revisar manualmente para determinar utilidade"
+    },
+    {
+      "action": "document_as_tool",
+      "location": "tools/ (create if needed)",
+      "description": "Documentar como ferramenta/script auxiliar"
+    },
+    {
+      "action": "document_as_tool",
+      "location": "tools/ (create if needed)",
+      "description": "Documentar como ferramenta/script auxiliar"
+    },
+    {
+      "action": "document_as_tool",
+      "location": "tools/ (create if needed)",
+      "description": "Documentar como ferramenta/script auxiliar"
+    },
+    {
+      "action": "review_manually",
+      "description": "Revisar manualmente para determinar utilidade"
+    },
+    {
+      "action": "review_manually",
+      "description": "Revisar manualmente para determinar utilidade"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_api",
+      "location": "api/",
+      "import_in": [
+        "agent_server.py"
+      ],
+      "description": "Adicionar ao roteador de APIs"
+    },
+    {
+      "action": "integrate_as_config",
+      "location": "config/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar ao sistema de configuração"
+    },
+    {
+      "action": "integrate_as_api",
+      "location": "api/",
+      "import_in": [
+        "agent_server.py"
+      ],
+      "description": "Adicionar ao roteador de APIs"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_api",
+      "location": "api/",
+      "import_in": [
+        "agent_server.py"
+      ],
+      "description": "Adicionar ao roteador de APIs"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_api",
+      "location": "api/",
+      "import_in": [
+        "agent_server.py"
+      ],
+      "description": "Adicionar ao roteador de APIs"
+    },
+    {
+      "action": "integrate_as_api",
+      "location": "api/",
+      "import_in": [
+        "agent_server.py"
+      ],
+      "description": "Adicionar ao roteador de APIs"
+    },
+    {
+      "action": "integrate_as_api",
+      "location": "api/",
+      "import_in": [
+        "agent_server.py"
+      ],
+      "description": "Adicionar ao roteador de APIs"
+    },
+    {
+      "action": "review_manually",
+      "description": "Revisar manualmente para determinar utilidade"
+    },
+    {
+      "action": "integrate_as_api",
+      "location": "api/",
+      "import_in": [
+        "agent_server.py"
+      ],
+      "description": "Adicionar ao roteador de APIs"
+    },
+    {
+      "action": "integrate_as_api",
+      "location": "api/",
+      "import_in": [
+        "agent_server.py"
+      ],
+      "description": "Adicionar ao roteador de APIs"
+    },
+    {
+      "action": "integrate_as_api",
+      "location": "api/",
+      "import_in": [
+        "agent_server.py"
+      ],
+      "description": "Adicionar ao roteador de APIs"
+    },
+    {
+      "action": "integrate_as_api",
+      "location": "api/",
+      "import_in": [
+        "agent_server.py"
+      ],
+      "description": "Adicionar ao roteador de APIs"
+    },
+    {
+      "action": "integrate_as_api",
+      "location": "api/",
+      "import_in": [
+        "agent_server.py"
+      ],
+      "description": "Adicionar ao roteador de APIs"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_api",
+      "location": "api/",
+      "import_in": [
+        "agent_server.py"
+      ],
+      "description": "Adicionar ao roteador de APIs"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "integrate_as_api",
+      "location": "api/",
+      "import_in": [
+        "agent_server.py"
+      ],
+      "description": "Adicionar ao roteador de APIs"
+    },
+    {
+      "action": "integrate_as_engine",
+      "location": "engines/",
+      "import_in": [
+        "agent_server.py",
+        "shared_core.py"
+      ],
+      "description": "Integrar como engine no sistema de engines"
+    },
+    {
+      "action": "review_manually",
+      "description": "Revisar manualmente para determinar utilidade"
+    }
+  ],
+  "summary": {
+    "by_purpose": {
+      "script": 5,
+      "client/server": 1,
+      "api": 35,
+      "test": 8,
+      "engine/module": 60,
+      "model": 2,
+      "configuration": 2,
+      "unknown": 33
+    },
+    "total_size_kb": 1892.71,
+    "total_lines": 45734
+  },
+  "recommendations": [
+    "Alto número de arquivos órfãos - considere reorganização do projeto",
+    "Integrar 60 engine(s) ao sistema",
+    "Adicionar 35 API(s) ao roteador",
+    "Organizar testes em estrutura adequada",
+    "Revisar 33 arquivo(s) de propósito desconhecido"
+  ]
+}

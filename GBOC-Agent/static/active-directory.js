@@ -58,7 +58,9 @@ async function loadAdTopology() {
                 isDcBadge.innerHTML = '<i class="fas fa-shield-alt"></i> Controlador de Domínio Ativo (DC)';
             } else {
                 isDcBadge.className = 'badge badge-info';
-                isDcBadge.innerHTML = '<i class="fas fa-server"></i> Servidor Membro / Standalone';
+                isDcBadge.innerHTML = top.part_of_domain
+                    ? '<i class="fas fa-server"></i> Servidor membro do domínio'
+                    : '<i class="fas fa-server"></i> Servidor autônomo (grupo de trabalho)';
             }
         }
 
@@ -68,11 +70,16 @@ async function loadAdTopology() {
         const forestLevelEl = document.getElementById('ad-forest-level');
         const recycleBinEl = document.getElementById('ad-recycle-bin-status');
 
-        if (domainNameEl) domainNameEl.textContent = top.domain_name || 'WORKGROUP';
-        if (forestNameEl) forestNameEl.textContent = top.forest_name || top.domain_name || 'N/A';
-        if (domainLevelEl) domainLevelEl.textContent = top.domain_functional_level || 'N/A';
-        if (forestLevelEl) forestLevelEl.textContent = top.forest_functional_level || 'N/A';
-        if (recycleBinEl) {
+        if (domainNameEl) domainNameEl.textContent = top.domain_name
+            || (top.workgroup ? `— (grupo de trabalho ${top.workgroup}, sem domínio)` : '— (sem domínio)');
+        const notDc = !top.is_domain_controller;
+        const memberTxt = top.part_of_domain ? `membro de ${top.domain_name}` : (top.workgroup ? `grupo de trabalho ${top.workgroup}` : 'não ingressado em domínio');
+        if (forestNameEl) forestNameEl.textContent = top.forest_name || (notDc ? `— (${memberTxt})` : '—');
+        if (domainLevelEl) domainLevelEl.textContent = top.domain_functional_level && top.domain_functional_level !== 'N/A' ? top.domain_functional_level : (notDc ? '— (não é DC)' : 'não informado pelo Get-ADDomain');
+        if (forestLevelEl) forestLevelEl.textContent = top.forest_functional_level && top.forest_functional_level !== 'N/A' ? top.forest_functional_level : (notDc ? '— (não é DC)' : 'não informado pelo Get-ADForest');
+        if (recycleBinEl && !top.is_domain_controller) {
+            recycleBinEl.innerHTML = '<span style="color:var(--text-muted);">— (não é controlador de domínio)</span>';
+        } else if (recycleBinEl) {
             recycleBinEl.innerHTML = top.recycle_bin_enabled
                 ? '<span style="color:var(--success); font-weight:700;"><i class="fas fa-check-circle"></i> Habilitada (AD Recycle Bin)</span>'
                 : '<span style="color:var(--warning); font-weight:600;"><i class="fas fa-exclamation-triangle"></i> Desabilitada</span>';
@@ -86,17 +93,18 @@ async function loadAdTopology() {
         const ridEl = document.getElementById('fsmo-rid');
         const infraEl = document.getElementById('fsmo-infra');
 
-        if (schemaEl) schemaEl.textContent = fsmo.schema_master || 'N/A';
-        if (namingEl) namingEl.textContent = fsmo.domain_naming_master || 'N/A';
-        if (pdcEl) pdcEl.textContent = fsmo.pdc_emulator || 'N/A';
-        if (ridEl) ridEl.textContent = fsmo.rid_master || 'N/A';
-        if (infraEl) infraEl.textContent = fsmo.infrastructure_master || 'N/A';
+        const _fsmo = v => (v && v !== 'N/A') ? v : (top.is_domain_controller ? 'não informado pelo AD' : '— (não é DC)');
+        if (schemaEl) schemaEl.textContent = _fsmo(fsmo.schema_master);
+        if (namingEl) namingEl.textContent = _fsmo(fsmo.domain_naming_master);
+        if (pdcEl) pdcEl.textContent = _fsmo(fsmo.pdc_emulator);
+        if (ridEl) ridEl.textContent = _fsmo(fsmo.rid_master);
+        if (infraEl) infraEl.textContent = _fsmo(fsmo.infrastructure_master);
 
         // Lista de DCs
         const dcsList = document.getElementById('ad-dcs-list');
         if (dcsList && Array.isArray(top.domain_controllers)) {
             if (!top.domain_controllers.length) {
-                dcsList.innerHTML = `<div style="padding:10px; color:var(--text-muted); font-size:0.85em;">Host atual: <strong>${top.domain_name || 'Standalone'}</strong></div>`;
+                dcsList.innerHTML = `<div style="padding:10px; color:var(--text-muted); font-size:0.85em;">Este servidor (<strong>${top.hostname || ''}</strong>) não é controlador de domínio${top.part_of_domain ? ` — membro de ${top.domain_name}` : (top.workgroup ? ` — grupo de trabalho ${top.workgroup}` : '')}.</div>`;
             } else {
                 dcsList.innerHTML = top.domain_controllers.map(dc => `
                     <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border); font-size:0.84em;">
@@ -128,16 +136,19 @@ async function loadAdHealth() {
         const netlogonBadge = document.getElementById('ad-health-netlogon');
         const repSummaryEl = document.getElementById('ad-repadmin-output');
 
-        if (sysvolBadge) {
-            sysvolBadge.className = `badge badge-${h.sysvol_shared ? 'success' : 'danger'}`;
-            sysvolBadge.innerHTML = `<i class="fas fa-${h.sysvol_shared ? 'check' : 'times'}"></i> ${h.sysvol_shared ? 'Compartilhado' : 'Falha'}`;
-        }
-        if (netlogonBadge) {
-            netlogonBadge.className = `badge badge-${h.netlogon_shared ? 'success' : 'danger'}`;
-            netlogonBadge.innerHTML = `<i class="fas fa-${h.netlogon_shared ? 'check' : 'times'}"></i> ${h.netlogon_shared ? 'Compartilhado' : 'Falha'}`;
-        }
+        // null = nao verificado (ex.: servidor nao e DC) - nunca exibido como OK ou falha
+        const _badge = (el, v) => {
+            if (!el) return;
+            if (h.is_domain_controller === false) { el.className = 'badge badge-secondary'; el.innerHTML = '<i class="fas fa-minus"></i> Não é DC'; return; }
+            if (v == null) { el.className = 'badge badge-secondary'; el.innerHTML = '<i class="fas fa-question"></i> Não verificado'; return; }
+            el.className = `badge badge-${v ? 'success' : 'danger'}`;
+            el.innerHTML = `<i class="fas fa-${v ? 'check' : 'times'}"></i> ${v ? 'Compartilhado' : 'Não compartilhado'}`;
+        };
+        _badge(sysvolBadge, h.sysvol_shared);
+        _badge(netlogonBadge, h.netlogon_shared);
         if (repSummaryEl) {
-            repSummaryEl.textContent = h.repadmin_output || 'Nenhuma falha de replicação detectada.';
+            repSummaryEl.textContent = h.repadmin_output
+                || (h.is_domain_controller === false ? 'Este servidor não é controlador de domínio.' : 'Replicação não verificada (repadmin indisponível).');
         }
     } catch (e) {
         console.error('Erro ao consultar saúde do AD:', e);
@@ -375,13 +386,21 @@ function openAdMonitorModal(jobId, title) {
                 _adPollingTimer = null;
                 if (fillEl) fillEl.style.width = '100%';
                 if (pctEl) pctEl.textContent = '100%';
-                if (statusText) statusText.innerHTML = '<span style="color:var(--success); font-weight:700;">✅ Backup do Active Directory concluído com sucesso!</span>';
+                if (statusText) statusText.innerHTML = job.type === 'ad_restore'
+                    ? '<span style="color:var(--success); font-weight:700;">✅ Backup verificado e roteiro de restauração em DSRM gerado (veja o log).</span>'
+                    : '<span style="color:var(--success); font-weight:700;">✅ Backup do Active Directory concluído e verificado.</span>';
+                loadAdBackupHistory();
+            } else if (job.status === 'partial') {
+                if (_adPollingTimer?.stop) _adPollingTimer.stop();
+                else clearInterval(_adPollingTimer);
+                _adPollingTimer = null;
+                if (statusText) { statusText.innerHTML = '<span style="color:var(--warning); font-weight:700;"></span>'; statusText.firstChild.textContent = `⚠️ Concluído parcialmente: ${job.error || 'veja o log'}`; }
                 loadAdBackupHistory();
             } else if (job.status === 'failed') {
                 if (_adPollingTimer?.stop) _adPollingTimer.stop();
                 else clearInterval(_adPollingTimer);
                 _adPollingTimer = null;
-                if (statusText) statusText.innerHTML = `<span style="color:var(--danger); font-weight:700;">❌ Falha no backup: ${job.error || 'Erro desconhecido'}</span>`;
+                if (statusText) { statusText.innerHTML = '<span style="color:var(--danger); font-weight:700;"></span>'; statusText.firstChild.textContent = `❌ Falha: ${job.error || 'Erro desconhecido'}`; }
             }
         } catch (e) {
             console.error('Erro no polling do backup AD:', e);

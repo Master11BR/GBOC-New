@@ -63,15 +63,17 @@ class ActiveDirectoryBackupEngine:
             "is_domain_controller": False,
             "forest_name": None,
             "domain_name": os.environ.get("USERDOMAIN", "WORKGROUP"),
-            "forest_functional_level": "N/A",
-            "domain_functional_level": "N/A",
+            # None = nao se aplica/nao lido (a tela explica o motivo: "nao e DC" ou "nao informado pelo AD")
+            "forest_functional_level": None,
+            "domain_functional_level": None,
             "fsmo_roles": {
-                "schema_master": "N/A",
-                "domain_naming_master": "N/A",
-                "pdc_emulator": "N/A",
-                "rid_master": "N/A",
-                "infrastructure_master": "N/A"
+                "schema_master": None,
+                "domain_naming_master": None,
+                "pdc_emulator": None,
+                "rid_master": None,
+                "infrastructure_master": None
             },
+            "hostname": __import__("socket").gethostname(),
             "domain_controllers": [],
             "global_catalog_servers": [],
             "tombstone_lifetime_days": 180,
@@ -111,8 +113,11 @@ class ActiveDirectoryBackupEngine:
                 } else {
                     [PSCustomObject]@{
                         IsDC = $false
+                        PartOfDomain = [bool]$cs.PartOfDomain
                         ForestName = $cs.Domain
                         DomainName = $cs.Domain
+                        Workgroup = $cs.Workgroup
+                        DomainRole = [int]$cs.DomainRole
                     } | ConvertTo-Json
                 }
             """
@@ -123,6 +128,13 @@ class ActiveDirectoryBackupEngine:
                 )
                 if res.returncode == 0 and res.stdout.strip():
                     raw = json.loads(res.stdout.strip())
+                    if not raw.get("IsDC"):
+                        # dados reais do Windows (antes: USERDOMAIN, que no login local e o nome da maquina)
+                        topology["part_of_domain"] = bool(raw.get("PartOfDomain"))
+                        topology["domain_name"] = raw.get("DomainName") if raw.get("PartOfDomain") else None
+                        topology["workgroup"] = raw.get("Workgroup") if not raw.get("PartOfDomain") else None
+                        topology["forest_name"] = topology["domain_name"]
+                        topology["domain_role"] = raw.get("DomainRole")
                     if raw.get("IsDC"):
                         topology["is_ad_installed"] = True
                         topology["is_domain_controller"] = True
@@ -131,11 +143,11 @@ class ActiveDirectoryBackupEngine:
                         topology["forest_functional_level"] = raw.get("ForestLevel", "Windows Server 2016/2019/2022")
                         topology["domain_functional_level"] = raw.get("DomainLevel", "Windows Server 2016/2019/2022")
                         topology["fsmo_roles"] = {
-                            "schema_master": raw.get("SchemaMaster", "N/A"),
-                            "domain_naming_master": raw.get("DomainNamingMaster", "N/A"),
-                            "pdc_emulator": raw.get("PDCEmulator", "N/A"),
-                            "rid_master": raw.get("RIDMaster", "N/A"),
-                            "infrastructure_master": raw.get("InfrastructureMaster", "N/A")
+                            "schema_master": raw.get("SchemaMaster"),
+                            "domain_naming_master": raw.get("DomainNamingMaster"),
+                            "pdc_emulator": raw.get("PDCEmulator"),
+                            "rid_master": raw.get("RIDMaster"),
+                            "infrastructure_master": raw.get("InfrastructureMaster")
                         }
                         topology["recycle_bin_enabled"] = bool(raw.get("RecycleBinEnabled"))
                         
@@ -143,11 +155,11 @@ class ActiveDirectoryBackupEngine:
                         dcs_list = dcs if isinstance(dcs, list) else [dcs]
                         for dc in dcs_list:
                             topology["domain_controllers"].append({
-                                "hostname": dc.get("Hostname", os.environ.get("COMPUTERNAME")),
-                                "ip_address": dc.get("IP", "127.0.0.1"),
-                                "operating_system": dc.get("OS", "Windows Server"),
-                                "is_global_catalog": dc.get("IsGC", True),
-                                "site": dc.get("Site", "Default-First-Site-Name")
+                                "hostname": dc.get("Hostname"),
+                                "ip_address": dc.get("IP"),
+                                "operating_system": dc.get("OS"),
+                                "is_global_catalog": dc.get("IsGC"),
+                                "site": dc.get("Site")
                             })
             except Exception as e:
                 logger.warning(f"Erro ao consultar topologia do AD: {e}")
@@ -158,16 +170,31 @@ class ActiveDirectoryBackupEngine:
         """
         Retorna status de replicação entre DCs, saúde de compartilhamento SYSVOL e diagnósticos DCDiag.
         """
+        # Nada e presumido saudavel: cada campo so recebe valor depois de verificado
         health = {
-            "replication_status": "HEALTHY",
+            "replication_status": "NAO_VERIFICADO",
             "replication_partners": [],
-            "sysvol_shared": True,
-            "netlogon_shared": True,
-            "dcdiag_summary": "Testes básicos de conectividade e diretório OK",
-            "ntds_vss_writer": "STABLE",
+            "sysvol_shared": None,
+            "netlogon_shared": None,
+            "dcdiag_summary": None,
+            "ntds_vss_writer": None,
             "errors": [],
             "timestamp": datetime.now().isoformat()
         }
+        try:
+            from engines.disaster_recovery_engine import dr_engine as _dr
+            _info = _dr.get_system_dr_info()
+            health["is_domain_controller"] = bool(_info.get("is_domain_controller"))
+            ntds_w = next((w for w in _info.get("vss_writers", []) if "ntds" in (w.get("name") or "").lower()), None)
+            if ntds_w:
+                health["ntds_vss_writer"] = "STABLE" if ntds_w.get("state_code") == 1 else (ntds_w.get("state") or f"código {ntds_w.get('state_code')}")
+            elif health["is_domain_controller"]:
+                health["ntds_vss_writer"] = "NOT_FOUND"
+            if not health["is_domain_controller"]:
+                health["replication_status"] = "NOT_DC"
+                return health
+        except Exception:
+            pass
 
         if sys.platform == "win32":
             # 1. Verificar compartilhamentos SYSVOL / NETLOGON
@@ -176,20 +203,29 @@ class ActiveDirectoryBackupEngine:
                 if net_share.returncode == 0:
                     health["sysvol_shared"] = "SYSVOL" in net_share.stdout.upper()
                     health["netlogon_shared"] = "NETLOGON" in net_share.stdout.upper()
-            except Exception:
-                pass
+                else:
+                    health["errors"].append(f"net share (código {net_share.returncode}): {(net_share.stderr or net_share.stdout).strip()[:200]}")
+            except Exception as e:
+                health["errors"].append(f"net share: {e}")
 
             # 2. Verificar replicação via repadmin
             try:
                 rep_res = subprocess.run(["repadmin", "/replsummary"], capture_output=True, text=True, timeout=12)
                 if rep_res.returncode == 0:
                     health["repadmin_output"] = rep_res.stdout.strip()
-                    if "fails" in rep_res.stdout.lower() or "error" in rep_res.stdout.lower():
-                        health["replication_status"] = "WARNING"
+                    low = rep_res.stdout.lower()
+                    import re as _re
+                    # linhas 'fails/total' com falhas > 0 ou mensagens de erro
+                    failing = [m for m in _re.findall(r"\b(\d+)\s*/\s*\d+\s+\d+\b", rep_res.stdout) if int(m) > 0]
+                    health["replication_status"] = "WARNING" if (failing or "error" in low or "erro" in low) else "HEALTHY"
                 else:
-                    health["repadmin_output"] = "Controlador de domínio único ou repadmin standalone."
-            except Exception:
-                health["repadmin_output"] = "Repadmin não invocado."
+                    # saida real do repadmin (antes: explicacao fixa inventada)
+                    health["repadmin_output"] = (f"repadmin /replsummary retornou código {rep_res.returncode}: "
+                                                 f"{(rep_res.stderr or rep_res.stdout).strip()[:600]}")
+            except FileNotFoundError:
+                health["repadmin_output"] = "repadmin não encontrado neste servidor (instale as ferramentas RSAT de AD DS)."
+            except Exception as e:
+                health["repadmin_output"] = f"repadmin não executado: {e}"
 
         return health
 
@@ -249,104 +285,163 @@ class ActiveDirectoryBackupEngine:
         include_registry: bool,
         include_dns: bool
     ):
+        """Backup real do AD: NTDS+SYSVOL via ntdsutil IFM (snapshot VSS), hives conferidos, zonas DNS e SHA-256."""
+        from engines.disaster_recovery_engine import dr_engine as _dr
         start_time = time.time()
-        self._append_log(job_id, f"Iniciando rotina de Backup Completo do Active Directory em: {target_dir}")
-
+        captured: List[str] = []
+        missing: List[str] = []
+        self._append_log(job_id, f"Iniciando backup do Active Directory em: {target_dir}")
         try:
+            if sys.platform != "win32":
+                raise RuntimeError("Backup do Active Directory disponível apenas no Windows.")
+            info = _dr.get_system_dr_info(force_refresh=True)
+            if not info.get("is_domain_controller"):
+                raise RuntimeError("Este servidor não é controlador de domínio: não há base NTDS para copiar. Nenhum backup foi gerado.")
             os.makedirs(target_dir, exist_ok=True)
             top = self.get_ad_topology()
+            self._update_progress(job_id, 5)
 
-            # 1. Congelamento VSS do NTDS Writer
-            self._append_log(job_id, "Invocando VSS Writer do Active Directory (NTDS Writer) para congelamento atômico...")
-            time.sleep(1.2)
-            self._update_progress(job_id, 15)
-
-            # 2. Extração do Banco de Dados NTDS.dit e Transaction Logs
-            ntds_export_dir = os.path.join(target_dir, "NTDS_Database")
-            os.makedirs(ntds_export_dir, exist_ok=True)
-            self._append_log(job_id, f"Extraindo base de dados Jet/ESENT 'NTDS.dit' e logs transacionais para {ntds_export_dir}...")
-            
-            target_dit = os.path.join(ntds_export_dir, "ntds.dit")
-            with open(target_dit, "wb") as f:
-                f.write(b"GBOC_ACTIVE_DIRECTORY_NTDS_ESENT_DATABASE_STREAM_v14.8.2\n" + b"\x00" * 8192)
-
-            time.sleep(1.5)
-            self._update_progress(job_id, 45)
-
-            # 3. Extração da pasta SYSVOL (Políticas GPO e Scripts)
-            if include_sysvol:
-                sysvol_export_dir = os.path.join(target_dir, "SYSVOL_Policies")
-                os.makedirs(sysvol_export_dir, exist_ok=True)
-                self._append_log(job_id, f"Mapeando políticas de grupo (GPOs) e scripts de logon da pasta SYSVOL...")
-                
-                real_sysvol = "C:\\Windows\\SYSVOL\\sysvol"
-                if os.path.exists(real_sysvol):
-                    try:
-                        shutil.copytree(real_sysvol, os.path.join(sysvol_export_dir, "domain"), dirs_exist_ok=True)
-                    except Exception:
-                        pass
+            # 1. NTDS (+ SYSVOL) via IFM - reaproveita a rotina verificada do motor de DR (esentutl incluso).
+            #    O helper registra mensagens no job do motor de DR: cria um job temporario la e copia depois.
+            with _dr.lock:
+                _dr.active_jobs[job_id] = {"job_id": job_id, "status": "running", "logs": []}
+            try:
+                ad_info = _dr._backup_ntds_ifm(job_id, target_dir, captured, missing) if include_sysvol else None
+            finally:
+                with _dr.lock:
+                    _tmp = _dr.active_jobs.pop(job_id, {}) or {}
+            for entry in _tmp.get("logs", []):
+                self._append_log(job_id, entry.get("message", ""))
+            if not include_sysvol:
+                ifm_dir = os.path.join(target_dir, "AD_IFM")
+                self._append_log(job_id, "Gerando cópia IFM do NTDS (sem SYSVOL) com ntdsutil...")
+                try:
+                    rc, out = _dr._run_console(["ntdsutil", "activate instance ntds", "ifm", f'create full "{ifm_dir}"', "quit", "quit"], timeout=7200)
+                except (OSError, subprocess.TimeoutExpired) as ex:
+                    rc, out = -1, str(ex)
+                ntds = os.path.join(ifm_dir, "Active Directory", "ntds.dit")
+                if rc == 0 and os.path.exists(ntds) and os.path.getsize(ntds) > 0:
+                    captured.append("NTDS")
+                    self._append_log(job_id, f"✅ NTDS copiado ({_dr._fmt_size(os.path.getsize(ntds))})")
                 else:
-                    os.makedirs(os.path.join(sysvol_export_dir, "Policies"), exist_ok=True)
-                    os.makedirs(os.path.join(sysvol_export_dir, "scripts"), exist_ok=True)
+                    missing.append("NTDS (Active Directory)")
+                    self._append_log(job_id, f"❌ Cópia IFM do NTDS falhou (código {rc}): {out[-400:] or 'sem mensagem'}")
+                ad_info = {"included": True, "method": "ntdsutil ifm (create full)", "ntdsutil_exit_code": rc}
+            self._update_progress(job_id, 60)
 
-                time.sleep(1.0)
-                self._update_progress(job_id, 65)
-
-            # 4. Hives de Registro Críticas (SAM, SECURITY, SYSTEM, SOFTWARE)
+            # 2. Hives do registro, cada um conferido
             if include_registry:
                 reg_dir = os.path.join(target_dir, "Registry_Hives")
                 os.makedirs(reg_dir, exist_ok=True)
-                self._append_log(job_id, "Exportando Hives do Registro do Windows (SAM, SECURITY, SYSTEM)...")
-                if sys.platform == "win32":
-                    for hive in ["SAM", "SECURITY", "SYSTEM", "SOFTWARE"]:
-                        try:
-                            hive_path = os.path.join(reg_dir, f"{hive}.hiv")
-                            subprocess.run(["reg", "save", f"HKLM\\{hive}", hive_path, "/y"], capture_output=True, timeout=10)
-                            self._append_log(job_id, f"Hive salvo: {hive}")
-                        except Exception:
-                            pass
-                time.sleep(1.0)
-                self._update_progress(job_id, 80)
+                self._append_log(job_id, "Exportando hives do registro (SAM, SECURITY, SYSTEM, SOFTWARE)...")
+                for hive in ["SAM", "SECURITY", "SYSTEM", "SOFTWARE"]:
+                    hive_path = os.path.join(reg_dir, f"{hive}.hiv")
+                    try:
+                        rc, out = _dr._run_console(["reg", "save", f"HKLM\\{hive}", hive_path, "/y"], timeout=600)
+                    except subprocess.TimeoutExpired:
+                        rc, out = -1, "tempo esgotado (600 s)"
+                    except OSError as ex:
+                        rc, out = -1, f"{ex}. O Windows ou o antivírus/EDR bloqueou o reg.exe."
+                    size = os.path.getsize(hive_path) if os.path.exists(hive_path) else 0
+                    if rc == 0 and size > 0:
+                        captured.append(f"hive {hive}")
+                        self._append_log(job_id, f"✅ Hive {hive} salvo ({_dr._fmt_size(size)})")
+                    else:
+                        missing.append(f"hive {hive}")
+                        self._append_log(job_id, f"❌ Hive {hive} NÃO foi salvo (código {rc}): {out[:300] or 'sem mensagem'}")
+            self._update_progress(job_id, 75)
 
-            # 5. Zonas DNS Integradas ao AD
+            # 3. Zonas DNS integradas ao AD (Export-DnsServerZone grava em %windir%\System32\dns)
             if include_dns:
-                self._append_log(job_id, "Exportando zonas DNS integradas ao Active Directory e registros SRV (_ldap, _kerberos)...")
-                time.sleep(0.8)
-                self._update_progress(job_id, 90)
+                dns_dir = os.path.join(target_dir, "DNS_Zones")
+                os.makedirs(dns_dir, exist_ok=True)
+                self._append_log(job_id, "Exportando zonas DNS integradas ao AD (Export-DnsServerZone)...")
+                stamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                ps = (
+                    "$ErrorActionPreference='Stop'; Import-Module DnsServer; "
+                    "$z = Get-DnsServerZone | Where-Object { $_.IsDsIntegrated -and -not $_.IsAutoCreated -and $_.ZoneName -ne 'TrustAnchors' }; "
+                    f"foreach ($i in $z) {{ $f = 'gboc_{stamp}_' + ($i.ZoneName -replace '[^\\w.-]','_') + '.dns'; "
+                    "Export-DnsServerZone -Name $i.ZoneName -FileName $f; Write-Output \"$($i.ZoneName)|$f\" }"
+                )
+                try:
+                    rc, out = _dr._run_console(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps], timeout=600)
+                except (OSError, subprocess.TimeoutExpired) as ex:
+                    rc, out = -1, str(ex)
+                dns_src = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32", "dns")
+                zones = 0
+                for line in out.splitlines():
+                    if "|" not in line:
+                        continue
+                    zname, fname = line.strip().split("|", 1)
+                    src = os.path.join(dns_src, fname)
+                    if os.path.exists(src):
+                        shutil.move(src, os.path.join(dns_dir, f"{zname}.dns"))
+                        zones += 1
+                if rc == 0 and zones:
+                    captured.append(f"DNS ({zones} zona(s))")
+                    self._append_log(job_id, f"✅ {zones} zona(s) DNS exportada(s)")
+                elif rc == 0:
+                    self._append_log(job_id, "ℹ️ Nenhuma zona DNS integrada ao AD encontrada neste servidor.")
+                else:
+                    missing.append("zonas DNS")
+                    self._append_log(job_id, f"❌ Exportação das zonas DNS falhou (código {rc}): {out[-300:] or 'sem mensagem'}")
+            self._update_progress(job_id, 85)
 
-            # 6. Geração do Manifesto e Hash de Integridade
+            # 4. Manifesto com SHA-256 real
+            self._append_log(job_id, "Calculando SHA-256 dos arquivos capturados...")
+            manifest_file = os.path.join(target_dir, "ad_backup_manifest.json")
+            files = []
+            for root, _d, names in os.walk(target_dir):
+                for n in names:
+                    p = os.path.join(root, n)
+                    if os.path.abspath(p) == os.path.abspath(manifest_file):
+                        continue
+                    try:
+                        files.append({"path": os.path.relpath(p, target_dir), "size_bytes": os.path.getsize(p), "sha256": _dr._sha256(p)})
+                    except OSError as ex:
+                        files.append({"path": os.path.relpath(p, target_dir), "error": str(ex)})
             manifest = {
                 "gboc_version": f"{AGENT_VERSION} Enterprise",
-                "backup_type": "FULL_ACTIVE_DIRECTORY_HOT_BACKUP",
+                "backup_type": "ACTIVE_DIRECTORY_IFM",
                 "forest": top.get("forest_name"),
                 "domain": top.get("domain_name"),
                 "fsmo_roles": top.get("fsmo_roles"),
-                "tombstone_lifetime_days": 180,
-                "authoritative_restore_supported": True,
-                "non_authoritative_restore_supported": True,
+                "active_directory": ad_info,
+                "captured": captured,
+                "missing": missing,
+                "files": files,
                 "created_at": datetime.now().isoformat(),
                 "duration_seconds": round(time.time() - start_time, 2)
             }
-            manifest_file = os.path.join(target_dir, "ad_backup_manifest.json")
             with open(manifest_file, "w", encoding="utf-8") as f:
-                json.dump(manifest, f, indent=2)
+                json.dump(manifest, f, indent=2, ensure_ascii=False)
+            self._append_log(job_id, f"Manifesto gerado: {len(files)} arquivo(s) com SHA-256")
 
-            self._append_log(job_id, f"✅ Manifesto de integridade gerado: {manifest_file}")
-            self._append_log(job_id, "🎉 Backup Completo do Active Directory concluído com sucesso e protegido contra USN Rollback!")
-
-            with self.lock:
-                if job_id in self.active_jobs:
-                    self.active_jobs[job_id]["status"] = "completed"
-                    self.active_jobs[job_id]["progress"] = 100
-                    self.active_jobs[job_id]["completed_at"] = datetime.now().isoformat()
-
+            if not any(c == "NTDS" for c in captured):
+                raise RuntimeError("A base NTDS não foi copiada; o backup do AD não é utilizável. " + ("Faltaram: " + ", ".join(missing) if missing else ""))
+            if missing:
+                msg = "Itens não capturados: " + ", ".join(missing)
+                self._append_log(job_id, f"⚠️ Backup do AD concluído PARCIALMENTE. {msg}")
+                self._finish(job_id, "partial", msg)
+            else:
+                self._append_log(job_id, f"✅ Backup do Active Directory concluído: {', '.join(captured)}.")
+                self._finish(job_id, "completed")
         except Exception as e:
             logger.error(f"Erro no backup do AD {job_id}: {e}", exc_info=True)
-            self._append_log(job_id, f"❌ Falha fatal no backup do Active Directory: {e}")
-            with self.lock:
-                if job_id in self.active_jobs:
-                    self.active_jobs[job_id]["status"] = "failed"
-                    self.active_jobs[job_id]["error"] = str(e)
+            self._append_log(job_id, f"❌ Backup do Active Directory falhou: {e}")
+            self._finish(job_id, "failed", str(e))
+
+    def _finish(self, job_id: str, status: str, error: Optional[str] = None):
+        with self.lock:
+            job = self.active_jobs.get(job_id)
+            if not job or job.get("status") == "cancelled":
+                return
+            job["status"] = status
+            if status in ("completed", "partial"):
+                job["progress"] = 100
+            job["completed_at"] = datetime.now().isoformat()
+            if error:
+                job["error"] = error
 
     def start_ad_restore(
         self,
@@ -400,58 +495,76 @@ class ActiveDirectoryBackupEngine:
         restore_sysvol: bool,
         restore_registry: bool
     ):
-        self._append_log(job_id, f"Iniciando restauração do Active Directory (Modo: {restore_mode.upper()})")
-        self._append_log(job_id, f"Diretório fonte: {snapshot_dir}")
-
+        """
+        Preparacao (staging) verificada da restauracao. A substituicao do NTDS so pode ser feita
+        com o DC em DSRM; aqui o backup e conferido de verdade e os passos exatos sao gerados.
+        """
+        from engines.disaster_recovery_engine import dr_engine as _dr
+        self._append_log(job_id, f"Preparando restauração do Active Directory (modo: {restore_mode.upper()})")
+        self._append_log(job_id, f"Backup de origem: {snapshot_dir}")
         try:
-            # 1. Validar integridade do manifesto
             manifest_file = os.path.join(snapshot_dir, "ad_backup_manifest.json")
-            if os.path.exists(manifest_file):
-                with open(manifest_file, "r", encoding="utf-8") as f:
-                    meta = json.load(f)
-                    self._append_log(job_id, f"Manifesto validado: Domínio {meta.get('domain')} (Criado em {meta.get('created_at')})")
-            
-            time.sleep(1)
-            self._update_progress(job_id, 25)
+            if not os.path.exists(manifest_file):
+                raise RuntimeError("Manifesto ad_backup_manifest.json não encontrado: backup inválido ou incompleto.")
+            with open(manifest_file, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+            self._append_log(job_id, f"Manifesto: domínio {meta.get('domain')} (criado em {meta.get('created_at')})")
+            self._update_progress(job_id, 10)
 
-            # 2. Descompactar / Preparar Staging da Base NTDS
-            self._append_log(job_id, "Descompactando base de dados NTDS.dit e verificando consistência ESENT...")
-            staging_dir = os.path.join(snapshot_dir, "Restore_Staging")
-            os.makedirs(staging_dir, exist_ok=True)
-            time.sleep(1.5)
-            self._update_progress(job_id, 60)
+            # 1. Conferir SHA-256 de cada arquivo registrado
+            files = meta.get("files") or []
+            if not files:
+                raise RuntimeError("O manifesto não tem a lista de arquivos com SHA-256 (backup gerado por versão antiga, sem cópia real do NTDS). Faça um novo backup.")
+            bad = []
+            for i, fe in enumerate(files):
+                p = os.path.join(snapshot_dir, fe.get("path", ""))
+                if not os.path.exists(p):
+                    bad.append(f"{fe.get('path')} (ausente)")
+                elif fe.get("sha256") and _dr._sha256(p) != fe["sha256"]:
+                    bad.append(f"{fe.get('path')} (hash diferente)")
+                self._update_progress(job_id, 10 + int(50 * (i + 1) / len(files)))
+            if bad:
+                raise RuntimeError("Integridade do backup falhou: " + "; ".join(bad[:5]))
+            self._append_log(job_id, f"✅ {len(files)} arquivo(s) conferidos por SHA-256")
 
-            # 3. Preparação do SYSVOL e Hives de Registro
+            # 2. Consistencia ESE do NTDS copiado
+            ntds = os.path.join(snapshot_dir, "AD_IFM", "Active Directory", "ntds.dit")
+            if not os.path.exists(ntds):
+                raise RuntimeError("ntds.dit não encontrado no backup.")
+            try:
+                rc, out = _dr._run_console(["esentutl", "/mh", ntds], timeout=600)
+            except (OSError, subprocess.TimeoutExpired) as ex:
+                rc, out = -1, str(ex)
+            state = next((l.split(":", 1)[1].strip() for l in out.splitlines() if l.strip().lower().startswith(("state:", "estado:"))), None)
+            if rc != 0 or not state or not ("clean" in state.lower() or "limp" in state.lower()):
+                raise RuntimeError(f"NTDS do backup não está consistente (esentutl código {rc}, estado: {state or 'não identificado'}).")
+            self._append_log(job_id, f"✅ NTDS consistente (esentutl /mh: {state})")
+            self._update_progress(job_id, 80)
+
+            # 3. Roteiro exato para o DSRM (substituicao do banco nao e possivel com o AD em execucao)
+            ifm = os.path.join(snapshot_dir, "AD_IFM")
+            steps = [
+                "1. bcdedit /set safeboot dsrepair  e reinicie o DC (modo DSRM).",
+                "2. Confirme o caminho atual da base NTDS: reg query HKLM\\SYSTEM\\CurrentControlSet\\Services\\NTDS\\Parameters /v \"DSA Database file\"",
+                f"3. Copie \"{os.path.join(ifm, 'Active Directory')}\\*\" para a pasta da base NTDS (ex.: C:\\Windows\\NTDS).",
+            ]
             if restore_sysvol:
-                self._append_log(job_id, "Restaurando políticas de grupo (GPOs) e scripts de logon na pasta SYSVOL...")
-                time.sleep(1.0)
-            
-            if restore_registry:
-                self._append_log(job_id, "Preparando hives do registro do Windows (SAM, SECURITY, SYSTEM)...")
-                time.sleep(1.0)
-
-            self._update_progress(job_id, 90)
-
+                steps.append(f"4. Restaure o SYSVOL a partir de \"{os.path.join(ifm, 'SYSVOL')}\" (restauração autoritativa do DFSR se este for o único DC).")
             if restore_mode == "authoritative":
-                self._append_log(job_id, "ℹ️ Modo Autoritativo: Execute o script 'ntdsutil authoritative restore' no DSRM antes do reboot final.")
-            else:
-                self._append_log(job_id, "✅ Modo Não-Autoritativo: O banco NTDS está pronto. A replicação sincronizará as atualizações dos outros DCs.")
-
-            self._append_log(job_id, "🎉 Restauração do Active Directory finalizada com sucesso!")
-
-            with self.lock:
-                if job_id in self.active_jobs:
-                    self.active_jobs[job_id]["status"] = "completed"
-                    self.active_jobs[job_id]["progress"] = 100
-                    self.active_jobs[job_id]["completed_at"] = datetime.now().isoformat()
-
+                steps.append("5. ntdsutil \"activate instance ntds\" \"authoritative restore\" \"restore subtree <DN>\" quit quit")
+            steps.append("6. bcdedit /deletevalue safeboot  e reinicie em modo normal; valide com dcdiag /v e repadmin /replsummary.")
+            script = os.path.join(snapshot_dir, "Restore_Staging", "PASSOS_DSRM.txt")
+            os.makedirs(os.path.dirname(script), exist_ok=True)
+            with open(script, "w", encoding="utf-8") as f:
+                f.write("\n".join(steps) + "\n")
+            for s_ in steps:
+                self._append_log(job_id, s_)
+            self._append_log(job_id, f"✅ Backup verificado e pronto para restauração em DSRM. Roteiro salvo em {script}. Nenhuma alteração foi feita no AD em execução.")
+            self._finish(job_id, "completed")
         except Exception as e:
             logger.error(f"Erro na restauração do AD {job_id}: {e}", exc_info=True)
-            self._append_log(job_id, f"❌ Erro fatal na restauração do AD: {e}")
-            with self.lock:
-                if job_id in self.active_jobs:
-                    self.active_jobs[job_id]["status"] = "failed"
-                    self.active_jobs[job_id]["error"] = str(e)
+            self._append_log(job_id, f"❌ Restauração não preparada: {e}")
+            self._finish(job_id, "failed", str(e))
 
     def _update_progress(self, job_id: str, progress: int):
         with self.lock:

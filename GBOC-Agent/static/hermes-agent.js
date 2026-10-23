@@ -169,7 +169,7 @@ const HermesUI = (() => {
         <div class="peer-item">
           <div class="peer-dot ${p.status !== 'online' ? 'offline' : ''}"></div>
           <div class="peer-info">
-            <div class="peer-hostname">${p.hostname || p.agent_id || 'Unknown'}</div>
+            <div class="peer-hostname">${p.hostname || p.agent_id || 'agente sem nome registrado'}</div>
             <div class="peer-meta">${p.ip || '?'} — GBOC v${p.version || '?'} — Visto: ${fmtDate(p.last_seen)}</div>
           </div>
           <div class="peer-rtt ${rttClass}">${rttLabel}</div>

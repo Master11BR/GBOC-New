@@ -469,7 +469,15 @@ class GBOCNativeEngine:
                 return False
 
             with zipfile.ZipFile(local_zip, 'r') as zf:
-                zf.extract(rel_path, dest)
+                # Nomes no zip usam "/"; no Windows o manifesto antigo traz "\\" -> arquivos em subpastas
+                # davam "There is no item named 'sub\\x.txt'" e não eram restaurados.
+                names = zf.namelist()
+                want = rel_path.replace('\\', '/').lstrip('/')
+                member = rel_path if rel_path in names else (want if want in names else next(
+                    (n for n in names if n.replace('\\', '/').lstrip('/').lower() == want.lower()), None))
+                if member is None:
+                    raise KeyError(f"'{rel_path}' não está no arquivo {archive}")
+                zf.extract(member, dest)
             return True
         except Exception as e:
             self.logger.error(f"Erro ao extrair {archive}: {e}")

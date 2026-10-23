@@ -46,7 +46,7 @@ class KubernetesBackupEngine:
             return {
                 "available": False,
                 "cluster_name": "Não Conectado",
-                "server_version": "N/A",
+                "server_version": None,
                 "distribution": "kubectl não instalado no host",
                 "namespaces": [],
                 "storage_classes": [],
@@ -58,11 +58,11 @@ class KubernetesBackupEngine:
         try:
             # Consultar versão do cluster
             ver_res = subprocess.run([kubectl_bin, "version", "--output=json"], capture_output=True, text=True, timeout=8)
-            server_version = "Desconhecido"
+            server_version = f"não obtida: {(ver_res.stderr or ver_res.stdout or 'sem resposta').strip()[:150]}"
             if ver_res.returncode == 0:
                 try:
                     ver_data = json.loads(ver_res.stdout)
-                    server_version = ver_data.get("serverVersion", {}).get("gitVersion", "Desconhecido")
+                    server_version = ver_data.get("serverVersion", {}).get("gitVersion") or "cluster sem serverVersion na resposta"
                 except Exception:
                     pass
 
@@ -95,8 +95,8 @@ class KubernetesBackupEngine:
             return {
                 "available": False,
                 "cluster_name": "Cluster Inacessível",
-                "server_version": "N/A",
-                "distribution": "Erro de conexão",
+                "server_version": None,
+                "distribution": f"Erro de conexão: {str(e)[:150]}",
                 "namespaces": [],
                 "storage_classes": [],
                 "csi_snapshotter_ready": False,

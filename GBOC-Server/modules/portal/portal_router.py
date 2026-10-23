@@ -101,7 +101,7 @@ async def summary(request: Request, tenant_id: Optional[str] = None):
 
 
 @router.get("/reports")
-async def reports(request: Request, tenant_id: Optional[str] = None):
+def reports(request: Request, tenant_id: Optional[str] = None):
     _tenant(request, tenant_id)
     from modules.reports import report_core as rc
     return {"status": "success", "reports": [{"code": c["code"], "name": c["name"], "description": c["description"], "category": c["category"]}

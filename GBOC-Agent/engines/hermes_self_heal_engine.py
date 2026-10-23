@@ -84,6 +84,26 @@ class HermesSelfHealEngine:
     # VSS Writers Auto-Repair
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _writer_failed(w: Dict[str, Any]) -> bool:
+        """Falha real: estado VSS >= 6 (FAILED_AT_*) ou erro registrado. [5] 'aguardando conclusao' e normal apos backup."""
+        code = w.get("state_code")
+        err = (w.get("last_error") or "").strip().lower()
+        if code is not None and code >= 6:
+            return True
+        return bool(err) and err not in ("no error", "sem erros", "sem erro")
+
+    @staticmethod
+    def _backup_running() -> bool:
+        try:
+            from shared_core import get_shared_core
+            with get_shared_core().get_db_connection() as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT COUNT(*) FROM task_executions WHERE status IN ('running','preparing','queued') AND started_at >= NOW() - INTERVAL '24 hours'")
+                return int(cur.fetchone()[0] or 0) > 0
+        except Exception:
+            return True  # na duvida, nao mexe no VSS
+
     def repair_vss_writers(self) -> Dict[str, Any]:
         """
         Detecta e repara VSS Writers problemáticos sem reiniciar o servidor.
@@ -107,7 +127,7 @@ class HermesSelfHealEngine:
         try:
             # Passo 1: Listar VSS Writers
             writers_before = self._get_vss_writers_status()
-            failed_before = [w for w in writers_before if w.get("state") in ("Failed", "Waiting for completion", "Unknown error")]
+            failed_before = [w for w in writers_before if self._writer_failed(w)]
             result["failed_writers_before"] = failed_before
 
             if not failed_before:
@@ -118,23 +138,20 @@ class HermesSelfHealEngine:
 
             logger.warning(f"[HERMES HEAL] {len(failed_before)} VSS Writer(s) com problema detectado(s)")
 
-            # Passo 2: Parar serviço VSS
-            self._run_command(["net", "stop", "vss", "/y"], result["steps_executed"], "Parando VSS")
+            if self._backup_running():
+                result["message"] = "Reparo adiado: há backup em execução (o VSS não é reiniciado durante backups)"
+                self._log_heal_event("vss_repair", "SKIPPED", result["message"])
+                logger.warning(f"[HERMES HEAL] {result['message']}")
+                return result
 
-            # Passo 3: Re-registrar DLLs críticas do VSS
-            vss_dlls = [
-                "ole32.dll", "vss_ps.dll", "vssapi.dll",
-                "cryptsvc.dll", "msxml2.dll", "msxml3.dll", "msxml4.dll",
-            ]
-            for dll in vss_dlls:
-                self._run_command(["regsvr32", "/s", dll], result["steps_executed"], f"Re-registro {dll}", ignore_error=True)
-
-            # Passo 4: Reiniciar serviço VSS
+            # Reinicia SOMENTE o servico VSS (sem '/y', que derrubava servicos dependentes) e sem re-registrar
+            # DLLs do sistema (ole32/msxml): isso interrompia processos em execucao, inclusive o Agente e o Servidor.
+            self._run_command(["net", "stop", "vss"], result["steps_executed"], "Parando VSS")
             self._run_command(["net", "start", "vss"], result["steps_executed"], "Iniciando VSS")
 
             # Passo 5: Verificar estado após reparo
             writers_after = self._get_vss_writers_status()
-            failed_after = [w for w in writers_after if w.get("state") in ("Failed", "Waiting for completion", "Unknown error")]
+            failed_after = [w for w in writers_after if self._writer_failed(w)]
             result["failed_writers_after"] = failed_after
             result["success"] = len(failed_after) < len(failed_before)
 
@@ -155,22 +172,36 @@ class HermesSelfHealEngine:
         try:
             proc = subprocess.run(
                 ["vssadmin", "list", "writers"],
-                capture_output=True, text=True, timeout=30,
+                capture_output=True, timeout=30,
                 creationflags=0x08000000  # CREATE_NO_WINDOW
             )
+            # Saida localizada (pt-BR: 'Nome do gravador', 'Estado', 'Ultimo erro') na pagina OEM:
+            # usa o codigo numerico do estado do VSS ([1] estavel, [5] aguardando conclusao, [6+] falha).
+            import re as _re
+            try:
+                import ctypes
+                enc = f"cp{ctypes.windll.kernel32.GetOEMCP()}"
+            except Exception:
+                enc = "utf-8"
+            out = (proc.stdout or b"").decode(enc, errors="replace")
             current_writer: Dict[str, str] = {}
-            for line in proc.stdout.splitlines():
+            for line in out.splitlines():
                 line = line.strip()
-                if line.startswith("Writer name:"):
+                low = line.lower()
+                if low.startswith(("writer name:", "nome do gravador:")):
                     if current_writer:
                         writers.append(current_writer)
-                    current_writer = {"name": line.replace("Writer name:", "").strip().strip("'")}
-                elif line.startswith("State:") and current_writer:
-                    state_part = line.replace("State:", "").strip()
-                    # Formato: "[1] Stable" → extrai "Stable"
-                    current_writer["state"] = state_part.split("]")[-1].strip() if "]" in state_part else state_part
-                elif line.startswith("Last error:") and current_writer:
-                    current_writer["last_error"] = line.replace("Last error:", "").strip()
+                    current_writer = {"name": line.split(":", 1)[1].strip().strip("'")}
+                elif current_writer and low.startswith(("state:", "estado:")):
+                    state_part = line.split(":", 1)[1].strip()
+                    m = _re.search(r"\[(\d+)\]", state_part)
+                    code = int(m.group(1)) if m else None
+                    current_writer["state_code"] = code
+                    current_writer["state"] = ("Stable" if code == 1 else "Waiting for completion" if code == 5
+                                               else "Failed" if (code or 0) >= 6
+                                               else (state_part.split("]")[-1].strip() if "]" in state_part else state_part))
+                elif current_writer and _re.match(r"^(last error|.ltimo erro):", low):
+                    current_writer["last_error"] = line.split(":", 1)[1].strip()
             if current_writer:
                 writers.append(current_writer)
         except FileNotFoundError:
@@ -181,11 +212,19 @@ class HermesSelfHealEngine:
 
     def _run_vss_health_check(self) -> None:
         """Verifica VSS Writers e repara automaticamente se houver falhas."""
+        if os.environ.get("GBOC_HERMES_VSS_REPAIR", "1") == "0":
+            return
         writers = self._get_vss_writers_status()
-        failed = [w for w in writers if w.get("state") in ("Failed", "Waiting for completion")]
-        if failed:
-            logger.warning(f"[HERMES HEAL] VSS Writers com falha detectados — iniciando reparo automático")
-            self.repair_vss_writers()
+        failed = [w for w in writers if self._writer_failed(w)]
+        if not failed:
+            return
+        # No maximo um reparo automatico a cada 6 h (antes: a cada ciclo, indefinidamente)
+        last = getattr(self, "_last_vss_repair", 0.0)
+        if time.time() - last < 6 * 3600:
+            return
+        self._last_vss_repair = time.time()
+        logger.warning(f"[HERMES HEAL] VSS Writers com falha real: {', '.join(w.get('name', '?') for w in failed[:5])} - iniciando reparo")
+        self.repair_vss_writers()
 
     # ------------------------------------------------------------------
     # Disk Space Pre-Guard
@@ -350,19 +389,21 @@ class HermesSelfHealEngine:
                 capture_output=True, text=True, timeout=10,
                 creationflags=0x08000000
             )
+            # O rotulo e localizado (STATE / ESTADO), mas o codigo e o nome do estado nao: "4  RUNNING"
+            import re as _re
             state = "unknown"
-            for line in proc.stdout.splitlines():
-                if "STATE" in line.upper():
-                    parts = line.split()
-                    if len(parts) >= 4:
-                        state_text = parts[-1].lower()
-                        if "running" in state_text:
-                            state = "running"
-                        elif "stopped" in state_text:
-                            state = "stopped"
-                        elif "pending" in state_text:
-                            state = "pending"
-                    break
+            m = _re.search(r":\s*([1-7])\s+(STOPPED|START_PENDING|STOP_PENDING|RUNNING|CONTINUE_PENDING|PAUSE_PENDING|PAUSED)\b",
+                           proc.stdout or "")
+            if m:
+                code = m.group(2)
+                state = "running" if code == "RUNNING" else "stopped" if code == "STOPPED" else \
+                        "paused" if code == "PAUSED" else "pending"
+            elif proc.returncode == 1060:
+                state = "not_installed"
+            else:
+                # estado nao reconhecido: devolve a saida real do sc em vez de 'unknown'
+                raw = " ".join((proc.stdout or proc.stderr or "").split())[:160]
+                return {"service": service_name, "state": "error", "detail": f"sc query (código {proc.returncode}): {raw or 'sem saída'}"}
             return {"service": service_name, "state": state}
         except FileNotFoundError:
             return {"service": service_name, "state": "unavailable", "note": "sc.exe not found"}

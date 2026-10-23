@@ -104,7 +104,7 @@ async def report_job_failure(request: Request):
 
 
 @router.get("/alert-config")
-async def get_alert_config():
+def get_alert_config():
     return JSONResponse({"status": "success", "config": _server_alert_config,
                          "note": "Canais e regras de envio ficam em Alertas e Falhas > Alertas proativos > Regras e canais."})
 

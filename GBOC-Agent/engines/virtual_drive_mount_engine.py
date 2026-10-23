@@ -94,14 +94,25 @@ class VirtualDriveMountEngine:
         try:
             # Comando de montagem real via rclone
             cmd = [rclone_bin, "mount", repository_url, drive_letter, "--vfs-cache-mode", "writes"]
-            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            time.sleep(1.5)
+            proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+            # So considera montado quando a letra aparece no sistema (ate 20 s)
+            mounted = False
+            for _ in range(40):
+                if proc.poll() is not None:
+                    break
+                if os.path.exists(drive_letter + "\\"):
+                    mounted = True
+                    break
+                time.sleep(0.5)
 
-            if proc.poll() is not None:
-                _, stderr = proc.communicate()
-                err_msg = stderr.decode('utf-8', errors='ignore') if stderr else "Falha ao iniciar processo rclone"
-                logs.append(f"❌ Erro ao montar: {err_msg}")
-                return {"success": False, "error": err_msg, "logs": logs}
+            if not mounted:
+                if proc.poll() is None:
+                    proc.kill()
+                _, stderr = proc.communicate(timeout=10)
+                err_msg = (stderr.decode('utf-8', errors='ignore').strip() if stderr else "") or \
+                          f"A unidade '{drive_letter}' não apareceu em 20 s (verifique o WinFsp e a URL do repositório)."
+                logs.append(f"❌ Erro ao montar: {err_msg[-400:]}")
+                return {"success": False, "error": err_msg[-400:], "logs": logs}
 
             logs.append(f"✅ Drive Virtual '{drive_letter}' montado com sucesso via processo PID #{proc.pid}!")
             drive_info = {
@@ -113,6 +124,8 @@ class VirtualDriveMountEngine:
                 "logs": logs
             }
             self.mounted_drives[drive_letter] = drive_info
+            self._procs = getattr(self, "_procs", {})
+            self._procs[drive_letter] = proc
             return {"success": True, "drive": drive_info}
 
         except Exception as e:
@@ -124,10 +137,35 @@ class VirtualDriveMountEngine:
         if not drive_letter.endswith(":"):
             drive_letter += ":"
 
-        if drive_letter in self.mounted_drives:
-            del self.mounted_drives[drive_letter]
-            return {"success": True, "message": f"Drive Virtual '{drive_letter}' desregistrado com sucesso."}
-        return {"success": True, "message": f"Drive '{drive_letter}' não estava montado."}
+        info = self.mounted_drives.get(drive_letter)
+        if not info:
+            return {"success": True, "message": f"Drive '{drive_letter}' não estava montado pelo GBOC."}
+        # Encerra o processo rclone que mantem a montagem e confere que a letra sumiu
+        proc = getattr(self, "_procs", {}).pop(drive_letter, None)
+        try:
+            if proc is not None and proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+            elif info.get("pid"):
+                p = psutil.Process(int(info["pid"]))
+                if "rclone" in (p.name() or "").lower():
+                    p.terminate()
+                    p.wait(timeout=10)
+        except (psutil.NoSuchProcess, ProcessLookupError):
+            pass
+        except Exception as e:
+            return {"success": False, "error": f"Falha ao encerrar o rclone: {e}"}
+        for _ in range(20):
+            if not os.path.exists(drive_letter + "\\"):
+                break
+            time.sleep(0.5)
+        if os.path.exists(drive_letter + "\\"):
+            return {"success": False, "error": f"A unidade '{drive_letter}' continua montada após encerrar o rclone."}
+        self.mounted_drives.pop(drive_letter, None)
+        return {"success": True, "message": f"Drive Virtual '{drive_letter}' desmontado."}
 
 
 # Singleton global

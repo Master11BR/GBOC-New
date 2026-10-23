@@ -99,7 +99,7 @@ async def chat_with_ai(body: QueryRequest, request: Request):
 
 @router.get("/config")
 @router_v1.get("/config")
-async def get_ai_provider_config(request: Request):
+def get_ai_provider_config(request: Request):
     """Retorna as configurações atuais dos provedores de IA (chaves mascaradas)."""
     require_ai_user(request)
     from engines.ai_assistant import load_ai_config
@@ -109,7 +109,7 @@ async def get_ai_provider_config(request: Request):
 
 @router.post("/config")
 @router_v1.post("/config")
-async def update_ai_provider_config(body: ConfigRequest, request: Request):
+def update_ai_provider_config(body: ConfigRequest, request: Request):
     """Atualiza as configurações do provedor de IA (somente administradores)."""
     require_ai_user(request, admin=True)
     from engines.ai_assistant import save_ai_config
@@ -173,7 +173,7 @@ async def agent_ai_diagnose(request: Request):
 
 @router.post("/auto_fix")
 @router_v1.post("/auto_fix")
-async def agent_ai_auto_fix(request: Request):
+def agent_ai_auto_fix(request: Request):
     """Não há remediação automática implementada: responde com erro explícito em vez de simular sucesso."""
     require_ai_user(request)
     return JSONResponse(

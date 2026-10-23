@@ -98,7 +98,7 @@ def get_overview() -> Dict[str, Any]:
                         total_7d = row[5] or 0
                         ok_7d = row[6] or 0
                         total_data_gb = round(total_bytes / (1024**3), 2) if total_bytes else 0
-                        backup_health_score = round((ok_7d / total_7d) * 100) if total_7d else 100
+                        backup_health_score = round((ok_7d / total_7d) * 100) if total_7d else None  # sem execucoes em 7 dias: sem nota (antes 100)
             except Exception as db_err:
                 logger.warning(f"Erro ao consultar banco no overview: {db_err}")
 
@@ -110,7 +110,7 @@ def get_overview() -> Dict[str, Any]:
             from core.server_client import central_client
             server_link = central_client.link_state() if central_client else {"state": "not_configured", "connected": False}
         except Exception as _sl_err:
-            server_link = {"state": "unknown", "connected": False, "detail": str(_sl_err)[:200]}
+            server_link = {"state": "error", "connected": False, "detail": f"Falha ao consultar a ligação com o Servidor Central: {str(_sl_err)[:180]}"}
 
         elapsed_ms = round((time.perf_counter() - request_start) * 1000, 2)
         logger.info(f"[PERF] GET /api/overview concluído em {elapsed_ms} ms")

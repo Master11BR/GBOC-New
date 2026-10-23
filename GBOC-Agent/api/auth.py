@@ -121,7 +121,7 @@ def validate_password(password: str) -> tuple:
 
 
 @_core_router.get("/password-policy")
-async def get_password_policy():
+def get_password_policy():
     """Returns the current password policy requirements."""
     return {
         "policy": PASSWORD_POLICY,
@@ -550,7 +550,7 @@ def login(req: LoginRequest, request: Request):
 
             cur.execute(
                 "INSERT INTO auth_sessions (user_id, token, ip_address, user_agent, expires_at) VALUES (%s, %s, %s, %s, %s)",
-                (user_id, token, client_ip, request.headers.get("user-agent", ""), expires.isoformat())
+                (user_id, token, client_ip, request.headers.get("user-agent", ""), expires.astimezone().isoformat())  # com fuso: coluna é timestamptz (sem fuso o PostgreSQL lia como UTC e a sessão vencia 3 h antes)
             )
             conn.commit()
 
@@ -692,7 +692,7 @@ def change_password(req: ChangePasswordRequest, request: Request):
 # ============================================================================
 
 @_core_router.get("/permissions")
-async def list_available_permissions():
+def list_available_permissions():
     """Retorna o catálogo de todas as permissões granulares disponíveis no sistema."""
     modules = {}
     for p in AVAILABLE_PERMISSIONS:

@@ -360,18 +360,8 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"[GUARDIAN] ⚠️ Falha ao iniciar Guardian: {e}")
 
-    # Iniciar Ransomware Shield (proteção real-time — não bloqueia startup)
-    try:
-        from engines.ransomware_shield import get_shield
-        shield = get_shield()
-        # Só inicia se explicitamente habilitado na config
-        if shield.config.get('enabled', False) and shield.config['monitored_paths']:
-            shield.start()
-            logger.info("[SHIELD] ✅ Ransomware Shield ativo (real-time)")
-        else:
-            logger.info("[SHIELD] Shield disponível mas não iniciado (habilite via API /api/ransomware/shield/start)")
-    except Exception as e:
-        logger.warning(f"[SHIELD] ⚠️ Falha ao carregar Shield: {e}")
+    # Ransomware Shield removido (out/2026): monitoramento de arquivos em tempo real é papel do antivírus/EDR.
+    # A proteção dos backups continua no Guardian (canaries + resposta automática) e na imutabilidade.
 
     # Iniciar Hermes Agent — Agente de Borda Autônomo (4 Pilares)
     try:
@@ -414,12 +404,6 @@ async def lifespan(app: FastAPI):
         logger.info("[GUARDIAN] Guardian parado")
     except Exception:
         pass
-    try:
-        from engines.ransomware_shield import get_shield
-        get_shield().stop()
-        logger.info("[SHIELD] Shield parado")
-    except Exception:
-        pass
 
 
 app = FastAPI(
@@ -437,7 +421,7 @@ except Exception as _hw_err:
 @app.get("/api/v1/version", tags=["System"])
 @app.get("/api/v1/system/version", tags=["System"])
 @app.get("/api/system/info", tags=["System"])
-async def get_agent_version_endpoint():
+def get_agent_version_endpoint():
     """Retorna informações detalhadas do versionamento semântico 2.0 e contrato de UI Model."""
     info = get_version_info()
     if isinstance(info, dict):
@@ -451,7 +435,7 @@ async def get_agent_version_endpoint():
     return info
 
 @app.get("/api/v1/system/ui-config", tags=["System"])
-async def get_agent_ui_config_endpoint():
+def get_agent_ui_config_endpoint():
     """Retorna a configuração oficial estrita do Modelo UI/UX Moderno."""
     return {
         "UI_MODEL": "modern",
@@ -622,17 +606,17 @@ def serve_file(filename):
 
 
 @app.get("/favicon.ico", include_in_schema=False)
-async def favicon():
+def favicon():
     return JSONResponse(content={}, status_code=200)
 
 
 @app.get("/.well-known/appspecific/com.chrome.devtools.json", include_in_schema=False)
-async def chrome_devtools():
+def chrome_devtools():
     return JSONResponse(content={}, status_code=200)
 
 
 @app.get("/", include_in_schema=False)
-async def serve_index():
+def serve_index():
     return serve_file("index.html")
 
 
@@ -789,7 +773,7 @@ except Exception as e:
 # ==============================================================================
 
 @app.get("/api/server/status")
-async def get_server_status():
+def get_server_status():
     """Obtém status da conexão com servidor central"""
     try:
         central_client.sync_runtime_config("consulta de status")   # reflete a chave gravada por outro processo
@@ -830,7 +814,7 @@ async def configure_server(request: Request, server_url: Optional[str] = None, a
         return {"status": "error", "message": str(e)}
 
 @app.post("/api/server/sync")
-async def sync_with_server():
+def sync_with_server():
     """Força sincronização com servidor central"""
     try:
         result = central_client.sync_with_server()
@@ -840,7 +824,7 @@ async def sync_with_server():
         return {"status": "error", "message": str(e)}
 
 @app.post("/api/server/config/heartbeat")
-async def configure_heartbeat(interval_minutes: int = 2):
+def configure_heartbeat(interval_minutes: int = 2):
     """Configura o intervalo do heartbeat (1-60 minutos)"""
     try:
         if not (1 <= interval_minutes <= 60):
@@ -871,7 +855,7 @@ async def configure_heartbeat(interval_minutes: int = 2):
         return {"status": "error", "message": str(e)}
 
 @app.post("/api/server/config/sync-interval")
-async def configure_sync_interval(interval_minutes: int = 10):
+def configure_sync_interval(interval_minutes: int = 10):
     """Configura o intervalo de sincronização (5-1440 minutos)"""
     try:
         if not (5 <= interval_minutes <= 1440):  # 5 min até 24h
@@ -893,7 +877,7 @@ async def configure_sync_interval(interval_minutes: int = 10):
         return {"status": "error", "message": str(e)}
 
 @app.post("/api/server/config/toggle")
-async def toggle_server_client(enabled: bool = True):
+def toggle_server_client(enabled: bool = True):
     """Habilita/desabilita o cliente do servidor central"""
     try:
         from server_config import config_manager
@@ -917,7 +901,7 @@ async def toggle_server_client(enabled: bool = True):
         return {"status": "error", "message": str(e)}
 
 @app.post("/api/server/config/reset")
-async def reset_server_config():
+def reset_server_config():
     """Reseta configuração do servidor para valores padrão"""
     try:
         from server_config import config_manager
@@ -936,7 +920,7 @@ async def reset_server_config():
         return {"status": "error", "message": str(e)}
 
 @app.get("/api/server/config")
-async def get_server_config():
+def get_server_config():
     """Obtém configuração atual do servidor central"""
     try:
         from server_config import config_manager
@@ -983,11 +967,6 @@ async def shutdown_agent(request: Request):
         except Exception:
             pass
         try:
-            from engines.ransomware_shield import get_shield
-            get_shield().stop()
-        except Exception:
-            pass
-        try:
             from shared_core import get_shared_core
             core = get_shared_core()
             if hasattr(core, "shutdown"):
@@ -1013,7 +992,7 @@ async def shutdown_agent(request: Request):
 #  core/agent_dr_sync.py — e, por serem registradas antes, sobrepunham as rotas reais com erro 500.)
 
 @app.post("/api/v1/dr/import-file")
-async def dr_import_from_file(request: Request):
+def dr_import_from_file(request: Request):
     """Restauração de pacote DR a partir de arquivo ainda não implementada (core/dr_restore_manager.py está vazio)."""
     return JSONResponse(
         {"status": "unavailable", "error": {"code": "DR_IMPORT_NOT_IMPLEMENTED",
@@ -1022,7 +1001,7 @@ async def dr_import_from_file(request: Request):
     )
 
 @app.get("/api/v1/security/defender-status")
-async def security_defender_status():
+def security_defender_status():
     try:
         from core.security_sentinel import security_sentinel
         return security_sentinel.get_windows_defender_status()
@@ -1128,7 +1107,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 @app.get("/login.html", include_in_schema=False)
-async def login_page():
+def login_page():
     candidates = [
         os.path.join(os.path.dirname(__file__), "static", "login.html"),
         os.path.join(os.path.dirname(__file__), "login.html"),
@@ -1141,7 +1120,7 @@ async def login_page():
     return HTMLResponse("<h1>Login page not found</h1>", status_code=404)
 
 @app.get("/static/{filename:path}", include_in_schema=False)
-async def serve_static_asset(filename: str):
+def serve_static_asset(filename: str):
     clean_fn = (filename or '').lstrip("/\\")
     if clean_fn.startswith("static/") or clean_fn.startswith("static\\"):
         clean_fn = clean_fn[7:]
@@ -1154,7 +1133,7 @@ async def serve_static_asset(filename: str):
     return HTMLResponse("Not found", status_code=404)
 
 @app.get("/{page_name:path}.html", include_in_schema=False)
-async def serve_any_html_page(page_name: str):
+def serve_any_html_page(page_name: str):
     clean_p = (page_name or '').lstrip("/\\")
     if clean_p.startswith("static/") or clean_p.startswith("static\\"):
         clean_p = clean_p[7:]
@@ -1181,7 +1160,7 @@ async def serve_any_html_page(page_name: str):
     return HTMLResponse(f"Página '{fname}' não encontrada.", status_code=404)
 
 @app.get("/{file:path}.js", include_in_schema=False)
-async def serve_any_js_page(file: str):
+def serve_any_js_page(file: str):
     clean_p = (file or '').lstrip("/\\")
     if clean_p.startswith("static/") or clean_p.startswith("static\\"):
         clean_p = clean_p[7:]
@@ -1195,7 +1174,7 @@ async def serve_any_js_page(file: str):
     return HTMLResponse("Not found", status_code=404)
 
 @app.get("/{file:path}.css", include_in_schema=False)
-async def serve_any_css_page(file: str):
+def serve_any_css_page(file: str):
     clean_p = (file or '').lstrip("/\\")
     if clean_p.startswith("static/") or clean_p.startswith("static\\"):
         clean_p = clean_p[7:]
@@ -1211,7 +1190,7 @@ async def serve_any_css_page(file: str):
 
 from fastapi.responses import RedirectResponse
 @app.get("/")
-async def index():
+def index():
     return RedirectResponse(url="/dashboard.html", status_code=302)
 
 if __name__ == "__main__":
