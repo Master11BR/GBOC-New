@@ -192,3 +192,6 @@ cython_debug/
 *.key
 *_cert.pem
 *_key.pem
+
+# Arquivos-isca do Ransomware Guardian: gerados por instalacao (hash guardado no banco local); versionar faz o pull regravar e gera alarme falso
+**/.gboc_canary*

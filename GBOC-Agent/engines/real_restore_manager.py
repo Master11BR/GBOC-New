@@ -475,7 +475,7 @@ class RestoreManager:
                 return self._list_kopia_snapshots(repo)
             elif engine == 'duplicati':
                 return self._list_duplicati_snapshots(repo)
-            elif engine == 'gboc_native':
+            elif engine in ('gboc_native', 'native'):
                 return self._list_native_snapshots(repo)
             else:
                 raise ValueError(f"Engine '{engine}' não suportado")
@@ -1118,7 +1118,9 @@ class RestoreManager:
             s = subprocess.run([restic, 'snapshots', '--json'], env=env, capture_output=True, text=True, timeout=300)
             for sn in (json.loads(s.stdout or '[]') or []):
                 snaps[sn.get('id')] = sn.get('time')
-            norm = lambda p: '/' + str(p).replace('\\', '/').lstrip('/').lower()
+            import re as _re
+            # "/C:/x" (pedido) e "/C/x" (restic no Windows) precisam bater: remove o ":" da letra do disco
+            norm = lambda p: _re.sub(r'^/([a-z]):(?=/|$)', r'/\1', '/' + str(p).replace('\\', '/').lstrip('/').lower())
             out = []
             for grp in json.loads(r.stdout or '[]') or []:
                 for m in grp.get('matches') or []:
@@ -1949,7 +1951,8 @@ class RestoreManager:
                 repo_type = 's3'
 
         args = []
-        password = repo.get('password') or repo.get('motor_password') or repo.get('cloud_password')
+        # mesma prioridade do backup (motor_password primeiro); antes 'password' antigo vencia a senha atual do motor
+        password = self._get_password(repo)
         if password:
             args.append(f"--passphrase={password}")
 

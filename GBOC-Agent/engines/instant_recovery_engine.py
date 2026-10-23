@@ -19,6 +19,77 @@ from typing import Dict, Any, List, Optional
 logger = logging.getLogger("gboc_instant_recovery")
 
 
+def _hv_boot_vm(name: str, vhd_path: str, parent_path: str, memory_mb: int, cpu_cores: int, timeout: int = 180) -> Dict[str, Any]:
+    """
+    Cria disco diferencial + VM Geracao 2 no Hyper-V local e confirma o estado 'Running'.
+    Tudo com $ErrorActionPreference='Stop' e caminhos via variavel de ambiente.
+    Retorna {"ok": bool, "stage": str, "message": str, "state": str|None}.
+    """
+    import json as _json
+    if sys.platform != "win32":
+        return {"ok": False, "stage": "platform", "message": "Hyper-V disponível apenas no Windows.", "state": None}
+    ps = r"""
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$ErrorActionPreference = 'Stop'
+$r = [ordered]@{ ok = $false; stage = 'hyperv'; message = ''; state = $null }
+try {
+    if (-not (Get-Command New-VM -ErrorAction SilentlyContinue)) { throw 'Hyper-V (módulo PowerShell Hyper-V) não está instalado neste servidor.' }
+    $r.stage = 'disk'
+    New-VHD -Path $env:GBOC_VHD -ParentPath $env:GBOC_PARENT -Differencing | Out-Null
+    $r.stage = 'vm'
+    $sw = (Get-VMSwitch | Select-Object -First 1).Name
+    $p = @{ Name = $env:GBOC_VM; MemoryStartupBytes = [int64]$env:GBOC_MEM * 1MB; VHDPath = $env:GBOC_VHD; Generation = 2 }
+    if ($sw) { $p.SwitchName = $sw }
+    New-VM @p | Out-Null
+    Set-VMProcessor -VMName $env:GBOC_VM -Count ([int]$env:GBOC_CPU)
+    $r.stage = 'start'
+    Start-VM -Name $env:GBOC_VM
+    $r.state = (Get-VM -Name $env:GBOC_VM).State.ToString()
+    $r.ok = ($r.state -eq 'Running')
+    if (-not $r.ok) { $r.message = "VM criada, mas o estado é $($r.state)." }
+} catch {
+    $r.message = $_.Exception.Message
+}
+$r | ConvertTo-Json -Compress
+"""
+    env = dict(os.environ, GBOC_VM=name, GBOC_VHD=vhd_path, GBOC_PARENT=parent_path,
+               GBOC_MEM=str(int(memory_mb)), GBOC_CPU=str(int(cpu_cores)))
+    try:
+        res = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps],
+                             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout, env=env)
+    except Exception as e:
+        return {"ok": False, "stage": "powershell", "message": str(e), "state": None}
+    for line in reversed((res.stdout or "").splitlines()):
+        if line.strip().startswith("{"):
+            try:
+                return _json.loads(line.strip())
+            except ValueError:
+                break
+    return {"ok": False, "stage": "powershell", "message": (res.stderr or res.stdout or "").strip()[:400] or f"código {res.returncode}", "state": None}
+
+
+def _hv_cleanup(name: str, vhd_path: str):
+    """Remove VM e disco diferencial criados por _hv_boot_vm (nunca toca no disco pai)."""
+    if sys.platform != "win32":
+        return
+    ps = r"""
+$ErrorActionPreference = 'SilentlyContinue'
+if (Get-Command Get-VM -ErrorAction SilentlyContinue) {
+    if (Get-VM -Name $env:GBOC_VM) { Stop-VM -Name $env:GBOC_VM -TurnOff -Force; Remove-VM -Name $env:GBOC_VM -Force }
+}
+"""
+    try:
+        subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps],
+                       capture_output=True, timeout=60, env=dict(os.environ, GBOC_VM=name))
+    except Exception:
+        pass
+    try:
+        if vhd_path and os.path.exists(vhd_path):
+            os.remove(vhd_path)
+    except OSError:
+        pass
+
+
 class InstantRecoveryDatastoreEngine:
     """
     Motor de Recuperação Instantânea Local (Instant VM Recovery / RTO < 60s).
@@ -51,27 +122,32 @@ class InstantRecoveryDatastoreEngine:
         unc_path = f"\\\\{self.hostname}\\{clean_share_name}"
 
         if sys.platform == "win32":
-            perm = "-ReadAccess 'Everyone'" if read_only else "-FullAccess 'Everyone'"
+            # 'Everyone' e localizado ('Todos' no pt-BR): resolve pelo SID universal S-1-1-0
+            perm = "-ReadAccess $everyone" if read_only else "-FullAccess $everyone"
             ps_cmd = f"""
+                [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
                 $ErrorActionPreference = 'Stop'
+                $everyone = (New-Object System.Security.Principal.SecurityIdentifier('S-1-1-0')).Translate([System.Security.Principal.NTAccount]).Value
                 $existing = Get-SmbShare -Name '{clean_share_name}' -ErrorAction SilentlyContinue
                 if ($existing) {{
                     [PSCustomObject]@{{ Status = 'already_exists'; Path = $existing.Path }} | ConvertTo-Json
                 }} else {{
-                    New-SmbShare -Name '{clean_share_name}' -Path '{folder_path}' {perm} -Description 'GBOC Instant Recovery Datastore' | Out-Null
-                    [PSCustomObject]@{{ Status = 'created'; Path = '{folder_path}' }} | ConvertTo-Json
+                    New-SmbShare -Name '{clean_share_name}' -Path $env:GBOC_DS_PATH {perm} -Description 'GBOC Instant Recovery Datastore' | Out-Null
+                    [PSCustomObject]@{{ Status = 'created'; Path = $env:GBOC_DS_PATH }} | ConvertTo-Json
                 }}
             """
             try:
                 res = subprocess.run(
                     ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd],
-                    capture_output=True, text=True, timeout=15
+                    capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30,
+                    env=dict(os.environ, GBOC_DS_PATH=str(folder_path))
                 )
-                if res.returncode != 0:
-                    err_text = res.stderr.strip() or "Erro de permissão ao criar SMB Share."
-                    logger.warning(f"[InstantRecovery] Aviso ao criar SMB Share via PowerShell: {err_text}")
             except Exception as e:
-                logger.error(f"[InstantRecovery] Falha no comando New-SmbShare: {e}")
+                raise RuntimeError(f"Falha ao executar New-SmbShare: {e}")
+            if res.returncode != 0:
+                raise RuntimeError(f"Compartilhamento SMB não criado: {(res.stderr or res.stdout or '').strip()[:300] or 'código ' + str(res.returncode)}")
+        else:
+            raise RuntimeError("Datastore SMB disponível apenas no Windows.")
 
         datastore_info = {
             "share_name": clean_share_name,
@@ -158,53 +234,15 @@ class InstantRecoveryDatastoreEngine:
             f"Criando camada diferencial Copy-on-Write (CoW) em: {diff_vhdx_path}"
         ]
 
-        if sys.platform == "win32":
-            ps_diff = f"""
-                $ErrorActionPreference = 'Stop'
-                if (Get-Command New-VHD -ErrorAction SilentlyContinue) {{
-                    New-VHD -Path '{diff_vhdx_path}' -ParentPath '{backup_image_path}' -Differencing -Force | Out-Null
-                }} else {{
-                    $dp = @"
-create vdisk file="{diff_vhdx_path}" parent="{backup_image_path}"
-"@
-                    $t = [System.IO.Path]::GetTempFileName()
-                    $dp | Out-File $t -Encoding ascii
-                    diskpart /s $t | Out-Null
-                    Remove-Item $t -Force -ErrorAction SilentlyContinue
-                }}
-            """
-            try:
-                subprocess.run(
-                    ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_diff],
-                    capture_output=True, text=True, timeout=20
-                )
-                logs.append("Disco diferencial CoW criado com sucesso.")
-            except Exception as e:
-                logs.append(f"Aviso no disco diferencial: {e}")
-
-            # 3. Boot no Hyper-V
-            ps_boot = f"""
-                $ErrorActionPreference = 'SilentlyContinue'
-                if (Get-Command New-VM -ErrorAction SilentlyContinue) {{
-                    $sw = (Get-VMSwitch | Select-Object -First 1).Name
-                    if (!$sw) {{ $sw = 'Default Switch' }}
-                    New-VM -Name '{resolved_vm_name}' -MemoryStartupBytes {memory_mb}MB -VHDPath '{diff_vhdx_path}' -Generation 2 -SwitchName $sw -ErrorAction SilentlyContinue | Out-Null
-                    Set-VMProcessor -VMName '{resolved_vm_name}' -Count {cpu_cores} -ErrorAction SilentlyContinue
-                    Start-VM -Name '{resolved_vm_name}' -ErrorAction SilentlyContinue | Out-Null
-                    Write-Output "INSTANT_VM_ONLINE"
-                }}
-            """
-            try:
-                vm_run = subprocess.run(
-                    ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_boot],
-                    capture_output=True, text=True, timeout=25
-                )
-                if "INSTANT_VM_ONLINE" in vm_run.stdout:
-                    logs.append(f"🚀 VM '{resolved_vm_name}' iniciada no Hyper-V direto do storage de backup!")
-                else:
-                    logs.append(f"Perfil de VM provisionado com sucesso ({memory_mb} MB, {cpu_cores} vCPUs).")
-            except Exception as e:
-                logs.append(f"Nota Hyper-V: {e}")
+        boot = _hv_boot_vm(resolved_vm_name, diff_vhdx_path, backup_image_path, memory_mb, cpu_cores)
+        if not boot.get("ok"):
+            _hv_cleanup(resolved_vm_name, diff_vhdx_path)
+            share_unc = datastore.get("unc_path")
+            if share_unc:
+                self.stop_datastore_share(share_unc.split("\\")[-1])
+            raise RuntimeError(f"Instant VM Recovery falhou (etapa '{boot.get('stage')}'): {boot.get('message')}")
+        logs.append("✅ Disco diferencial CoW criado.")
+        logs.append(f"✅ VM '{resolved_vm_name}' em execução no Hyper-V a partir do storage de backup (estado: {boot.get('state')}).")
 
         rto_seconds = max(0.2, round(time.time() - start_time, 2))
 
@@ -228,7 +266,7 @@ create vdisk file="{diff_vhdx_path}" parent="{backup_image_path}"
 
         return {
             "status": "success",
-            "message": f"Instant VM Recovery concluído em {rto_seconds}s (RTO < 60s cumprido com êxito).",
+            "message": f"VM iniciada em {rto_seconds}s (tempo medido até o Hyper-V reportar 'Running'; o boot do sistema convidado não é verificado aqui).",
             "vm": vm_record
         }
 
@@ -244,18 +282,7 @@ create vdisk file="{diff_vhdx_path}" parent="{backup_image_path}"
                 return {"status": "error", "message": f"VM instantânea {vm_id} não encontrada."}
 
         vm_name = vm.get("vm_name")
-        if sys.platform == "win32" and vm_name:
-            ps_stop = f"""
-                Stop-VM -Name '{vm_name}' -TurnOff -Force -ErrorAction SilentlyContinue
-                Remove-VM -Name '{vm_name}' -Force -ErrorAction SilentlyContinue
-            """
-            try:
-                subprocess.run(
-                    ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_stop],
-                    capture_output=True, text=True, timeout=12
-                )
-            except Exception:
-                pass
+        _hv_cleanup(vm_name, vm.get("diff_vhdx"))
 
         # Desalocar Datastore SMB se houver
         share_unc = vm.get("datastore_share")

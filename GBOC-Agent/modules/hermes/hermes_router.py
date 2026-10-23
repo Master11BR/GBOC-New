@@ -48,7 +48,7 @@ class QueueFlushRequest(BaseModel):
 # ==============================================================================
 
 @router.get("/status")
-async def hermes_status():
+def hermes_status():
     """
     Retorna o status consolidado de todos os pilares do Hermes Agent.
     """
@@ -72,7 +72,7 @@ async def hermes_status():
 # ==============================================================================
 
 @router.get("/queue/status")
-async def queue_status():
+def queue_status():
     """Status detalhado da fila offline do Hermes."""
     try:
         return hermes_queue_engine.get_status()
@@ -81,7 +81,7 @@ async def queue_status():
 
 
 @router.post("/queue/flush")
-async def queue_flush(req: QueueFlushRequest):
+def queue_flush(req: QueueFlushRequest):
     """
     Retorna o próximo lote de mensagens pendentes na fila offline para entrega.
     Utilizado pelo Hermes WebSocket Engine para burst sync ao servidor.
@@ -114,7 +114,7 @@ async def queue_ack(request: Request):
 
 
 @router.post("/queue/gc")
-async def queue_gc():
+def queue_gc():
     """Executa o garbage collector da fila offline (remove mensagens acked antigas)."""
     try:
         removed = hermes_queue_engine.run_gc()
@@ -128,7 +128,7 @@ async def queue_gc():
 # ==============================================================================
 
 @router.post("/self-heal/vss")
-async def heal_vss():
+def heal_vss():
     """
     Detecta e repara VSS Writers problemáticos (Failed / Waiting for completion).
     Executa o reparo sem reiniciar o servidor host.
@@ -141,7 +141,7 @@ async def heal_vss():
 
 
 @router.post("/self-heal/disk")
-async def heal_disk(req: DiskGuardRequest):
+def heal_disk(req: DiskGuardRequest):
     """
     Executa o disk guard manual: verifica o espaço em disco e expurga
     arquivos temporários seguros se o uso estiver acima do limiar crítico.
@@ -154,7 +154,7 @@ async def heal_disk(req: DiskGuardRequest):
 
 
 @router.post("/self-heal/services")
-async def heal_services(req: ServiceWatchdogRequest):
+def heal_services(req: ServiceWatchdogRequest):
     """
     Verifica e reinicia serviços críticos do Windows se estiverem parados
     (vss, swprv, schedule, lanmanworkstation por padrão).
@@ -169,7 +169,7 @@ async def heal_services(req: ServiceWatchdogRequest):
 
 
 @router.get("/self-heal/log")
-async def heal_log(limit: int = 100):
+def heal_log(limit: int = 100):
     """Retorna o histórico de eventos de auto-cura executados pelo Hermes."""
     try:
         events = hermes_self_heal_engine.get_heal_log(limit=limit)
@@ -187,7 +187,7 @@ async def heal_log(limit: int = 100):
 # ==============================================================================
 
 @router.get("/mesh/topology")
-async def mesh_topology():
+def mesh_topology():
     """Retorna a topologia completa da rede mesh P2P de agentes GBOC na LAN."""
     try:
         return hermes_mesh_engine.get_topology()
@@ -196,7 +196,7 @@ async def mesh_topology():
 
 
 @router.post("/mesh/discover")
-async def mesh_discover():
+def mesh_discover():
     """
     Executa uma varredura imediata de agentes GBOC na sub-rede local via mDNS/UDP.
     Aguarda 5 segundos por respostas antes de retornar a lista de peers encontrados.
@@ -213,7 +213,7 @@ async def mesh_discover():
 # ==============================================================================
 
 @router.get("/bandwidth/profile")
-async def bandwidth_profile():
+def bandwidth_profile():
     """
     Retorna o perfil de largura de banda aprendido pelo Hermes (heatmap 7d × 24h)
     com o throttle recomendado para cada hora da semana.
@@ -225,7 +225,7 @@ async def bandwidth_profile():
 
 
 @router.post("/bandwidth/throttle")
-async def bandwidth_set_throttle(req: ThrottleRequest):
+def bandwidth_set_throttle(req: ThrottleRequest):
     """
     Define o limite de bandwidth para backups manualmente.
     Passe mbps=null para retornar ao modo automático adaptativo.
@@ -238,7 +238,7 @@ async def bandwidth_set_throttle(req: ThrottleRequest):
 
 
 @router.get("/bandwidth/estimate")
-async def bandwidth_estimate(size_mb: float = 1024.0):
+def bandwidth_estimate(size_mb: float = 1024.0):
     """
     Estima o tempo de transferência para um backup de tamanho informado
     com base no throttle atual do Hermes.

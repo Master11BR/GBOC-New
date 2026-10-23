@@ -60,6 +60,77 @@ class DisasterRecoveryEngine:
                 if len(self.active_jobs[job_id]["logs"]) > 300:
                     self.active_jobs[job_id]["logs"] = self.active_jobs[job_id]["logs"][-300:]
 
+    # ------------------------------------------------------------------
+    # Utilitarios reais (sem simulacao): execucao, status e verificacao
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _console_encoding() -> str:
+        """Ferramentas de console do Windows (reg, ntdsutil, dism) escrevem na pagina OEM (ex.: cp850)."""
+        if sys.platform == "win32":
+            try:
+                import ctypes
+                return f"cp{ctypes.windll.kernel32.GetOEMCP()}"
+            except Exception:
+                pass
+        return "utf-8"
+
+    def _run_console(self, cmd: List[str], timeout: int):
+        """Executa a ferramenta e devolve (codigo_de_saida, saida_decodificada)."""
+        res = subprocess.run(cmd, capture_output=True, timeout=timeout)
+        enc = self._console_encoding()
+        out = (res.stdout or b"").decode(enc, errors="replace")
+        err = (res.stderr or b"").decode(enc, errors="replace")
+        return res.returncode, (out + ("\n" + err if err.strip() else "")).strip()
+
+    @staticmethod
+    def _is_admin() -> bool:
+        if sys.platform != "win32":
+            return hasattr(os, "geteuid") and os.geteuid() == 0
+        try:
+            import ctypes
+            return bool(ctypes.windll.shell32.IsUserAnAdmin())
+        except Exception:
+            return False
+
+    @staticmethod
+    def _fmt_size(n: int) -> str:
+        for unit in ("B", "KB", "MB", "GB", "TB"):
+            if n < 1024 or unit == "TB":
+                return f"{n:.1f} {unit}" if unit != "B" else f"{n} B"
+            n /= 1024.0
+        return f"{n:.1f} TB"
+
+    @staticmethod
+    def _sha256(path: str, chunk: int = 4 * 1024 * 1024) -> str:
+        import hashlib
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            for block in iter(lambda: f.read(chunk), b""):
+                h.update(block)
+        return h.hexdigest()
+
+    def _set_progress(self, job_id: str, pct: int):
+        with self.lock:
+            if job_id in self.active_jobs:
+                self.active_jobs[job_id]["progress"] = pct
+
+    def _is_cancelled(self, job_id: str) -> bool:
+        with self.lock:
+            return self.active_jobs.get(job_id, {}).get("status") == "cancelled"
+
+    def _finish_job(self, job_id: str, status: str, error: Optional[str] = None):
+        """Fecha o job com o status real; nunca sobrescreve um cancelamento do operador."""
+        with self.lock:
+            job = self.active_jobs.get(job_id)
+            if not job or job.get("status") == "cancelled":
+                return
+            job["status"] = status
+            if status in ("completed", "partial"):
+                job["progress"] = 100
+            job["completed_at"] = datetime.now().isoformat()
+            if error:
+                job["error"] = error
+
     def get_physical_disks(self, force_refresh: bool = False) -> List[Dict[str, Any]]:
         """
         Retorna informações 100% reais sobre os discos físicos e partições do sistema.
@@ -188,11 +259,16 @@ class DisasterRecoveryEngine:
             # 1. Verificar se é Active Directory Domain Controller via winreg nativo (sub-milissegundo)
             try:
                 import winreg
+                # A chave Services\NTDS existe tambem em servidores que NAO sao DC (ex.: so 'RID Values').
+                # Controlador de dominio de verdade tem o banco NTDS configurado em Parameters\'DSA Database file'.
                 try:
-                    with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Services\NTDS"):
-                        info["is_domain_controller"] = True
-                        info["ad_roles"].append("Active Directory Domain Services (AD DS)")
-                except FileNotFoundError:
+                    with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Services\NTDS\Parameters") as k:
+                        dsa_db, _t = winreg.QueryValueEx(k, "DSA Database file")
+                        if dsa_db:
+                            info["is_domain_controller"] = True
+                            info["ntds_database"] = dsa_db
+                            info["ad_roles"].append("Active Directory Domain Services (AD DS)")
+                except (FileNotFoundError, OSError):
                     info["is_domain_controller"] = False
 
                 domain = os.environ.get("USERDNSDOMAIN") or os.environ.get("USERDOMAIN")
@@ -202,30 +278,35 @@ class DisasterRecoveryEngine:
 
             # 2. Verificar VSS Writers
             try:
-                vss_res = subprocess.run(
-                    ["vssadmin", "list", "writers"],
-                    capture_output=True, text=True, timeout=12
-                )
-                if vss_res.returncode == 0 and vss_res.stdout:
+                # Saida localizada (ex.: pt-BR 'Nome do gravador', 'Estado: [1] Estavel', 'Ultimo erro: Sem erros')
+                # e na pagina OEM: le em bytes e usa o codigo numerico do estado ([1] = estavel).
+                import re as _re
+                vss_rc, vss_out = self._run_console(["vssadmin", "list", "writers"], timeout=20)
+                if vss_rc == 0 and vss_out:
                     writers = []
-                    lines = vss_res.stdout.splitlines()
                     current_writer = {}
-                    for line in lines:
+                    for line in vss_out.splitlines():
                         line_str = line.strip()
-                        if line_str.startswith("Writer name:"):
+                        low = line_str.lower()
+                        if low.startswith(("writer name:", "nome do gravador:")):
                             if current_writer and "name" in current_writer:
                                 writers.append(current_writer)
                             current_writer = {"name": line_str.split(":", 1)[1].strip("' ")}
-                        elif "State:" in line_str and current_writer:
+                        elif current_writer and low.startswith(("state:", "estado:")):
                             current_writer["state"] = line_str.split(":", 1)[1].strip()
-                        elif "Last error:" in line_str and current_writer:
+                            m = _re.search(r"\[(\d+)\]", line_str)
+                            current_writer["state_code"] = int(m.group(1)) if m else None
+                        elif current_writer and _re.match(r"^(last error|.ltimo erro):", low):
                             current_writer["last_error"] = line_str.split(":", 1)[1].strip()
                     if current_writer and "name" in current_writer:
                         writers.append(current_writer)
 
+                    ok_errors = ("no error", "sem erros", "sem erro")
                     info["vss_writers"] = writers
                     info["vss_writer_count"] = len(writers)
-                    unhealthy = [w for w in writers if "Stable" not in w.get("state", "") or "No error" not in w.get("last_error", "No error")]
+                    # [1] estavel e [5] aguardando conclusao (normal apos backup) sem erro = saudavel; [6+] = falha
+                    unhealthy = [w for w in writers if (w.get("state_code") or 0) >= 6 or w.get("state_code") is None
+                                 or w.get("last_error", "no error").strip().lower() not in ok_errors]
                     info["vss_healthy"] = len(unhealthy) == 0
                     if not info["vss_healthy"]:
                         info["unhealthy_writers"] = unhealthy
@@ -348,126 +429,142 @@ class DisasterRecoveryEngine:
             "message": f"Clonagem P2V iniciada para o disco físico #{disk_number} -> {target}"
         }
 
+    def _find_disk2vhd(self) -> Optional[str]:
+        """Localiza o Sysinternals Disk2vhd (PATH ou pasta tools do Agente)."""
+        names = ("disk2vhd64.exe", "disk2vhd.exe")
+        for n in names:
+            p = shutil.which(n)
+            if p:
+                return p
+        bases = [Path(__file__).resolve().parent.parent / "tools"]
+        try:
+            from core.gboc_paths import data_dir as _gboc_data_dir
+            bases.insert(0, _gboc_data_dir("tools", create=False))
+        except Exception:
+            pass
+        for base in bases:
+            for n in names:
+                c = Path(base) / n
+                if c.exists():
+                    return str(c)
+        return None
+
     def _p2v_worker(self, job_id: str, disk_number: int, target_path: str, is_dynamic: bool):
         start_time = time.time()
-        self._append_log(job_id, f"Iniciando orquestração P2V do Disco Físico #{disk_number}")
+        self._append_log(job_id, f"Iniciando conversão P2V do disco físico #{disk_number}")
         self._append_log(job_id, f"Destino da imagem virtual: {target_path}")
-
         try:
+            if sys.platform != "win32":
+                raise RuntimeError("Conversão P2V disponível apenas no Windows.")
+            if not self._is_admin():
+                raise RuntimeError("O Agente precisa de privilégio administrativo para ler o disco físico. Nenhum dado foi copiado.")
+            tool = self._find_disk2vhd()
+            if not tool:
+                raise RuntimeError(
+                    "Nenhum dado foi copiado: a conversão P2V usa o Sysinternals Disk2vhd (disk2vhd64.exe), "
+                    "que não foi encontrado. Coloque o disk2vhd64.exe na pasta 'tools' do Agente ou no PATH e tente novamente."
+                )
+            if os.path.exists(target_path):
+                raise RuntimeError("O arquivo de destino já existe; escolha outro nome para não sobrescrever uma imagem existente.")
+
+            # Volumes (com letra) do disco escolhido e espaco realmente ocupado
+            ps = (
+                f"Get-Partition -DiskNumber {int(disk_number)} -ErrorAction Stop | Where-Object DriveLetter | "
+                "ForEach-Object { $v = Get-Volume -DriveLetter $_.DriveLetter; \"$($_.DriveLetter)|$($v.Size - $v.SizeRemaining)\" }"
+            )
+            rc, out = self._run_console(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps], timeout=60)
+            letters, used_bytes = [], 0
+            for line in out.splitlines():
+                parts = line.strip().split("|")
+                if len(parts) == 2 and len(parts[0]) == 1 and parts[0].isalpha():
+                    letters.append(parts[0].upper() + ":")
+                    try:
+                        used_bytes += int(parts[1])
+                    except ValueError:
+                        pass
+            if rc != 0 or not letters:
+                raise RuntimeError(f"Não foi possível identificar volumes com letra no disco #{disk_number}: {out[:300] or 'sem saída'}")
+
             target_dir = os.path.dirname(target_path)
             if target_dir:
                 os.makedirs(target_dir, exist_ok=True)
-
-            # 1. Congelamento e Criação de Snapshot VSS consistente
-            self._append_log(job_id, "Invocando VSS Writer para congelamento transacional consistente do sistema...")
-
-            # 2. Executar PowerShell para criação do VHDX a partir do disco físico
-            ps_script = f"""
-                $ErrorActionPreference = 'Stop'
-                $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-                Write-Output "IS_ADMIN:$isAdmin"
-                
-                $disk = Get-Disk -Number {disk_number} -ErrorAction SilentlyContinue
-                $size = if ($disk) {{ $disk.Size }} else {{ 64GB }}
-                $target = '{target_path}'
-                
-                if (Get-Command New-VHD -ErrorAction SilentlyContinue) {{
-                    $vType = if ('{is_dynamic}' -eq 'True') {{ 'Dynamic' }} else {{ 'Fixed' }}
-                    New-VHD -Path $target -SizeBytes $size -$vType -Force | Out-Null
-                    Write-Output "VHDX_CREATED_HYPERV"
-                }} else {{
-                    $dpScript = @"
-create vdisk file="$target" maximum=$([math]::Round($size/1MB)) type={('expandable' if is_dynamic else 'fixed')}
-select vdisk file="$target"
-attach vdisk
-"@
-                    $tmpFile = [System.IO.Path]::GetTempFileName()
-                    $dpScript | Out-File -FilePath $tmpFile -Encoding ascii
-                    diskpart /s $tmpFile | Out-Null
-                    Remove-Item $tmpFile -Force -ErrorAction SilentlyContinue
-                    Write-Output "VHDX_CREATED_DISKPART"
-                }}
-            """
-            
-            self._append_log(job_id, "Inicializando alocação do container VHDX e descritores GPT/MBR...")
-            is_admin = True
-            if sys.platform == "win32":
-                try:
-                    res_p2v = subprocess.run(
-                        ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_script],
-                        capture_output=True, text=True, timeout=60
-                    )
-                    if "IS_ADMIN:False" in res_p2v.stdout:
-                        is_admin = False
-                        self._append_log(job_id, "⚠️ Aviso: O agente está rodando sem elevação administrativa total. A cópia direta de setores RAW requer privilégios elevados.")
-                except Exception as ex_ps:
-                    self._append_log(job_id, f"Aviso de alocação de container: {ex_ps}")
-
-            # 3. Stream consistente de dados com progresso real em blocos
-            disks = self.get_physical_disks()
-            disk_info = next((d for d in disks if d["disk_number"] == disk_number), {})
-            total_bytes = disk_info.get("size_bytes", 64 * 1024 * 1024 * 1024)
             with self.lock:
                 if job_id in self.active_jobs:
-                    self.active_jobs[job_id]["total_bytes"] = total_bytes
+                    self.active_jobs[job_id]["total_bytes"] = used_bytes
 
-            self._append_log(job_id, f"Iniciando transferência direta de blocos do disco físico ({round(total_bytes/(1024**3), 2)} GB)...")
-            
-            # Cópia iterativa com atualização de taxa de transferência
-            steps = 20
-            for i in range(1, steps + 1):
-                with self.lock:
-                    if self.active_jobs[job_id].get("status") == "cancelled":
-                        self._append_log(job_id, "🛑 Operação de clonagem cancelada pelo usuário.")
-                        return
+            # Aceite da EULA pelo mecanismo padrao da Sysinternals (evita janela bloqueando o servico)
+            try:
+                import winreg
+                with winreg.CreateKey(winreg.HKEY_CURRENT_USER, r"Software\Sysinternals\Disk2Vhd") as k:
+                    winreg.SetValueEx(k, "EulaAccepted", 0, winreg.REG_DWORD, 1)
+            except Exception:
+                pass
 
-                time.sleep(0.4)
-                pct = int((i / steps) * 100)
-                processed = int((i / steps) * total_bytes)
+            if not is_dynamic:
+                self._append_log(job_id, "ℹ️ O Disk2vhd sempre gera disco de tamanho dinâmico; a opção 'fixo' não se aplica.")
+            self._append_log(job_id, f"Copiando {', '.join(letters)} ({self._fmt_size(used_bytes)} em uso) com Disk2vhd (snapshot VSS)...")
+            proc = subprocess.Popen([tool, *letters, target_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            last_size, last_log = 0, 0.0
+            while proc.poll() is None:
+                if self._is_cancelled(job_id):
+                    proc.kill()
+                    proc.wait(timeout=30)
+                    try:
+                        if os.path.exists(target_path):
+                            os.remove(target_path)
+                    except OSError:
+                        pass
+                    self._append_log(job_id, "🛑 Conversão cancelada; o arquivo parcial foi removido.")
+                    return
+                size = os.path.getsize(target_path) if os.path.exists(target_path) else 0
                 elapsed = max(0.1, time.time() - start_time)
-                speed = round((processed / (1024 * 1024)) / elapsed, 1)
-
+                if size == 0 and elapsed > 120:
+                    proc.kill()
+                    raise RuntimeError("O Disk2vhd não começou a gravar a imagem em 120 s (possível erro de parâmetros ou bloqueio). Nenhum dado foi copiado.")
+                pct = min(99, int(size * 100 / used_bytes)) if used_bytes else 0
                 with self.lock:
                     if job_id in self.active_jobs:
                         self.active_jobs[job_id]["progress"] = pct
-                        self.active_jobs[job_id]["bytes_processed"] = processed
-                        self.active_jobs[job_id]["speed_mbps"] = speed
+                        self.active_jobs[job_id]["bytes_processed"] = size
+                        self.active_jobs[job_id]["speed_mbps"] = round(size / (1024 * 1024) / elapsed, 1)
+                if size != last_size and time.time() - last_log > 30:
+                    self._append_log(job_id, f"Gravado: {self._fmt_size(size)} de ~{self._fmt_size(used_bytes)} ({pct}%)")
+                    last_log = time.time()
+                last_size = size
+                time.sleep(2)
 
-                if i % 4 == 0 or i == steps:
-                    self._append_log(job_id, f"Progresso P2V: {pct}% concluído • Velocidade: {speed} MB/s • Processado: {round(processed/(1024**3), 2)} GB")
+            enc = self._console_encoding()
+            so, se = proc.communicate()
+            msg = ((so or b"").decode(enc, errors="replace") + (se or b"").decode(enc, errors="replace")).strip()
+            size = os.path.getsize(target_path) if os.path.exists(target_path) else 0
+            if proc.returncode != 0 or size == 0:
+                raise RuntimeError(f"Disk2vhd terminou com código {proc.returncode} e {size} bytes gravados: {msg[:400] or 'sem mensagem'}")
 
-            # 4. Gerar descritor de Máquina Virtual (Hyper-V / Proxmox VM config)
+            disks = self.get_physical_disks()
+            disk_info = next((d for d in disks if d["disk_number"] == disk_number), {})
             vm_meta_path = Path(target_path).with_suffix(".vmconfig.json")
             vm_config = {
                 "vm_name": f"P2V-Clone-Disk{disk_number}-{int(time.time())}",
                 "virtual_disk": os.path.basename(target_path),
+                "virtual_disk_bytes": size,
+                "volumes": letters,
                 "generation": 2 if disk_info.get("partition_style") == "GPT" else 1,
                 "firmware": "UEFI" if disk_info.get("partition_style") == "GPT" else "BIOS",
-                "recommended_memory_mb": 8192,
-                "recommended_cpu_cores": 4,
-                "hypervisor_target": ["Hyper-V", "Proxmox VE (QEMU)", "VirtualBox", "VMware ESXi"],
-                "is_admin_elevated": is_admin,
+                "tool": "Sysinternals Disk2vhd",
                 "created_at": datetime.now().isoformat()
             }
             with open(vm_meta_path, "w", encoding="utf-8") as f:
                 json.dump(vm_config, f, indent=2)
-
-            self._append_log(job_id, f"✅ Perfil de VM gerado com sucesso: {vm_meta_path.name}")
-            self._append_log(job_id, "🎉 Conversão P2V finalizada com sucesso! O disco VHDX está pronto para montagem em Hyper-V ou Proxmox.")
-
             with self.lock:
                 if job_id in self.active_jobs:
-                    self.active_jobs[job_id]["status"] = "completed"
-                    self.active_jobs[job_id]["progress"] = 100
-                    self.active_jobs[job_id]["completed_at"] = datetime.now().isoformat()
-
+                    self.active_jobs[job_id]["bytes_processed"] = size
+            self._append_log(job_id, f"✅ Imagem gerada: {os.path.basename(target_path)} ({self._fmt_size(size)}) em {round(time.time() - start_time)} s")
+            self._append_log(job_id, f"Perfil de VM salvo em {vm_meta_path.name}. Teste o boot da imagem antes de considerá-la pronta para recuperação.")
+            self._finish_job(job_id, "completed")
         except Exception as e:
             logger.error(f"Erro no worker P2V {job_id}: {e}", exc_info=True)
-            self._append_log(job_id, f"❌ Erro fatal na clonagem P2V: {e}")
-            with self.lock:
-                if job_id in self.active_jobs:
-                    self.active_jobs[job_id]["status"] = "failed"
-                    self.active_jobs[job_id]["error"] = str(e)
+            self._append_log(job_id, f"❌ Conversão P2V falhou: {e}")
+            self._finish_job(job_id, "failed", str(e))
 
     # ==========================================================================
     # WORKER: BACKUP A QUENTE DE SERVIDOR & ACTIVE DIRECTORY (SYSTEM STATE)
@@ -506,85 +603,187 @@ attach vdisk
         }
 
     def _system_state_worker(self, job_id: str, target_folder: str, include_ad: bool):
-        self._append_log(job_id, "Iniciando Backup de Servidor a Quente & System State (Zero-Mock)")
+        self._append_log(job_id, "Iniciando backup do System State (registro, BCD e, em controlador de domínio, NTDS/SYSVOL)")
         self._append_log(job_id, f"Diretório de destino: {target_folder}")
-
+        captured: List[str] = []
+        missing: List[str] = []
         try:
+            if sys.platform != "win32":
+                raise RuntimeError("Backup de System State disponível apenas no Windows.")
             os.makedirs(target_folder, exist_ok=True)
-            sys_info = self.get_system_dr_info()
+            sys_info = self.get_system_dr_info(force_refresh=True)
 
-            # 1. Verificar disponibilidade do wbadmin para System State oficial
-            has_wbadmin = False
-            if sys.platform == "win32":
-                chk = subprocess.run(["where", "wbadmin"], capture_output=True, text=True)
-                if chk.returncode == 0:
-                    has_wbadmin = True
+            if not self._is_admin():
+                self._append_log(job_id, "⚠️ O Agente não está com privilégio administrativo: hives protegidos e o NTDS não poderão ser copiados.")
 
-            self._append_log(job_id, "Acionando VSS Writer do Active Directory (NTDS) e System Writer...")
-            self.active_jobs[job_id]["progress"] = 20
+            n_writers = sys_info.get("vss_writer_count", 0)
+            if n_writers:
+                bad = sys_info.get("unhealthy_writers") or []
+                if bad:
+                    names = ", ".join(f"{w.get('name')} ({w.get('state', '?')})" for w in bad[:5])
+                    self._append_log(job_id, f"⚠️ VSS writers com problema: {names}")
+                else:
+                    self._append_log(job_id, f"VSS: {n_writers} writer(s) estáveis.")
+            else:
+                self._append_log(job_id, "⚠️ Não foi possível consultar os VSS writers (vssadmin list writers).")
+            self._set_progress(job_id, 10)
 
-            # 2. Extração do Registro do Windows com catálogo completo
-            self._append_log(job_id, "Exportando Hives de Registro do Sistema (SAM, SECURITY, SYSTEM, SOFTWARE, BCD)...")
+            # 1. Hives do registro - cada um conferido (codigo de saida + arquivo nao vazio)
             reg_dir = os.path.join(target_folder, "Registry_Hives")
             os.makedirs(reg_dir, exist_ok=True)
-            
-            saved_hives = []
-            if sys.platform == "win32":
-                for hive in ["SAM", "SECURITY", "SYSTEM", "SOFTWARE"]:
-                    try:
-                        hive_path = os.path.join(reg_dir, f"{hive}.hiv")
-                        subprocess.run(["reg", "save", f"HKLM\\{hive}", hive_path, "/y"], capture_output=True, timeout=15)
-                        if os.path.exists(hive_path):
-                            saved_hives.append(hive)
-                            self._append_log(job_id, f"Hive salvo com sucesso: {hive} ({round(os.path.getsize(hive_path)/1024, 1)} KB)")
-                    except Exception as ex_reg:
-                        self._append_log(job_id, f"Aviso ao salvar hive {hive}: {ex_reg}")
-            
-            self.active_jobs[job_id]["progress"] = 50
+            self._append_log(job_id, "Exportando hives do registro (SAM, SECURITY, SYSTEM, SOFTWARE)...")
+            for idx, hive in enumerate(["SAM", "SECURITY", "SYSTEM", "SOFTWARE"]):
+                if self._is_cancelled(job_id):
+                    return
+                hive_path = os.path.join(reg_dir, f"{hive}.hiv")
+                try:
+                    rc, out = self._run_console(["reg", "save", f"HKLM\\{hive}", hive_path, "/y"], timeout=600)
+                except subprocess.TimeoutExpired:
+                    rc, out = -1, "tempo esgotado (600 s)"
+                except OSError as ex:
+                    rc, out = -1, (f"{ex}. O Windows ou o antivírus/EDR bloqueou a execução do reg.exe "
+                                   "(a proteção contra extração de credenciais costuma bloquear a cópia de SAM/SECURITY).")
+                size = os.path.getsize(hive_path) if os.path.exists(hive_path) else 0
+                if rc == 0 and size > 0:
+                    captured.append(f"hive {hive}")
+                    self._append_log(job_id, f"✅ Hive {hive} salvo ({self._fmt_size(size)})")
+                else:
+                    missing.append(f"hive {hive}")
+                    self._append_log(job_id, f"❌ Hive {hive} NÃO foi salvo (código {rc}, {size} bytes): {out[:300] or 'sem mensagem'}")
+                    if os.path.exists(hive_path) and size == 0:
+                        try:
+                            os.remove(hive_path)
+                        except OSError:
+                            pass
+                self._set_progress(job_id, 10 + (idx + 1) * 8)
 
-            # 3. Active Directory & SYSVOL
-            if sys_info.get("is_domain_controller") and include_ad:
-                self._append_log(job_id, "Identificado Controlador de Domínio Active Directory (DC).")
-                self._append_log(job_id, "Coletando catálogo de políticas de grupo e metadados SYSVOL...")
-                self.active_jobs[job_id]["progress"] = 75
-                self._append_log(job_id, "✅ Integridade do Active Directory validada (Consistência ESENT/NTDS).")
+            # 2. Banco de configuracao de boot (BCD)
+            bcd_path = os.path.join(target_folder, "BCD_export")
+            try:
+                rc, out = self._run_console(["bcdedit", "/export", bcd_path], timeout=120)
+            except (OSError, subprocess.TimeoutExpired) as ex:
+                rc, out = -1, str(ex)
+            size = os.path.getsize(bcd_path) if os.path.exists(bcd_path) else 0
+            if rc == 0 and size > 0:
+                captured.append("BCD")
+                self._append_log(job_id, f"✅ BCD exportado ({self._fmt_size(size)})")
             else:
-                self._append_log(job_id, "Servidor Standalone/Membro: Consolidando arquivos de boot BCD e perfis do sistema...")
-                self.active_jobs[job_id]["progress"] = 75
+                missing.append("BCD")
+                self._append_log(job_id, f"❌ BCD NÃO foi exportado (código {rc}): {out[:300] or 'sem mensagem'}")
+            self._set_progress(job_id, 50)
 
-            # 4. Criação do Manifesto Criptográfico SHA-256
+            # 3. Active Directory (somente em controlador de dominio)
+            ad_info: Dict[str, Any] = {"included": False}
+            if sys_info.get("is_domain_controller"):
+                if include_ad:
+                    ad_info = self._backup_ntds_ifm(job_id, target_folder, captured, missing)
+                else:
+                    self._append_log(job_id, "ℹ️ Controlador de domínio detectado, mas a opção de incluir o Active Directory está desmarcada.")
+            elif include_ad:
+                self._append_log(job_id, "ℹ️ Este servidor não é controlador de domínio: não há base NTDS para copiar.")
+            if self._is_cancelled(job_id):
+                return
+            self._set_progress(job_id, 85)
+
+            # 4. Manifesto com SHA-256 real de cada arquivo capturado
+            self._append_log(job_id, "Calculando SHA-256 dos arquivos capturados...")
+            manifest_file = os.path.join(target_folder, "dr_manifest.json")
+            files = []
+            for root, _dirs, names in os.walk(target_folder):
+                for n in names:
+                    p = os.path.join(root, n)
+                    if os.path.abspath(p) == os.path.abspath(manifest_file):
+                        continue
+                    rel = os.path.relpath(p, target_folder)
+                    try:
+                        files.append({"path": rel, "size_bytes": os.path.getsize(p), "sha256": self._sha256(p)})
+                    except OSError as ex:
+                        files.append({"path": rel, "error": str(ex)})
             manifest = {
                 "gboc_version": f"{AGENT_VERSION} Enterprise",
-                "backup_type": "HOT_SYSTEM_STATE_AND_AD",
+                "backup_type": "SYSTEM_STATE_EXPORT",
                 "hostname": sys_info.get("hostname"),
                 "domain": sys_info.get("domain_name"),
                 "is_domain_controller": sys_info.get("is_domain_controller"),
-                "vss_writers_checked": sys_info.get("vss_writer_count", 0),
-                "hives_captured": saved_hives,
-                "wbadmin_supported": has_wbadmin,
-                "created_at": datetime.now().isoformat(),
-                "recovery_mode": "Authoritative & Non-Authoritative AD Restore Supported"
+                "vss_writers_checked": n_writers,
+                "vss_healthy": sys_info.get("vss_healthy"),
+                "captured": captured,
+                "missing": missing,
+                "active_directory": ad_info,
+                "files": files,
+                "wbadmin_available": shutil.which("wbadmin") is not None,
+                "created_at": datetime.now().isoformat()
             }
-            manifest_file = os.path.join(target_folder, "dr_manifest.json")
             with open(manifest_file, "w", encoding="utf-8") as f:
-                json.dump(manifest, f, indent=2)
+                json.dump(manifest, f, indent=2, ensure_ascii=False)
+            self._append_log(job_id, f"Manifesto gerado: dr_manifest.json ({len(files)} arquivo(s) com SHA-256)")
 
-            self._append_log(job_id, f"Manifesto de integridade gerado: {os.path.basename(manifest_file)}")
-            self._append_log(job_id, "🎉 Backup do System State & Active Directory concluído com êxito!")
-
-            with self.lock:
-                if job_id in self.active_jobs:
-                    self.active_jobs[job_id]["status"] = "completed"
-                    self.active_jobs[job_id]["progress"] = 100
-                    self.active_jobs[job_id]["completed_at"] = datetime.now().isoformat()
+            if not captured:
+                raise RuntimeError("Nenhum item do System State foi capturado. " + ("Faltaram: " + ", ".join(missing) if missing else ""))
+            if missing:
+                msg = "Itens não capturados: " + ", ".join(missing)
+                self._append_log(job_id, f"⚠️ Backup do System State concluído PARCIALMENTE. {msg}")
+                self._finish_job(job_id, "partial", msg)
+            else:
+                self._append_log(job_id, f"✅ Backup do System State concluído: {len(captured)} item(ns) capturado(s) e registrados no manifesto.")
+                self._finish_job(job_id, "completed")
 
         except Exception as e:
             logger.error(f"Erro no backup de System State {job_id}: {e}", exc_info=True)
             self._append_log(job_id, f"❌ Falha no backup do System State: {e}")
-            with self.lock:
-                if job_id in self.active_jobs:
-                    self.active_jobs[job_id]["status"] = "failed"
-                    self.active_jobs[job_id]["error"] = str(e)
+            self._finish_job(job_id, "failed", str(e))
+
+    def _backup_ntds_ifm(self, job_id: str, target_folder: str, captured: List[str], missing: List[str]) -> Dict[str, Any]:
+        """Copia NTDS + SYSVOL com ntdsutil IFM (usa snapshot VSS) e confere a consistencia ESE com esentutl."""
+        info: Dict[str, Any] = {"included": True, "method": "ntdsutil ifm (create sysvol full)"}
+        ifm_dir = os.path.join(target_folder, "AD_IFM")
+        self._append_log(job_id, "Controlador de domínio: gerando cópia IFM do NTDS e do SYSVOL com ntdsutil (snapshot VSS)...")
+        try:
+            rc, out = self._run_console(
+                ["ntdsutil", "activate instance ntds", "ifm", f'create sysvol full "{ifm_dir}"', "quit", "quit"],
+                timeout=7200
+            )
+        except subprocess.TimeoutExpired:
+            rc, out = -1, "tempo esgotado (2 h)"
+        except OSError as ex:
+            rc, out = -1, f"{ex} (execução do ntdsutil bloqueada)"
+        info["ntdsutil_exit_code"] = rc
+        ntds = os.path.join(ifm_dir, "Active Directory", "ntds.dit")
+        size = os.path.getsize(ntds) if os.path.exists(ntds) else 0
+        if rc != 0 or size == 0:
+            missing.append("NTDS (Active Directory)")
+            tail = " | ".join(l.strip() for l in out.splitlines()[-6:] if l.strip())
+            self._append_log(job_id, f"❌ Cópia IFM do NTDS falhou (código {rc}): {tail[:400] or 'sem mensagem'}")
+            info["ok"] = False
+            return info
+        captured.append("NTDS")
+        self._append_log(job_id, f"✅ NTDS copiado ({self._fmt_size(size)})")
+        if os.path.isdir(os.path.join(ifm_dir, "SYSVOL")):
+            captured.append("SYSVOL")
+            self._append_log(job_id, "✅ SYSVOL copiado")
+        else:
+            missing.append("SYSVOL")
+            self._append_log(job_id, "❌ SYSVOL não foi encontrado na cópia IFM")
+
+        try:
+            rc2, out2 = self._run_console(["esentutl", "/mh", ntds], timeout=600)
+        except (OSError, subprocess.TimeoutExpired) as ex:
+            rc2, out2 = -1, str(ex)
+        state = None
+        for line in out2.splitlines():
+            s = line.strip()
+            if s.lower().startswith(("state:", "estado:")):
+                state = s.split(":", 1)[1].strip()
+                break
+        info["ese_state"] = state
+        if rc2 == 0 and state and ("clean" in state.lower() or "limp" in state.lower()):
+            info["ok"] = True
+            self._append_log(job_id, f"✅ Consistência ESE do NTDS verificada (esentutl /mh: {state})")
+        else:
+            info["ok"] = False
+            missing.append("verificação de consistência do NTDS")
+            self._append_log(job_id, f"⚠️ Consistência do NTDS não confirmada (esentutl código {rc2}, estado: {state or 'não identificado'})")
+        return info
 
     # ==========================================================================
     # WORKER: MÍDIA DE BOOT & EXTRAÇÃO DE DRIVERS (WINPE / ISO)
@@ -623,82 +822,127 @@ attach vdisk
             "message": f"Construção da mídia de boot inicializada ({media_type.upper()})"
         }
 
+    @staticmethod
+    def _find_adk():
+        """Retorna (DandISetEnv.bat ou None, complemento WinPE instalado?)."""
+        base = Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")) / "Windows Kits" / "10" / "Assessment and Deployment Kit"
+        env_bat = base / "Deployment Tools" / "DandISetEnv.bat"
+        winpe = base / "Windows Preinstallation Environment" / "amd64"
+        return (str(env_bat) if env_bat.exists() else None), winpe.exists()
+
     def _boot_media_worker(self, job_id: str, target_iso: str, media_type: str, embed_drivers: bool):
-        self._append_log(job_id, f"Iniciando construção do GBOC Recovery Environment® ({media_type.upper()}) [Zero-Mock]")
-        
+        self._append_log(job_id, f"Iniciando construção da mídia de recuperação ({media_type.upper()})")
         try:
+            if sys.platform != "win32":
+                raise RuntimeError("Construção de mídia WinPE disponível apenas no Windows.")
             staging_dir = str(self.dr_exports_dir / "WinPE_Recovery_Staging")
             drivers_dir = os.path.join(staging_dir, "Drivers")
             os.makedirs(drivers_dir, exist_ok=True)
 
-            # 1. Extração real de drivers do host
-            if embed_drivers and sys.platform == "win32":
-                self._append_log(job_id, "Extraindo drivers nativos de controladoras RAID, SAS, NVMe e Rede do Host...")
+            # 1. Exportacao real dos drivers de terceiros instalados no host
+            driver_count = 0
+            drivers_failed = False
+            if embed_drivers:
+                self._append_log(job_id, "Exportando drivers de terceiros instalados no host (Export-WindowsDriver)...")
+                ps = f"Export-WindowsDriver -Online -Destination '{drivers_dir}' | Out-Null"
                 try:
-                    ps_driver = f"Export-WindowsDriver -Online -Destination '{drivers_dir}'"
-                    subprocess.run(
-                        ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_driver],
-                        capture_output=True, text=True, timeout=45
-                    )
-                    driver_count = len(list(Path(drivers_dir).glob("*.inf")))
-                    self._append_log(job_id, f"✅ {driver_count} pacote(s) de drivers extraídos para: {drivers_dir}")
-                except Exception as ex_drv:
-                    self._append_log(job_id, f"Aviso na extração de drivers: {ex_drv}")
+                    rc, out = self._run_console(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps], timeout=1800)
+                except (OSError, subprocess.TimeoutExpired) as ex:
+                    rc, out = -1, str(ex)
+                driver_count = len(list(Path(drivers_dir).rglob("*.inf")))
+                if rc == 0:
+                    self._append_log(job_id, f"✅ {driver_count} driver(s) exportado(s) para {drivers_dir}")
+                else:
+                    drivers_failed = True
+                    self._append_log(job_id, f"❌ Exportação de drivers falhou (código {rc}): {out[:300] or 'sem mensagem'}")
+            self._set_progress(job_id, 30)
+            if self._is_cancelled(job_id):
+                return
 
-            self.active_jobs[job_id]["progress"] = 50
+            # 2. ISO bootavel real: precisa do Windows ADK + complemento WinPE
+            dandi, has_winpe = self._find_adk()
+            if not dandi or not has_winpe:
+                what = "o Windows ADK" if not dandi else "o complemento WinPE do Windows ADK"
+                msg = f"ISO não gerada: {what} não está instalado neste servidor."
+                if driver_count:
+                    msg += f" Os drivers exportados estão em {drivers_dir}."
+                self._append_log(job_id, f"⚠️ {msg}")
+                self._finish_job(job_id, "partial" if driver_count else "failed", msg)
+                return
 
-            # 2. Gerar layout de staging EFI / WinPE com scripts de recuperação
-            self._append_log(job_id, "Gerando scripts de recuperação autônoma GBOC Bare-Metal Engine no ambiente WinPE...")
-            scripts_dir = os.path.join(staging_dir, "GBOC_Scripts")
-            os.makedirs(scripts_dir, exist_ok=True)
-            
-            with open(os.path.join(scripts_dir, "startnet.cmd"), "w", encoding="utf-8") as f:
-                f.write("@echo off\r\nwpeinit\r\necho GBOC Bare Metal Recovery Initialized.\r\n")
+            work_dir = os.path.join(staging_dir, "WinPE_amd64")
+            mount_dir = os.path.join(work_dir, "mount")
+            subprocess.run(["dism", "/Cleanup-Mountpoints"], capture_output=True, timeout=300)
+            if os.path.exists(work_dir):
+                shutil.rmtree(work_dir, ignore_errors=True)
+            startnet = os.path.join(staging_dir, "startnet.cmd")
+            with open(startnet, "w", encoding="ascii") as f:
+                f.write("@echo off\r\nwpeinit\r\necho GBOC Recovery Environment (WinPE)\r\n")
+
+            bat_lines = [
+                "@echo off",
+                f'call "{dandi}"',
+                f'call copype amd64 "{work_dir}" || exit /b 10',
+                f'dism /Mount-Image /ImageFile:"{work_dir}\\media\\sources\\boot.wim" /Index:1 /MountDir:"{mount_dir}" || exit /b 11',
+            ]
+            if embed_drivers and driver_count:
+                bat_lines.append(f'dism /Image:"{mount_dir}" /Add-Driver /Driver:"{drivers_dir}" /Recurse /ForceUnsigned || set GBOC_DRV_ERR=1')
+            bat_lines += [
+                f'copy /y "{startnet}" "{mount_dir}\\Windows\\System32\\startnet.cmd" >nul',
+                f'dism /Unmount-Image /MountDir:"{mount_dir}" /Commit || (dism /Unmount-Image /MountDir:"{mount_dir}" /Discard & exit /b 12)',
+                f'call MakeWinPEMedia /ISO /F "{work_dir}" "{target_iso}" || exit /b 13',
+                "if defined GBOC_DRV_ERR exit /b 2",
+                "exit /b 0",
+            ]
+            bat = os.path.join(staging_dir, "build_winpe.cmd")
+            with open(bat, "w", encoding="mbcs" if sys.platform == "win32" else "utf-8") as f:
+                f.write("\r\n".join(bat_lines) + "\r\n")
+
+            self._append_log(job_id, "Gerando WinPE com o Windows ADK (copype, DISM e MakeWinPEMedia)...")
+            self._set_progress(job_id, 45)
+            try:
+                rc, out = self._run_console(["cmd", "/c", bat], timeout=3600)
+            except subprocess.TimeoutExpired:
+                rc, out = -1, "tempo esgotado (1 h)"
+                subprocess.run(["dism", "/Unmount-Image", f"/MountDir:{mount_dir}", "/Discard"], capture_output=True, timeout=600)
+            iso_size = os.path.getsize(target_iso) if os.path.exists(target_iso) else 0
+            steps = {10: "copype", 11: "montagem do boot.wim", 12: "gravação do boot.wim", 13: "MakeWinPEMedia"}
 
             manifest_pe = {
-                "environment": "WinPE / GBOC Recovery ISO",
-                "drivers_embedded": embed_drivers,
-                "staging_path": staging_dir,
+                "environment": "WinPE (Windows ADK)",
+                "iso": target_iso if iso_size else None,
+                "iso_bytes": iso_size,
+                "iso_sha256": self._sha256(target_iso) if iso_size else None,
+                "drivers_exported": driver_count,
+                "drivers_injected": bool(embed_drivers and driver_count and rc == 0),
+                "build_exit_code": rc,
                 "created_at": datetime.now().isoformat()
             }
             with open(os.path.join(staging_dir, "winpe_manifest.json"), "w", encoding="utf-8") as f:
-                json.dump(manifest_pe, f, indent=2)
+                json.dump(manifest_pe, f, indent=2, ensure_ascii=False)
 
-            self.active_jobs[job_id]["progress"] = 80
-
-            # 3. Compilar ISO se oscdimg (ADK) ou xorriso estiver disponível no sistema
-            has_iso_builder = False
-            builder_cmd = None
-            if sys.platform == "win32":
-                chk_adk = subprocess.run(["where", "oscdimg"], capture_output=True, text=True)
-                if chk_adk.returncode == 0:
-                    has_iso_builder = True
-                    builder_cmd = ["oscdimg", "-m", "-o", "-u2", "-udfver102", staging_dir, target_iso]
-
-            if has_iso_builder and builder_cmd:
-                self._append_log(job_id, "Compilando imagem ISO bootável via oscdimg (Windows ADK)...")
-                iso_res = subprocess.run(builder_cmd, capture_output=True, text=True, timeout=60)
-                if iso_res.returncode == 0:
-                    self._append_log(job_id, f"✅ Mídia de Boot ISO compilada com sucesso: {target_iso}")
+            if rc in (0, 2) and iso_size > 0:
+                shutil.rmtree(work_dir, ignore_errors=True)
+                self._append_log(job_id, f"✅ ISO WinPE gerada: {target_iso} ({self._fmt_size(iso_size)})")
+                problems = []
+                if rc == 2:
+                    problems.append("parte dos drivers não foi injetada no WinPE")
+                if drivers_failed:
+                    problems.append("a exportação de drivers falhou")
+                if problems:
+                    msg = "ISO gerada, mas " + " e ".join(problems) + "."
+                    self._append_log(job_id, f"⚠️ {msg}")
+                    self._finish_job(job_id, "partial", msg)
                 else:
-                    self._append_log(job_id, f"Aviso oscdimg: {iso_res.stderr.strip()}")
+                    self._finish_job(job_id, "completed")
             else:
-                self._append_log(job_id, f"ℹ️ Ambiente de staging WinPE pronto com drivers e scripts em: {staging_dir}")
-                self._append_log(job_id, "ℹ️ Para compilação automatizada da ISO no Windows, instale o Windows ADK (oscdimg.exe).")
-
-            with self.lock:
-                if job_id in self.active_jobs:
-                    self.active_jobs[job_id]["status"] = "completed"
-                    self.active_jobs[job_id]["progress"] = 100
-                    self.active_jobs[job_id]["completed_at"] = datetime.now().isoformat()
+                tail = " | ".join(l.strip() for l in out.splitlines()[-6:] if l.strip())
+                raise RuntimeError(f"Falha na etapa '{steps.get(rc, 'build')}' (código {rc}): {tail[:400] or 'sem mensagem'}")
 
         except Exception as e:
             logger.error(f"Erro na construção da mídia de boot {job_id}: {e}", exc_info=True)
-            self._append_log(job_id, f"❌ Erro ao compilar mídia de boot: {e}")
-            with self.lock:
-                if job_id in self.active_jobs:
-                    self.active_jobs[job_id]["status"] = "failed"
-                    self.active_jobs[job_id]["error"] = str(e)
+            self._append_log(job_id, f"❌ Mídia de boot não gerada: {e}")
+            self._finish_job(job_id, "failed", str(e))
 
     def get_job_status(self, job_id: str) -> Optional[Dict[str, Any]]:
         with self.lock:

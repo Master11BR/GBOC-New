@@ -110,16 +110,23 @@ def kopia_policy_args(pol: Dict[str, int]) -> List[str]:
             "--keep-annual", str(pol.get("yearly") or 0)]
 
 
+def _dup_frame(n: int, unit: str) -> str:
+    """Janela do Duplicati para N períodos. Com N = 1 a janela fica igual ao intervalo ("1Y:1Y") e o Duplicati
+    rejeita o backup inteiro (RetentionPolicyParseError: "An interval cannot be bigger than the timeframe"),
+    pois mede a janela pelo calendário e o intervalo como duração fixa. +1 dia de margem mantém a mesma regra."""
+    return f"{n}{unit}" if n > 1 else f"1{unit}1D"
+
+
 def duplicati_retention_arg(pol: Dict[str, int]) -> str:
     parts = []
     if pol.get("days"):
         parts.append(f"{pol['days']}D:0s")
     if pol.get("weekly"):
-        parts.append(f"{pol['weekly']}W:1W")
+        parts.append(f"{_dup_frame(pol['weekly'], 'W')}:1W")
     if pol.get("monthly"):
-        parts.append(f"{pol['monthly']}M:1M")
+        parts.append(f"{_dup_frame(pol['monthly'], 'M')}:1M")
     if pol.get("yearly"):
-        parts.append(f"{pol['yearly']}Y:1Y")
+        parts.append(f"{_dup_frame(pol['yearly'], 'Y')}:1Y")
     return "--retention-policy=" + ",".join(parts)
 
 

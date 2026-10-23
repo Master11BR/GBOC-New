@@ -112,14 +112,14 @@ def _require_admin(request: Request) -> Dict[str, Any]:
 
 
 @router.get("/pairing/check")
-async def pairing_check(request: Request):
+def pairing_check(request: Request):
     """Usado pelo Agente para validar URL + chave (o guarda global já validou a chave)."""
     from modules.agents.agent_pairing import request_has_valid_agent_key
     return {"status": "success", "paired": request_has_valid_agent_key(request.headers)}
 
 
 @router.get("/pairing")
-async def pairing_get(request: Request):
+def pairing_get(request: Request):
     """Exibe a chave de pareamento para configurar novos agentes (somente admin)."""
     _require_admin(request)
     from modules.agents.agent_pairing import get_pairing_key, AGENT_KEY_HEADER
@@ -136,7 +136,7 @@ async def pairing_get(request: Request):
 
 
 @router.post("/pairing/rotate")
-async def pairing_rotate(request: Request):
+def pairing_rotate(request: Request):
     """Gera nova chave de pareamento. Agentes com a chave antiga deixam de sincronizar."""
     u = _require_admin(request)
     from modules.agents.agent_pairing import rotate_pairing_key

@@ -97,6 +97,13 @@
             background: linear-gradient(135deg, #dc2626, #ef4444) !important;
         }
 
+        /* Painel dos logs fica parado em qualquer estilo (Fernly/Cyber 3D); a animação é só nos itens */
+        html .log-toast-panel[data-antigravity="off"],
+        html .log-toast-panel[data-antigravity="off"]:hover {
+            transform: none !important;
+            animation: none !important;
+        }
+
         .log-controls {
             display: flex;
             gap: 12px;
@@ -174,6 +181,8 @@
             overscroll-behavior: contain;
             padding-right: 4px;
         }
+        /* itens nao encolhem na coluna flex rolavel (antes cortavam a 2a linha da mensagem) */
+        .list > * { flex-shrink: 0; }
 
         .list .copy,
         .list .msg-text,
@@ -424,7 +433,7 @@
             </div>
         </div>
 
-        <section class="panel log-toast-panel">
+        <section class="panel log-toast-panel" data-antigravity="off">
             <nav class="filters" aria-label="Filtro de notificações de logs">
                 <button class="filter active" data-filter="all"><i class="fas fa-layer-group"></i> Todos</button>
                 <button class="filter" data-filter="success"><i class="fas fa-check-circle"></i> Success</button>

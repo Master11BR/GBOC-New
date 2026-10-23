@@ -210,7 +210,7 @@ def _compute_comprehensive(days: int = 30) -> Dict[str, Any]:
 
 
 @router.get("/comprehensive")
-async def get_comprehensive_stats(days: int = 30):
+def get_comprehensive_stats(days: int = 30):
     """Obtém estatísticas abrangentes"""
     request_start = time.perf_counter()
     try:
@@ -218,12 +218,12 @@ async def get_comprehensive_stats(days: int = 30):
         return {"status": "success", "data": data}
     except Exception as e:
         logger.warning(f"Advanced stats fallback: {e}")
-        return {"status": "success", "data": _default_comprehensive(), "note": "advanced_stats_fallback_error"}
+        return {"status": "error", "message": str(e), "data": _default_comprehensive(), "note": "advanced_stats_fallback_error"}
     finally:
         _log_endpoint_perf("/api/advanced-stats/comprehensive", request_start, f"days={days}")
 
 @router.get("/health-score")
-async def get_health_score():
+def get_health_score():
     """Obtém score de saúde do sistema"""
     request_start = time.perf_counter()
     try:
@@ -235,19 +235,19 @@ async def get_health_score():
         }
     except Exception as e:
         logger.warning(f"Health score fallback: {e}")
-        return {"status": "success", "health_score": 0, "timestamp": datetime.now().isoformat(), "note": "advanced_stats_fallback_error"}
+        return {"status": "error", "message": str(e), "health_score": None, "timestamp": datetime.now().isoformat(), "note": "advanced_stats_fallback_error"}
     finally:
         _log_endpoint_perf("/api/advanced-stats/health-score", request_start)
 
 @router.get("/predictions")
-async def get_predictions():
+def get_predictions():
     """Obtém previsões do sistema"""
     request_start = time.perf_counter()
     try:
         data = _compute_comprehensive(30)
         return {"status": "success", "predictions": data.get("predictions", {})}
     except Exception as e:
-        return {"status": "success", "predictions": {"storage_30d_gb": 0, "storage_60d_gb": 0, "storage_90d_gb": 0}}
+        return {"status": "error", "message": str(e), "predictions": {"storage_30d_gb": 0, "storage_60d_gb": 0, "storage_90d_gb": 0}}
     finally:
         _log_endpoint_perf("/api/advanced-stats/predictions", request_start)
 
@@ -285,7 +285,7 @@ def get_trends(days: int = 30):
         }
     except Exception as e:
         logger.warning(f"Trends fallback: {e}")
-        return {"status": "success", "trends": {}}
+        return {"status": "error", "message": str(e), "trends": {}}
     finally:
         _log_endpoint_perf("/api/advanced-stats/trends", request_start, f"days={days}")
 

@@ -13,6 +13,7 @@ Integrates 7 Security Tools with REAL System Detection (NO Mocked / Simulated Da
 Plus internal entropy analysis, canary honeypots, and suspicious extension detection.
 """
 
+import threading
 import logging
 import os
 import math
@@ -233,6 +234,15 @@ def _hash_file(filepath: str) -> str:
     return h.hexdigest()
 
 
+def _canary_content_valid(filepath: str) -> bool:
+    try:
+        with open(filepath, 'rb') as f:
+            raw = f.read(512)
+    except OSError:
+        return False
+    return bool(_CANARY_CONTENT_RE.match(raw.strip()))
+
+
 def create_canary(filepath: str) -> Dict:
     ensure_tables()
     canary_content = f"GBOC_CANARY_{datetime.now().isoformat()}_{os.urandom(16).hex()}"
@@ -248,6 +258,12 @@ def create_canary(filepath: str) -> Dict:
     """, (filepath, file_hash, file_hash))
 
     return {'file_path': filepath, 'hash': file_hash, 'status': 'created'}
+
+
+import re as _re
+# Conteudo escrito por create_canary(). Ransomware criptografa (binario/alta entropia) e nao gera este texto;
+# o mesmo texto com outro hash = isca regravada por outra instalacao, git ou teste do proprio GBOC.
+_CANARY_CONTENT_RE = _re.compile(rb"^GBOC_CANARY_\d{4}-\d{2}-\d{2}T[\d:.]+_[0-9a-f]{32}$")
 
 
 def verify_canaries() -> Dict[str, Any]:
@@ -269,6 +285,13 @@ def verify_canaries() -> Dict[str, Any]:
                 detail['status'] = 'intact'
                 results['intact'] += 1
                 _execute("UPDATE ransomware_canaries SET last_verified_at = CURRENT_TIMESTAMP WHERE id = %s", (c['id'],))
+            elif _canary_content_valid(fpath):
+                detail['status'] = 'rebaselined'
+                results['intact'] += 1
+                results['rebaselined'] = results.get('rebaselined', 0) + 1
+                _execute("UPDATE ransomware_canaries SET original_hash = %s, is_compromised = false, last_verified_at = CURRENT_TIMESTAMP WHERE id = %s",
+                         (current_hash, c['id']))
+                logger.warning(f"[Canary] {fpath} foi regravado com conteúdo-isca válido (outra instalação, git ou teste); referência atualizada, sem incidente.")
             else:
                 detail['status'] = 'COMPROMISED'
                 detail['original_hash'] = c['original_hash']
@@ -729,33 +752,35 @@ def get_scan_history(limit: int = 20) -> List[Dict]:
 def get_protection_status() -> Dict[str, Any]:
     ensure_tables()
     canaries = _query("SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE is_compromised) AS compromised FROM ransomware_canaries")
-    last_scan = _query("SELECT id, threat_level, started_at, summary FROM ransomware_scans WHERE status = 'completed' ORDER BY started_at DESC LIMIT 1")
-
     c = canaries[0] if canaries else {'total': 0, 'compromised': 0}
-    ls = last_scan[0] if last_scan else None
-
-    tools = get_integrated_tools_status()
-
+    # Varredura e "7 ferramentas" removidas (papel do antivírus): o status considera só os canaries.
     return {
         'canaries': {
             'total': c.get('total', 0),
             'compromised': c.get('compromised', 0),
             'status': 'ok' if c.get('compromised', 0) == 0 else 'ALERT'
         },
-        'last_scan': {
-            'scan_id': ls.get('id') if ls else None,
-            'threat_level': ls.get('threat_level', 'unknown') if ls else 'never_scanned',
-            'date': ls.get('started_at').isoformat() if ls and ls.get('started_at') else None,
-            'summary': ls.get('summary') if ls else {}
-        },
-        'integrated_tools': tools,
-        'overall_status': 'protected' if (c.get('compromised', 0) == 0 and
-                                           (not ls or ls.get('threat_level') in ('none', 'low')))
-                          else 'at_risk'
+        'overall_status': 'protected' if c.get('compromised', 0) == 0 else 'at_risk'
     }
 
 
-def get_local_protection_status() -> Dict[str, Any]:
+_LOCAL_PROT_CACHE: Dict[str, Any] = {"at": 0.0, "data": None}
+_LOCAL_PROT_LOCK = threading.Lock()
+_LOCAL_PROT_TTL = 300  # s — o estado do antivírus muda raramente; consultar o PowerShell leva ~2 s
+
+
+def get_local_protection_status(force: bool = False) -> Dict[str, Any]:
+    """Status do antivírus/EDR local (cache de 5 min; uma consulta por vez)."""
+    import time as _t
+    with _LOCAL_PROT_LOCK:
+        if not force and _LOCAL_PROT_CACHE["data"] is not None and _t.time() - _LOCAL_PROT_CACHE["at"] < _LOCAL_PROT_TTL:
+            return _LOCAL_PROT_CACHE["data"]
+        data = _get_local_protection_status_uncached()
+        _LOCAL_PROT_CACHE["data"], _LOCAL_PROT_CACHE["at"] = data, _t.time()
+        return data
+
+
+def _get_local_protection_status_uncached() -> Dict[str, Any]:
     """Retorna o status real do antivírus/EDR local e eventos recentes de segurança."""
     import subprocess
     import json
@@ -771,10 +796,15 @@ def get_local_protection_status() -> Dict[str, Any]:
 
     if os.name == 'nt':
         def _run_ps(script: str, timeout: int = 10):
+            # Saída em UTF-8: sem isso o PowerShell responde na página de código do console e os acentos
+            # das mensagens do Windows chegam corrompidos ("VersÆo", "Relat¢rio")
             return subprocess.run(
-                ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
+                ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+                 "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; " + script],
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=timeout,
             )
 

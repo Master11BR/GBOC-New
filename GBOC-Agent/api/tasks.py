@@ -148,6 +148,147 @@ def create_task(task: TaskCreate, request: Request) -> Dict[str, Any]:
 # "running", etc. as task_id integers and returning 422.
 # ============================================================
 
+# ------------------------------------------------------------
+# Versoes reais de cada backup (snapshots listados no repositorio pelo motor)
+# Cache por repositorio, invalidado quando termina uma nova execucao naquele repositorio.
+# ------------------------------------------------------------
+import threading as _threading
+from concurrent.futures import ThreadPoolExecutor as _TPE, wait as _wait
+
+_VERSIONS_CACHE: Dict[Any, Dict[str, Any]] = {}
+_VERSIONS_LOCK = _threading.Lock()
+_VERSIONS_POOL = _TPE(max_workers=4, thread_name_prefix="gboc-versions")
+_VERSIONS_INFLIGHT: Dict[Any, Any] = {}
+
+
+def _count_repo_versions(core, repo_id, marker) -> Dict[str, Any]:
+    try:
+        snaps = core.restore_manager.list_snapshots(repo_id)
+        res = {"count": len(snaps or []), "error": None}
+    except Exception as e:
+        res = {"count": None, "error": str(e)[:200]}
+    res["marker"] = marker
+    res["checked_at"] = datetime.now().isoformat()
+    with _VERSIONS_LOCK:
+        _VERSIONS_CACHE[repo_id] = res
+        _VERSIONS_INFLIGHT.pop(repo_id, None)
+    return res
+
+
+def _duplicati_fast_versions(repo_path: str, repo_type: str, task_ids: List[Any]) -> Optional[Dict[str, Any]]:
+    """
+    Duplicati: conta versoes sem ir a nuvem.
+    1) job do servidor Duplicati com o mesmo destino -> BackupListCount do proprio Duplicati
+    2) destino local inexistente -> erro explicito (nao '0 versoes')
+    3) banco local da tarefa (data/duplicati_dbs/task_<id>.sqlite) -> tabela Fileset
+    None = sem fonte rapida (usa a listagem completa).
+    """
+    import os, sqlite3
+    base = (repo_path or "").split("?")[0].rstrip("/\\").lower()
+    try:
+        from core.integrations.duplicati_native import get_duplicati_native_service
+        for it in (get_duplicati_native_service().list_backups() or {}).get("items", []):
+            b = it.get("Backup") or {}
+            url = str(b.get("TargetURL") or it.get("target_url") or "").split("?")[0].rstrip("/\\").lower()
+            if base and url == base:
+                n = (b.get("Metadata") or {}).get("BackupListCount") or it.get("versions_count")
+                if n is not None:
+                    return {"count": int(n), "error": None, "source": "Duplicati"}
+    except Exception:
+        pass
+    if (repo_type or "local").lower() == "local" and repo_path:
+        if not os.path.isdir(repo_path):
+            return {"count": None, "error": f"Destino '{repo_path}' não encontrado"}
+        # No destino local cada versao do Duplicati e um arquivo duplicati-*.dlist.* (fonte fiel e rapida)
+        import glob as _glob
+        n = len(_glob.glob(os.path.join(repo_path, "duplicati-*.dlist.*")))
+        return {"count": n, "error": None if n else f"Nenhuma versão do Duplicati em '{repo_path}' (pasta sem arquivos .dlist)",
+                "source": "arquivos do destino"}
+    try:
+        from core.gboc_paths import data_dir
+        for tid in task_ids:
+            f = os.path.join(str(data_dir("duplicati_dbs", create=False)), f"task_{tid}.sqlite")
+            if os.path.exists(f):
+                con = sqlite3.connect(f"file:{f}?mode=ro", uri=True)
+                try:
+                    n = con.execute("SELECT COUNT(*) FROM Fileset").fetchone()[0]
+                finally:
+                    con.close()
+                return {"count": int(n), "error": None, "source": "base local da tarefa"}
+    except Exception:
+        pass
+    return None
+
+
+@router.get("/versions")
+def get_task_versions(refresh: bool = False, wait_seconds: int = 8) -> Dict[str, Any]:
+    """Numero de versoes (snapshots) de cada tarefa, contadas no repositorio pelo motor real."""
+    from shared_core import get_shared_core
+    core = get_shared_core()
+    if not getattr(core, "restore_manager", None):
+        raise HTTPException(status_code=503, detail="Restore manager indisponível")
+    with core.get_db_connection() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT t.id, t.repository_id,
+                   (SELECT MAX(te.id) FROM task_executions te JOIN tasks t2 ON t2.id = te.task_id
+                     WHERE t2.repository_id = t.repository_id AND te.status IN ('completed', 'success', 'warning')) AS marker,
+                   r.engine, r.path, r.type
+            FROM tasks t LEFT JOIN repositories r ON r.id = t.repository_id
+            WHERE t.repository_id IS NOT NULL
+        """)
+        rows = cur.fetchall()
+    per_repo_tasks: Dict[Any, List[Any]] = {}
+    markers: Dict[Any, Any] = {}
+    repo_info: Dict[Any, tuple] = {}
+    for tid, rid, marker, r_engine, r_path, r_type in rows:
+        per_repo_tasks.setdefault(rid, []).append(tid)
+        markers[rid] = marker
+        repo_info[rid] = ((r_engine or "").lower(), r_path or "", r_type or "")
+
+    # Duplicati: fonte rapida (servidor Duplicati / base local), sem listar a nuvem
+    for rid, (r_engine, r_path, r_type) in repo_info.items():
+        if r_engine == "duplicati":
+            fast = _duplicati_fast_versions(r_path, r_type, per_repo_tasks.get(rid, []))
+            if fast is not None:
+                fast.update(marker=markers.get(rid), checked_at=datetime.now().isoformat())
+                with _VERSIONS_LOCK:
+                    _VERSIONS_CACHE[rid] = fast
+                markers[rid] = ("fast", markers.get(rid))
+                with _VERSIONS_LOCK:
+                    _VERSIONS_CACHE[rid]["marker"] = markers[rid]
+
+    futures = []
+    with _VERSIONS_LOCK:
+        for rid, marker in markers.items():
+            if isinstance(marker, tuple):  # ja resolvido pela fonte rapida do Duplicati
+                continue
+            c = _VERSIONS_CACHE.get(rid)
+            fresh = c and c.get("marker") == marker and not c.get("error") and not refresh
+            if not fresh and rid not in _VERSIONS_INFLIGHT:
+                _VERSIONS_INFLIGHT[rid] = _VERSIONS_POOL.submit(_count_repo_versions, core, rid, marker)
+            if rid in _VERSIONS_INFLIGHT:
+                futures.append(_VERSIONS_INFLIGHT[rid])
+    if futures:
+        _wait(futures, timeout=max(0, min(int(wait_seconds), 60)))
+
+    out: Dict[str, Any] = {}
+    with _VERSIONS_LOCK:
+        for rid, tids in per_repo_tasks.items():
+            c = _VERSIONS_CACHE.get(rid) or {}
+            pending = rid in _VERSIONS_INFLIGHT
+            for tid in tids:
+                out[str(tid)] = {
+                    "repository_id": rid,
+                    "count": c.get("count"),
+                    "error": c.get("error"),
+                    "pending": pending,
+                    "shared_with": len(tids) - 1,
+                    "checked_at": c.get("checked_at"),
+                }
+    return {"status": "success", "versions": out}
+
+
 @router.get("/status")
 def get_tasks_status() -> Dict[str, Any]:
     """Lista todas as tarefas com status atual (para aba Sistema)"""
@@ -197,7 +338,7 @@ def get_tasks_status() -> Dict[str, Any]:
         return {"status": "success", "tasks": formatted_tasks}
     except Exception as e:
         logger.error(f"❌ Tasks status: {e}", exc_info=True)
-        return {"status": "success", "tasks": []}
+        return {"status": "error", "message": str(e), "tasks": []}
 
 
 @router.get("/system/errors/recent")
@@ -324,7 +465,7 @@ def get_running_tasks_detailed() -> Dict[str, Any]:
         return {"status": "success", "executions": executions, "count": len(executions)}
     except Exception as e:
         logger.error(f"❌ Running detailed: {e}", exc_info=True)
-        return {"status": "success", "executions": [], "count": 0}
+        return {"status": "error", "message": str(e), "executions": [], "count": 0}
 
 def _live_row(ex: Dict[str, Any]) -> Dict[str, Any]:
     """Progresso de uma execução em andamento com velocidade, % e tempo restante calculados."""
@@ -402,6 +543,10 @@ def get_running_tasks_live() -> Dict[str, Any]:
             except Exception as e:                       # banco antigo sem alguma coluna: consulta mais simples
                 logger.debug(f"running/live: {e}")
         items = [_live_row(dict(zip(cols, r))) for r in rows]
+        # Execução em "preparando" sem nenhum arquivo há mais de 6 h é órfã (processo caiu antes de começar):
+        # não vira barra de progresso eterna. A limpeza ao iniciar o TaskManager as marca como interrompidas.
+        items = [i for i in items if i["finished"] or not (i.get("status") == "preparing"
+                 and not i.get("files_processed") and (i.get("elapsed_seconds") or 0) > 6 * 3600)]
         running_tasks = {i["task_id"] for i in items if not i["finished"]}
         # concluído só aparece se a mesma tarefa não estiver rodando de novo; um por tarefa (o mais recente)
         seen, out = set(), []
@@ -656,7 +801,7 @@ def get_task_history(task_id: int, limit: int = 20) -> Dict[str, Any]:
         return {"status": "success", "history": history, "count": len(history)}
     except Exception as e:
         logger.error(f"❌ Task history: {e}", exc_info=True)
-        return {"status": "success", "history": [], "count": 0}
+        return {"status": "error", "message": str(e), "history": [], "count": 0}
 
 
 @router.get("/execution/{exec_id}")
@@ -683,7 +828,7 @@ def get_execution_status(exec_id: int) -> Dict[str, Any]:
         columns = [desc[0] for desc in cursor.description]
         execution = dict(zip(columns, row))
         return {
-            "status": execution.get("status", "unknown"),
+            "status": execution.get("status") or "sem status registrado",
             "execution": execution,
             "error_message": execution.get("error_message"),
             "progress": execution.get("progress", 0),

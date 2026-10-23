@@ -53,14 +53,14 @@ class ChannelUpdate(BaseModel):
 # ─── CRUD ─────────────────────────────────────────────────────────
 
 @router.get("/")
-async def list_channels():
+def list_channels():
     """List all notification channels."""
     from engines.notification_channels import list_channels
     return {"channels": _clean(list_channels())}
 
 
 @router.get("/{channel_id}")
-async def get_channel(channel_id: int):
+def get_channel(channel_id: int):
     """Get a specific notification channel."""
     from engines.notification_channels import get_channel as _get
     ch = _get(channel_id)
@@ -70,7 +70,7 @@ async def get_channel(channel_id: int):
 
 
 @router.post("/")
-async def create_channel(body: ChannelCreate):
+def create_channel(body: ChannelCreate):
     """Create a new notification channel."""
     valid_types = ['slack', 'teams', 'discord', 'telegram', 'webhook']
     if body.channel_type not in valid_types:
@@ -81,7 +81,7 @@ async def create_channel(body: ChannelCreate):
 
 
 @router.put("/{channel_id}")
-async def update_channel(channel_id: int, body: ChannelUpdate):
+def update_channel(channel_id: int, body: ChannelUpdate):
     """Update a notification channel."""
     from engines.notification_channels import get_channel as _get, update_channel as _update
     if not _get(channel_id):
@@ -91,7 +91,7 @@ async def update_channel(channel_id: int, body: ChannelUpdate):
 
 
 @router.delete("/{channel_id}")
-async def delete_channel(channel_id: int):
+def delete_channel(channel_id: int):
     """Delete a notification channel."""
     from engines.notification_channels import get_channel as _get, delete_channel as _del
     if not _get(channel_id):
@@ -103,7 +103,7 @@ async def delete_channel(channel_id: int):
 # ─── Test & History ───────────────────────────────────────────────
 
 @router.post("/{channel_id}/test")
-async def test_channel(channel_id: int):
+def test_channel(channel_id: int):
     """Send a test notification to a channel."""
     from engines.notification_channels import test_channel as _test
     result = _test(channel_id)
@@ -113,7 +113,7 @@ async def test_channel(channel_id: int):
 
 
 @router.get("/history/all")
-async def notification_history(limit: int = 50):
+def notification_history(limit: int = 50):
     """Get notification delivery history."""
     from engines.notification_channels import get_history
     return {"history": _clean(get_history(limit))}

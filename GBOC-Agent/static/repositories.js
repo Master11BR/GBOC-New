@@ -27,7 +27,7 @@ const typeIcons = {
 };
 
 function getTypeInfo(type) {
-    return typeIcons[type] || { icon: 'fa-database', label: type || 'Desconhecido', color: '#a0aec0' };
+    return typeIcons[type] || { icon: 'fa-database', label: type || 'tipo não cadastrado', color: '#a0aec0' };
 }
 
 // ============================================================================
@@ -303,7 +303,7 @@ window.loadRepositories = async function() {
                         statusBadge = `<span class="status-badge status-error"><i class="fas fa-exclamation-circle"></i> Falha na Inicialização</span>`;
                         break;
                     default:
-                        statusBadge = `<span class="status-badge status-unknown">${repo.status || 'desconhecido'}</span>`;
+                        statusBadge = `<span class="status-badge status-unknown">${repo.status || 'sem status registrado'}</span>`;
                 }
 
                 const pathOrBucket = repo.type === 'local' ? (repo.path || 'N/A') : (repo.bucket || repo.endpoint || 'N/A');
@@ -346,7 +346,7 @@ window.loadRepositories = async function() {
                         const raw = await resp.json().catch(() => ({}));
                         const payload = raw?.data || raw;
                         if (resp.ok && (raw.success !== false)) {
-                            const summary = payload.summary || `Engine: ${(payload.engine || 'desconhecido').toUpperCase()}\nTipo: ${(payload.repo_type || 'desconhecido').toUpperCase()}`;
+                            const summary = payload.summary || `Engine: ${(payload.engine || 'motor não cadastrado').toUpperCase()}\nTipo: ${(payload.repo_type || 'tipo não cadastrado').toUpperCase()}`;
                             showToast(`✅ Conexão válida\n${summary}`);
                         } else {
                             const err = raw.error || raw.detail || raw.message || payload.message || 'Falha ao testar repositório.';
@@ -864,7 +864,7 @@ function initRepoPage() {
                     const raw = await resp.json().catch(() => ({}));
                     const payload = raw?.data || raw;
                     if (resp.ok && (raw.success !== false)) {
-                        const summary = payload.summary || `Engine: ${(payload.engine || 'desconhecido').toUpperCase()}\nTipo: ${(payload.repo_type || 'desconhecido').toUpperCase()}`;
+                        const summary = payload.summary || `Engine: ${(payload.engine || 'motor não cadastrado').toUpperCase()}\nTipo: ${(payload.repo_type || 'tipo não cadastrado').toUpperCase()}`;
                         showToast(`✅ Conexão válida\n${summary}`);
                     } else {
                         const err = raw.error || raw.detail || raw.message || payload.message || 'Falha ao testar repositório.';

@@ -219,7 +219,7 @@ def _get_agent_data() -> Dict[str, Any]:
                         data["executions"].append({
                             "id": r[0],
                             "task_id": r[1],
-                            "status": (r[2] or "UNKNOWN").upper(),
+                            "status": (r[2] or "SEM STATUS REGISTRADO").upper(),
                             "start_time": r[3].isoformat() if hasattr(r[3], 'isoformat') else str(r[3]) if r[3] else None,
                             "duration_sec": float(r[4] or 0),
                             "bytes": int(r[5] or 0),

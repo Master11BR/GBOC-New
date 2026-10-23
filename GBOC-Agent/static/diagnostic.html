@@ -486,7 +486,12 @@ async function loadHealth(){
         ]);
         if(!comp||!hs)return;
         const d=comp.data;
-        const score=hs.health_score||0;
+        if(typeof hs.health_score!=='number'){
+            document.getElementById('healthScore').textContent='—';
+            document.getElementById('healthFill').style.width='0%';
+            return;
+        }
+        const score=hs.health_score;
         document.getElementById('healthScore').textContent=score.toFixed(0);
         document.getElementById('healthFill').style.width=score+'%';
         document.getElementById('healthFill').style.background=score>=70?'var(--success)':score>=40?'var(--warning)':'var(--danger)';
@@ -590,7 +595,12 @@ async function loadSla(){
     try{
         const data=await api('/api/preemptive/sla-compliance?days='+_chartDays('slaRingChart',30,loadSla));
         if(!data)return;
-        const s=data.summary;
+        const s=data.summary||{};
+        if(data.status==='error'||s.compliance_pct==null){
+            ['slaCompliant','slaAtRisk','slaNonCompliant'].forEach(id=>{const el=document.getElementById(id); if(el) el.textContent='—';});
+            const rp=document.getElementById('slaRingPct'); if(rp){ rp.textContent='—'; rp.title=data.message||'Sem tarefas para avaliar'; }
+            return;
+        }
         document.getElementById('slaCompliant').textContent=s.compliant||0;
         document.getElementById('slaAtRisk').textContent=s.at_risk||0;
         document.getElementById('slaNonCompliant').textContent=s.non_compliant||0;
@@ -991,6 +1001,11 @@ async function loadAlerts(){
     try{
         const data=await api('/api/preemptive/alerts');
         if(!data)return;
+        if(data.status==='error'){
+            ['alertTotal','alertWarnings'].forEach(id=>{const el=document.getElementById(id); if(el) el.textContent='—';});
+            const rl=document.getElementById('alertRiskLevel'); if(rl){ rl.textContent=('ERRO: '+(data.message||'falha na consulta')).slice(0,70); rl.title=data.message||''; }
+            return;
+        }
         const alerts=data.alerts||[];
         const warnings=data.warnings||[];
 
@@ -1057,6 +1072,11 @@ async function loadHealthAlerts(){
     try{
         const data=await api('/api/preemptive/alerts');
         if(!data)return;
+        if(data.status==='error'){
+            const el=document.getElementById('healthAlertsList');
+            if(el){ el.innerHTML='<div style="color:var(--warning);padding:10px"></div>'; el.firstChild.textContent='⚠️ Não foi possível verificar os alertas: '+(data.message||'erro'); }
+            return;
+        }
         const all=[...(data.alerts||[]).map(a=>({...a,cls:'critical'})),...(data.warnings||[]).map(w=>({...w,cls:'warning'}))];
         const el=document.getElementById('healthAlertsList');
         if(all.length>0){
@@ -1209,7 +1229,7 @@ async function runAIDiagnostic(customPrompt) {
     const alertsData = await api('/api/preemptive/alerts');
     const activeAlerts = (alertsData && alertsData.alerts) ? alertsData.alerts : [];
 
-    if (!customPrompt && !alertsData) {
+    if (!customPrompt && (!alertsData || alertsData.status === 'error')) {
         box.innerHTML = '<span style="color:var(--warning)"><i class="fas fa-exclamation-triangle"></i> Não foi possível consultar os alertas preventivos — o estado do sistema não pôde ser verificado.</span>';
         return;
     }

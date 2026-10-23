@@ -52,66 +52,89 @@ class UniversalRestoreEngine:
                 "logs": logs
             }
 
+        errors: List[str] = []
         injected_drivers_count = 0
 
-        # 1. Injeção de drivers via DISM se pasta fornecida e no Windows
-        if drivers_folder and os.path.exists(drivers_folder) and sys.platform == "win32":
-            logs.append(f"Injetando drivers da pasta '{drivers_folder}' via DISM...")
+        def _run(cmd, timeout):
+            res = subprocess.run(cmd, capture_output=True, timeout=timeout)
             try:
-                cmd = [
-                    "dism.exe",
-                    f"/Image:{vol}",
-                    f"/Add-Driver",
-                    f"/Driver:{drivers_folder}",
-                    "/Recurse",
-                    "/ForceUnsigned"
-                ]
-                res = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
-                if res.returncode == 0:
-                    logs.append("✅ Drivers injetados com sucesso na imagem do Windows!")
-                    injected_drivers_count += 1
-                else:
-                    logs.append(f"Aviso no DISM: {res.stderr or res.stdout}")
-            except Exception as e:
-                logs.append(f"Erro ao executar DISM: {e}")
+                import ctypes
+                enc = f"cp{ctypes.windll.kernel32.GetOEMCP()}"
+            except Exception:
+                enc = "utf-8"
+            out = ((res.stdout or b"") + b"\n" + (res.stderr or b"")).decode(enc, errors="replace").strip()
+            return res.returncode, out
 
-        # 2. Correção de serviços de boot no registro offline (SYSTEM hive)
-        fixed_services = []
-        if sys.platform == "win32" and os.path.exists(system_hive):
-            logs.append("Montando hive de registro offline HKLM\\SYSTEM para ativação de drivers de boot...")
-            temp_key = "GBOC_OFFLINE_SYS"
-            try:
-                # Carregar hive offline
-                subprocess.run(["reg", "load", f"HKLM\\{temp_key}", system_hive], capture_output=True, timeout=10)
-
-                # Definir Start=0 (BOOT_START) para todos os drivers críticos de armazenamento
-                for svc in self.CRITICAL_BOOT_SERVICES:
-                    try:
-                        svc_key = f"HKLM\\{temp_key}\\ControlSet001\\Services\\{svc}"
-                        # Testar se a chave existe e definir Start = 0 (DWORD)
-                        sub_res = subprocess.run(
-                            ["reg", "add", svc_key, "/v", "Start", "/t", "REG_DWORD", "/d", "0", "/f"],
-                            capture_output=True, timeout=5
-                        )
-                        if sub_res.returncode == 0:
-                            fixed_services.append(svc)
-                    except Exception:
-                        pass
-
-                # Descarregar hive offline
-                subprocess.run(["reg", "unload", f"HKLM\\{temp_key}"], capture_output=True, timeout=10)
-                logs.append(f"✅ Hive descarregada. {len(fixed_services)} serviços de boot ativados (Start=0): {', '.join(fixed_services[:6])}...")
-            except Exception as ex_reg:
-                logs.append(f"Aviso na manipulação de registro offline: {ex_reg}")
+        # 1. Injecao de drivers via DISM (resultado conferido)
+        if drivers_folder:
+            if not os.path.isdir(drivers_folder):
+                errors.append(f"pasta de drivers '{drivers_folder}' não encontrada")
+                logs.append(f"❌ Pasta de drivers '{drivers_folder}' não encontrada.")
+            elif sys.platform == "win32":
+                n_inf = len(list(Path(drivers_folder).rglob("*.inf")))
+                logs.append(f"Injetando {n_inf} driver(s) (.inf) da pasta '{drivers_folder}' via DISM...")
                 try:
-                    subprocess.run(["reg", "unload", f"HKLM\\{temp_key}"], capture_output=True, timeout=5)
-                except Exception:
-                    pass
+                    rc, out = _run(["dism.exe", f"/Image:{vol}", "/Add-Driver", f"/Driver:{drivers_folder}", "/Recurse", "/ForceUnsigned"], 1800)
+                except Exception as e:
+                    rc, out = -1, str(e)
+                if rc == 0:
+                    injected_drivers_count = n_inf
+                    logs.append(f"✅ DISM concluiu a injeção de {n_inf} driver(s).")
+                else:
+                    errors.append(f"DISM terminou com código {rc}")
+                    logs.append(f"❌ DISM terminou com código {rc}: {out[-400:]}")
 
-        logs.append("🎉 Universal Hardware Restore concluído. O sistema operacional está pronto para boot em hardware virgem ou diferente.")
-        
+        # 2. Servicos de boot na hive SYSTEM offline (somente servicos que EXISTEM na imagem)
+        fixed_services: List[str] = []
+        failed_services: List[str] = []
+        if sys.platform == "win32":
+            if not os.path.exists(system_hive):
+                errors.append("hive SYSTEM offline não encontrada")
+                logs.append(f"❌ Hive SYSTEM offline não encontrada em {system_hive}.")
+            else:
+                temp_key = "GBOC_OFFLINE_SYS"
+                logs.append("Montando hive de registro offline HKLM\\SYSTEM...")
+                rc, out = _run(["reg", "load", f"HKLM\\{temp_key}", system_hive], 60)
+                if rc != 0:
+                    errors.append("não foi possível montar a hive SYSTEM offline")
+                    logs.append(f"❌ reg load falhou (código {rc}): {out[:300]}")
+                else:
+                    try:
+                        control_set = "ControlSet001"
+                        rcq, outq = _run(["reg", "query", f"HKLM\\{temp_key}\\Select", "/v", "Current"], 30)
+                        import re as _re
+                        m = _re.search(r"0x([0-9a-fA-F]+)", outq) if rcq == 0 else None
+                        if m:
+                            control_set = f"ControlSet{int(m.group(1), 16):03d}"
+                        for svc in self.CRITICAL_BOOT_SERVICES:
+                            svc_key = f"HKLM\\{temp_key}\\{control_set}\\Services\\{svc}"
+                            if _run(["reg", "query", svc_key], 15)[0] != 0:
+                                continue  # driver nao existe nesta imagem: nao criar chave orfa
+                            if _run(["reg", "add", svc_key, "/v", "Start", "/t", "REG_DWORD", "/d", "0", "/f"], 15)[0] == 0:
+                                fixed_services.append(svc)
+                            else:
+                                failed_services.append(svc)
+                    finally:
+                        rcu, outu = _run(["reg", "unload", f"HKLM\\{temp_key}"], 60)
+                        if rcu != 0:
+                            errors.append("a hive SYSTEM offline não foi descarregada")
+                            logs.append(f"❌ reg unload falhou (código {rcu}): {outu[:300]}. Descarregue manualmente: reg unload HKLM\\{temp_key}")
+                    logs.append(f"Control set: {control_set}. Serviços de boot ativados (Start=0): {', '.join(fixed_services) or 'nenhum encontrado na imagem'}")
+                    if failed_services:
+                        errors.append(f"falha ao ativar {', '.join(failed_services)}")
+                        logs.append(f"❌ Falha ao ativar: {', '.join(failed_services)}")
+                    if not fixed_services and not failed_services:
+                        logs.append("⚠️ Nenhum dos drivers de armazenamento conhecidos existe nesta imagem; injete os drivers da controladora pela pasta de drivers.")
+
+        success = not errors
+        if success:
+            logs.append("✅ Universal Restore aplicado. Teste o boot no hardware de destino.")
+        else:
+            logs.append("❌ Universal Restore terminou com problemas: " + "; ".join(errors))
+
         return {
-            "success": True,
+            "success": success,
+            "error": "; ".join(errors) or None,
             "target_volume": vol,
             "injected_drivers_count": injected_drivers_count,
             "activated_boot_services": fixed_services,

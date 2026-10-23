@@ -39,7 +39,7 @@
                     <div style="background:var(--bg-input);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px">
                         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
                             <h4 style="margin:0"><i class="fas fa-hdd" style="color:#ed8936"></i> Unidade LTO Streaming (Tape Drive Native Engine)</h4>
-                            <span class="badge-ok" style="background:rgba(72,187,120,0.15);color:#48bb78;padding:2px 8px;border-radius:4px;font-size:0.75em;font-weight:700">Driver SCSI Ready</span>
+                            <span id="tape-status" style="background:rgba(148,163,184,0.15);color:var(--text-muted);padding:2px 8px;border-radius:4px;font-size:0.75em;font-weight:700">Verificando...</span>
                         </div>
                         <p style="font-size:0.82em;color:var(--text-muted)">Suporta montagem de volumes LTFS (Linear Tape File System), bloqueio de fita física e gravação sequencial streaming tar/raw.</p>
                         
@@ -70,6 +70,7 @@
                             <button class="btn btn-primary" onclick="formatTapeLTFS()"><i class="fas fa-eraser"></i> Formatar Cartucho LTFS</button>
                             <button class="btn btn-secondary" onclick="ejectTape()"><i class="fas fa-eject"></i> Ejetar Fita</button>
                         </div>
+                        <div id="tape-result" style="display:none;margin-top:12px;padding:10px 12px;border-radius:8px;font-size:0.84em;line-height:1.45"></div>
                     </div>
                 </div>
             </div>
@@ -81,15 +82,37 @@
             new UnifiedSidebar().initialize();
         });
 
-        function scanTapeDrives() {
-            alert('Escaneando barramento SCSI/SAS...\nDriver de fita verificado.');
+        // Detecção REAL (WMI Win32_TapeDrive / Win32_Autoloader no Agente). Antes: alertas de sucesso sem executar nada.
+        function tapeResult(ok, html) {
+            const el = document.getElementById('tape-result'); el.style.display = 'block';
+            el.style.background = ok ? 'rgba(16,185,129,.1)' : 'rgba(239,68,68,.08)';
+            el.style.border = '1px solid ' + (ok ? 'rgba(16,185,129,.35)' : 'rgba(239,68,68,.35)');
+            el.innerHTML = html;
         }
-        function formatTapeLTFS() {
-            alert('Formatando volume LTFS na unidade de fita...');
+        let _tapeInv = null;
+        async function scanTapeDrives() {
+            const badge = document.getElementById('tape-status');
+            badge.textContent = 'Verificando...';
+            try {
+                const r = await fetch('/api/v1/enterprise/tape-robotics/inventory'); const d = await r.json(); _tapeInv = d;
+                const drives = d.drives || [];
+                if (d.installed) {
+                    badge.textContent = `${drives.length} unidade(s) detectada(s)`; badge.style.color = '#48bb78'; badge.style.background = 'rgba(72,187,120,0.15)';
+                    tapeResult(true, 'Hardware de fita detectado: ' + (drives.map(x => x.name).join(', ') || 'unidade sem nome') + (d.changer ? ` · Robô: ${d.changer.name}` : ''));
+                } else {
+                    badge.textContent = 'Nenhuma unidade de fita'; badge.style.color = 'var(--danger)'; badge.style.background = 'rgba(239,68,68,0.12)';
+                    tapeResult(false, d.message || 'Nenhuma unidade de fita detectada neste servidor.');
+                }
+            } catch (e) { badge.textContent = 'Indisponível'; tapeResult(false, 'Falha ao consultar o Agente: ' + e.message); }
         }
-        function ejectTape() {
-            alert('Enviando comando SCSI Eject à unidade de fita.');
+        function _notImplemented(op) {
+            const hw = _tapeInv && _tapeInv.installed;
+            tapeResult(false, `<b>${op}</b> ainda não está implementado nesta versão do GBOC` +
+                (hw ? ' — a unidade foi detectada, mas nenhum comando foi enviado a ela.' : ' e nenhuma unidade de fita foi detectada neste servidor.'));
         }
+        function formatTapeLTFS() { _notImplemented('Formatar cartucho LTFS'); }
+        function ejectTape() { _notImplemented('Ejetar fita'); }
+        document.addEventListener('DOMContentLoaded', scanTapeDrives);
     </script>
 </body>
 </html>

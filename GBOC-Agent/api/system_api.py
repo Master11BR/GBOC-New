@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/system", tags=["System Management"])
 
 @router.get("/version")
-async def get_system_version_info():
+def get_system_version_info():
     """Retorna a versão oficial dinâmica e dados de versão do Agente GBOC."""
     try:
         from version_control import get_version_info, __version__
@@ -36,7 +36,7 @@ async def get_system_version_info():
         }
 
 @router.get("/diagnostic")
-async def run_full_diagnostic():
+def run_full_diagnostic():
     """Executa diagnóstico completo do sistema"""
     try:
         from utils.diagnostic_report import SystemDiagnostic
@@ -51,7 +51,7 @@ async def run_full_diagnostic():
         raise HTTPException(500, str(e))
 
 @router.get("/orphan-files")
-async def scan_orphan_files():
+def scan_orphan_files():
     """Escaneia arquivos órfãos"""
     try:
         from utils.orphan_file_detector import OrphanFileDetector
@@ -304,7 +304,7 @@ def get_schema_health():
 
 
 @router.get("/changelog")
-async def get_changelog():
+def get_changelog():
     """Retorna o conteúdo do CHANGELOG.md"""
     import os
     from datetime import datetime

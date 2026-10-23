@@ -557,17 +557,6 @@ class CentralServerClient:
         except:
             return {}
     
-    def _get_local_ip(self) -> str:
-        """Obtém IP local"""
-        try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(("8.8.8.8", 80))
-            ip = s.getsockname()[0]
-            s.close()
-            return ip
-        except:
-            return "unknown"
-    
     def _get_repository_statistics(self) -> Dict[str, Any]:
         """Obtém estatísticas dos repositórios"""
         try:
@@ -1593,8 +1582,8 @@ class CentralServerClient:
         except Exception:
             pass
 
-        # Fallback de LAN genérico para não transmitir 127.0.0.1 ao servidor central
-        return "192.168.1.100"
+        # Sem IP de rede detectavel (antes enviava um IP inventado, 192.168.1.100)
+        return "sem IP de rede (somente loopback)"
 
     def _get_public_ip(self) -> str:
         """Obtém o IP público REAL da máquina na internet (com cache de 15 minutos)."""

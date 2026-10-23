@@ -170,8 +170,17 @@ class OrphanFileDetector:
         
         if 'script' in file_name or 'if __name__' in content:
             return "script"
-        
-        return "unknown"
+
+        # Sem categoria: usa a descricao que o proprio arquivo traz (docstring ou 1o comentario)
+        desc = ""
+        try:
+            import ast as _ast
+            desc = (_ast.get_docstring(_ast.parse(content)) or "").strip().splitlines()[0] if content.strip() else ""
+        except Exception:
+            desc = ""
+        if not desc:
+            desc = next((l.lstrip("# ").strip() for l in content.splitlines() if l.strip().startswith("#") and len(l.strip()) > 3), "")
+        return f"não classificado: {desc[:80]}" if desc else "não classificado (arquivo sem descrição)"
     
     def _generate_integration_suggestions(self):
         """Gera sugestões de integração"""

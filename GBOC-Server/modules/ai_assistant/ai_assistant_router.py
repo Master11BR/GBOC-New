@@ -437,7 +437,7 @@ async def server_ai_query(request: Request):
 
 
 @router.get("/config")
-async def get_server_ai_config(request: Request):
+def get_server_ai_config(request: Request):
     """Retorna as configurações de IA do Servidor Central (chaves mascaradas)."""
     _require_auth(request)
     return JSONResponse({"status": "success", "config": aip.mask_config(load_server_ai_config()),
@@ -487,7 +487,7 @@ async def server_ai_diagnose(request: Request):
 
 
 @router.post("/auto_fix")
-async def server_ai_auto_fix(request: Request):
+def server_ai_auto_fix(request: Request):
     """
     Não existe ação de remediação automática implementada no Servidor Central.
     Retorna erro explícito em vez de simular sucesso (Política Zero-Mock).

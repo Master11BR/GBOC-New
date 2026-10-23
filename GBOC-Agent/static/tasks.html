@@ -61,6 +61,26 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 .gl-actions { min-width:96px; display:flex; justify-content:flex-end; }
 .gl-err { margin-top:6px; color:#f87171; font-size:.8em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 @media (max-width: 900px) { .gl-card { grid-template-columns:auto minmax(0,1fr); } .gl-prog, .gl-actions { grid-column:1 / -1; } .gl-actions { justify-content:flex-start; min-width:0; } .gl-actions:empty { display:none; } }
+/* Faixa compacta da tela de tarefas */
+.tk-strip { display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px; margin-bottom:18px; }
+.tk-kpi { display:inline-flex; align-items:center; gap:8px; padding:8px 14px; border-radius:10px; background:var(--bg-card);
+  border:1px solid var(--border, rgba(255,255,255,.08)); border-left:4px solid var(--success,#48bb78); font-size:.9em; color:var(--text-muted); }
+.tk-kpi > i { color:var(--success,#48bb78); }
+.tk-kpi-num { font-size:1.35em; font-weight:700; color:var(--success,#48bb78); line-height:1; }
+.tk-kpi-sep { width:1px; height:18px; background:var(--border, rgba(255,255,255,.15)); margin:0 4px; }
+.tk-kpi-eta { color:var(--text); font-weight:600; }
+.tk-strip .tk-legend { margin:0; flex:1 1 auto; }
+/* Progresso ao vivo compacto */
+.gl-wrap { gap:8px; margin:0 0 24px; }
+.gl-card { gap:12px; padding:10px 14px; border-radius:10px; }
+.gl-icon { width:36px; height:36px; border-radius:9px; font-size:1em; }
+.gl-name { font-size:.95em; gap:8px; }
+.gl-meta { margin-top:3px; font-size:.78em; }
+.gl-file { margin-top:2px; font-size:.75em; }
+.gl-top { font-size:.8em; }
+.gl-bar { height:7px; margin:5px 0; }
+.gl-stats { font-size:.75em; }
+.gl-title-row { font-size:.95em; }
 @media (prefers-reduced-motion: reduce) { .gl-dot, .gl-bar.gl-indet .gl-fill { animation:none; } .gl-fill { transition:none; } }
 </style>
 </head>
@@ -81,30 +101,17 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             </div>
         </header>
 
-        <!-- Card de Acompanhamento de Backup -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 30px;">
-            <div class="status-card" style="background: var(--bg-card); padding: 20px; border-radius: 10px; border-left: 5px solid #48bb78;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                    <h3 style="margin: 0; color: var(--text); font-size: 1.1em;"><i class="fas fa-play-circle" style="color: var(--success); margin-right: 8px;"></i>Backups Ativos</h3>
-                </div>
-                <div style="display: flex; align-items: center; gap: 15px;">
-                    <div>
-                        <div style="font-size: 2.5em; font-weight: bold; color: var(--success);" id="activeBackupsTasks">0</div>
-                        <div style="color: var(--text-muted); font-size: 0.9em;">tarefas em execução</div>
-                    </div>
-                    <div style="flex: 1;">
-                        <div style="color: var(--text-muted); font-size: 0.8em; margin-bottom: 5px;">Tempo Estimado</div>
-                        <div style="color: var(--text); font-weight: 600;" id="backupEtaTasks">Nenhum ativo</div>
-                    </div>
-                </div>
+        <!-- Faixa compacta: backups ativos + legenda de cores -->
+        <div class="tk-strip">
+            <div class="tk-kpi" title="Backups em execução agora">
+                <i class="fas fa-play-circle"></i>
+                <span class="tk-kpi-num" id="activeBackupsTasks">0</span>
+                <span class="tk-kpi-lbl">em execução</span>
+                <span class="tk-kpi-sep" aria-hidden="true"></span>
+                <span class="tk-kpi-lbl">Tempo estimado:</span>
+                <span class="tk-kpi-eta" id="backupEtaTasks">Nenhum ativo</span>
             </div>
-        </div>
-
-        <!-- Backups em execução: barra de progresso ao vivo (api/tasks/running/live) -->
-        <section id="live-backups" class="gl-wrap" hidden aria-live="polite" aria-label="Backups em execução"></section>
-
-        <!-- Legenda de cores -->
-        <div class="gboc-legend">
+        <div class="gboc-legend tk-legend">
             <span style="font-weight:600; margin-right:6px;">Motor:</span>
             <span class="gboc-legend-item"><span class="gboc-legend-swatch" style="background:#4299e1"></span>Restic</span>
             <span class="gboc-legend-item"><span class="gboc-legend-swatch" style="background:#9f7aea"></span>Kopia</span>
@@ -118,9 +125,14 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             <span class="gboc-legend-item"><span class="gboc-legend-swatch" style="background:#ecc94b"></span>GCS</span>
             <span class="gboc-legend-item"><span class="gboc-legend-swatch" style="background:#9f7aea"></span>SFTP</span>
         </div>
+        </div>
+
+        <div id="task-list" class="gboc-box-grid">
+            <p style="color:var(--text-muted)">Carregando tarefas...</p>
+        </div>
 
         <!-- Painel de Erros Recentes de Tarefas -->
-        <div class="status-card" style="background: var(--bg-card); padding: 16px; border-radius: 10px; border-left: 5px solid #f56565; margin-bottom: 24px;">
+        <div class="status-card" style="background: var(--bg-card); padding: 16px; border-radius: 10px; border-left: 5px solid #f56565; margin: 24px 0;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                 <h3 style="margin:0; color:var(--text); font-size:1.05em;"><i class="fas fa-triangle-exclamation" style="color:var(--danger); margin-right:8px;"></i>Erros Recentes de Tarefas</h3>
                 <button class="btn btn-sm btn-secondary" onclick="loadTaskErrorsPanel()"><i class="fas fa-rotate"></i> Atualizar</button>
@@ -129,9 +141,11 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 <div style="color:var(--text-muted);">Carregando erros...</div>
             </div>
         </div>
-        <div id="task-list" class="gboc-box-grid">
-            <p style="color:var(--text-muted)">Carregando tarefas...</p>
-        </div>
+        <!-- Backups em execução: barra de progresso ao vivo (api/tasks/running/live) -->
+        <section id="live-backups" class="gl-wrap" hidden aria-live="polite" aria-label="Backups em execução"></section>
+
+
+
     </main>
 </div>
 
@@ -547,6 +561,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             });
 
             renderTasks();
+            loadTaskVersions();
 
             // Carregar status de backups ativos
             await updateActiveBackupsCard();
@@ -568,14 +583,14 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             const running = data.overview_summary?.running || 0;
             if (running > 0) {
                 activeBackupsEl.innerText = running;
-                activeBackupsEl.style.color = "#48bb78";
+                activeBackupsEl.style.color = "var(--success,#48bb78)";
                 backupEtaEl.innerText = "Calculando tempo restante...";
-                backupEtaEl.style.color = "#a0aec0";
+                backupEtaEl.style.color = "";
             } else {
                 activeBackupsEl.innerText = "0";
-                activeBackupsEl.style.color = "white";
+                activeBackupsEl.style.color = "var(--text-muted)";
                 backupEtaEl.innerText = "Nenhum ativo";
-                backupEtaEl.style.color = "#a0aec0";
+                backupEtaEl.style.color = "";
             }
         } catch (e) {
             console.error('Erro ao atualizar card de backups:', e);
@@ -621,6 +636,48 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         } catch(e) { return cron; }
     }
 
+    // Versoes reais (snapshots no repositorio) - consultadas no maximo a cada 60 s
+    let taskVersions = {};
+    let _versionsFetchedAt = 0;
+    let _versionsLoading = false;
+    function _versionsLabel(id) {
+        const v = taskVersions[String(id)];
+        if (!v) return '<span style="color:var(--text-muted)">Versões: consultando…</span>';
+        if (v.count == null) {
+            if (v.pending) return '<span style="color:var(--text-muted)">Versões: consultando…</span>';
+            const err = String(v.error || 'indisponível').replace(/"/g, '&quot;');
+            return `<span style="color:var(--warning)" title="${err}">Versões: não foi possível consultar</span>`;
+        }
+        if (v.count === 0 && v.error) {
+            const err = String(v.error).replace(/"/g, '&quot;');
+            return `<span style="color:var(--warning)" title="${err}"><strong>0</strong> versões — ${err.replace(/&quot;/g,'"')}</span>`;
+        }
+        const shared = v.shared_with ? ` <span style="color:var(--text-muted)" title="Contagem do repositório, compartilhado com ${v.shared_with} outra(s) tarefa(s)">(repositório compartilhado)</span>` : '';
+        const when = v.checked_at ? ` title="Consultado em ${new Date(v.checked_at).toLocaleString('pt-BR')}"` : '';
+        return `<strong${when}>${v.count}</strong> ${v.count === 1 ? 'versão' : 'versões'}${shared}`;
+    }
+    function _paintVersions() {
+        document.querySelectorAll('.task-versions').forEach(el => { el.innerHTML = _versionsLabel(el.dataset.taskId); });
+    }
+    async function loadTaskVersions(force) {
+        if (_versionsLoading || (!force && Date.now() - _versionsFetchedAt < 60000)) return;
+        _versionsLoading = true;
+        try {
+            const r = await fetch('/api/tasks/versions' + (force ? '?refresh=true' : ''));
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            const d = await r.json();
+            taskVersions = d.versions || {};
+            _versionsFetchedAt = Date.now();
+            // ainda consultando algum repositorio remoto: tenta de novo em 15 s
+            if (Object.values(taskVersions).some(v => v.pending)) _versionsFetchedAt = Date.now() - 45000;
+        } catch (e) {
+            Object.keys(taskVersions).length || tasks.forEach(t => taskVersions[String(t.id)] = { count: null, error: e.message });
+        } finally {
+            _versionsLoading = false;
+            _paintVersions();
+        }
+    }
+
     function renderTasks() {
         const list = document.getElementById('task-list');
         if (!list) return;
@@ -637,7 +694,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 
         const cardsHtml = tasks.map(task => {
             const repoName = task.repository_name || `Repo #${task.repository_id}`;
-            const repoType = task.repository_type || 'unknown';
+            const repoType = task.repository_type || (task.repository_id ? 'tipo não cadastrado' : 'sem repositório');
             const taskEngine = (task.engine || 'restic').toLowerCase();
             const repoEngine = (task.repository_engine || task.engine || 'restic').toLowerCase();
             const status = task.status || 'idle';
@@ -651,11 +708,10 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 'gcs': 'Google Cloud',
                 'sftp': 'SFTP/Rede',
                 's3': 'Amazon S3',
-                'azure': 'Azure Blob',
-                'unknown': 'Desconhecido'
+                'azure': 'Azure Blob'
             };
             const storageTypeLabel = typeLabels[repoType] || repoType.toUpperCase();
-            const storageClass = `storage-${repoType}`;
+            const storageClass = `storage-${(task.repository_type || 'none').replace(/[^\w-]/g, '')}`;
 
             let displayPaths = 'Nenhum caminho';
             if (task.source_paths) {
@@ -685,6 +741,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                     <div class="gboc-box-row"><i class="fas fa-cogs"></i><span class="row-value">Tarefa: ${taskEngine}</span></div>
                     <div class="gboc-box-row"><i class="fas fa-database"></i><span class="row-value">Repo: ${repoEngine}</span></div>
                     <div class="gboc-box-row"><i class="fas ${scheduleIcon}"></i><span class="row-value">${scheduleText}</span></div>
+                    <div class="gboc-box-row"><i class="fas fa-layer-group"></i><span class="row-value task-versions" data-task-id="${task.id}">${_versionsLabel(task.id)}</span></div>
                     <div class="gboc-box-row">
                         <span class="gboc-box-status">
                             <span class="status-dot ${status}"></span> ${status.toUpperCase()}
@@ -1541,7 +1598,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             panel.innerHTML = items.map(it => {
                 const dt = it.started_at ? formatDateLocal(it.started_at) : '—';
                 const task = it.task_name || `Task ${it.task_id || '—'}`;
-                const engine = (it.engine || 'unknown').toUpperCase();
+                const engine = (it.engine || 'motor não registrado').toUpperCase();
                 const msg = String(it.error_message || 'Sem detalhe').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 return `
                     <div style="padding:8px 0; border-bottom:1px solid var(--border);">

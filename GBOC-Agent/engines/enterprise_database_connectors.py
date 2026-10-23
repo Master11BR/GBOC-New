@@ -17,6 +17,8 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 
 logger = logging.getLogger("gboc_enterprise_db_connectors")
+# Backups de banco levam de minutos a horas: limite configuravel (padrao 6 h; antes 120-180 s)
+_DB_BACKUP_TIMEOUT = int(os.environ.get("GBOC_DBBACKUP_TIMEOUT", "21600"))
 
 
 class EnterpriseDatabaseConnectors:
@@ -176,7 +178,7 @@ EXIT;
                 f.write(rman_commands)
 
             self._append_log(job_id, f"Executando comando RMAN: {rman_bin} target / cmdfile={rman_script_path}")
-            res = subprocess.run([rman_bin, "target", "/", f"cmdfile={rman_script_path}"], capture_output=True, text=True, timeout=120)
+            res = subprocess.run([rman_bin, "target", "/", f"cmdfile={rman_script_path}"], capture_output=True, text=True, timeout=_DB_BACKUP_TIMEOUT)
             
             if res.returncode != 0:
                 raise RuntimeError(f"Oracle RMAN retornou código de erro {res.returncode}: {res.stderr or res.stdout}")
@@ -250,13 +252,14 @@ EXIT;
             self._append_log(job_id, f"Executando hdbsql no tenant {tenant_db}...")
             res = subprocess.run([
                 hdbsql_bin, "-i", instance_id, "-d", tenant_db,
-                f"BACKUP DATA FOR FULL SYSTEM USING BACKINT ('{target_dir}\\saphana_stream')"
-            ], capture_output=True, text=True, timeout=180)
+                # Backup em arquivo (BACKINT exige agente de terceiros e nao aceita caminho de pasta)
+                "BACKUP DATA USING FILE ('" + os.path.join(target_dir, "saphana_full").replace("'", "''") + "')"
+            ], capture_output=True, text=True, timeout=_DB_BACKUP_TIMEOUT)
 
             if res.returncode != 0:
                 raise RuntimeError(f"SAP HANA hdbsql falhou ({res.returncode}): {res.stderr or res.stdout}")
 
-            self._append_log(job_id, "✅ Backup SAP HANA concluído com sucesso via Backint Stream!")
+            self._append_log(job_id, "✅ Backup SAP HANA concluído (BACKUP DATA USING FILE).")
 
             with self.lock:
                 if job_id in self.active_jobs:
@@ -321,7 +324,7 @@ EXIT;
             self._append_log(job_id, f"Invocando comando: {db2_bin} BACKUP DATABASE {db_name} ONLINE TO '{target_dir}' INCLUDE LOGS...")
             res = subprocess.run([
                 db2_bin, "BACKUP", "DATABASE", db_name, "ONLINE", "TO", target_dir, "INCLUDE", "LOGS"
-            ], capture_output=True, text=True, timeout=180)
+            ], capture_output=True, text=True, timeout=_DB_BACKUP_TIMEOUT)
 
             if res.returncode != 0:
                 raise RuntimeError(f"IBM DB2 backup falhou ({res.returncode}): {res.stderr or res.stdout}")

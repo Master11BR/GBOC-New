@@ -757,16 +757,16 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                         try {
                             const metaResp = await fetch(`/api/repositories/${repoId}`);
                             const meta = await metaResp.json();
-                            engine = engine || String(meta?.engine || 'desconhecido').toUpperCase();
-                            repoType = repoType || String(meta?.type || 'desconhecido').toUpperCase();
+                            engine = engine || String(meta?.engine || 'motor não cadastrado').toUpperCase();
+                            repoType = repoType || String(meta?.type || 'tipo não cadastrado').toUpperCase();
                             repoName = repoName || meta?.name || '';
                         } catch (e) {}
                     }
 
                     const summary = result.summary || [
                         repoName ? `Repositório: ${repoName}` : null,
-                        `Engine: ${engine || 'DESCONHECIDO'}`,
-                        `Tipo: ${repoType || 'DESCONHECIDO'}`,
+                        `Engine: ${engine || 'não cadastrado'}`,
+                        `Tipo: ${repoType || 'não cadastrado'}`,
                         `Conexão local/engine: ${result.diagnostics?.local?.ok ? 'OK' : 'FALHA'} (${result.diagnostics?.local?.elapsed_ms || 0} ms)`,
                         `Conexão secundária: ${result.diagnostics?.secondary?.checked ? (result.diagnostics?.secondary?.ok ? 'OK' : 'FALHA') : 'N/A'} (${result.diagnostics?.secondary?.elapsed_ms || 0} ms)`,
                         `Autenticação: ${result.diagnostics?.auth?.checked ? (result.diagnostics?.auth?.ok ? 'OK' : 'FALHA') : 'N/A'} (${result.diagnostics?.auth?.elapsed_ms || 0} ms)`,

@@ -57,7 +57,7 @@ class AdRestoreObjectRequest(BaseModel):
 # ── PostgreSQL Granular ───────────────────────────────────────────────────────
 
 @router.post("/postgres/inspect")
-async def inspect_postgres_dump(req: InspectPgDumpRequest):
+def inspect_postgres_dump(req: InspectPgDumpRequest):
     """Lê o Table of Contents (TOC) de um arquivo dump do PostgreSQL sem restaurar a base."""
     try:
         res = sql_granular_explorer.inspect_postgres_dump(req.dump_file_path)
@@ -69,7 +69,7 @@ async def inspect_postgres_dump(req: InspectPgDumpRequest):
 
 
 @router.post("/postgres/restore-table")
-async def restore_postgres_table(req: RestorePgTableRequest):
+def restore_postgres_table(req: RestorePgTableRequest):
     """Restaura cirurgicamente apenas UMA tabela a partir de um dump PostgreSQL."""
     try:
         res = sql_granular_explorer.restore_postgres_single_table(
@@ -90,7 +90,7 @@ async def restore_postgres_table(req: RestorePgTableRequest):
 # ── SQLite Granular ───────────────────────────────────────────────────────────
 
 @router.post("/sqlite/inspect")
-async def inspect_sqlite_tables(req: InspectSqliteRequest):
+def inspect_sqlite_tables(req: InspectSqliteRequest):
     """Lista todas as tabelas e contagem de linhas reais em arquivo SQLite."""
     try:
         res = sql_granular_explorer.inspect_sqlite_tables(req.database_file)
@@ -102,7 +102,7 @@ async def inspect_sqlite_tables(req: InspectSqliteRequest):
 
 
 @router.post("/sqlite/extract-table")
-async def extract_sqlite_table(req: ExtractSqliteTableRequest):
+def extract_sqlite_table(req: ExtractSqliteTableRequest):
     """Extrai cirurgicamente uma tabela de banco SQLite para um novo arquivo."""
     try:
         res = sql_granular_explorer.extract_sqlite_table_to_new_db(
@@ -118,7 +118,7 @@ async def extract_sqlite_table(req: ExtractSqliteTableRequest):
 # ── Microsoft SQL Server Granular ─────────────────────────────────────────────
 
 @router.post("/mssql/tables")
-async def list_mssql_tables(req: MssqlListTablesRequest):
+def list_mssql_tables(req: MssqlListTablesRequest):
     """Consulta schemas e contagem de linhas reais em banco Microsoft SQL Server."""
     res = sql_granular_explorer.list_mssql_tables(
         server=req.server,
@@ -133,7 +133,7 @@ async def list_mssql_tables(req: MssqlListTablesRequest):
 # ── Active Directory Granular ─────────────────────────────────────────────────
 
 @router.get("/ad/objects")
-async def list_ad_objects(filter: str = Query("all"), search: str = Query("")):
+def list_ad_objects(filter: str = Query("all"), search: str = Query("")):
     """Pesquisa objetos granulares do Active Directory (Usuários, Grupos, GPOs)."""
     res = ad_granular_explorer.list_ad_objects_from_live_or_snapshot(
         filter_type=filter,
@@ -143,7 +143,7 @@ async def list_ad_objects(filter: str = Query("all"), search: str = Query("")):
 
 
 @router.post("/ad/restore-object")
-async def restore_ad_object(req: AdRestoreObjectRequest):
+def restore_ad_object(req: AdRestoreObjectRequest):
     """Restaura granularmente um objeto no Active Directory a partir do Recycle Bin ou NTDS."""
     res = ad_granular_explorer.restore_granular_ad_object(
         object_dn=req.object_dn,

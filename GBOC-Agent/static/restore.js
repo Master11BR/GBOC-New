@@ -589,7 +589,7 @@ async function updateRestoreStatus(restoreId) {
         // Atualizar status
         const statusBadge = document.getElementById('restore-status-badge');
         if (statusBadge) {
-            statusBadge.textContent = (status.status || 'unknown').toUpperCase();
+            statusBadge.textContent = (status.status || 'sem status na resposta').toUpperCase();
             statusBadge.className = `badge badge-${getStatusClass(status.status)}`;
         }
         
@@ -922,8 +922,8 @@ async function diagnoseSnapshots() {
         const data = await res.json();
 
         const repoName = data.repository?.name || data.repository?.id || currentRepositoryId;
-        const repoEngine = String(data.repository?.engine || 'desconhecido').toUpperCase();
-        const repoType = String(data.repository?.type || 'desconhecido').toUpperCase();
+        const repoEngine = String(data.repository?.engine || 'motor não cadastrado').toUpperCase();
+        const repoType = String(data.repository?.type || 'tipo não cadastrado').toUpperCase();
 
         if (res.ok && data.status === 'success') {
             hideRestoreDiagnostic();

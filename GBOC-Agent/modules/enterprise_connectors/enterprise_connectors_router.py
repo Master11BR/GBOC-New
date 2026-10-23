@@ -50,14 +50,14 @@ class TapeMoveRequest(BaseModel):
 # ── Conectores de Banco de Dados ─────────────────────────────────────────────
 
 @router.get("/databases/detect")
-async def detect_databases():
+def detect_databases():
     """Detecta instâncias locais de Oracle, SAP HANA e IBM DB2."""
     res = enterprise_db_connectors.detect_enterprise_databases()
     return JSONResponse({"status": "success", "detected": res})
 
 
 @router.post("/oracle/backup")
-async def start_oracle_backup(req: OracleBackupRequest):
+def start_oracle_backup(req: OracleBackupRequest):
     """Inicia backup Oracle RMAN nativo."""
     try:
         res = enterprise_db_connectors.start_oracle_rman_backup(
@@ -72,7 +72,7 @@ async def start_oracle_backup(req: OracleBackupRequest):
 
 
 @router.post("/saphana/backup")
-async def start_sap_hana_backup(req: SapHanaBackupRequest):
+def start_sap_hana_backup(req: SapHanaBackupRequest):
     """Inicia backup SAP HANA via Backint."""
     try:
         res = enterprise_db_connectors.start_sap_hana_backup(
@@ -86,7 +86,7 @@ async def start_sap_hana_backup(req: SapHanaBackupRequest):
 
 
 @router.post("/ibmdb2/backup")
-async def start_ibm_db2_backup(req: IbmDb2BackupRequest):
+def start_ibm_db2_backup(req: IbmDb2BackupRequest):
     """Inicia backup IBM DB2 online."""
     try:
         res = enterprise_db_connectors.start_ibm_db2_backup(db_name=req.db_name)
@@ -97,7 +97,7 @@ async def start_ibm_db2_backup(req: IbmDb2BackupRequest):
 
 
 @router.get("/job/status/{job_id}")
-async def get_db_job_status(job_id: str):
+def get_db_job_status(job_id: str):
     """Retorna status de um job de banco de dados corporativo."""
     status = enterprise_db_connectors.get_job_status(job_id)
     if not status:
@@ -108,35 +108,35 @@ async def get_db_job_status(job_id: str):
 # ── Continuous Data Protection (CDP) ─────────────────────────────────────────
 
 @router.get("/cdp/status")
-async def get_cdp_status():
+def get_cdp_status():
     """Retorna o status atual do motor de CDP e RPO medido."""
     res = cdp_engine.get_cdp_status()
     return JSONResponse({"status": "success", "data": res})
 
 
 @router.post("/cdp/start")
-async def start_cdp():
+def start_cdp():
     """Ativa o daemon de micro-journaling do CDP."""
     res = cdp_engine.start_cdp_daemon()
     return JSONResponse(res)
 
 
 @router.post("/cdp/stop")
-async def stop_cdp():
+def stop_cdp():
     """Pausa o daemon do CDP."""
     res = cdp_engine.stop_cdp_daemon()
     return JSONResponse(res)
 
 
 @router.get("/cdp/checkpoints")
-async def list_cdp_checkpoints(limit: int = Query(40)):
+def list_cdp_checkpoints(limit: int = Query(40)):
     """Retorna lista cronológica de micro-checkpoints para o Point-in-Time Slider."""
     checkpoints = cdp_engine.list_cdp_checkpoints(limit=limit)
     return JSONResponse({"status": "success", "checkpoints": checkpoints, "count": len(checkpoints)})
 
 
 @router.post("/cdp/rollback")
-async def execute_cdp_rollback(req: CdpRollbackRequest):
+def execute_cdp_rollback(req: CdpRollbackRequest):
     """Executa restauração Point-in-Time exata para o checkpoint selecionado."""
     try:
         res = cdp_engine.rollback_to_point_in_time(
@@ -152,14 +152,14 @@ async def execute_cdp_rollback(req: CdpRollbackRequest):
 # ── Robótica de Fita LTO ─────────────────────────────────────────────────────
 
 @router.get("/tape-robotics/inventory")
-async def get_tape_robotics_inventory(changer_id: str = Query("Changer0")):
+def get_tape_robotics_inventory(changer_id: str = Query("Changer0")):
     """Retorna inventário completo da biblioteca de fitas e leitor de código de barras."""
     res = tape_robotics_engine.get_tape_library_inventory(changer_id=changer_id)
     return JSONResponse(res)
 
 
 @router.post("/tape-robotics/move")
-async def move_tape_media(req: TapeMoveRequest):
+def move_tape_media(req: TapeMoveRequest):
     """Executa comando de movimentação mecânica do braço robótico da fita."""
     res = tape_robotics_engine.move_tape_media(
         changer_id=req.changer_id,
@@ -173,7 +173,7 @@ async def move_tape_media(req: TapeMoveRequest):
 # ── Auditoria & Conformidade Internacional ───────────────────────────────────
 
 @router.get("/compliance/certificate")
-async def get_compliance_certificate(target: str = Query("SERVIDOR-2025")):
-    """Gera laudo formal e certificado digital de conformidade (ISO 27001, SOC 2, LGPD)."""
-    cert = audit_compliance_pack.generate_compliance_certificate(target_agent=target)
+def get_compliance_certificate(request: Request, target: Optional[str] = Query(None)):
+    """Laudo de autoavaliação de conformidade (ISO 27001, SOC 2, LGPD...) com evidências reais."""
+    cert = audit_compliance_pack.generate_compliance_certificate(target_agent=target, transport_scheme=request.url.scheme)
     return JSONResponse({"status": "success", "certificate": cert})

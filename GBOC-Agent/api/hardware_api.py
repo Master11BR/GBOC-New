@@ -112,7 +112,22 @@ def get_agent_ambient_telemetry() -> Dict[str, Any]:
         "cached": False
     }
 
+_HW_CACHE: Dict[str, Any] = {"at": 0.0, "data": None}
+_HW_LOCK = __import__("threading").Lock()
+_HW_TTL = 20  # s — cada coleta abre vários PowerShell (~7 s); o painel consulta a cada 5 s
+
+
 def get_agent_hardware_telemetry() -> Dict[str, Any]:
+    """Telemetria de hardware com cache curto e uma coleta por vez (evita PowerShell em paralelo)."""
+    with _HW_LOCK:
+        if _HW_CACHE["data"] is not None and time.time() - _HW_CACHE["at"] < _HW_TTL:
+            return _HW_CACHE["data"]
+        data = _get_agent_hardware_telemetry_uncached()
+        _HW_CACHE["data"], _HW_CACHE["at"] = data, time.time()
+        return data
+
+
+def _get_agent_hardware_telemetry_uncached() -> Dict[str, Any]:
     """
     Coleta telemetria 100% REAL do hardware do host do Agente:
     - Processador: Modelo, Cores, Threads, Clock (MHz), Carga (%) e Sensores térmicos.
@@ -131,7 +146,7 @@ def get_agent_hardware_telemetry() -> Dict[str, Any]:
         "load_percent": psutil.cpu_percent(interval=0.1) if PSUTIL_AVAILABLE else 0.0,
         "clock_mhz": None,
         "temperature_c": None,
-        "temperature_status": "unavailable"
+        "temperature_status": "sem leitura (sensor ainda não consultado)"
     }
 
     # 2. Memory Telemetry
@@ -196,15 +211,16 @@ def get_agent_hardware_telemetry() -> Dict[str, Any]:
                 for d in disks_list:
                     sz_bytes = d.get("Size") or 0
                     sz_gb = round(sz_bytes / (1024**3), 1) if sz_bytes else 0
-                    health = d.get("HealthStatus") or "OK"
-                    op_status = d.get("OperationalStatus") or "OK"
+                    # Sem valor do Windows nao vira "OK" nem "SATA": informa que o Windows nao forneceu
+                    health = d.get("HealthStatus") or "não informado pelo Windows"
+                    op_status = d.get("OperationalStatus") or "não informado pelo Windows"
                     temp_c = d.get("Temperature")
-                    temp_status = "normal" if (temp_c and temp_c < 45) else "high" if (temp_c and temp_c < 55) else "critical" if temp_c else "unknown"
+                    temp_status = "normal" if (temp_c and temp_c < 45) else "high" if (temp_c and temp_c < 55) else "critical" if temp_c else "sem sensor (o disco/driver não informa temperatura)"
                     
                     physical_disks.append({
                         "name": d.get("FriendlyName") or "Disco Físico",
-                        "media_type": d.get("MediaType") or "Desconhecido",
-                        "bus_type": d.get("BusType") or "SATA",
+                        "media_type": d.get("MediaType") or "não informado pelo Windows",
+                        "bus_type": d.get("BusType") or "não informado pelo Windows",
                         "size_gb": sz_gb,
                         "health_status": health,
                         "operational_status": op_status,
@@ -242,7 +258,7 @@ def get_agent_hardware_telemetry() -> Dict[str, Any]:
                             "health_status": st,
                             "operational_status": st,
                             "temperature_c": None,
-                            "temperature_status": "unknown",
+                            "temperature_status": "sem sensor (o disco/driver não informa temperatura)",
                             "wear_percent": None,
                             "read_errors": None,
                             "smart_status": "HEALTHY" if st.upper() == "OK" else "DEGRADED"
@@ -277,8 +293,9 @@ def get_agent_hardware_telemetry() -> Dict[str, Any]:
                 ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps_temp],
                 capture_output=True,
                 text=True,
-                timeout=2
+                timeout=20  # antes 2 s: o PowerShell nem terminava de iniciar e a leitura era descartada
             )
+            cpu_data["temperature_status"] = "sem sensor: o firmware não expõe MSAcpi_ThermalZoneTemperature"
             if res_temp.returncode == 0 and res_temp.stdout.strip():
                 temp_json = json.loads(res_temp.stdout)
                 if isinstance(temp_json, list):
@@ -289,8 +306,10 @@ def get_agent_hardware_telemetry() -> Dict[str, Any]:
                     if 0 < celsius < 115:
                         cpu_data["temperature_c"] = celsius
                         cpu_data["temperature_status"] = "normal" if celsius < 75 else "high" if celsius < 85 else "critical"
-        except Exception:
-            pass
+                    else:
+                        cpu_data["temperature_status"] = f"leitura inválida do sensor ({raw_k})"
+        except Exception as e_t:
+            cpu_data["temperature_status"] = f"sem leitura: {str(e_t)[:120]}"
 
     # 5. Ambient Weather Telemetry (Cidade onde o agente roda)
     ambient_data = get_agent_ambient_telemetry()
@@ -338,12 +357,12 @@ def get_agent_hardware_telemetry() -> Dict[str, Any]:
 
 @router.get("/api/v1/system/hardware")
 @router.get("/api/system/hardware")
-async def get_agent_hardware_v1(request: Request):
+def get_agent_hardware_v1(request: Request):
     """Endpoint legado/v1 para telemetria de hardware, S.M.A.R.T. e ambiente no Agente."""
     return get_agent_hardware_telemetry()
 
 @router.get("/api/v2/system/hardware")
-async def get_agent_hardware_v2(request: Request):
+def get_agent_hardware_v2(request: Request):
     """Endpoint moderno v2 com envelope para telemetria de hardware, S.M.A.R.T. e ambiente no Agente."""
     t0 = time.perf_counter()
     data = get_agent_hardware_telemetry()

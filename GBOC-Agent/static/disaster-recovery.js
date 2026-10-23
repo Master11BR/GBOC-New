@@ -70,10 +70,13 @@ async function loadDisasterRecoveryOverview() {
             if (info.is_domain_controller) {
                 adBadge.className = 'badge badge-success';
                 adBadge.innerHTML = '<i class="fas fa-shield-alt"></i> Controlador de Domínio (AD DS Ativo)';
-                adDetails.innerHTML = `Domínio: <strong>${info.domain_name || 'Desconhecido'}</strong> • Base NTDS.dit & SYSVOL consistentes via VSS.`;
+                adDetails.innerHTML = '';
+                adDetails.append('Domínio: ');
+                const b = document.createElement('strong'); b.textContent = info.domain_name || 'não informado pelo Windows'; adDetails.append(b);
+                adDetails.append(` • Base NTDS: ${info.ntds_database || 'caminho não encontrado no registro'}`);
             } else {
                 adBadge.className = 'badge badge-info';
-                adBadge.innerHTML = '<i class="fas fa-server"></i> Servidor Membro / Standalone';
+                adBadge.innerHTML = '<i class="fas fa-server"></i> Não é controlador de domínio';
                 adDetails.innerHTML = `Host: <strong>${info.hostname}</strong> • System State padrão (Registry SAM/SYSTEM + BCD).`;
             }
         }
@@ -566,6 +569,16 @@ function openDrMonitorModal(jobId, title) {
                 if (fillEl) fillEl.style.width = '100%';
                 if (pctEl) pctEl.textContent = '100%';
                 if (statusText) statusText.innerHTML = '<span style="color:var(--success); font-weight:700;">✅ Operação concluída com sucesso!</span>';
+            } else if (job.status === 'partial') {
+                if (_activeDrPolling?.stop) _activeDrPolling.stop();
+                else clearInterval(_activeDrPolling);
+                _activeDrPolling = null;
+                if (fillEl) fillEl.style.width = '100%';
+                if (pctEl) pctEl.textContent = '100%';
+                if (statusText) {
+                    statusText.innerHTML = '<span style="color:var(--warning); font-weight:700;"></span>';
+                    statusText.firstChild.textContent = `⚠️ Concluído parcialmente: ${job.error || 'veja os itens não capturados no log'}`;
+                }
             } else if (job.status === 'failed' || job.status === 'cancelled') {
                 if (_activeDrPolling?.stop) _activeDrPolling.stop();
                 else clearInterval(_activeDrPolling);

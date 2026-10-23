@@ -233,7 +233,11 @@ class SqlGranularExplorer:
                 "message": "Inspeção MSSQL via PowerShell nativo suportada em Windows host."
             }
 
-        auth_clause = "-IntegratedSecurity" if trusted_connection else f"-Username '{user}' -Password '{password}'"
+        # Servidor/banco/usuario/senha vao por variavel de ambiente e a string de conexao e montada pelo
+        # SqlConnectionStringBuilder (antes: interpolados no script -> injecao de comandos via aspas)
+        ps_env = dict(os.environ, GBOC_SQL_SERVER=str(server or ""), GBOC_SQL_DB=str(database or ""),
+                      GBOC_SQL_USER=str(user or ""), GBOC_SQL_PASS=str(password or ""),
+                      GBOC_SQL_TRUSTED="1" if trusted_connection else "0")
         ps_script = f"""
             $ErrorActionPreference = 'Stop'
             $query = @"
@@ -248,12 +252,13 @@ WHERE p.index_id IN (0, 1)
 ORDER BY s.name, t.name;
 "@
             try {{
-                $connStr = if ('{trusted_connection}' -eq 'True') {{
-                    "Server={server};Database={database};Integrated Security=True;TrustServerCertificate=True"
-                }} else {{
-                    "Server={server};Database={database};User Id={user};Password={password};TrustServerCertificate=True"
-                }}
-                $conn = New-Object System.Data.SqlClient.SqlConnection($connStr)
+                $b = New-Object System.Data.SqlClient.SqlConnectionStringBuilder
+                $b['Data Source'] = $env:GBOC_SQL_SERVER
+                $b['Initial Catalog'] = $env:GBOC_SQL_DB
+                $b['TrustServerCertificate'] = $true
+                if ($env:GBOC_SQL_TRUSTED -eq '1') {{ $b['Integrated Security'] = $true }}
+                else {{ $b['User ID'] = $env:GBOC_SQL_USER; $b['Password'] = $env:GBOC_SQL_PASS }}
+                $conn = New-Object System.Data.SqlClient.SqlConnection($b.ConnectionString)
                 $conn.Open()
                 $cmd = $conn.CreateCommand()
                 $cmd.CommandText = $query
@@ -278,7 +283,7 @@ ORDER BY s.name, t.name;
         try:
             res = subprocess.run(
                 ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_script],
-                capture_output=True, text=True, timeout=15
+                capture_output=True, text=True, timeout=15, env=ps_env
             )
             if res.returncode == 0 and res.stdout.strip():
                 data = json.loads(res.stdout.strip())

@@ -33,6 +33,13 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         .stat-card .val{font-size:1.8em;font-weight:700}
         .stat-card .lbl{font-size:.8em;color:var(--text-muted);margin-top:4px}
 
+/* Proporção: KPIs e card do antivírus compactos (stat-card do tema tem min-height de 140px) */
+#kpi-row .stat-card { min-height:0; padding:12px 16px; }
+#kpi-row .stat-card .val { font-size:1.6em; line-height:1.1; }
+#kpi-row .stat-card .lbl { font-size:.8em; margin-top:2px; }
+#local-protection-card.stat-card { min-height:0; padding:12px 16px !important; border-left-width:3px; }
+#local-protection-card #av-icon { font-size:1.5em !important; }
+.ev-msg { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; font-size:.85em; line-height:1.4; }
         .two-col{display:grid;grid-template-columns:1fr 1fr;gap:24px}
         @media(max-width:900px){.two-col{grid-template-columns:1fr}}
 
@@ -103,11 +110,10 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             <header class="header">
                 <div>
                     <h1 class="page-title"><i class="fas fa-shield-virus" style="color:var(--danger)"></i> Detecção de Ransomware</h1>
-                    <div class="page-subtitle">Análise de entropia, extensões suspeitas, canary files e varredura completa</div>
+                    <div class="page-subtitle">Canary files, resposta automática do Guardian e status do antivírus local</div>
                 </div>
                 <div class="header-actions">
                     <button class="btn btn-secondary" onclick="loadAll()"><i class="fas fa-sync-alt"></i> Atualizar</button>
-                    <button class="btn btn-primary" onclick="openScanModal()"><i class="fas fa-search"></i> Nova Varredura</button>
                     <button class="btn btn-success" onclick="openCanaryModal()"><i class="fas fa-dove"></i> Criar Canary</button>
                 </div>
             </header>
@@ -170,28 +176,10 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             <div class="stats-row" id="kpi-row">
                 <div class="stat-card"><div class="val" id="kpi-canaries">0</div><div class="lbl">Canary Files</div></div>
                 <div class="stat-card"><div class="val" id="kpi-compromised" style="color:var(--danger)">0</div><div class="lbl">Comprometidos</div></div>
-                <div class="stat-card"><div class="val" id="kpi-scans">0</div><div class="lbl">Varreduras</div></div>
-                <div class="stat-card"><div class="val" id="kpi-last-threat">—</div><div class="lbl">Último Nível</div></div>
                 <div class="stat-card"><div class="val" id="kpi-incidents" style="color:var(--warning)">0</div><div class="lbl">Incidentes</div></div>
             </div>
 
-            <!-- STACK DE SEGURANÇA OPEN SOURCE (7 FERRAMENTAS INTEGRADAS) -->
-            <div class="panel" style="margin-bottom:24px;border:2px solid rgba(0,240,255,0.2)">
-                <div class="panel-header">
-                    <div>
-                        <h3><i class="fas fa-shield-alt" style="color:var(--primary)"></i> Stack de Segurança Open Source (7 Ferramentas Integradas)</h3>
-                        <p style="font-size:0.82em;color:var(--text-muted);margin:4px 0 0 0">ClamAV, Armadito, ClamWin/ClamTk, Hypatia, Wazuh HIDS, YARA e Rkhunter integrados diretamente no motor de backup GBOC.</p>
-                    </div>
-                    <button class="btn btn-primary" onclick="runMultiToolScan()"><i class="fas fa-play-circle"></i> Varredura Integrada (7 Ferramentas)</button>
-                </div>
-                <div class="panel-body" style="padding:16px">
-                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;" id="tools-grid-container">
-                        <div class="empty-msg">Carregando ferramentas de segurança...</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="two-col">
+            <div>
                 <!-- Canary Files -->
                 <div class="panel">
                     <div class="panel-header">
@@ -201,49 +189,18 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                     <div class="panel-body" id="canary-list"><div class="empty-msg">Carregando...</div></div>
                 </div>
 
-                <!-- Scan History -->
-                <div class="panel">
-                    <div class="panel-header">
-                        <h3><i class="fas fa-history" style="color:var(--primary)"></i> Histórico de Varreduras</h3>
-                    </div>
-                    <div class="panel-body" style="padding:0">
-                        <table class="tbl">
-                            <thead><tr><th>Data</th><th>Tipo</th><th>Alvo</th><th>Ameaça</th><th>Duração</th></tr></thead>
-                            <tbody id="scan-history"><tr><td colspan="5" class="empty-msg">Carregando...</td></tr></tbody>
-                        </table>
-                    </div>
-                </div>
             </div>
 
             <!-- Incident History -->
             <div class="panel" style="margin-top:4px">
                 <div class="panel-header">
                     <h3><i class="fas fa-skull-crossbones" style="color:var(--danger)"></i> Incidentes de Ransomware</h3>
-                    <span style="font-size:.78em;color:var(--text-muted)" id="incident-count"></span>
+                    <span style="display:flex;gap:10px;align-items:center">
+                        <span style="font-size:.78em;color:var(--text-muted)" id="incident-count"></span>
+                        <button class="btn btn-sm btn-secondary" onclick="resolveAllIncidents()" title="Resolver todos os incidentes ativos e desbloquear repositórios/tarefas"><i class="fas fa-check-double"></i> Resolver ativos</button>
+                    </span>
                 </div>
                 <div class="panel-body" id="incident-list"><div class="empty-msg"><i class="fas fa-check-circle" style="font-size:2em;opacity:.3;display:block;margin-bottom:8px"></i>Nenhum incidente registrado — tudo limpo</div></div>
-            </div>
-
-            <!-- Scan Modal -->
-            <div class="modal-overlay" id="scan-modal">
-                <div class="modal-box" style="width:580px">
-                    <h3><i class="fas fa-search" style="color:var(--primary)"></i> Nova Varredura</h3>
-                    <div class="form-group">
-                        <label>Diretório Alvo</label>
-                        <div style="display:flex;gap:6px">
-                            <input type="text" id="scan-path" placeholder="Selecione ou digite o caminho..." style="flex:1">
-                            <button class="btn btn-secondary" onclick="toggleFsBrowser('scan')" title="Procurar pasta"><i class="fas fa-folder-open"></i></button>
-                        </div>
-                        <div class="fs-browser" id="fs-browser-scan" style="display:none">
-                            <div class="fs-path-bar" id="fs-crumbs-scan"></div>
-                            <div id="fs-list-scan"><div class="fs-loading"><i class="fas fa-spinner fa-spin"></i> Carregando...</div></div>
-                        </div>
-                    </div>
-                    <div class="modal-actions">
-                        <button class="btn btn-secondary" onclick="closeScanModal()">Cancelar</button>
-                        <button class="btn btn-primary" onclick="startScan()"><i class="fas fa-play"></i> Iniciar Varredura</button>
-                    </div>
-                </div>
             </div>
 
             <!-- Canary Modal -->
@@ -288,7 +245,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     const API='/api/ransomware';
 
     async function loadAll(){
-        await Promise.allSettled([loadStatus(), loadSecurityTools(), loadCanaries(), loadHistory(), loadGuardian(), loadIncidents(), loadLocalProtection()]);
+        await Promise.allSettled([loadStatus(), loadCanaries(), loadGuardian(), loadIncidents(), loadLocalProtection()]);
     }
 
     async function loadLocalProtection(){
@@ -329,11 +286,13 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 
             if (tbody) {
                 if(data.recent_security_events && data.recent_security_events.length > 0) {
+                    const _esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
                     tbody.innerHTML = data.recent_security_events.map(ev => {
+                        const msg = _esc(ev.message || '—');
                         return `<tr>
                             <td style="white-space:nowrap">${ev.time ? new Date(ev.time).toLocaleString() : '—'}</td>
-                            <td><span class="badge-warn">${ev.id ?? '—'}</span></td>
-                            <td>${ev.message || '—'}</td>
+                            <td style="white-space:nowrap"><span class="badge-warn">${_esc(ev.id ?? '—')}</span></td>
+                            <td><div class="ev-msg" title="${msg}">${msg}</div></td>
                         </tr>`;
                     }).join('');
                 } else {
@@ -356,72 +315,6 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 tbody.innerHTML = `<tr><td colspan="3" class="empty-msg" style="color:var(--warning)">Falha ao validar proteção local: ${String(e.message || e)}</td></tr>`;
             }
         }
-    }
-
-    async function loadSecurityTools(){
-        try{
-            const r=await fetch(API+'/tools');
-            const d=await r.json();
-            const tools=d.tools||{};
-            const container=document.getElementById('tools-grid-container');
-            if(!container) return;
-
-            const toolList=[
-                {id:'clamav', name:'ClamAV Engine', icon:'fa-virus-slash', color:'#4299e1'},
-                {id:'armadito', name:'Armadito Antivirus', icon:'fa-shield-virus', color:'#ed8936'},
-                {id:'clamwin_clamtk', name:'ClamWin / ClamTk GUI', icon:'fa-desktop', color:'#38b2ac'},
-                {id:'hypatia', name:'Hypatia Mobile Guard', icon:'fa-mobile-alt', color:'#9f7aea'},
-                {id:'wazuh_hids', name:'Wazuh / OSSEC HIDS', icon:'fa-user-shield', color:'#48bb78'},
-                {id:'yara', name:'YARA Engine', icon:'fa-code-branch', color:'#f56565'},
-                {id:'rkhunter', name:'Rkhunter (Rootkit Hunter)', icon:'fa-user-ninja', color:'#ecc94b'}
-            ];
-
-            container.innerHTML=toolList.map(t=>{
-                const info=tools[t.id]||{};
-                const installed=Boolean(info.installed || info.available);
-                const statusBadge=installed
-                    ?'<span style="background:rgba(72,187,120,0.15);color:#48bb78;border:1px solid rgba(72,187,120,0.3);padding:2px 7px;border-radius:4px;font-size:0.72em;font-weight:700"><i class="fas fa-check-circle"></i> Instalado</span>'
-                    :'<span style="background:rgba(245,101,101,0.15);color:#f56565;border:1px solid rgba(245,101,101,0.3);padding:2px 7px;border-radius:4px;font-size:0.72em;font-weight:700"><i class="fas fa-times-circle"></i> Não Instalado</span>';
-                
-                const actionBtn=installed
-                    ?`<button class="btn btn-sm btn-primary" onclick="scanSingleTool('${t.id}')" style="width:100%;margin-top:10px;font-size:0.78em"><i class="fas fa-search"></i> Varrer com ${t.name.split(' ')[0]}</button>`
-                    :`<button class="btn btn-sm btn-secondary" disabled style="width:100%;margin-top:10px;font-size:0.78em;opacity:0.45;cursor:not-allowed"><i class="fas fa-ban"></i> Ausente no SO</button>`;
-
-                const binaryText = installed ? (info.binary || 'Caminho verificado no SO') : 'Não encontrado no PATH do SO';
-
-                return `<div style="background:var(--bg-input);border:1px solid ${installed?'var(--border)':'rgba(245,101,101,0.3)'};border-radius:10px;padding:14px">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-                        <div style="font-weight:700;font-size:0.9em;display:flex;align-items:center;gap:6px">
-                            <i class="fas ${t.icon}" style="color:${t.color}"></i> ${info.name||t.name}
-                        </div>
-                        ${statusBadge}
-                    </div>
-                    <div style="font-size:0.78em;color:var(--text-muted);margin-bottom:6px">${info.type||'Motor de Segurança'}</div>
-                    <div style="font-size:0.75em;color:${installed?'var(--text-secondary)':'#f56565'};font-family:monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${binaryText}">${info.status || binaryText}</div>
-                    ${actionBtn}
-                </div>`;
-            }).join('');
-        }catch(e){console.error('loadSecurityTools:',e)}
-    }
-
-    async function scanSingleTool(toolId){
-        const path=prompt('Digite o diretório ou caminho para a varredura dedicada:', 'C:\\') || 'C:\\';
-        try{
-            const r=await fetch(API+'/tools/scan/'+toolId,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target_path:path})});
-            const d=await r.json();
-            alert(`Varredura com ${toolId.toUpperCase()} Concluída!\nStatus: ${d.status||'OK'}\nAmeaças identificadas: ${d.threats_found||d.threats_matched||d.rootkits_found||0}`);
-            loadAll();
-        }catch(e){alert('Erro ao executar ferramenta: '+e.message)}
-    }
-
-    async function runMultiToolScan(){
-        const path=prompt('Digite o diretório alvo para a varredura integrada com as 7 Ferramentas:', 'C:\\') || 'C:\\';
-        try{
-            const r=await fetch(API+'/tools/scan/integrated',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target_path:path})});
-            const d=await r.json();
-            alert(`Varredura Integrada Multi-Tool Concluída!\nNível de Risco: ${(d.threat_level||'none').toUpperCase()}\nTotal de Ameaças: ${d.total_threats_detected||0}\nFerramentas Executadas: ${d.tools_executed||7}`);
-            loadAll();
-        }catch(e){alert('Erro ao executar varredura integrada: '+e.message)}
     }
 
     // ─── Guardian Auto-Response ──────────────────────────────────
@@ -530,26 +423,37 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         }catch(e){console.error('loadIncidents:',e)}
     }
 
+    function _lockMsg(d){
+        if(!d) return '';
+        if(d.note) return '\n'+d.note;
+        return (d.restored_repositories||d.restored_tasks)?`\nDesbloqueados: ${d.restored_repositories||0} repositório(s), ${d.restored_tasks||0} tarefa(s).`:'';
+    }
     async function resolveIncident(id){
         if(!confirm('Marcar este incidente como resolvido?'))return;
-        try{await fetch(API+'/guardian/incidents/'+id+'/resolve',{method:'PUT'});loadIncidents();loadGuardian()}catch(e){alert('Erro: '+e.message)}
+        try{const r=await fetch(API+'/guardian/incidents/'+id+'/resolve',{method:'PUT'});const d=await r.json().catch(()=>null);
+            const m=_lockMsg(d); if(m) alert('Incidente resolvido.'+m);
+            loadIncidents();loadGuardian()}catch(e){alert('Erro: '+e.message)}
+    }
+    async function resolveAllIncidents(){
+        if(!confirm('Resolver TODOS os incidentes ativos?\nRepositórios e tarefas bloqueados pelo Guardian voltarão ao status anterior.'))return;
+        try{const r=await fetch(API+'/guardian/incidents/resolve-active',{method:'PUT'});const d=await r.json();
+            alert(`${d.resolved||0} incidente(s) resolvido(s).`+_lockMsg(d));loadIncidents();loadGuardian()}catch(e){alert('Erro: '+e.message)}
     }
 
     async function loadStatus(){
         try{
             const r=await fetch(API+'/status');const d=await r.json();
-            const c=d.canaries||{};const ls=d.last_scan||{};
+            const c=d.canaries||{};
             document.getElementById('kpi-canaries').textContent=c.total||0;
             document.getElementById('kpi-compromised').textContent=c.compromised||0;
-            const tl=ls.threat_level||d.overall_status||'none';
-            document.getElementById('kpi-last-threat').textContent=tl.toUpperCase();
+            const tl=d.overall_status==='protected'?'none':'critical';
             const banner=document.getElementById('threat-banner');
             banner.className='threat-banner '+(d.overall_status==='protected'?'none':tl);
             const icon=banner.querySelector('.icon i');
             if(d.overall_status==='protected'){
                 icon.className='fas fa-shield-alt';icon.style.color='var(--success)';
                 document.getElementById('threat-title').textContent='Sistema Protegido';
-                document.getElementById('threat-sub').textContent=`${c.total} canary files ativos · Último scan: ${ls.date?gbocFormatDateTime(ls.date):'Nunca'}`;
+                document.getElementById('threat-sub').textContent=`${c.total} canary files ativos · Guardian monitora os canaries; detecção de malware fica com o antivírus`;
             } else {
                 icon.className='fas fa-exclamation-triangle';icon.style.color='var(--danger)';
                 document.getElementById('threat-title').textContent='⚠ Atenção — Possível Ameaça Detectada';
@@ -590,29 +494,6 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         }catch(e){console.error('loadCanaries:',e)}
     }
 
-    async function loadHistory(){
-        try{
-            const r=await fetch(API+'/scan/history?limit=15');const d=await r.json();
-            const scans=d.scans||[];
-            document.getElementById('kpi-scans').textContent=scans.length;
-            const tb=document.getElementById('scan-history');
-            if(!scans.length){tb.innerHTML='<tr><td colspan="5" class="empty-msg">Nenhuma varredura</td></tr>';return}
-            tb.innerHTML=scans.map(s=>{
-                const tl=s.threat_level||'none';
-                const cls=tl==='none'?'badge-none':tl==='low'?'badge-none':tl==='medium'?'badge-warn':'badge-crit';
-                return `<tr>
-                    <td style="font-size:.82em;white-space:nowrap">${s.started_at?gbocFormatDateTime(s.started_at):'—'}</td>
-                    <td>${s.scan_type||'full'}</td>
-                    <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${s.target_path||''}">${s.target_path||'—'}</td>
-                    <td><span class="${cls}">${tl.toUpperCase()}</span></td>
-                    <td>${s.duration_seconds||0}s</td>
-                </tr>`;
-            }).join('');
-        }catch(e){console.error('loadHistory:',e)}
-    }
-
-    function openScanModal(){document.getElementById('scan-modal').classList.add('show')}
-    function closeScanModal(){document.getElementById('scan-modal').classList.remove('show');document.getElementById('fs-browser-scan').style.display='none'}
     function openCanaryModal(){document.getElementById('canary-modal').classList.add('show')}
     function closeCanaryModal(){document.getElementById('canary-modal').classList.remove('show');document.getElementById('fs-browser-canary').style.display='none'}
 
@@ -691,26 +572,13 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         }
     }
 
-    async function startScan(){
-        const path=document.getElementById('scan-path').value.trim();
-        if(!path){alert('Informe o diretório alvo');return}
-        closeScanModal();
-        try{
-            const r=await fetch(API+'/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target_path:path})});
-            const d=await r.json();
-            if(!r.ok){alert('Erro: '+(d.detail||'Desconhecido'));return}
-            alert(`Varredura concluída!\nNível de ameaça: ${(d.threat_level||'none').toUpperCase()}\nAchados: ${d.findings?.length||0}`);
-            loadAll();
-        }catch(e){alert('Erro: '+e.message)}
-    }
-
     async function createCanary(){
         const path=document.getElementById('canary-path').value.trim();
         if(!path){alert('Informe o caminho');return}
         closeCanaryModal();
         try{
             const r=await fetch(API+'/canary',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({file_path:path})});
-            if(!r.ok){const d=await r.json();alert('Erro: '+(d.detail||'Desconhecido'));return}
+            if(!r.ok){const d=await r.json();alert('Erro: '+(d.detail||('HTTP '+r.status)));return}
             loadAll();
         }catch(e){alert('Erro: '+e.message)}
     }

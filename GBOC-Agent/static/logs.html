@@ -101,6 +101,13 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             background: linear-gradient(135deg, #dc2626, #ef4444) !important;
         }
 
+        /* Painel dos logs fica parado em qualquer estilo (Fernly/Cyber 3D); a animação é só nos itens */
+        html .log-toast-panel[data-antigravity="off"],
+        html .log-toast-panel[data-antigravity="off"]:hover {
+            transform: none !important;
+            animation: none !important;
+        }
+
         .log-controls {
             display: flex;
             gap: 12px;
@@ -197,6 +204,8 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             overscroll-behavior: contain;
             padding-right: 4px;
         }
+        /* itens nao encolhem na coluna flex rolavel (antes cortavam a 2a linha da mensagem) */
+        .list > * { flex-shrink: 0; }
 
         .list .copy,
         .list .msg-text,
@@ -483,7 +492,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             </header>
 
             <div class="content" style="width:100%;">
-                <section class="panel log-toast-panel">
+                <section class="panel log-toast-panel" data-antigravity="off">
                     <nav class="filters" aria-label="Filtro de notificações de logs">
                         <button class="filter active" data-filter="all"><i class="fas fa-layer-group"></i> Todos</button>
                         <button class="filter" data-filter="success"><i class="fas fa-check-circle"></i> Success</button>
@@ -595,8 +604,10 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             });
         }
 
-        function render(animate = true) {
+        // onlyNew: Set de ids — só esses itens animam (os já exibidos ficam parados)
+        function render(animate = true, onlyNew = null) {
             const items = visibleItems();
+            let newIdx = 0;
             list.innerHTML = '';
 
             items.forEach((n, index) => {
@@ -604,7 +615,8 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 el.className = 'toast';
                 el.dataset.type = n.type;
                 el.dataset.id = n.id;
-                if (!animate) el.style.animation = 'none';
+                const animThis = animate && (!onlyNew || onlyNew.has(n.id));
+                if (!animThis) el.style.animation = 'none';
 
                 const isWarnOrErr = n.type === 'error' || n.type === 'warning';
                 const aiBtnHtml = isWarnOrErr ? `
@@ -629,7 +641,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                     </div>
                 `;
 
-                el.style.animationDelay = `${Math.min(index * 45, 600)}ms`;
+                if (animThis) el.style.animationDelay = `${Math.min((onlyNew ? newIdx++ : index) * 45, 600)}ms`;
 
                 el.querySelector('.dismiss').addEventListener('click', (e) => {
                     e.stopPropagation();
@@ -775,10 +787,15 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 if (!more) lastLogSig = sig;
                 logOffset += rawLogs.length;
                 if (!unchanged) {
+                    const prevIds = new Set(allLogs.map(x => x.id));
                     allLogs = more ? allLogs.concat(mapped) : mapped;
                     const keepScroll = list.scrollTop;
-                    // Animação só no carregamento manual; refresh automático é estático
-                    render(!more && !auto);
+                    if (auto) {
+                        // Refresh automático: só os logs que chegaram agora entram animados
+                        render(true, new Set(mapped.filter(x => !prevIds.has(x.id)).map(x => x.id)));
+                    } else {
+                        render(!more);
+                    }
                     if (auto) list.scrollTop = keepScroll;
                 }
                 if (data.total != null) count.textContent = `(${allLogs.length.toLocaleString('pt-BR')} de ${Number(data.total).toLocaleString('pt-BR')})`;

@@ -61,7 +61,7 @@ def verify_disk_or_db_integrity(file_path: str) -> Dict[str, Any]:
         return {
             "valid": False,
             "error": f"Arquivo '{file_path}' não encontrado no storage.",
-            "format": "UNKNOWN"
+            "format": "arquivo ausente"
         }
 
     file_size = os.path.getsize(file_path)

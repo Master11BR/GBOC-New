@@ -8,6 +8,7 @@ import os
 import json
 import socket
 import subprocess
+import shutil
 import time
 import httpx
 import logging
@@ -766,7 +767,31 @@ class GBOCDiagnosticSystem:
         return False
     
     def _check_disk_health(self, device) -> str:
-        """Verifica saúde do disco usando SMART"""
+        """Saude real do disco: Windows via Get-Disk (HealthStatus); Linux via SMART (smartctl)."""
+        if os.name == 'nt':
+            import re as _re
+            letter = (str(device or "")[:1] or "").upper()
+            if not _re.fullmatch(r"[A-Z]", letter):
+                return f"não verificado: unidade inválida ({device})"
+            cache = getattr(self, "_disk_health_cache", {})
+            hit = cache.get(letter)
+            if hit and time.time() - hit[0] < 300:
+                return hit[1]
+            try:
+                r = subprocess.run(["powershell", "-NoProfile", "-Command",
+                                    f"(Get-Partition -DriveLetter '{letter}' -ErrorAction Stop | Get-Disk -ErrorAction Stop).HealthStatus"],
+                                   capture_output=True, text=True, timeout=20)
+                hs = (r.stdout or "").strip()
+                val = {"healthy": "healthy", "warning": "warning", "unhealthy": "failing"}.get(hs.lower()) if r.returncode == 0 and hs \
+                    else f"não verificado: {(r.stderr or 'sem resposta do Get-Disk').strip().splitlines()[0][:120]}"
+                val = val or hs
+            except Exception as e:
+                val = f"não verificado: {e}"
+            cache[letter] = (time.time(), val)
+            self._disk_health_cache = cache
+            return val
+        if not shutil.which('smartctl'):
+            return "não verificado: smartctl (smartmontools) não instalado"
         if os.name != 'nt':
             try:
                 result = subprocess.run(
@@ -916,15 +941,15 @@ class GBOCDiagnosticSystem:
         """Obtém gateway padrão"""
         try:
             if os.name == 'nt':
+                # Rota padrao IPv4 (independe do idioma do Windows; antes procurava 'Default Gateway' no ipconfig)
                 result = subprocess.run(
-                    ['ipconfig'],
-                    capture_output=True,
-                    text=True
+                    ['powershell', '-NoProfile', '-Command',
+                     "(Get-NetRoute -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue | Sort-Object RouteMetric | Select-Object -First 1).NextHop"],
+                    capture_output=True, text=True, timeout=15
                 )
-                import re
-                match = re.search(r'Default Gateway.*?: ([\d.]+)', result.stdout)
-                if match:
-                    return match.group(1)
+                gw = (result.stdout or "").strip()
+                if gw and gw != "0.0.0.0":
+                    return gw
             else:
                 result = subprocess.run(
                     ['ip', 'route', 'show', 'default'],
@@ -1089,8 +1114,9 @@ class GBOCDiagnosticSystem:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 return match.group(1)
-                
-        return "unknown"
+        # sem numero de versao no texto: devolve a primeira linha real da saida do programa
+        first = next((l.strip() for l in (text or "").splitlines() if l.strip()), "")
+        return first[:80] or "sem saída de versão"
     
     # ================================
     # CACHE E OTIMIZAÇÃO

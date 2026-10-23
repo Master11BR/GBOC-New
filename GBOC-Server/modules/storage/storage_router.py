@@ -61,7 +61,7 @@ def _get_server_storage_stats():
     return stats
 
 @router.get("/overview")
-async def get_storage_overview():
+def get_storage_overview():
     """Retorna o uso atual de armazenamento no servidor e nos motores (Local vs. Nuvem)."""
     stats = _get_server_storage_stats()
     total_capacity = sum(s["total_gb"] for s in stats)
@@ -184,7 +184,7 @@ def get_storage_history(days: int = 30):
     })
 
 @router.post("/scan")
-async def scan_storage():
+def scan_storage():
     """Executa varredura de discos no servidor central."""
     stats = _get_server_storage_stats()
     return JSONResponse({

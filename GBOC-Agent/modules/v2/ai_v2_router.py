@@ -54,7 +54,7 @@ async def chat_with_ai_v2(body: QueryRequestV2, request: Request):
 
 
 @router.get("/config")
-async def get_ai_config_v2(request: Request):
+def get_ai_config_v2(request: Request):
     """Retorna a configuração dos provedores de IA (chaves mascaradas)."""
     t0 = time.perf_counter()
     require_ai_user(request)
@@ -64,7 +64,7 @@ async def get_ai_config_v2(request: Request):
 
 
 @router.post("/config")
-async def update_ai_config_v2(body: ConfigRequest, request: Request):
+def update_ai_config_v2(body: ConfigRequest, request: Request):
     """Atualiza as configurações de IA (somente administradores)."""
     t0 = time.perf_counter()
     require_ai_user(request, admin=True)

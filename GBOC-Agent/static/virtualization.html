@@ -18,6 +18,11 @@
     <script src="/static/gboc-layout-manager.js?v=14.8.2"></script>
     <script src="/static/gboc-modal.js?v=14.8.2"></script>
 <script src="/static/sidebar.js"></script>
+<style>
+.vt-badge { padding:2px 6px; border-radius:4px; font-size:0.75em; font-weight:700; background:rgba(148,163,184,0.15); color:var(--text-muted); }
+.vt-badge.ok { background:rgba(72,187,120,0.15); color:#48bb78; }
+.vt-badge.fail { background:rgba(239,68,68,0.12); color:#f87171; }
+</style>
 </head>
 <body>
     <div class="app-layout">
@@ -34,7 +39,7 @@
                 <div class="stat-card"><div class="val" id="vmware-count">0</div><div class="lbl">VMware ESXi / vCenter</div></div>
                 <div class="stat-card"><div class="val" id="hyperv-count">0</div><div class="lbl">Hyper-V RCT / Cluster</div></div>
                 <div class="stat-card"><div class="val" id="proxmox-count">0</div><div class="lbl">Proxmox VE (vzdump)</div></div>
-                <div class="stat-card"><div class="val" style="color:var(--success)" id="vms-healthy">100%</div><div class="lbl">Status da Proteção</div></div>
+                <div class="stat-card" title="O GBOC ainda não mede a proteção por máquina virtual (backup por VM)."><div class="val" style="color:var(--text-muted)" id="vms-healthy">—</div><div class="lbl">Proteção por VM (sem medição)</div></div>
             </div>
 
             <!-- TABBED INTERFACE FOR HYPERVISORS -->
@@ -51,7 +56,7 @@
                                 <h4 style="margin:0;font-size:1.05em;display:flex;align-items:center;gap:8px">
                                     <i class="fas fa-cloud" style="color:#4299e1"></i> VMware ESXi / vCenter
                                 </h4>
-                                <span class="badge-ok" style="background:rgba(72,187,120,0.15);color:#48bb78;padding:2px 6px;border-radius:4px;font-size:0.75em;font-weight:700">Ativo</span>
+                                <span id="vmware-badge" class="vt-badge">Não verificado</span>
                             </div>
                             <p style="font-size:0.8em;color:var(--text-muted);margin-bottom:12px">Backup incremental de VMs VMware gratuitas e pagas via API vSphere, VDDK e snapshots de réplica.</p>
                             <div class="form-group" style="margin-bottom:8px">
@@ -67,7 +72,7 @@
                                 <h4 style="margin:0;font-size:1.05em;display:flex;align-items:center;gap:8px">
                                     <i class="fas fa-window-restore" style="color:#ed8936"></i> Hyper-V RCT & Cluster CSV
                                 </h4>
-                                <span class="badge-ok" style="background:rgba(72,187,120,0.15);color:#48bb78;padding:2px 6px;border-radius:4px;font-size:0.75em;font-weight:700">Ativo</span>
+                                <span id="hyperv-badge" class="vt-badge">Não verificado</span>
                             </div>
                             <p style="font-size:0.8em;color:var(--text-muted);margin-bottom:12px">Backup incremental RCT (Resilient Change Tracking), Failover Cluster e suporte a discos CSV.</p>
                             <div class="form-group" style="margin-bottom:8px">
@@ -83,7 +88,7 @@
                                 <h4 style="margin:0;font-size:1.05em;display:flex;align-items:center;gap:8px">
                                     <i class="fas fa-server" style="color:#9f7aea"></i> Proxmox VE (vzdump / PBS)
                                 </h4>
-                                <span class="badge-ok" style="background:rgba(72,187,120,0.15);color:#48bb78;padding:2px 6px;border-radius:4px;font-size:0.75em;font-weight:700">Ativo</span>
+                                <span id="proxmox-badge" class="vt-badge">Não verificado</span>
                             </div>
                             <p style="font-size:0.8em;color:var(--text-muted);margin-bottom:12px">Backup de contêineres LXC e máquinas virtuais Proxmox VE via vzdump e Proxmox Backup Server.</p>
                             <div class="form-group" style="margin-bottom:8px">
@@ -151,6 +156,7 @@
                     const data = await res.json();
                     const countEl = document.getElementById('hyperv-count');
                     if (countEl) countEl.textContent = data.count || 0;
+                    setVtBadge('hyperv-badge', data.status === 'success', data.status === 'success' ? `${data.count || 0} VM(s)` : 'Indisponível');
                     if (data.vms && data.vms.length > 0) {
                         renderVmList(data.vms);
                     } else if (tbody) {
@@ -179,6 +185,11 @@
             }
         }
 
+        // Selos refletem o último teste real (antes: "Ativo" fixo nos três, mesmo sem conexão)
+        function setVtBadge(id, ok, text) {
+            const b = document.getElementById(id); if (!b) return;
+            b.textContent = text; b.classList.toggle('ok', !!ok); b.classList.toggle('fail', !ok);
+        }
         async function testVmwareConnection() {
             const host = document.getElementById('vmware-host').value.trim();
             if (!host) {
@@ -204,9 +215,9 @@
                 if (res.ok && data.status === 'success') {
                     document.getElementById('vmware-count').textContent = data.count || 0;
                     renderVmList(data.vms);
-                    alert(`✅ Conectado com sucesso ao ${data.hypervisor}!\n${data.count} VMs encontradas.`);
+                    setVtBadge('vmware-badge', true, 'Conectado'); alert(`✅ Conectado com sucesso ao ${data.hypervisor}!\n${data.count} VMs encontradas.`);
                 } else {
-                    alert(`❌ Falha na conexão com VMware:\n${data.message || data.error || 'Host inacessível'}`);
+                    setVtBadge('vmware-badge', false, 'Falha'); alert(`❌ Falha na conexão com VMware:\n${data.message || data.error || 'Host inacessível'}`);
                 }
             } catch (e) {
                 alert(`Erro de comunicação: ${e.message}`);
@@ -226,9 +237,9 @@
                 if (res.ok && data.status === 'success') {
                     document.getElementById('hyperv-count').textContent = data.count || 0;
                     renderVmList(data.vms);
-                    alert(`✅ Escaneamento WMI Hyper-V concluído!\n${data.count} máquinas virtuais detectadas.`);
+                    setVtBadge('hyperv-badge', true, `${data.count} VM(s)`); alert(`✅ Escaneamento WMI Hyper-V concluído!\n${data.count} máquinas virtuais detectadas.`);
                 } else {
-                    alert(`Aviso Hyper-V:\n${data.message || 'Serviço vmms não disponível no host.'}`);
+                    setVtBadge('hyperv-badge', false, 'Indisponível'); alert(`Aviso Hyper-V:\n${data.message || 'Serviço vmms não disponível no host.'}`);
                 }
             } catch (e) {
                 alert(`Erro ao consultar Hyper-V: ${e.message}`);
@@ -243,7 +254,11 @@
                 alert('Informe a URL da API Proxmox VE (porta 8006).');
                 return;
             }
-            alert(`Conexão iniciada com Proxmox API (${url}).\nPara backup de contêineres e VMs, utilize vzdump ou configure o PBS.`);
+            try {
+                const r = await fetch('/api/v1/virtualization/proxmox/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
+                const d = await r.json();
+                setVtBadge('proxmox-badge', !!d.reachable, d.reachable ? 'API alcançada' : 'Sem acesso'); alert(d.message || (d.error ? 'Falha: ' + d.error : 'Sem resposta'));
+            } catch (e) { alert('Falha ao consultar o Agente: ' + e.message); }
         }
 
         function renderVmList(vms) {

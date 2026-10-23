@@ -62,13 +62,13 @@ class M365ConfigureRequest(BaseModel):
 # ── 1. SaaS Cloud-Native Endpoints ──────────────────────────────────────────
 
 @router.get("/saas/tenants")
-async def get_saas_tenants():
+def get_saas_tenants():
     """Retorna status e conexões de tenants SaaS (M365, Google Workspace, Entra ID)."""
     return JSONResponse({"status": "success", "data": saas_protection_engine.get_saas_tenants_status()})
 
 
 @router.post("/saas/m365/configure")
-async def configure_m365(req: M365ConfigureRequest):
+def configure_m365(req: M365ConfigureRequest):
     """Configura e valida credenciais do Microsoft 365 App Registration."""
     try:
         res = saas_protection_engine.save_m365_credentials(
@@ -83,8 +83,53 @@ async def configure_m365(req: M365ConfigureRequest):
         return JSONResponse(status_code=400, content={"status": "error", "error": str(e)})
 
 
+class ExchangeVerifyRequest(BaseModel):
+    edb_path: str
+
+
+@router.post("/exchange/verify")
+def verify_exchange_edb(req: ExchangeVerifyRequest):
+    """Verificação REAL do Exchange on-premises neste servidor: o arquivo .EDB existe (e tamanho) e o
+    'Microsoft Exchange Writer' está registrado no VSS (vssadmin list writers)."""
+    import os, subprocess
+    path = (req.edb_path or "").strip().strip('"')
+    edb = {"path": path, "exists": bool(path) and os.path.isfile(path)}
+    if edb["exists"]:
+        edb["size_bytes"] = os.path.getsize(path)
+    writer = {"found": False, "state": None, "error": None}
+    try:
+        try:
+            import ctypes
+            _oem = f"cp{ctypes.windll.kernel32.GetOEMCP()}"
+        except Exception:
+            _oem = "utf-8"
+        r = subprocess.run(["vssadmin", "list", "writers"], capture_output=True, text=True,
+                           encoding=_oem, errors="replace", timeout=60)
+        out = (r.stdout or "") + (r.stderr or "")
+        if r.returncode != 0:
+            writer["error"] = out.strip()[-300:] or f"vssadmin retornou {r.returncode} (requer execução como administrador)"
+        blocks = out.split("Writer name:") if "Writer name:" in out else out.split("Nome do gravador:")
+        for b in blocks[1:]:
+            if "Exchange" in b.splitlines()[0]:
+                writer["found"] = True
+                for ln in b.splitlines():
+                    if "State:" in ln or "Estado:" in ln:
+                        writer["state"] = ln.split(":", 1)[1].strip()
+                        break
+                break
+    except Exception as e:
+        writer["error"] = str(e)
+    ok = edb["exists"] and writer["found"]
+    return JSONResponse({"status": "success" if ok else "error", "edb": edb, "vss_writer": writer,
+                         "message": ("Banco .EDB encontrado e Microsoft Exchange Writer registrado no VSS." if ok else
+                                     "; ".join(m for m in (
+                                         None if edb["exists"] else "Arquivo .EDB não encontrado neste servidor",
+                                         None if writer["found"] else (writer["error"] or "Microsoft Exchange Writer não registrado no VSS (Exchange não instalado neste servidor?)"),
+                                     ) if m))})
+
+
 @router.get("/saas/m365/discover")
-async def discover_m365_resources():
+def discover_m365_resources():
     """Descobre caixas postais do Exchange e sites SharePoint no tenant M365 configurado."""
     cfg = saas_protection_engine.load_config().get("microsoft_365", {})
     if not (cfg.get("tenant_id") and cfg.get("client_id") and cfg.get("client_secret")):
@@ -109,14 +154,14 @@ async def discover_m365_resources():
 
 
 @router.post("/saas/backup")
-async def start_saas_backup(req: SaasBackupRequest):
+def start_saas_backup(req: SaasBackupRequest):
     """Inicia backup de Microsoft 365 ou Google Workspace."""
     res = saas_protection_engine.start_saas_backup(provider=req.provider, services=req.services)
     return JSONResponse(res)
 
 
 @router.get("/saas/status/{job_id}")
-async def get_saas_job_status(job_id: str):
+def get_saas_job_status(job_id: str):
     """Retorna status de um job de backup SaaS."""
     status = saas_protection_engine.get_job_status(job_id)
     if not status:
@@ -127,20 +172,20 @@ async def get_saas_job_status(job_id: str):
 # ── 2. Kubernetes Endpoints ─────────────────────────────────────────────────
 
 @router.get("/k8s/inventory")
-async def get_k8s_inventory():
+def get_k8s_inventory():
     """Retorna namespaces, PVCs e storage classes do cluster Kubernetes."""
     return JSONResponse({"status": "success", "data": k8s_backup_engine.get_cluster_inventory()})
 
 
 @router.post("/k8s/backup")
-async def start_k8s_backup(req: K8sBackupRequest):
+def start_k8s_backup(req: K8sBackupRequest):
     """Inicia backup de Namespace Kubernetes e CSI Volume Snapshots."""
     res = k8s_backup_engine.start_k8s_backup(namespace=req.namespace, include_pvcs=req.include_pvcs)
     return JSONResponse(res)
 
 
 @router.get("/k8s/status/{job_id}")
-async def get_k8s_job_status(job_id: str):
+def get_k8s_job_status(job_id: str):
     """Retorna status de um job de backup Kubernetes."""
     status = k8s_backup_engine.get_job_status(job_id)
     if not status:
@@ -151,13 +196,13 @@ async def get_k8s_job_status(job_id: str):
 # ── 3. Storage Hardware Arrays Endpoints ────────────────────────────────────
 
 @router.get("/storage-arrays/list")
-async def list_storage_arrays():
+def list_storage_arrays():
     """Retorna a lista de arrays de storage SAN/NAS configurados (NetApp, Pure, Dell, HPE)."""
     return JSONResponse({"status": "success", "arrays": storage_array_engine.list_storage_arrays()})
 
 
 @router.post("/storage-arrays/snapshot")
-async def trigger_hardware_snapshot(req: StorageArraySnapRequest):
+def trigger_hardware_snapshot(req: StorageArraySnapRequest):
     """Dispara um snapshot de hardware instantâneo (< 2s) no storage."""
     res = storage_array_engine.trigger_hardware_snapshot(array_id=req.array_id, volume_or_lun=req.volume_or_lun)
     return JSONResponse(res)
@@ -166,7 +211,7 @@ async def trigger_hardware_snapshot(req: StorageArraySnapRequest):
 # ── 4. Cyber Cleanroom & Shannon Entropy Endpoints ──────────────────────────
 
 @router.post("/cleanroom/scan")
-async def scan_cyber_cleanroom(req: CleanroomScanRequest):
+def scan_cyber_cleanroom(req: CleanroomScanRequest):
     """Executa varredura de Entropia de Shannon e regras YARA no snapshot."""
     res = cyber_cleanroom_engine.scan_snapshot_entropy_and_yara(snapshot_id=req.snapshot_id)
     return JSONResponse(res)
@@ -175,7 +220,7 @@ async def scan_cyber_cleanroom(req: CleanroomScanRequest):
 # ── 5. Multi-Cloud Direct Failover Endpoints ────────────────────────────────
 
 @router.post("/cloud-failover/launch")
-async def launch_cloud_failover(req: CloudFailoverRequest):
+def launch_cloud_failover(req: CloudFailoverRequest):
     """Executa o 1-Click Failover para AWS EC2 ou Azure VM."""
     if req.provider.upper() == "AWS":
         res = cloud_failover_engine.launch_aws_ec2_failover(
@@ -195,13 +240,13 @@ async def launch_cloud_failover(req: CloudFailoverRequest):
 # ── 6. ITIL & SSO Endpoints ─────────────────────────────────────────────────
 
 @router.get("/itil/status")
-async def get_itil_status():
+def get_itil_status():
     """Retorna status das integrações ServiceNow, Jira e SSO SAML/OIDC."""
     return JSONResponse({"status": "success", "data": itil_sso_engine.get_itil_status()})
 
 
 @router.post("/itil/test-incident")
-async def test_itil_incident(req: ItilTestRequest):
+def test_itil_incident(req: ItilTestRequest):
     """Dispara webhook de teste para ServiceNow ou Jira."""
     res = itil_sso_engine.trigger_test_incident(system_type=req.system_type)
     return JSONResponse(res)

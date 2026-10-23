@@ -24,8 +24,13 @@ class VirtualLabSandboxEngine:
     """
 
     def __init__(self):
-        self.sandbox_dir = Path("data/dr_sandbox").resolve()
-        self.sandbox_dir.mkdir(parents=True, exist_ok=True)
+        # dentro da pasta do Agente (antes: relativo ao diretorio atual do processo)
+        from core.gboc_paths import data_dir as _gboc_data_dir
+        self.sandbox_dir = _gboc_data_dir("dr_sandbox", create=False)
+        try:
+            self.sandbox_dir.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
 
     def run_isolated_boot_verification(
         self,
@@ -36,7 +41,13 @@ class VirtualLabSandboxEngine:
     ) -> Dict[str, Any]:
         start_time = time.time()
         lab_id = f"vlab_{int(time.time())}"
-        name = vm_name or f"GBOC-Sandbox-{snapshot_id[:8]}"
+        import re as _re
+        # Nome e caminhos entram em scripts PowerShell: nome restrito e caminhos sem aspas
+        name = _re.sub(r"[^\w.-]", "_", vm_name or f"GBOC-Sandbox-{str(snapshot_id)[:8]}")[:64]
+        if disk_path and ("'" in disk_path or "`" in disk_path or "$" in disk_path):
+            return {"success": False, "status": "Inconclusivo", "lab_id": lab_id,
+                    "error": "Caminho do VHDX contém caracteres não permitidos (', `, $).",
+                    "logs": [f"❌ Caminho inválido: {disk_path}"]}
 
         logs = [f"Iniciando verificação de Virtual Lab Isolado para o Snapshot #{snapshot_id}"]
 
@@ -99,9 +110,15 @@ class VirtualLabSandboxEngine:
             # Buscar VHDX de recuperação nos diretórios de exportação
             from core.gboc_paths import data_dir as _gboc_data_dir
             # pasta atual do DR + a antiga (exportacoes feitas por versoes anteriores)
+            # So aceita imagem que corresponda ao snapshot pedido (antes: qualquer .vhdx, e o resultado
+            # era atribuido ao snapshot errado)
             candidates = list(_gboc_data_dir("dr_exports", create=False).glob("*.vhdx")) + list(Path("C:/GBOC-DR").glob("*.vhdx"))
-            if candidates:
-                resolved_disk = str(candidates[0])
+            sid = str(snapshot_id or "").lower()
+            matches = [c for c in candidates if sid and sid in c.name.lower()]
+            if len(matches) == 1:
+                resolved_disk = str(matches[0])
+            elif len(matches) > 1:
+                logs.append(f"⚠️ Mais de uma imagem corresponde ao snapshot {snapshot_id}: informe o caminho do VHDX.")
 
         if not resolved_disk or not os.path.exists(resolved_disk):
             logs.append(f"⚠️ Disco virtual de recuperação para snapshot {snapshot_id} não localizado em disco.")
@@ -134,14 +151,25 @@ class VirtualLabSandboxEngine:
             New-VHD -ParentPath '{resolved_disk}' -Path '{diff_vhdx}' -Differencing -Force | Out-Null
             Write-Output "DIFF_VHDX_READY"
         """
+        diff_ok = False
         try:
             diff_res = subprocess.run(
                 ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_diff],
-                capture_output=True, text=True, timeout=20
+                capture_output=True, text=True, timeout=60
             )
+            diff_ok = "DIFF_VHDX_READY" in (diff_res.stdout or "") and os.path.exists(diff_vhdx)
+            diff_err = (diff_res.stderr or diff_res.stdout or "").strip()[:300]
         except Exception as ex_diff:
-            logs.append(f"Aviso na criação de disco diferencial: {ex_diff}")
-            diff_vhdx = resolved_disk
+            diff_err = str(ex_diff)
+        if not diff_ok:
+            # Nunca dar boot na imagem original: isso alteraria o proprio backup
+            logs.append(f"❌ Disco diferencial não criado ({diff_err or 'sem mensagem'}); teste cancelado para não alterar a imagem do backup.")
+            return {
+                "success": False, "status": "Inconclusivo", "lab_id": lab_id, "snapshot_id": snapshot_id,
+                "vm_name": name, "error": "Falha ao criar o disco diferencial (CoW).",
+                "duration_seconds": round(time.time() - start_time, 2),
+                "timestamp": datetime.now().isoformat(), "logs": logs
+            }
 
         # 5. Provisionar VM temporária no Hyper-V
         logs.append(f"Criando Máquina Virtual de teste '{name}' (Geração 2 / UEFI, Switch: GBOC-Isolated-Lab)...")

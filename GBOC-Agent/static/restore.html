@@ -633,7 +633,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 return `
                     <div class="option-card" id="repo-card-${repo.id}" onclick="selectRepo('${repo.id}')">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                            <strong style="font-size:0.95em;">${repo.name}</strong>
+                            <strong style="font-size:0.95em; min-width:0; overflow-wrap:anywhere;">${repo.name}</strong>
                             <span class="badge-tag badge-engine" style="${engineBadgeStyle}">${engine.toUpperCase()}</span>
                         </div>
                         <div style="font-size:0.8em; color:var(--text-muted); margin-bottom:6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${repo.path || repo.bucket || ''}">
@@ -1021,7 +1021,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                                     <td style="padding:8px;">#${h.repository_id}</td>
                                     <td style="padding:8px;font-family:monospace;">${String(h.snapshot_id || '').substring(0,8)}</td>
                                     <td style="padding:8px;">${h.target_path || 'Original'}</td>
-                                    <td style="padding:8px;"><span style="color:${badgeColor};font-weight:700;">${(h.status || 'unknown').toUpperCase()}</span></td>
+                                    <td style="padding:8px;"><span style="color:${badgeColor};font-weight:700;">${(h.status || 'sem status registrado').toUpperCase()}</span></td>
                                     <td style="padding:8px;text-align:right;">
                                         <button class="btn btn-sm btn-secondary" onclick="openRestoreDetailModal(${h.id})" style="padding:4px 8px;font-size:0.8em;">
                                             <i class="fas fa-eye"></i> Detalhes
@@ -1062,7 +1062,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 
             body.innerHTML = `
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:18px;background:var(--bg-input);padding:14px;border-radius:8px;border:1px solid var(--border);">
-                    <div><span style="font-size:0.78em;color:var(--text-muted);">Status:</span><br><strong style="color:${statusBadgeColor}">${(info.status || 'unknown').toUpperCase()}</strong></div>
+                    <div><span style="font-size:0.78em;color:var(--text-muted);">Status:</span><br><strong style="color:${statusBadgeColor}">${(info.status || 'sem status registrado').toUpperCase()}</strong></div>
                     <div><span style="font-size:0.78em;color:var(--text-muted);">Arquivos Restaurados:</span><br><strong>${info.files_restored || 0}</strong></div>
                     <div><span style="font-size:0.78em;color:var(--text-muted);">Duração:</span><br><strong>${info.duration_seconds ? info.duration_seconds + 's' : '—'}</strong></div>
                     <div><span style="font-size:0.78em;color:var(--text-muted);">Destino:</span><br><strong style="font-size:0.88em;">${info.target_path || '—'}</strong></div>

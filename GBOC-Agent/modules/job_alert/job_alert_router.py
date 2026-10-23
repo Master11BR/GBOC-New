@@ -8,7 +8,7 @@ from typing import Optional
 router = APIRouter(prefix="/api/v1/jobs", tags=["Job Alert Monitor"])
 
 @router.get("/failed")
-async def list_failed_jobs(limit: int = 50):
+def list_failed_jobs(limit: int = 50):
     """Retorna a lista de jobs com falhas ativas e histórico."""
     from engines.job_alert_monitor import get_failed_jobs
     return JSONResponse({"status": "success", "failures": get_failed_jobs(limit)})
@@ -30,14 +30,14 @@ async def report_job_failure(request: Request):
     return JSONResponse({"status": "success", "record": rec, "escalated": escalated})
 
 @router.post("/resolve/{task_id}")
-async def resolve_job(task_id: str):
+def resolve_job(task_id: str):
     """Marca uma falha de job como resolvida."""
     from engines.job_alert_monitor import resolve_job_failure
     resolve_job_failure(task_id)
     return JSONResponse({"status": "success", "message": f"Job {task_id} marcado como resolvido"})
 
 @router.get("/alert-config")
-async def get_alert_config():
+def get_alert_config():
     """Retorna configurações de alerta."""
     from engines.job_alert_monitor import load_alert_config
     cfg = load_alert_config()
@@ -58,7 +58,7 @@ async def save_alert_config(request: Request):
     return JSONResponse({"status": "success", "config": saved})
 
 @router.post("/test-alert")
-async def test_alert_channel(request: Request):
+def test_alert_channel(request: Request):
     """Dispara um alerta de teste em todos os canais configurados."""
     from engines.job_alert_monitor import dispatch_job_failure_alert
     dispatch_job_failure_alert(

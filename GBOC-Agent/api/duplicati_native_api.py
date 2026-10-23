@@ -28,7 +28,7 @@ def _require_admin(request: Request) -> Dict[str, Any]:
 
 
 @router.get("/managed-password")
-async def get_managed_password(request: Request) -> Dict[str, Any]:
+def get_managed_password(request: Request) -> Dict[str, Any]:
     """Senha do Duplicati definida pelo próprio GBOC (só administradores; cada consulta fica auditada)."""
     user = _require_admin(request)
     service = get_duplicati_native_service()
@@ -49,7 +49,7 @@ async def get_managed_password(request: Request) -> Dict[str, Any]:
 
 
 @router.get("/status")
-async def get_status() -> Dict[str, Any]:
+def get_status() -> Dict[str, Any]:
     service = get_duplicati_native_service()
     return {
         "config": service.get_config_summary(),
@@ -58,13 +58,13 @@ async def get_status() -> Dict[str, Any]:
 
 
 @router.get("/config")
-async def get_config() -> Dict[str, Any]:
+def get_config() -> Dict[str, Any]:
     service = get_duplicati_native_service()
     return service.get_config_summary()
 
 
 @router.post("/config")
-async def save_config(payload: Dict[str, Any]) -> Dict[str, Any]:
+def save_config(payload: Dict[str, Any]) -> Dict[str, Any]:
     try:
         service = get_duplicati_native_service()
         cfg = service.save_config(payload)
@@ -84,13 +84,13 @@ async def save_config(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 
 @router.get("/discover")
-async def discover() -> Dict[str, Any]:
+def discover() -> Dict[str, Any]:
     service = get_duplicati_native_service()
     return {"endpoints": service.discover_endpoints()}
 
 
 @router.get("/backups")
-async def list_backups() -> Dict[str, Any]:
+def list_backups() -> Dict[str, Any]:
     service = get_duplicati_native_service()
     result = service.list_backups()
     if result.get("status") == "error":
@@ -99,7 +99,7 @@ async def list_backups() -> Dict[str, Any]:
 
 
 @router.post("/backups")
-async def create_backup(payload: Dict[str, Any]) -> Dict[str, Any]:
+def create_backup(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Cria uma nova rotina de backup no Duplicati nativo e vincula ao GBOC."""
     try:
         service = get_duplicati_native_service()
@@ -117,7 +117,7 @@ async def create_backup(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 @router.post("/sync")
 @router.get("/sync")
-async def sync_duplicati() -> Dict[str, Any]:
+def sync_duplicati() -> Dict[str, Any]:
     """Sincroniza os backups e execuções do Duplicati Native com o banco de dados do GBOC."""
     try:
         service = get_duplicati_native_service()
@@ -128,7 +128,7 @@ async def sync_duplicati() -> Dict[str, Any]:
 
 
 @router.get("/backups/{backup_id}/filesets")
-async def list_backup_filesets(backup_id: str) -> Dict[str, Any]:
+def list_backup_filesets(backup_id: str) -> Dict[str, Any]:
     """Lista snapshots / pontos de recuperação de um backup do Duplicati."""
     service = get_duplicati_native_service()
     snapshots = service.list_filesets(backup_id)
@@ -143,7 +143,7 @@ async def list_backup_filesets(backup_id: str) -> Dict[str, Any]:
 # ── Controle de Jobs ──────────────────────────────────────────────────────────
 
 @router.get("/progress")
-async def get_progress() -> Dict[str, Any]:
+def get_progress() -> Dict[str, Any]:
     """Estado de progresso atual do Duplicati."""
     service = get_duplicati_native_service()
     result = service.get_progress()
@@ -153,7 +153,7 @@ async def get_progress() -> Dict[str, Any]:
 
 
 @router.get("/serverstate")
-async def get_server_state() -> Dict[str, Any]:
+def get_server_state() -> Dict[str, Any]:
     """Estado do servidor Duplicati (scheduled, running, paused...)."""
     service = get_duplicati_native_service()
     result = service.get_server_state()
@@ -163,7 +163,7 @@ async def get_server_state() -> Dict[str, Any]:
 
 
 @router.post("/backups/{backup_id}/run")
-async def run_backup(backup_id: str) -> Dict[str, Any]:
+def run_backup(backup_id: str) -> Dict[str, Any]:
     """Inicia um job de backup manualmente."""
     service = get_duplicati_native_service()
     result = service.run_backup(backup_id)
@@ -173,7 +173,7 @@ async def run_backup(backup_id: str) -> Dict[str, Any]:
 
 
 @router.post("/backups/{backup_id}/stop")
-async def stop_backup(backup_id: str, abort: bool = False) -> Dict[str, Any]:
+def stop_backup(backup_id: str, abort: bool = False) -> Dict[str, Any]:
     """Para ou aborta um job de backup em execução. Use abort=true para forçar."""
     service = get_duplicati_native_service()
     result = service.stop_backup(backup_id, abort=abort)
@@ -183,7 +183,7 @@ async def stop_backup(backup_id: str, abort: bool = False) -> Dict[str, Any]:
 
 
 @router.get("/backups/{backup_id}/log")
-async def get_backup_log(backup_id: str, page_size: int = 20) -> Dict[str, Any]:
+def get_backup_log(backup_id: str, page_size: int = 20) -> Dict[str, Any]:
     """Log de execuções de um job específico."""
     service = get_duplicati_native_service()
     result = service.get_backup_log(backup_id, page_size=page_size)
@@ -193,7 +193,7 @@ async def get_backup_log(backup_id: str, page_size: int = 20) -> Dict[str, Any]:
 
 
 @router.post("/server/pause")
-async def pause_server() -> Dict[str, Any]:
+def pause_server() -> Dict[str, Any]:
     """Pausa o agendador do Duplicati."""
     service = get_duplicati_native_service()
     result = service.pause_server()
@@ -203,7 +203,7 @@ async def pause_server() -> Dict[str, Any]:
 
 
 @router.post("/server/resume")
-async def resume_server() -> Dict[str, Any]:
+def resume_server() -> Dict[str, Any]:
     """Retoma o agendador do Duplicati."""
     service = get_duplicati_native_service()
     result = service.resume_server()
@@ -215,7 +215,7 @@ async def resume_server() -> Dict[str, Any]:
 # ── Agendamento ───────────────────────────────────────────────────────────────
 
 @router.post("/backups/{backup_id}/schedule")
-async def set_schedule(backup_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+def set_schedule(backup_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     """Define ou atualiza o agendamento automático de um job de backup.
 
     Corpo esperado:
@@ -238,7 +238,7 @@ async def set_schedule(backup_id: str, payload: Dict[str, Any]) -> Dict[str, Any
 # ── Restauração ───────────────────────────────────────────────────────────────
 
 @router.post("/backups/{backup_id}/restore")
-async def restore_backup(backup_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+def restore_backup(backup_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     """Inicia a restauração de arquivos de um backup.
 
     Corpo esperado:
@@ -262,7 +262,7 @@ async def restore_backup(backup_id: str, payload: Dict[str, Any]) -> Dict[str, A
 # ── Resultado da última execução ──────────────────────────────────────────────
 
 @router.get("/backups/{backup_id}/lastresult")
-async def get_last_result(backup_id: str) -> Dict[str, Any]:
+def get_last_result(backup_id: str) -> Dict[str, Any]:
     """Retorna o ParsedResult e erros da última execução do backup."""
     service = get_duplicati_native_service()
     result = service.get_last_result(backup_id)
@@ -274,7 +274,7 @@ async def get_last_result(backup_id: str) -> Dict[str, Any]:
 # ── Criação, Exclusão, Reparo e Manutenção de Backups ──────────────────────────
 
 @router.delete("/backups/{backup_id}")
-async def delete_backup(backup_id: str, delete_remote_files: bool = False) -> Dict[str, Any]:
+def delete_backup(backup_id: str, delete_remote_files: bool = False) -> Dict[str, Any]:
     """Exclui um job de backup do Duplicati."""
     service = get_duplicati_native_service()
     result = service.delete_backup(backup_id, delete_remote_files=delete_remote_files)
@@ -284,7 +284,7 @@ async def delete_backup(backup_id: str, delete_remote_files: bool = False) -> Di
 
 
 @router.post("/backups/{backup_id}/repair")
-async def repair_backup(backup_id: str) -> Dict[str, Any]:
+def repair_backup(backup_id: str) -> Dict[str, Any]:
     """Executa a reconstrução/reparo do banco local do backup."""
     service = get_duplicati_native_service()
     result = service.repair_backup(backup_id)
@@ -294,7 +294,7 @@ async def repair_backup(backup_id: str) -> Dict[str, Any]:
 
 
 @router.post("/backups/{backup_id}/verify")
-async def verify_backup(backup_id: str) -> Dict[str, Any]:
+def verify_backup(backup_id: str) -> Dict[str, Any]:
     """Testa a conexão e a integridade com o destino remoto."""
     service = get_duplicati_native_service()
     result = service.verify_backup(backup_id)
@@ -304,7 +304,7 @@ async def verify_backup(backup_id: str) -> Dict[str, Any]:
 
 
 @router.post("/backups/{backup_id}/compact")
-async def compact_backup(backup_id: str) -> Dict[str, Any]:
+def compact_backup(backup_id: str) -> Dict[str, Any]:
     """Compacta e limpa blocos no destino remoto do backup."""
     service = get_duplicati_native_service()
     result = service.compact_backup(backup_id)

@@ -118,7 +118,7 @@ async def _respond(rep: Dict[str, Any], format: str):
 
 
 @router.get("/catalog")
-async def get_reports_catalog():
+def get_reports_catalog():
     """Catálogo dos relatórios reais (operação, SLA, risco, capacidade, segurança e comercial)."""
     items = rc.catalog("server")
     return JSONResponse({"status": "success", "total": len(items), "reports": [
@@ -228,7 +228,7 @@ except ImportError:
 
 
 @router.get("/flagships")
-async def list_flagship_reports():
+def list_flagship_reports():
     """Retorna o catálogo dos 8 relatórios flagship executivos da Arquitetura v4.0."""
     return JSONResponse({
         "status": "success",
@@ -240,7 +240,7 @@ async def list_flagship_reports():
 
 
 @router.get("/flagships/{flagship_id}")
-async def get_flagship_report_endpoint(
+def get_flagship_report_endpoint(
     flagship_id: str,
     format: str = Query("html", pattern="^(html|pdf|csv|json)$"),
     print: Optional[str] = Query(None)

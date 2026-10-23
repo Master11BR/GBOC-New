@@ -464,7 +464,7 @@ async def pull_ollama_model(request: Request):
 
 @router.get("/ai-config")
 @router_v1.get("/ai-config")
-async def get_ai_config(request: Request):
+def get_ai_config(request: Request):
     """Configuração do motor de IA de diagnóstico (chaves mascaradas)."""
     _ai_auth(request)
     from engines.ai_diagnostic_engine import ai_diagnostic_engine

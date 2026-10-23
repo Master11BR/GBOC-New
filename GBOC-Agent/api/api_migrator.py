@@ -11,7 +11,7 @@ logger = logging.getLogger("gboc_api_migrator")
 router = APIRouter(prefix="/api/v1/migrator", tags=["Engine Migrator"])
 
 @router.get("/discover")
-async def discover_engines_endpoint():
+def discover_engines_endpoint():
     """Varre e descobre tarefas, repositórios e senhas de motores legados/externos no agente."""
     try:
         data = migrator_engine.discover_engines()

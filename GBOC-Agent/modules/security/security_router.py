@@ -8,7 +8,7 @@ logger = logging.getLogger("gboc_agent_security")
 router = APIRouter(prefix="/api/v1/security", tags=["Agent Security Sentinel"])
 
 @router.get("/defender-status")
-async def get_defender_status():
+def get_defender_status():
     """Retorna o status do Windows Defender e antivírus local no agente."""
     return {
         "status": "success",

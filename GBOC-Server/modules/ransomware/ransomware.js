@@ -26,13 +26,13 @@ async function runGuardianAIDiagnostic() {
         const d = await r.json();
         if (!r.ok) throw new Error(d.detail || d.message || `HTTP ${r.status}`);
 
-        const health = d.global_health_score ?? 'n/d';
-        const status = d.overall_status || 'UNKNOWN';
+        const health = d.global_health_score ?? 'sem nota calculada';
+        const status = d.overall_status || 'sem status na resposta do Server';
         const nodes = d.nodes_scanned || 0;
         const text = d.ai_executive_summary || 'Diagnóstico concluído.';
 
         if (summaryEl) {
-            summaryEl.textContent = `Status: ${status} | Saúde: ${health}% | Nós analisados: ${nodes}. ${text}`;
+            summaryEl.textContent = `Status: ${status} | Saúde: ${typeof health === 'number' ? health + '%' : health} | Nós analisados: ${nodes}. ${text}`;
         }
     } catch (e) {
         console.error('runGuardianAIDiagnostic error:', e);

@@ -42,7 +42,7 @@ class AuthoritativeScriptRequest(BaseModel):
 
 
 @router.get("/topology")
-async def get_ad_topology():
+def get_ad_topology():
     """Retorna topologia completa do Active Directory (Floresta, Domínio, FSMO Roles)."""
     try:
         top = ad_backup_engine.get_ad_topology()
@@ -53,7 +53,7 @@ async def get_ad_topology():
 
 
 @router.get("/health")
-async def get_ad_health():
+def get_ad_health():
     """Retorna saúde do Active Directory, status de replicação e compartilhamentos."""
     try:
         health = ad_backup_engine.get_ad_health()
@@ -64,7 +64,7 @@ async def get_ad_health():
 
 
 @router.post("/backup/start")
-async def start_ad_backup(req: AdBackupStartRequest):
+def start_ad_backup(req: AdBackupStartRequest):
     """Inicia processo de backup a quente do Active Directory (NTDS, SYSVOL, Registry)."""
     try:
         res = ad_backup_engine.start_ad_backup(
@@ -80,7 +80,7 @@ async def start_ad_backup(req: AdBackupStartRequest):
 
 
 @router.post("/restore/start")
-async def start_ad_restore(req: AdRestoreStartRequest):
+def start_ad_restore(req: AdRestoreStartRequest):
     """Inicia processo de restauração do Active Directory (Não-Autoritativa ou DSRM Staging)."""
     try:
         res = ad_backup_engine.start_ad_restore(
@@ -97,7 +97,7 @@ async def start_ad_restore(req: AdRestoreStartRequest):
 
 @router.get("/backup/status/{job_id}")
 @router.get("/restore/status/{job_id}")
-async def get_ad_job_status(job_id: str):
+def get_ad_job_status(job_id: str):
     """Retorna status e progresso em tempo real de uma tarefa de backup ou restore do AD."""
     status = ad_backup_engine.get_job_status(job_id)
     if not status:
@@ -106,7 +106,7 @@ async def get_ad_job_status(job_id: str):
 
 
 @router.get("/backup/history")
-async def list_ad_backup_history():
+def list_ad_backup_history():
     """Retorna o histórico de backups do Active Directory disponíveis em disco."""
     try:
         history = ad_backup_engine.list_ad_backup_history()
@@ -117,7 +117,7 @@ async def list_ad_backup_history():
 
 
 @router.delete("/backup/snapshot/{snapshot_name}")
-async def delete_ad_snapshot(snapshot_name: str):
+def delete_ad_snapshot(snapshot_name: str):
     """Exclui um snapshot de backup do Active Directory."""
     success = ad_backup_engine.delete_ad_snapshot(snapshot_name)
     if success:
@@ -126,7 +126,7 @@ async def delete_ad_snapshot(snapshot_name: str):
 
 
 @router.get("/objects")
-async def list_ad_objects(filter: str = Query("all"), search: str = Query("")):
+def list_ad_objects(filter: str = Query("all"), search: str = Query("")):
     """Pesquisa objetos granulares do Active Directory (Usuários, Grupos, OUs, GPOs)."""
     try:
         res = ad_granular_explorer.list_ad_objects_from_live_or_snapshot(
@@ -140,7 +140,7 @@ async def list_ad_objects(filter: str = Query("all"), search: str = Query("")):
 
 
 @router.post("/objects/restore")
-async def restore_ad_object(req: AdGranularRestoreRequest):
+def restore_ad_object(req: AdGranularRestoreRequest):
     """Restauração granular de um objeto específico no Active Directory (Item-Level Restore)."""
     try:
         res = ad_granular_explorer.restore_granular_ad_object(
@@ -155,7 +155,7 @@ async def restore_ad_object(req: AdGranularRestoreRequest):
 
 
 @router.post("/authoritative-script")
-async def generate_authoritative_restore_script(req: AuthoritativeScriptRequest):
+def generate_authoritative_restore_script(req: AuthoritativeScriptRequest):
     """Gera script ntdsutil e guia para restauração autoritativa de OU."""
     try:
         res = ad_backup_engine.generate_authoritative_restore_script(req.target_ou_dn)

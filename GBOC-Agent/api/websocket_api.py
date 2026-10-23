@@ -123,7 +123,7 @@ async def websocket_endpoint(ws: WebSocket):
 # ─── REST endpoint for stats ──────────────────────────────────────
 
 @router.get("/api/websocket/status")
-async def ws_status():
+def ws_status():
     return {"active_connections": manager.count}
 
 

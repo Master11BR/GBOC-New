@@ -75,7 +75,7 @@ def _get_host_telemetry():
     }
 
 @router.get("/ui-config")
-async def get_system_ui_config_v2(request: Request):
+def get_system_ui_config_v2(request: Request):
     """Retorna a configuração oficial estrita do Modelo UI/UX Moderno (API v2)."""
     t0 = time.perf_counter()
     ui_data = {
@@ -92,7 +92,7 @@ async def get_system_ui_config_v2(request: Request):
     return build_v2_response(data=ui_data, execution_time_ms=elapsed)
 
 @router.get("/version")
-async def get_system_version_v2(request: Request):
+def get_system_version_v2(request: Request):
     """Retorna metadados completos de versão SemVer 2.0 dentro do envelope v2."""
     t0 = time.perf_counter()
     try:
@@ -105,7 +105,7 @@ async def get_system_version_v2(request: Request):
     return build_v2_response(data=v_info, execution_time_ms=elapsed)
 
 @router.get("/info")
-async def get_system_info_v2(request: Request):
+def get_system_info_v2(request: Request):
     """Retorna a telemetria em tempo real do servidor e ambiente operacional."""
     t0 = time.perf_counter()
     telemetry = _get_host_telemetry()

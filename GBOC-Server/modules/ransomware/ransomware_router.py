@@ -1,5 +1,5 @@
 # GBOC System v14.8.2 Enterprise Edition
-# Module: Ransomware Shield Router (Server Central & Agents Unified Protection)
+# Module: Ransomware Guardian Router (Server Central & Agents Unified Protection)
 
 import json
 import logging
@@ -31,16 +31,13 @@ except Exception:
 
 
 logger = logging.getLogger("gboc_ransomware_module")
-router = APIRouter(prefix="/api/v1/server/ransomware", tags=["Ransomware Shield"])
+router = APIRouter(prefix="/api/v1/server/ransomware", tags=["Ransomware Guardian"])
 
 PROTECTION_MODULES_7 = [
     {"id": "process_guard", "name": "Real-time Process Guard", "icon": "fa-user-shield", "status": "ACTIVE", "description": "Monitoramento heurístico contínuo contra encerramento não autorizado de processos críticos."},
     {"id": "canary_trap", "name": "Canary Files & Deception Trap", "icon": "fa-dove", "status": "ACTIVE", "description": "Armadilhas deception distribuídas com alerta em tempo real perante modificações suspeitas."},
-    {"id": "vss_lock", "name": "VSS ShadowCopy Lock & Immutability", "icon": "fa-lock", "status": "ACTIVE", "description": "Bloqueio rígido de comandos VSSADMIN e proteção imutável de cópias de sombra do sistema."},
-    {"id": "mbr_protection", "name": "MBR / GPT Protection Engine", "icon": "fa-hdd", "status": "ACTIVE", "description": "Proteção do setor de boot contra ransomware do tipo wiper/bootloader."},
     {"id": "event_monitor", "name": "System Event & AV/EDR WMI Monitor", "icon": "fa-binoculars", "status": "ACTIVE", "description": "Coleta automatizada de logs do Event Viewer e verificação do status de Antivírus/EDR."},
     {"id": "ai_preemptive", "name": "Preemptive AI Threat Diagnostic", "icon": "fa-brain", "status": "ACTIVE", "description": "Diagnóstico preditivo via IA para análise proativa de vetores de vulnerabilidade."},
-    {"id": "auto_isolation", "name": "Emergency Network Isolation", "icon": "fa-network-wired", "status": "READY", "description": "Isolamento automatizado em microssegundos no caso de detecção de sequestro de dados."},
 ]
 
 
@@ -352,7 +349,7 @@ def _server_heuristic_diag(local_protection: Dict[str, Any], active_incidents: i
     elif not local_protection.get("av_active"):
         rec.append("Ativar proteção em tempo real da solução AV/EDR")
     if active_incidents > 0:
-        rec.append("Validar incidentes ativos e executar varredura integrada nos agentes")
+        rec.append("Validar incidentes ativos e verificar os agentes afetados com o antivírus/EDR")
     if not rec:
         rec.append("Manter sincronização contínua e auditoria diária de canários")
 
@@ -361,7 +358,6 @@ def _server_heuristic_diag(local_protection: Dict[str, Any], active_incidents: i
         "status": status,
         "threat_score": score,
         "canaries_verified": 0,
-        "vss_lock": "ENABLED",
         "recommendation": "; ".join(rec),
         "mode": "heuristic",
     }
@@ -418,11 +414,8 @@ async def sync_ransomware_central():
 
         endpoints = {
             "status": "/api/ransomware/status",
-            "tools": "/api/ransomware/tools",
             "canaries": "/api/ransomware/canary/list",
-            "history": "/api/ransomware/scan/history?limit=20",
             "guardian": "/api/ransomware/guardian/status",
-            "shield": "/api/ransomware/shield/status",
             "incidents": "/api/ransomware/guardian/incidents?limit=30",
             "local_protection": "/api/ransomware/local_protection",
         }
@@ -447,8 +440,6 @@ async def sync_ransomware_central():
             evs = []
             for ev in (payloads.get("local_protection") or {}).get("recent_security_events", []) or []:
                 evs.append({"event_type": f"guardian_event_{ev.get('id', 'n/a')}", "message": ev.get("message"), "timestamp": ev.get("time")})
-            for scan in (payloads.get("history") or {}).get("scans", []) or []:
-                evs.append({"event_type": f"scan_{scan.get('threat_level', 'none')}", "message": f"Scan {scan.get('scan_type', 'full')} em {scan.get('target_path', 'N/A')}", "timestamp": scan.get("started_at")})
             summary["events"] += _persist_ransomware_events(conn, agent_id, hostname, evs)
             summary["incidents"] += _persist_ransomware_incidents(conn, agent_id, (payloads.get("incidents") or {}).get("incidents", []))
 
@@ -557,17 +548,11 @@ async def execute_agent_ransomware_action(agent_id: str, request: Request):
         "guardian_stop": ("POST", "/api/ransomware/guardian/stop", None),
         "guardian_test": ("POST", "/api/ransomware/guardian/test", None),
         "guardian_verify_canaries": ("GET", "/api/ransomware/canary/verify", None),
-        "shield_start": ("POST", "/api/ransomware/shield/start", None),
-        "shield_stop": ("POST", "/api/ransomware/shield/stop", None),
         "guardian_ai_diag": ("GET", "/api/ransomware/guardian/ai_diagnostic?include_llm=true", None),
     }
 
-    if action == "scan":
-        target_path = str(body.get("target_path") or "").strip()
-        if not target_path:
-            raise HTTPException(status_code=400, detail="target_path obrigatório para ação scan")
-        res = await _fetch_agent_endpoint(agent_id, "/api/ransomware/scan", method="POST", json_body={"target_path": target_path}, timeout=60.0)
-    elif action in route_map:
+    # Ações "scan" e "shield_*" removidas (out/2026): varredura e proteção em tempo real ficam com o antivírus/EDR.
+    if action in route_map:
         method, endpoint, payload = route_map[action]
         res = await _fetch_agent_endpoint(agent_id, endpoint, method=method, json_body=payload)
     else:
@@ -695,11 +680,8 @@ def get_ransomware_modules():
     evidence = {
         "process_guard": False,
         "canary_trap": False,
-        "vss_lock": False,
-        "mbr_protection": False,
         "event_monitor": False,
         "ai_preemptive": False,
-        "auto_isolation": False,
     }
 
     conn = None
@@ -714,7 +696,7 @@ def get_ransomware_modules():
                 """
                 SELECT snapshot_type, payload_json
                 FROM ransomware_agent_snapshots
-                WHERE snapshot_type IN ('guardian', 'canaries', 'shield', 'local_protection')
+                WHERE snapshot_type IN ('guardian', 'canaries', 'local_protection')
                 ORDER BY id DESC
                 LIMIT 300
                 """
@@ -733,16 +715,6 @@ def get_ransomware_modules():
                     canaries = payload.get("canaries") if isinstance(payload, dict) else []
                     if isinstance(canaries, list) and len(canaries) > 0:
                         evidence["canary_trap"] = True
-                elif stype == "shield":
-                    cfg = payload.get("config") if isinstance(payload, dict) else {}
-                    if isinstance(cfg, dict):
-                        if bool(cfg.get("vss_guard_enabled")):
-                            evidence["vss_lock"] = True
-                        if bool(cfg.get("auto_isolate_network")):
-                            evidence["auto_isolation"] = True
-                        monitored = cfg.get("monitored_paths") or []
-                        if isinstance(monitored, list) and any("boot" in str(p).lower() or "efi" in str(p).lower() for p in monitored):
-                            evidence["mbr_protection"] = True
                 elif stype == "local_protection":
                     if bool(payload.get("av_installed")) and bool(payload.get("av_active")):
                         evidence["event_monitor"] = True
@@ -771,7 +743,7 @@ def get_ransomware_modules():
         mid = m.get("id")
         has_ev = bool(evidence.get(mid))
         if has_ev:
-            m["status"] = "ATIVO" if mid != "auto_isolation" else "PRONTO"
+            m["status"] = "ATIVO"
             m["validated"] = True
         else:
             m["status"] = "NÃO VALIDADO"
@@ -859,7 +831,7 @@ async def local_protection_status():
             'Select-Object AMServiceEnabled, AntivirusEnabled, RealTimeProtectionEnabled | '
             'ConvertTo-Json -Depth 2'
         )
-        def_result = await asyncio.to_thread(subprocess.run, ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", defender_cmd], capture_output=True, text=True, timeout=10)
+        def_result = await asyncio.to_thread(subprocess.run, ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; " + defender_cmd], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10)
         if def_result.returncode == 0 and def_result.stdout.strip():
             try:
                 d = json.loads(def_result.stdout)
@@ -875,7 +847,7 @@ async def local_protection_status():
                 'Get-CimInstance -Namespace root/SecurityCenter2 -ClassName AntiVirusProduct | '
                 'Select-Object displayName, productState | ConvertTo-Json -Depth 2'
             )
-            cim_result = await asyncio.to_thread(subprocess.run, ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", cim_cmd], capture_output=True, text=True, timeout=10)
+            cim_result = await asyncio.to_thread(subprocess.run, ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; " + cim_cmd], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10)
             if cim_result.returncode == 0 and cim_result.stdout.strip():
                 try:
                     products = json.loads(cim_result.stdout)
@@ -893,7 +865,7 @@ async def local_protection_status():
             'StartTime=(Get-Date).AddDays(-3)} -ErrorAction SilentlyContinue -MaxEvents 5 | '
             'Select-Object TimeCreated, Id, Message | ConvertTo-Json -Depth 2'
         )
-        log_result = await asyncio.to_thread(subprocess.run, ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", log_cmd], capture_output=True, text=True, timeout=10)
+        log_result = await asyncio.to_thread(subprocess.run, ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; " + log_cmd], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10)
         if log_result.returncode == 0 and log_result.stdout.strip():
             try:
                 logs = json.loads(log_result.stdout)
@@ -951,7 +923,6 @@ async def preemptive_ai_diag(request: Request):
                     "status": data.get("status") or (data.get("heuristic") or {}).get("status") or "UNKNOWN",
                     "threat_score": int((data.get("threat_score") if isinstance(data.get("threat_score"), int) else (data.get("heuristic") or {}).get("threat_score") or 0)),
                     "canaries_verified": int((data.get("heuristic") or {}).get("canaries_total") or 0),
-                    "vss_lock": "ENABLED" if ((data.get("heuristic") or {}).get("shield_running") is not False) else "UNKNOWN",
                     "recommendation": data.get("recommendation") or (data.get("heuristic") or {}).get("recommendation") or "Sem recomendação",
                     "mode": data.get("mode") or "hybrid",
                 }
@@ -961,7 +932,6 @@ async def preemptive_ai_diag(request: Request):
                     "status": "UNREACHABLE",
                     "threat_score": 100,
                     "canaries_verified": 0,
-                    "vss_lock": "UNKNOWN",
                     "recommendation": f"Falha na coleta do diagnóstico IA: {res.get('error')}",
                     "mode": "heuristic",
                 }

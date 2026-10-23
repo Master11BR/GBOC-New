@@ -54,14 +54,14 @@ class PolicyUpdate(BaseModel):
 # ─── CRUD ─────────────────────────────────────────────────────────
 
 @router.get("/policies")
-async def list_policies():
+def list_policies():
     """List all replication policies."""
     from engines.backup_replicator import list_policies
     return {"policies": _clean(list_policies())}
 
 
 @router.get("/policies/{policy_id}")
-async def get_policy(policy_id: int):
+def get_policy(policy_id: int):
     """Get a specific replication policy."""
     from engines.backup_replicator import get_policy as _get
     policy = _get(policy_id)
@@ -71,7 +71,7 @@ async def get_policy(policy_id: int):
 
 
 @router.post("/policies")
-async def create_policy(body: PolicyCreate):
+def create_policy(body: PolicyCreate):
     """Create a new replication policy."""
     from engines.backup_replicator import create_policy
     try:
@@ -82,7 +82,7 @@ async def create_policy(body: PolicyCreate):
 
 
 @router.put("/policies/{policy_id}")
-async def update_policy(policy_id: int, body: PolicyUpdate):
+def update_policy(policy_id: int, body: PolicyUpdate):
     """Update a replication policy."""
     from engines.backup_replicator import get_policy as _get, update_policy as _update
     if not _get(policy_id):
@@ -92,7 +92,7 @@ async def update_policy(policy_id: int, body: PolicyUpdate):
 
 
 @router.delete("/policies/{policy_id}")
-async def delete_policy(policy_id: int):
+def delete_policy(policy_id: int):
     """Delete a replication policy."""
     from engines.backup_replicator import get_policy as _get, delete_policy as _del
     if not _get(policy_id):
@@ -104,7 +104,7 @@ async def delete_policy(policy_id: int):
 # ─── Execution ────────────────────────────────────────────────────
 
 @router.post("/policies/{policy_id}/run")
-async def trigger_replication(policy_id: int):
+def trigger_replication(policy_id: int):
     """Trigger replication for a policy."""
     from engines.backup_replicator import get_policy as _get, run_replication
     if not _get(policy_id):
@@ -121,14 +121,14 @@ async def trigger_replication(policy_id: int):
 # ─── History & Status ─────────────────────────────────────────────
 
 @router.get("/history")
-async def replication_history(policy_id: Optional[int] = None, limit: int = 20):
+def replication_history(policy_id: Optional[int] = None, limit: int = 20):
     """Get replication execution history."""
     from engines.backup_replicator import get_history
     return {"history": _clean(get_history(policy_id, limit))}
 
 
 @router.get("/321-status")
-async def three_two_one_status():
+def three_two_one_status():
     """Check 3-2-1 rule compliance for all backup tasks."""
     from engines.backup_replicator import get_321_status
     return _clean(get_321_status())
@@ -137,7 +137,7 @@ async def three_two_one_status():
 # ─── Aliases for frontend compatibility (rules = policies) ────────
 
 @router.get("/stats")
-async def replication_stats():
+def replication_stats():
     """Aggregated replication statistics."""
     try:
         from engines.backup_replicator import list_policies, get_history
@@ -160,7 +160,7 @@ async def replication_stats():
 
 
 @router.get("/rules")
-async def list_rules():
+def list_rules():
     """Alias: list replication rules (= policies with extra fields for UI)."""
     from engines.backup_replicator import list_policies
     policies = list_policies()
@@ -193,7 +193,7 @@ class RuleCreate(BaseModel):
 
 
 @router.post("/rules")
-async def create_rule(body: RuleCreate):
+def create_rule(body: RuleCreate):
     """Create a replication rule (wraps policy create)."""
     from engines.backup_replicator import create_policy
     try:
@@ -213,7 +213,7 @@ async def create_rule(body: RuleCreate):
 
 
 @router.post("/rules/{rule_id}/sync")
-async def trigger_rule_sync(rule_id: int):
+def trigger_rule_sync(rule_id: int):
     """Trigger sync for a replication rule."""
     from engines.backup_replicator import get_policy as _get, run_replication
     if not _get(rule_id):
@@ -226,7 +226,7 @@ async def trigger_rule_sync(rule_id: int):
 
 
 @router.delete("/rules/{rule_id}")
-async def delete_rule(rule_id: int):
+def delete_rule(rule_id: int):
     """Delete a replication rule."""
     from engines.backup_replicator import get_policy as _get, delete_policy as _del
     if not _get(rule_id):

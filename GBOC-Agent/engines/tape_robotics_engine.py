@@ -107,14 +107,14 @@ class TapeRoboticsEngine:
                 "logs": ["❌ Falha: Hardware robótico de fitas ausente no host."]
             }
 
+        # Nenhum comando SCSI "Move Medium" é enviado por esta versão: antes respondia "Mídia movida" sem mover nada.
         return {
-            "success": True,
-            "source_slot": source_slot,
-            "target": target_drive_or_slot,
-            "is_drive": is_drive_target,
-            "duration_seconds": 1.5,
+            "success": False,
+            "implemented": False,
+            "error": "Movimentação robótica de mídia ainda não implementada nesta versão do GBOC "
+                     "(o hardware foi detectado, mas nenhum comando foi enviado ao robô).",
+            "detected": {"changers": hw.get("changers"), "drives": hw.get("drives")},
             "timestamp": datetime.now().isoformat(),
-            "logs": [f"Mídia movida do Slot #{source_slot} para {'Drive #' + str(target_drive_or_slot) if is_drive_target else 'Slot #' + str(target_drive_or_slot)}"]
         }
 
 

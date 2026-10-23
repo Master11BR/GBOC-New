@@ -74,54 +74,94 @@ class BitrotScrubEngine:
                     "blocks_scanned": 0,
                     "corrupted_blocks_found": 0,
                     "auto_healed_blocks": 0,
-                    "integrity_health_percent": 100.0,
-                    "parity_type": "SHA-256 Block Verification",
+                    "integrity_health_percent": None,
+                    "parity_type": "SHA-256 por arquivo comparado com referência",
                     "timestamp": datetime.now().isoformat(),
                     "logs": logs
                 }
 
-            logs.append(f"Localizados {len(candidate_files)} arquivos para amostragem de integridade de blocos.")
+            logs.append(f"Localizados {len(candidate_files)} arquivos para amostragem de integridade.")
+
+            # Referencia por arquivo (tamanho, mtime, SHA-256) gravada na 1a varredura. Corrupcao silenciosa =
+            # arquivo com mesmo tamanho e mtime (nao foi reescrito) mas conteudo/hash diferente.
+            import json as _json
+            from core.gboc_paths import data_dir as _gboc_data_dir
+            base_dir = _gboc_data_dir("bitrot_baseline", create=False)
+            base_dir.mkdir(parents=True, exist_ok=True)
+            base_file = base_dir / (hashlib.sha1(str(target).lower().encode("utf-8")).hexdigest() + ".json")
+            try:
+                baseline = _json.loads(base_file.read_text(encoding="utf-8")) if base_file.exists() else {}
+            except Exception:
+                baseline = {}
+            new_refs = changed = silent = 0
+            bytes_cap = block_size * 5000
 
             for fpath in candidate_files:
+                if total_bytes >= bytes_cap:
+                    break
+                key = str(fpath)
                 try:
-                    files_scanned += 1
+                    st = fpath.stat()
+                    h = hashlib.sha256()
                     with open(fpath, "rb") as f:
                         while True:
                             chunk = f.read(block_size)
                             if not chunk:
                                 break
-                            # Calcular hash real do bloco para validar consistência
-                            hashlib.sha256(chunk).digest()
+                            h.update(chunk)
                             blocks_scanned += 1
                             total_bytes += len(chunk)
-                            # Limite de segurança para não travar a UI em testes
-                            if blocks_scanned >= 5000:
-                                break
+                    files_scanned += 1
+                    digest = h.hexdigest()
+                    ref = baseline.get(key)
+                    if not ref:
+                        new_refs += 1
+                    elif ref.get("size") == st.st_size and ref.get("mtime") == int(st.st_mtime):
+                        if ref.get("sha256") != digest:
+                            silent += 1
+                            corrupted_blocks += 1
+                            logs.append(f"❌ Corrupção silenciosa: '{fpath.name}' mudou de conteúdo sem ser reescrito (tamanho e data iguais).")
+                            continue  # mantem a referencia boa para nao mascarar o problema
+                    else:
+                        changed += 1
+                    baseline[key] = {"size": st.st_size, "mtime": int(st.st_mtime), "sha256": digest}
                 except OSError as io_err:
                     corrupted_blocks += 1
                     logs.append(f"⚠️ Erro de leitura física no arquivo '{fpath.name}': {io_err}")
 
-                if blocks_scanned >= 5000:
-                    break
+            try:
+                base_file.write_text(_json.dumps(baseline), encoding="utf-8")
+            except Exception as e_b:
+                logs.append(f"⚠️ Não foi possível gravar a referência de hashes: {e_b}")
 
             duration = round(time.time() - start_time, 2)
             total_mb = round(total_bytes / (1024 * 1024), 2)
-            logs.append(f"Varredura concluída: {blocks_scanned} blocos verificados ({total_mb} MB lidos em {files_scanned} arquivos).")
+            logs.append(f"Varredura concluída: {files_scanned} arquivo(s), {total_mb} MB lidos (amostra limitada a {len(candidate_files)} arquivo(s)).")
+            if new_refs:
+                logs.append(f"ℹ️ {new_refs} arquivo(s) verificados pela primeira vez: referência registrada; a comparação ocorre a partir da próxima varredura.")
+            if changed:
+                logs.append(f"ℹ️ {changed} arquivo(s) foram reescritos desde a última varredura (referência atualizada).")
             if corrupted_blocks == 0:
-                logs.append("✅ 100% de paridade e legibilidade confirmada. Nenhuma corrupção silenciosa detectada.")
+                compared = files_scanned - new_refs - changed
+                logs.append(f"✅ Nenhuma corrupção encontrada: {compared} arquivo(s) comparados com a referência, sem erro de leitura." if compared
+                            else "✅ Nenhum erro de leitura. Ainda não há arquivos comparáveis com a referência.")
             else:
-                logs.append(f"⚠️ {corrupted_blocks} blocos apresentaram inconsistências de E/S física.")
+                logs.append(f"⚠️ {corrupted_blocks} problema(s): {silent} corrupção(ões) silenciosa(s), {corrupted_blocks - silent} erro(s) de leitura.")
 
-            health = 100.0 if blocks_scanned == 0 else round((1.0 - (corrupted_blocks / max(blocks_scanned, 1))) * 100.0, 1)
+            health = None if files_scanned == 0 else round((1.0 - (corrupted_blocks / max(files_scanned, 1))) * 100.0, 1)
 
             return {
                 "success": corrupted_blocks == 0,
                 "target_path": str(target),
                 "blocks_scanned": blocks_scanned,
+                "files_scanned": files_scanned,
+                "files_compared": files_scanned - new_refs - changed,
+                "files_new_reference": new_refs,
                 "corrupted_blocks_found": corrupted_blocks,
+                "silent_corruptions": silent,
                 "auto_healed_blocks": 0,
                 "integrity_health_percent": health,
-                "parity_type": "SHA-256 Physical Block Parity",
+                "parity_type": "SHA-256 por arquivo comparado com referência",
                 "bytes_scanned_mb": total_mb,
                 "duration_seconds": duration,
                 "timestamp": datetime.now().isoformat(),

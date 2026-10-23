@@ -525,16 +525,21 @@ class HealerEngine:
         try:
             actions_taken = []
             
+            all_ok = True
             for action in rule.get("actions", []):
                 result = self._execute_healing_action(action, issue_data)
+                ok = not str(result).startswith(("Falha", "Ação de remediação não implementada", "Reexecução não"))
+                all_ok = all_ok and ok
                 actions_taken.append({
                     "action": action,
+                    "ok": ok,
                     "result": result
                 })
-            
+
             return {
-                "success": True,
-                "message": f"Regra {rule['name']} aplicada com sucesso",
+                "success": all_ok and bool(actions_taken),
+                "message": (f"Regra {rule['name']} aplicada" if all_ok and actions_taken
+                            else f"Regra {rule['name']} não foi aplicada por completo (veja as ações)"),
                 "actions": actions_taken
             }
             
@@ -571,9 +576,15 @@ class HealerEngine:
 
             elif action == "retry_backup":
                 task_id = issue_data.get("task_id")
-                if task_id:
-                    return f"Solicitada reexecução da Tarefa de Backup #{task_id}"
-                return "Reexecução de backup solicitada sem ID de tarefa"
+                if not task_id:
+                    return "Reexecução não disparada: o problema não informa o ID da tarefa"
+                tm = getattr(self.core, "task_manager", None) if self.core else None
+                if not tm:
+                    return "Falha: TaskManager indisponível para reexecutar a tarefa"
+                r = tm.trigger_task(int(task_id))
+                if r.get("status") == "success":
+                    return f"Tarefa #{task_id} reexecutada (execução #{r.get('execution_id')})"
+                return f"Falha ao reexecutar a tarefa #{task_id}: {r.get('message')}"
 
             elif action == "check_resources":
                 import psutil
@@ -582,7 +593,7 @@ class HealerEngine:
                 return f"Telemetria verificada: CPU={cpu}%, RAM={mem}%"
 
             else:
-                return f"Ação de remediação '{action}' executada com validação no ambiente host"
+                return f"Ação de remediação não implementada: '{action}' (nada foi executado)"
         except Exception as ex:
             return f"Falha na ação de remediação '{action}': {ex}"
 

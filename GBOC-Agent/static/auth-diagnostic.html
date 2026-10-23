@@ -211,7 +211,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 
             if (data.authenticated) {
                 setStatus('status-authenticated', 'ok', '✅ Sim');
-                log(`✅ Usuário autenticado: ${data.username || 'desconhecido'}`);
+                log(`✅ Usuário autenticado: ${data.username || 'sem nome de usuário na sessão'}`);
             } else {
                 setStatus('status-authenticated', 'warning', '⚠️ Não');
                 log('⚠️ Usuário NÃO autenticado');

@@ -106,7 +106,22 @@ def get_ambient_telemetry() -> Dict[str, Any]:
         "cached": False
     }
 
+_HW_CACHE: Dict[str, Any] = {"at": 0.0, "data": None}
+_HW_LOCK = __import__("threading").Lock()
+_HW_TTL = 20  # s — cada coleta abre vários PowerShell (~7 s); o painel consulta a cada 5 s
+
+
 def get_hardware_telemetry() -> Dict[str, Any]:
+    """Telemetria de hardware com cache curto e uma coleta por vez (evita PowerShell em paralelo)."""
+    with _HW_LOCK:
+        if _HW_CACHE["data"] is not None and time.time() - _HW_CACHE["at"] < _HW_TTL:
+            return _HW_CACHE["data"]
+        data = _get_hardware_telemetry_uncached()
+        _HW_CACHE["data"], _HW_CACHE["at"] = data, time.time()
+        return data
+
+
+def _get_hardware_telemetry_uncached() -> Dict[str, Any]:
     """
     Coleta telemetria 100% REAL do hardware do host:
     - Processador: Modelo, Cores, Threads, Clock (MHz), Carga (%) e Sensores térmicos.
@@ -332,12 +347,12 @@ def get_hardware_telemetry() -> Dict[str, Any]:
 
 @router.get("/api/v1/system/hardware")
 @router.get("/api/system/hardware")
-async def get_hardware_v1(request: Request):
+def get_hardware_v1(request: Request):
     """Endpoint legado/v1 para telemetria de hardware, S.M.A.R.T. e ambiente."""
     return get_hardware_telemetry()
 
 @router.get("/api/v2/system/hardware")
-async def get_hardware_v2(request: Request):
+def get_hardware_v2(request: Request):
     """Endpoint moderno v2 com envelope para telemetria de hardware, S.M.A.R.T. e ambiente."""
     t0 = time.perf_counter()
     data = get_hardware_telemetry()

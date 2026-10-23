@@ -1687,38 +1687,38 @@ function gbocToggleSidebarCollapse(){
                 <div class="kpi-grid" style="margin-bottom:20px">
                     <div class="kpi-card">
                         <div class="kpi-header"><span>Índice de Prontidão DR</span><div class="kpi-icon green"><i class="fas fa-shield-halved"></i></div></div>
-                        <div class="kpi-value" id="srv-dr-score">100%</div>
-                        <div class="kpi-sub">Nível Enterprise A+</div>
+                        <div class="kpi-value" id="srv-dr-score">—</div>
+                        <div class="kpi-sub" id="srv-dr-score-sub">Backups bem-sucedidos (24 h)</div>
                     </div>
                     <div class="kpi-card">
                         <div class="kpi-header"><span>RTO Médio Alvo</span><div class="kpi-icon blue"><i class="fas fa-stopwatch"></i></div></div>
-                        <div class="kpi-value" id="srv-dr-rto">&lt; 5 min</div>
-                        <div class="kpi-sub">Instant VM Boot</div>
+                        <div class="kpi-value" id="srv-dr-rto">—</div>
+                        <div class="kpi-sub" id="srv-dr-rto-sub">Média das restaurações (90 dias)</div>
                     </div>
                     <div class="kpi-card">
                         <div class="kpi-header"><span>RPO Médio Alvo</span><div class="kpi-icon orange"><i class="fas fa-clock-rotate-left"></i></div></div>
-                        <div class="kpi-value" id="srv-dr-rpo">&lt; 15 min</div>
-                        <div class="kpi-sub">CDP & Replicação</div>
+                        <div class="kpi-value" id="srv-dr-rpo">—</div>
+                        <div class="kpi-sub" id="srv-dr-rpo-sub">Pior idade do último backup ok</div>
                     </div>
                     <div class="kpi-card">
                         <div class="kpi-header"><span>Testes em Sandbox</span><div class="kpi-icon green"><i class="fas fa-vial-circle-check"></i></div></div>
-                        <div class="kpi-value" id="srv-dr-tests">100% OK</div>
-                        <div class="kpi-sub">Zero-Mock Verified</div>
+                        <div class="kpi-value" id="srv-dr-tests">—</div>
+                        <div class="kpi-sub" id="srv-dr-tests-sub">Testes de restauração (30 dias)</div>
                     </div>
                 </div>
 
                 <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:14px;margin-bottom:20px">
-                    <div class="panel" style="background:var(--bg-input);padding:16px;border-radius:8px">
+                    <div class="dr-tile" style="background:var(--bg-input);padding:16px;border-radius:8px;border:1px solid var(--border)">
                         <h4><i class="fas fa-bolt" style="color:var(--warning)"></i> Recuperação Instantânea (Instant VM Boot)</h4>
                         <p style="font-size:0.85em;color:var(--text-muted);margin:8px 0">Montagem direta de discos VHDX/VMDK em Hyper-V ou VMware sem necessidade de cópia prévia.</p>
                         <button class="btn btn-primary" style="font-size:0.82em;padding:6px 12px" onclick="switchTab('surerestore')">Executar Boot Instantâneo</button>
                     </div>
-                    <div class="panel" style="background:var(--bg-input);padding:16px;border-radius:8px">
+                    <div class="dr-tile" style="background:var(--bg-input);padding:16px;border-radius:8px;border:1px solid var(--border)">
                         <h4><i class="fas fa-microchip" style="color:var(--info)"></i> P2V & Mídia de Boot WinPE</h4>
                         <p style="font-size:0.85em;color:var(--text-muted);margin:8px 0">Conversão de servidores físicos em máquinas virtuais e geração de mídia WinPE com drivers colhidos.</p>
                         <button class="btn btn-secondary" style="font-size:0.82em;padding:6px 12px" onclick="switchTab('surerestore')">Gerenciar Mídia de Boot</button>
                     </div>
-                    <div class="panel" style="background:var(--bg-input);padding:16px;border-radius:8px">
+                    <div class="dr-tile" style="background:var(--bg-input);padding:16px;border-radius:8px;border:1px solid var(--border)">
                         <h4><i class="fas fa-flask" style="color:var(--success)"></i> Virtual Lab Sandbox</h4>
                         <p style="font-size:0.85em;color:var(--text-muted);margin:8px 0">Ambiente de teste com rede isolada para validação automática de consistência de aplicações.</p>
                         <button class="btn btn-success" style="font-size:0.82em;padding:6px 12px" onclick="switchTab('surerestore')">Iniciar Virtual Lab</button>
@@ -1787,7 +1787,7 @@ function gbocToggleSidebarCollapse(){
                     Escolha o agente, as tarefas que usam motores externos (Restic, Kopia, Duplicati) e o repositório de destino: as tarefas passam a rodar no <strong>Motor Nativo GBOC</strong> a partir da próxima execução. Os backups antigos continuam no repositório de origem para restauração.
                 </p>
 
-                <div class="panel step-wizard-nav" style="background:var(--bg-card);padding:14px 20px;border-radius:12px;border:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+                <div class="step-wizard-nav" style="background:var(--bg-card);padding:14px 20px;border-radius:12px;border:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
                     <div class="step-item active" id="step-nav-1" style="display:flex;align-items:center;gap:8px;font-weight:700;color:var(--primary)">
                         <div style="width:28px;height:28px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:0.85em">1</div>
                         <span>Descoberta</span>
@@ -2067,7 +2067,7 @@ function gbocToggleSidebarCollapse(){
                     if(document.getElementById('kpi-jobs')) document.getElementById('kpi-jobs').textContent=s.backups_24h||0;
                     if(document.getElementById('kpi-volume')) document.getElementById('kpi-volume').textContent=s.total_gb_7d||0;
                     if(document.getElementById('kpi-alerts')) document.getElementById('kpi-alerts').textContent=s.total_alerts||0;
-                    if(document.getElementById('kpi-success-rate')) document.getElementById('kpi-success-rate').textContent=(s.success_rate_24h||100)+'% sucesso';
+                    if(document.getElementById('kpi-success-rate')) document.getElementById('kpi-success-rate').textContent=(s.success_rate_24h==null?'sem backups nas últimas 24 h':s.success_rate_24h+'% sucesso');
                 }
 
                 if(backups.status==='fulfilled' && backups.value){
@@ -2241,7 +2241,7 @@ function gbocToggleSidebarCollapse(){
                 document.getElementById('an-total-exec').textContent=k.executions?.total||0;
                 document.getElementById('an-success-rate').textContent=(k.executions?.success_rate||0)+'% sucesso';
                 document.getElementById('an-24h').textContent=k.last_24h?.total||0;
-                document.getElementById('an-24h-rate').textContent=(k.last_24h?.success_rate||0)+'% sucesso';
+                document.getElementById('an-24h-rate').textContent=(k.last_24h?.success_rate==null?'sem execuções':k.last_24h.success_rate+'% sucesso');
                 document.getElementById('an-fails-7d').textContent=k.last_7d?.failed||0;
                 document.getElementById('an-avg-dur').textContent=(k.executions?.avg_duration||0)+'s';
 
@@ -4697,19 +4697,25 @@ function gbocToggleSidebarCollapse(){
         }
 
         async function loadServerDRReadiness() {
+            // KPIs reais (GET /api/v1/dr/kpis). Sem dados -> "Sem dados" (antes: texto fixo "100%", "< 5 min"...)
+            const fmtDur = sec => sec == null ? null : (sec < 90 ? `${Math.round(sec)} s` : sec < 5400 ? `${Math.round(sec / 60)} min` : sec < 172800 ? `${(sec / 3600).toFixed(1)} h` : `${(sec / 86400).toFixed(1)} dias`);
+            const put = (id, val, sub, color) => { const v = document.getElementById(id), sb = document.getElementById(id + '-sub');
+                if (v) { v.textContent = val ?? 'Sem dados'; v.style.color = val == null ? 'var(--text-muted)' : (color || ''); }
+                if (sb && sub) sb.textContent = sub; };
             try {
-                const r = await fetch(window.GBOC_API_BASE + '/api/v1/dashboard/stats');
-                if (r.ok) {
-                    const d = await r.json();
-                    const rate = d.success_rate_24h ?? 100;
-                    const el = document.getElementById('srv-dr-score');
-                    if (el) {
-                        el.textContent = `${rate}%`;
-                        el.style.color = rate >= 90 ? 'var(--success)' : (rate >= 75 ? 'var(--warning)' : 'var(--danger)');
-                    }
-                }
-            } catch(e) {
-                console.warn('DR Readiness score check:', e);
+                const r = await fetch(window.GBOC_API_BASE + '/api/v1/dr/kpis');
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                const d = await r.json();
+                const rd = d.readiness || {}, rto = d.rto || {}, rpo = d.rpo || {}, t = d.tests || {};
+                const lvl = p => p >= 90 ? 'var(--success)' : (p >= 75 ? 'var(--warning)' : 'var(--danger)');
+                put('srv-dr-score', rd.percent == null ? null : rd.percent + '%', rd.total ? `${rd.ok}/${rd.total} backups ok (24 h)` : 'Nenhum backup nas últimas 24 h', rd.percent == null ? null : lvl(rd.percent));
+                put('srv-dr-rto', fmtDur(rto.avg_seconds), rto.restores ? `Média de ${rto.restores} restauração(ões) (90 dias)` : 'Nenhuma restauração registrada (90 dias)');
+                const rpoSub = rpo.tasks ? `${rpo.tasks} tarefa(s) · ${rpo.tasks_without_success ? rpo.tasks_without_success + ' sem backup ok' : 'todas com backup ok'} (30 dias)` : 'Nenhuma execução (30 dias)';
+                put('srv-dr-rpo', fmtDur(rpo.worst_seconds), rpoSub, rpo.tasks_without_success ? 'var(--danger)' : null);
+                put('srv-dr-tests', t.percent == null ? null : `${t.percent}%`, t.total ? `${t.passed}/${t.total} testes aprovados (30 dias)` : 'Nenhum teste de restauração (30 dias)', t.percent == null ? null : lvl(t.percent));
+            } catch (e) {
+                console.warn('KPIs de DR:', e);
+                ['srv-dr-score', 'srv-dr-rto', 'srv-dr-rpo', 'srv-dr-tests'].forEach(id => put(id, null, 'Indisponível: ' + e.message));
             }
         }
 

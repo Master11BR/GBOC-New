@@ -247,7 +247,7 @@ class BackupAnalytics:
                 continue
         
         if not hours:
-            return "unknown"
+            return "sem backups com data registrada"
         
         # Agrupar por períodos
         night = sum(1 for h in hours if 0 <= h < 6)
