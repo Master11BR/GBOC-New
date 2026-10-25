@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v14.8.2 Enterprise Edition
+# GBOC System v14.8.3 Enterprise Edition
 # Module: Active Directory Dedicated Backup & Recovery Engine
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================
@@ -20,7 +20,7 @@ from typing import Dict, Any, List, Optional
 try:
     from version_control import __version__ as AGENT_VERSION
 except Exception:
-    AGENT_VERSION = "14.8.2"
+    AGENT_VERSION = "14.8.3"
 
 logger = logging.getLogger("gboc_ad_backup_engine")
 
@@ -611,7 +611,7 @@ class ActiveDirectoryBackupEngine:
 # ==============================================================================
 # Script de Restauração Autoritativa do Active Directory (NTDSUTIL)
 # Objeto Alvo: {target_ou_dn}
-# Gerado pelo GBOC Agent v14.8.2 Enterprise
+# Gerado pelo GBOC Agent v14.8.3 Enterprise
 # ==============================================================================
 
 # 1. Reinicie o Controlador de Domínio no modo DSRM (Directory Services Restore Mode)

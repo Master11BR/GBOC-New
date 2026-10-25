@@ -1,6 +1,6 @@
 <#
 ==============================================================================
-GBOC System v14.8.1 Enterprise Edition - Gerador do pacote de instalacao
+GBOC System v14.8.3 Enterprise Edition - Gerador do pacote de instalacao
 ==============================================================================
 Modos:
   Completo : codigo do Agente/Servidor + programas em Prereqs\ (Python com as bibliotecas do GBOC

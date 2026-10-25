@@ -61,6 +61,59 @@ class DuplicatiConfig:
     timeout_seconds: int = 8
 
 
+def get_duplicati_target_label(target_url: str, endpoint: str = "") -> str:
+    """Retorna uma descrição legível e precisa do destino do Duplicati."""
+    from urllib.parse import urlparse, parse_qs
+    target_url = str(target_url or "").strip()
+    if not target_url:
+        return "Não configurado"
+    if target_url.startswith("enc-v1:"):
+        return "Destino Cifrado (Duplicati enc-v1)"
+
+    u = urlparse(target_url)
+    scheme = (u.scheme or "").lower()
+    qs = parse_qs(u.query)
+    ep = (endpoint or qs.get("s3-server-name", [""])[0] or qs.get("server-name", [""])[0] or "").lower()
+
+    if scheme in ("b2",):
+        return "Backblaze B2 (Nativo)"
+    if scheme in ("s3", "s3s"):
+        if "wasabisys.com" in ep or "wasabi" in ep:
+            return "Wasabi S3 Cloud"
+        if "backblazeb2.com" in ep or "backblaze" in ep:
+            return "Backblaze B2 (S3 API)"
+        if "storage.googleapis.com" in ep:
+            return "Google Cloud Storage (S3 API)"
+        if "r2.cloudflarestorage.com" in ep:
+            return "Cloudflare R2"
+        if "amazonaws.com" in ep or not ep or ep == "s3.amazonaws.com":
+            return "Amazon S3 Cloud"
+        return f"S3 Compatível ({ep})"
+    if scheme in ("azure", "azureblob"):
+        return "Azure Blob Storage"
+    if scheme in ("googledrive", "gdrive"):
+        return "Google Drive"
+    if scheme in ("onedrive", "onedrivev2", "mssp"):
+        return "Microsoft OneDrive"
+    if scheme in ("sharepoint",):
+        return "Microsoft SharePoint"
+    if scheme in ("dropbox",):
+        return "Dropbox"
+    if scheme in ("box",):
+        return "Box.com"
+    if scheme in ("mega",):
+        return "Mega.nz"
+    if scheme in ("webdav", "webdavs"):
+        return "WebDAV"
+    if scheme in ("ssh", "sftp"):
+        return "SFTP / SSH"
+    if scheme in ("ftp", "ftps"):
+        return "FTP"
+    if scheme in ("file", "") or (len(target_url) > 1 and target_url[1] == ":") or target_url.startswith(("\\\\", "/")):
+        return "Disco Local / Pasta em Rede"
+    return f"Nuvem Remota ({scheme})"
+
+
 def parse_duplicati_target_and_creds(target_url: str, passphrase: str = "", settings: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     from urllib.parse import urlparse, parse_qs
     import re
@@ -71,44 +124,115 @@ def parse_duplicati_target_and_creds(target_url: str, passphrase: str = "", sett
 
     target_url = str(target_url or "").strip()
     if target_url.startswith("enc-v1:"):
-        clean_path = target_url
-        endpoint = ""
-        bucket = ""
-        prefix = ""
+        return {
+            "repo_type": "cloud",
+            "target_label": "Destino Cifrado (Duplicati enc-v1)",
+            "clean_path": target_url,
+            "config": {
+                "bucket": "",
+                "prefix": "",
+                "endpoint": "",
+                "region": "",
+                "access_key": "",
+                "secret_key": "",
+                "passphrase": passphrase,
+                "is_encrypted_target": True
+            },
+            "password": passphrase,
+            "motor_password": passphrase,
+            "encryption_password": passphrase,
+            "cloud_password": ""
+        }
+
+    u = urlparse(target_url)
+    scheme = (u.scheme or "").lower()
+    qs = parse_qs(u.query)
+    bucket = u.netloc or ""
+    prefix = u.path.strip("/") if u.path else ""
+
+    endpoint = (
+        qs.get("s3-server-name", [""])[0] 
+        or qs.get("server-name", [""])[0] 
+        or settings.get("s3-server-name") 
+        or settings.get("--s3-server-name") 
+        or ""
+    ).strip()
+
+    auth_user = (
+        qs.get("auth-username", [""])[0] 
+        or settings.get("auth-username") 
+        or settings.get("--auth-username") 
+        or ""
+    ).strip()
+
+    auth_pass = (
+        qs.get("auth-password", [""])[0] 
+        or settings.get("auth-password") 
+        or settings.get("--auth-password") 
+        or ""
+    ).strip()
+    if auth_pass == "***************":
+        auth_pass = ""
+
+    ep_lower = endpoint.lower()
+
+    if scheme in ("b2",):
+        repo_type = "b2"
+        access_key = qs.get("b2-accountid", [""])[0] or settings.get("b2-accountid") or settings.get("--b2-accountid") or auth_user
+        secret_key = qs.get("b2-applicationkey", [""])[0] or settings.get("b2-applicationkey") or settings.get("--b2-applicationkey") or auth_pass
+        clean_path = f"b2://{bucket}/{prefix}" if prefix else f"b2://{bucket}"
+    elif scheme in ("s3", "s3s"):
+        access_key = qs.get("aws-access-key-id", [""])[0] or settings.get("aws-access-key-id") or settings.get("--aws-access-key-id") or auth_user
+        secret_key = qs.get("aws-secret-access-key", [""])[0] or settings.get("aws-secret-access-key") or settings.get("--aws-secret-access-key") or auth_pass
+        clean_path = f"s3://{bucket}/{prefix}" if prefix else f"s3://{bucket}"
+        if "wasabisys.com" in ep_lower or "wasabi" in ep_lower:
+            repo_type = "wasabi"
+        elif "backblazeb2.com" in ep_lower or "backblaze" in ep_lower:
+            repo_type = "b2"
+        elif "storage.googleapis.com" in ep_lower:
+            repo_type = "gcs"
+        else:
+            repo_type = "s3"
+    elif scheme in ("azure", "azureblob"):
+        repo_type = "azure"
+        access_key = qs.get("azure-account-name", [""])[0] or settings.get("azure-account-name") or settings.get("--azure-account-name") or auth_user
+        secret_key = qs.get("azure-access-key", [""])[0] or settings.get("azure-access-key") or settings.get("--azure-accesskey") or auth_pass
+        clean_path = f"azure://{bucket}/{prefix}" if prefix else f"azure://{bucket}"
+    elif scheme in ("googledrive", "gdrive"):
+        repo_type = "googledrive"
+        access_key = qs.get("authid", [""])[0] or auth_user
+        secret_key = auth_pass
+        clean_path = f"googledrive://{bucket}/{prefix}" if prefix else (f"googledrive://{bucket}" if bucket else target_url)
+    elif scheme in ("onedrive", "onedrivev2", "mssp"):
+        repo_type = "onedrive"
+        access_key = qs.get("authid", [""])[0] or auth_user
+        secret_key = auth_pass
+        clean_path = f"onedrive://{bucket}/{prefix}" if prefix else (f"onedrive://{bucket}" if bucket else target_url)
+    elif scheme in ("ssh", "sftp"):
+        repo_type = "sftp"
+        access_key = auth_user
+        secret_key = auth_pass
+        clean_path = f"sftp://{bucket}/{prefix}" if prefix else f"sftp://{bucket}"
+    elif scheme in ("webdav", "webdavs"):
+        repo_type = "webdav"
+        access_key = auth_user
+        secret_key = auth_pass
+        clean_path = f"webdav://{bucket}/{prefix}" if prefix else f"webdav://{bucket}"
+    elif scheme in ("file", "") or (len(target_url) > 1 and target_url[1] == ":") or target_url.startswith(("\\\\", "/")):
+        repo_type = "local"
         access_key = ""
         secret_key = ""
-        repo_type = "cloud"
+        clean_path = target_url[7:] if target_url.startswith("file://") else target_url
+        if clean_path.startswith("/") and len(clean_path) > 2 and clean_path[2] == ":":
+            clean_path = clean_path[1:]
+        clean_path = os.path.normpath(clean_path)
     else:
-        u = urlparse(target_url)
-        qs = parse_qs(u.query)
-        bucket = u.netloc or ""
-        prefix = u.path.strip("/") if u.path else ""
-        endpoint = qs.get("s3-server-name", [""])[0]
-        access_key = qs.get("auth-username", [""])[0]
-        secret_key = qs.get("auth-password", [""])[0]
-        if secret_key == "***************":
-            secret_key = ""
+        repo_type = "cloud"
+        access_key = auth_user
+        secret_key = auth_pass
+        clean_path = target_url
 
-        is_cloud = any(p in target_url.lower() for p in ["s3:", "wasabi", "b2:", "azure", "sftp:"]) or bool(endpoint)
-        target_lower = (target_url + " " + endpoint).lower()
-        if "wasabi" in target_lower:
-            repo_type = "wasabi"
-        elif "b2" in target_lower or "backblaze" in target_lower:
-            repo_type = "b2"
-        elif "azure" in target_lower:
-            repo_type = "azure"
-        elif is_cloud:
-            repo_type = "s3"
-        else:
-            repo_type = "local"
-
-        if is_cloud:
-            clean_path = f"s3://{bucket}/{prefix}" if prefix else f"s3://{bucket}"
-        else:
-            clean_path = target_url[7:] if target_url.startswith("file://") else target_url
-            if clean_path.startswith("/") and len(clean_path) > 2 and clean_path[2] == ":":
-                clean_path = clean_path[1:]
-            clean_path = os.path.normpath(clean_path)
+    target_label = get_duplicati_target_label(target_url, endpoint)
 
     region = ""
     if endpoint:
@@ -117,6 +241,8 @@ def parse_duplicati_target_and_creds(target_url: str, passphrase: str = "", sett
             region = m.group(1)
         elif qs.get("s3-location-constraint"):
             region = qs.get("s3-location-constraint")[0]
+        elif qs.get("s3-region"):
+            region = qs.get("s3-region")[0]
 
     enc_mod = settings.get("encryption-module") or settings.get("--encryption-module") or "aes"
     comp_mod = settings.get("compression-module") or settings.get("--compression-module") or "zip"
@@ -129,26 +255,31 @@ def parse_duplicati_target_and_creds(target_url: str, passphrase: str = "", sett
         "region": region,
         "access_key": access_key,
         "secret_key": secret_key,
-        "aws_access_key": access_key,
-        "aws_secret_key": secret_key,
-        "b2_account_id": access_key,
-        "b2_account_key": secret_key,
-        "azure_account_name": access_key,
-        "azure_account_key": secret_key,
         "passphrase": passphrase,
         "encryption_module": enc_mod,
         "compression_module": comp_mod,
         "dblock_size": dblock
     }
 
+    if repo_type in ("s3", "wasabi"):
+        config["aws_access_key"] = access_key
+        config["aws_secret_key"] = secret_key
+    elif repo_type == "b2":
+        config["b2_account_id"] = access_key
+        config["b2_account_key"] = secret_key
+    elif repo_type == "azure":
+        config["azure_account_name"] = access_key
+        config["azure_account_key"] = secret_key
+
     return {
         "repo_type": repo_type,
+        "target_label": target_label,
         "clean_path": clean_path,
         "config": config,
         "password": passphrase,
         "motor_password": passphrase,
         "encryption_password": passphrase,
-        "cloud_password": secret_key
+        "cloud_password": secret_key if repo_type != "local" else ""
     }
 
 
@@ -881,17 +1012,7 @@ exit 4
                         desc = row["Description"] or ""
                         target_url = str(row["TargetURL"] or "")
 
-                        dest_label = "Destino Remoto"
-                        if "wasabi" in target_url.lower():
-                            dest_label = "Wasabi S3"
-                        elif "s3.amazonaws" in target_url.lower():
-                            dest_label = "Amazon S3"
-                        elif "b2" in target_url.lower():
-                            dest_label = "Backblaze B2"
-                        elif "azure" in target_url.lower():
-                            dest_label = "Azure Blob"
-                        elif "file://" in target_url.lower() or ":" in target_url:
-                            dest_label = "Disco Local / Pasta"
+                        dest_label = get_duplicati_target_label(target_url)
 
                         metadata = {}
                         try:
@@ -1045,18 +1166,8 @@ exit 4
                             passphrase = settings_dict.get("passphrase") or b.get("Description") or ""
                             sources = b.get("Sources") or []
 
-                            dest_label = "Destino Remoto"
                             target_url = str(b.get("TargetURL") or "")
-                            if "wasabi" in target_url.lower():
-                                dest_label = "Wasabi S3 Cloud"
-                            elif "s3.amazonaws" in target_url.lower() or "s3://" in target_url.lower():
-                                dest_label = "Amazon S3 Cloud"
-                            elif "b2" in target_url.lower():
-                                dest_label = "Backblaze B2 Cloud"
-                            elif "azure" in target_url.lower():
-                                dest_label = "Azure Blob Cloud"
-                            elif "file://" in target_url.lower() or ":" in target_url:
-                                dest_label = "Disco Local / Pasta"
+                            dest_label = get_duplicati_target_label(target_url)
 
                             meta = b.get("Metadata", {})
                             last_run = meta.get("LastBackupDate") or meta.get("LastBackupFinished")
@@ -1102,17 +1213,28 @@ exit 4
         target_url = str(b.get("TargetURL") or raw_item.get("target_url") or "")
         meta = b.get("Metadata") or raw_item.get("metadata") or {}
 
-        dest_label = "Destino Remoto"
-        if "wasabi" in target_url.lower():
-            dest_label = "Wasabi S3 Cloud"
-        elif "s3.amazonaws" in target_url.lower() or "s3://" in target_url.lower():
-            dest_label = "Amazon S3 Cloud"
-        elif "b2" in target_url.lower():
-            dest_label = "Backblaze B2 Cloud"
-        elif "azure" in target_url.lower():
-            dest_label = "Azure Blob Cloud"
-        elif "file://" in target_url.lower() or ":" in target_url:
-            dest_label = "Disco Local / Pasta"
+        dest_label = get_duplicati_target_label(target_url)
+
+        settings_dict = {}
+        raw_settings = b.get("Settings") or raw_item.get("settings") or []
+        if isinstance(raw_settings, list):
+            for itm in raw_settings:
+                if isinstance(itm, dict):
+                    k = (itm.get("Name") or "").lstrip("-")
+                    v = itm.get("Value")
+                    if k and v is not None:
+                        settings_dict[k] = v
+        elif isinstance(raw_settings, dict):
+            settings_dict = raw_settings
+
+        passphrase = (
+            raw_item.get("passphrase")
+            or settings_dict.get("passphrase")
+            or b.get("Description")
+            or raw_item.get("description")
+            or ""
+        )
+        sources = b.get("Sources") or raw_item.get("sources") or []
 
         def fix_iso_date(raw_val: Any) -> Optional[str]:
             if not raw_val:
@@ -1137,6 +1259,9 @@ exit 4
             "description": desc,
             "target_url": target_url,
             "target_label": dest_label,
+            "passphrase": passphrase,
+            "sources": sources,
+            "settings": settings_dict,
             "last_run": last_run,
             "last_status": last_status,
             "last_error": last_error_msg,
@@ -1174,7 +1299,17 @@ exit 4
             except Exception as e:
                 last_error = str(e)
 
-        # Fallback: tentar ler diretamente do SQLite local do Duplicati
+        # Fallback 1: tentar ler via extract_all_duplicati_backups_detailed (roda ServerUtil nativo para decifrar)
+        detailed_items = self.extract_all_duplicati_backups_detailed()
+        if detailed_items:
+            normalized = [self._normalize_backup_item(i) for i in detailed_items]
+            return {
+                "status": "success",
+                "items": normalized,
+                "source": "serverutil_detailed"
+            }
+
+        # Fallback 2: tentar ler diretamente do SQLite local do Duplicati
         db_items = self._read_duplicati_server_db()
         if db_items:
             normalized = [self._normalize_backup_item(i) for i in db_items]
@@ -1721,12 +1856,19 @@ exit 4
                 if repo_row:
                     repo_id = repo_row[0]
                 else:
-                    repo_type = "cloud" if is_cloud else "local"
+                    parsed = parse_duplicati_target_and_creds(target_url, passphrase, {"passphrase": passphrase})
+                    repo_type = parsed["repo_type"]
+                    clean_path = parsed["clean_path"]
+                    config_json = json.dumps(parsed["config"])
+                    pwd = parsed["password"] or None
+                    m_pwd = parsed["motor_password"] or None
+                    enc_pwd = parsed["encryption_password"] or None
+                    c_pwd = parsed["cloud_password"] or None
                     cur.execute("""
-                        INSERT INTO repositories (name, type, path, engine, status, enabled, initialized, created_at, updated_at)
-                        VALUES (%s, %s, %s, 'duplicati', 'active', true, true, %s, %s)
+                        INSERT INTO repositories (name, type, path, engine, status, enabled, initialized, password, motor_password, encryption_password, cloud_password, config, created_at, updated_at)
+                        VALUES (%s, %s, %s, 'duplicati', 'active', true, true, %s, %s, %s, %s, %s, %s, %s)
                         RETURNING id
-                    """, (repo_name, repo_type, repo_path, now_str, now_str))
+                    """, (repo_name, repo_type, clean_path, pwd, m_pwd, enc_pwd, c_pwd, config_json, now_str, now_str))
                     repo_id = cur.fetchone()[0]
 
                 # Criar / Garantir tarefa na tabela 'tasks'

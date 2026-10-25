@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 14.8.2 - Ransomware Detection API
+GBOC 14.8.3 - Ransomware Detection API
 Canaries, Guardian (resposta automática) e status do antivírus local.
 Varredura/"7 ferramentas" e Shield removidos (out/2026): detecção de malware é papel do antivírus/EDR.
 Rotas síncronas (def): o FastAPI as executa em threadpool, sem travar o event loop.

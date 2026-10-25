@@ -39,7 +39,7 @@ except Exception:
     try:
         from version_control import __version__ as TARGET_VERSION
     except Exception:
-        TARGET_VERSION = "14.8.2"
+        TARGET_VERSION = "14.8.3"
 
 TARGET_EXTENSIONS = {".py", ".html", ".js", ".css", ".ps1", ".bat", ".txt"}
 EXCLUDE_DIRS = {".git", ".vs", "__pycache__", ".venv", "venv", "logs", "data", "node_modules", "tests", "_claude_sync",

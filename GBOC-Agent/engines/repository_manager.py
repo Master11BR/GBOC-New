@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC Agent 14.8.2 - Repository Manager
+GBOC Agent 14.8.3 - Repository Manager
 Refatorado para usar backends de armazenamento modulares.
 """
 

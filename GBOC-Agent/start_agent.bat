@@ -1,5 +1,5 @@
 @REM ==============================================================================
-@REM GBOC System v14.8.2 Enterprise Edition
+@REM GBOC System v14.8.3 Enterprise Edition
 @REM Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 @REM Propriedade Intelectual & Direitos Autorais Registrados.
 @REM ==============================================================================
@@ -12,12 +12,12 @@ if /i "%~1"=="/service" set "GBOC_PAUSE=rem"
 cd /d "%~dp0"
 CLS
 REM ========================================
-REM GBOC Agent v14.8.2 - Inicializacao
+REM GBOC Agent v14.8.3 - Inicializacao
 REM ========================================
 
 echo.
 echo ========================================
-echo   GBOC Agent v14.8.2 - Iniciando...
+echo   GBOC Agent v14.8.3 - Iniciando...
 echo ========================================
 echo.
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 14.8.2 - API de Verificação de Integridade
+GBOC 14.8.3 - API de Verificação de Integridade
 Executa restic check / kopia verify para validar integridade dos repositórios
 """
 
@@ -104,18 +104,21 @@ def _build_duplicati_url(repo: Dict[str, Any]) -> str:
     prefix = str(repo.get('prefix') or '').strip('/')
 
     # Se o caminho já for uma URL completa do Duplicati, retornar diretamente
-    if repo_path.startswith(('s3://', 'b2://', 'file://', 'azure://', 'webdav://', 'googledrive://', 'onedrive://', 'mega://')):
+    if repo_path.startswith(('s3://', 'b2://', 'file://', 'azure://', 'webdav://', 'googledrive://', 'onedrive://', 'mega://', 'enc-v1:')):
         return repo_path
 
     repo_type = (repo.get('type') or 'local').lower()
     if repo_type in ('cloud', 'remote'):
         endpoint = str(repo.get('endpoint') or '').lower()
-        if 'wasabi' in endpoint or 'wasabi' in repo_path.lower():
+        p_lower = repo_path.lower()
+        if 'wasabisys.com' in endpoint or 'wasabi' in endpoint or p_lower.startswith('wasabi://'):
             repo_type = 'wasabi'
-        elif 'b2' in endpoint or 'backblaze' in endpoint or 'b2' in repo_path.lower():
+        elif 'backblazeb2.com' in endpoint or 'backblaze' in endpoint or p_lower.startswith('b2://'):
             repo_type = 'b2'
-        elif 'azure' in endpoint or 'azure' in repo_path.lower():
+        elif 'azure' in endpoint or p_lower.startswith('azure://'):
             repo_type = 'azure'
+        elif 'googleapis.com' in endpoint or p_lower.startswith(('googledrive://', 'gdrive://')):
+            repo_type = 'gcs'
         else:
             repo_type = 's3'
 
@@ -145,12 +148,15 @@ def _build_duplicati_auth_args(repo: Dict[str, Any]) -> List[str]:
 
     if repo_type in ('cloud', 'remote'):
         endpoint = str(repo.get('endpoint') or '').lower()
-        if 'wasabi' in endpoint or 'wasabi' in repo_path.lower():
+        p_lower = repo_path.lower()
+        if 'wasabisys.com' in endpoint or 'wasabi' in endpoint or p_lower.startswith('wasabi://'):
             repo_type = 'wasabi'
-        elif 'b2' in endpoint or 'backblaze' in endpoint or 'b2' in repo_path.lower():
+        elif 'backblazeb2.com' in endpoint or 'backblaze' in endpoint or p_lower.startswith('b2://'):
             repo_type = 'b2'
-        elif 'azure' in endpoint or 'azure' in repo_path.lower():
+        elif 'azure' in endpoint or p_lower.startswith('azure://'):
             repo_type = 'azure'
+        elif 'googleapis.com' in endpoint or p_lower.startswith(('googledrive://', 'gdrive://')):
+            repo_type = 'gcs'
         else:
             repo_type = 's3'
 

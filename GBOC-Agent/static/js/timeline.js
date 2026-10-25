@@ -1,12 +1,12 @@
 /*
 ==============================================================================
-GBOC System v14.8.2 Enterprise Edition
+GBOC System v14.8.3 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
 */
 /**
- * GBOC v14.8.2 - Execution Timeline (Gantt-like)
+ * GBOC v14.8.3 - Execution Timeline (Gantt-like)
  * Renders backup execution timeline with hover details.
  */
 class ExecutionTimeline {

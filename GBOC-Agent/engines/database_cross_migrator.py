@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-GBOC Agent 14.8.2 - Database Cross Migrator (SQLite <-> PostgreSQL)
+GBOC Agent 14.8.3 - Database Cross Migrator (SQLite <-> PostgreSQL)
 Migração de dados completa e sem perda de informações históricas entre bancos de dados.
 """
 
