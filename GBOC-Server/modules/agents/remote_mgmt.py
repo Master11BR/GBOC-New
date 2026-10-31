@@ -11,6 +11,7 @@ Ambos usam a chave de pareamento; o Agente aplica as mesmas validações da sua 
 Rotas:
   GET  /api/v1/agents/{agent_id}/remote/status          — resumo (canais, saúde, sincronização)
   ANY  /api/v1/agents/{agent_id}/remote/api/{path}       — chamada à API do agente (path começa com api/)
+  GET  /api/v1/agents/{agent_id}/remote/inventory       — todas as rotas da API do agente (somente leitura)
 Ações que alteram algo (POST/PUT/DELETE) exigem perfil admin/operator e ficam na auditoria.
 """
 from __future__ import annotations
@@ -18,7 +19,9 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import Any, Dict, Optional, Tuple
+import re
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
 from fastapi import APIRouter, Request
@@ -148,6 +151,69 @@ async def remote_status(agent_id: str):
             "health": health["body"] if health["status_code"] < 400 else None,
             "health_error": None if health["status_code"] < 400 else health["body"],
             "server_link": server["body"] if server["status_code"] < 400 else None}
+
+
+_UI_SOURCE = Path(__file__).with_name("remote_mgmt.js")
+_WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+
+def _norm_route(path: str) -> str:
+    """Normaliza parâmetros ({id} e ${...} de template JS) para comparar rotas."""
+    p = re.sub(r"\$\{[^}]*\}|\{[^}]*\}", "{}", path.split("?")[0])
+    return p.strip("/")
+
+
+def build_inventory(openapi: Dict[str, Any], ui_text: str) -> Dict[str, Any]:
+    """Lista as rotas /api/ do agente a partir do OpenAPI e marca as que já têm tela no Server."""
+    ui_routes = {_norm_route(m) for m in re.findall(r"api/[^'\"`\s)]*", ui_text)}
+    routes: List[Dict[str, Any]] = []
+    for raw_path, ops in (openapi.get("paths") or {}).items():
+        if not raw_path.startswith("/api/") or not isinstance(ops, dict):
+            continue
+        norm = _norm_route(raw_path.lstrip("/"))
+        for method, op in ops.items():
+            m = method.upper()
+            if m not in ("GET", "POST", "PUT", "PATCH", "DELETE") or not isinstance(op, dict):
+                continue
+            routes.append({
+                "method": m,
+                "path": raw_path,
+                "tags": op.get("tags") or [],
+                "summary": op.get("summary") or op.get("operationId") or "",
+                "write": m in _WRITE_METHODS,
+                "has_body": bool(op.get("requestBody")),
+                "covered_by_ui": norm in ui_routes,
+            })
+    routes.sort(key=lambda r: (r["path"], r["method"]))
+    groups: Dict[str, int] = {}
+    for r in routes:
+        key = (r["tags"][0] if r["tags"] else "sem grupo")
+        groups[key] = groups.get(key, 0) + 1
+    return {
+        "total": len(routes),
+        "writes": sum(1 for r in routes if r["write"]),
+        "covered_by_ui": sum(1 for r in routes if r["covered_by_ui"]),
+        "groups": dict(sorted(groups.items())),
+        "routes": routes,
+    }
+
+
+@router.get("/{agent_id}/remote/inventory")
+async def remote_inventory(agent_id: str):
+    row = await asyncio.to_thread(_agent_row, agent_id)
+    if not row:
+        return JSONResponse({"status": "error", "message": "Agente não encontrado"}, status_code=404)
+    res = await agent_call(agent_id, "GET", "openapi.json", timeout=30)
+    if res["status_code"] >= 400 or not isinstance(res["body"], dict):
+        return JSONResponse({"status": "error", "message": "Não foi possível obter o inventário do agente",
+                             "detail": res["body"]}, status_code=502)
+    try:
+        ui_text = _UI_SOURCE.read_text(encoding="utf-8")
+    except OSError:
+        ui_text = ""
+    inv = build_inventory(res["body"], ui_text)
+    inv.update({"status": "success", "agent_id": agent_id, "channel": res.get("channel")})
+    return inv
 
 
 @router.api_route("/{agent_id}/remote/api/{subpath:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])

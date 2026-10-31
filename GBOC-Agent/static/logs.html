@@ -207,6 +207,13 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         /* itens nao encolhem na coluna flex rolavel (antes cortavam a 2a linha da mensagem) */
         .list > * { flex-shrink: 0; }
 
+        /* Sem deslocamento no hover: o item e o painel ficam parados para selecionar texto (todos os temas) */
+        html body .log-toast-panel .list .toast:hover,
+        html body .log-toast-panel .list .toast:focus-within,
+        html body .log-toast-panel:hover {
+            transform: none !important;
+        }
+
         .list .copy,
         .list .msg-text,
         .list strong {
@@ -557,6 +564,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         let allLogs = [];
         let isLoading = false;
         let refreshTimer = null;
+        let pendingAutoRender = false;
         let searchTerm = '';
 
         function mapLogToType(level, message = '') {
@@ -791,12 +799,18 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                     allLogs = more ? allLogs.concat(mapped) : mapped;
                     const keepScroll = list.scrollTop;
                     if (auto) {
-                        // Refresh automático: só os logs que chegaram agora entram animados
-                        render(true, new Set(mapped.filter(x => !prevIds.has(x.id)).map(x => x.id)));
+                        if (selectionInsideList()) {
+                            // Usuário está selecionando texto da lista: a re-renderização espera a seleção terminar
+                            pendingAutoRender = true;
+                        } else {
+                            // Refresh automático: só os logs que chegaram agora entram animados
+                            render(true, new Set(mapped.filter(x => !prevIds.has(x.id)).map(x => x.id)));
+                            list.scrollTop = keepScroll;
+                        }
                     } else {
+                        pendingAutoRender = false;
                         render(!more);
                     }
-                    if (auto) list.scrollTop = keepScroll;
                 }
                 if (data.total != null) count.textContent = `(${allLogs.length.toLocaleString('pt-BR')} de ${Number(data.total).toLocaleString('pt-BR')})`;
                 document.getElementById('loadMore').style.display = data.has_more ? '' : 'none';
@@ -859,6 +873,21 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             alert(`${Number(d.deleted || 0).toLocaleString('pt-BR')} registro(s) removido(s).`);
             loadRetention(); refreshLogs();
         }
+
+        // Seleção de texto dentro da lista (para o refresh automático não apagar o que o usuário está copiando)
+        function selectionInsideList() {
+            const sel = window.getSelection();
+            if (!sel || sel.isCollapsed || !sel.rangeCount) return false;
+            return list.contains(sel.anchorNode) || list.contains(sel.focusNode);
+        }
+        document.addEventListener('selectionchange', () => {
+            if (pendingAutoRender && !selectionInsideList()) {
+                pendingAutoRender = false;
+                const keep = list.scrollTop;
+                render(false);
+                list.scrollTop = keep;
+            }
+        });
 
         function scheduleRefresh() {
             if (refreshTimer) clearTimeout(refreshTimer);

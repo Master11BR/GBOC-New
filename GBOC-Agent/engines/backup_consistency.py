@@ -10,8 +10,8 @@ consistente, sem derrubar ninguém.
   Precisa de administrador (o serviço GBOCAgent roda como LocalSystem).
 
 Arquivos abertos no compartilhamento (close_open_share_files):
-  * "never" (padrão): não fecha nada - com VSS isso não é necessário;
-  * "on_vss_failure": fecha só se o VSS não estiver disponível ou falhar;
+  * "never": não fecha nada - com VSS isso não é necessário;
+  * "on_vss_failure" (padrão): fecha só se o VSS não estiver disponível ou falhar;
   * "always": fecha antes de todo backup.
   Fecha SÓ os arquivos abertos via rede (SMB) dentro das pastas do backup e registra quem/qual arquivo. Quem
   estava com o arquivo aberto pode perder o que não salvou. Testado: clientes Windows com SMB 2.1/3 reabrem o
@@ -33,7 +33,8 @@ logger = logging.getLogger("gboc_consistency")
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SESSIONS_FILE = os.path.join(BASE_DIR, "data", "vss_sessions.json")
 KEY = "backup_consistency"
-DEFAULT = {"vss": "auto", "close_open_share_files": "never"}
+# Padrão: VSS quando disponível; só fecha arquivos abertos se o VSS falhar (decisão de 27/10/2026).
+DEFAULT = {"vss": "auto", "close_open_share_files": "on_vss_failure"}
 _lock = threading.Lock()
 
 

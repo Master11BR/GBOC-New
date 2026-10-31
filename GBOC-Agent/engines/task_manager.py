@@ -952,7 +952,13 @@ class TaskManager:
                     'completed',
                     snapshot_id=snapshot_id,
                     files_processed=files_count,
-                    bytes_processed=bytes_count
+                    bytes_processed=bytes_count,
+                    files_new=result.get('files_new'),
+                    files_changed=result.get('files_changed'),
+                    files_unmodified=result.get('files_unmodified'),
+                    bytes_added=result.get('bytes_added'),
+                    bytes_stored=result.get('bytes_stored'),
+                    bytes_total=result.get('bytes_total'),
                 )
                 # o monitor grava os contadores dele ao concluir: sem isso arquivos/bytes ficavam 0 nos motores
                 # que não informam progresso (nativo, Kopia)
@@ -1104,6 +1110,14 @@ class TaskManager:
                         stats['files'] = data.get('files_new', 0) + data.get('files_changed', 0)
                         stats['bytes'] = data.get('data_added', 0)
                         stats['snapshot_id'] = data.get('snapshot_id')
+                        # detalhes para o registro da execução (igual ao Duplicati: o que foi copiado,
+                        # quanto ficou na nuvem e a taxa de compressão)
+                        stats['files_new'] = int(data.get('files_new', 0) or 0)
+                        stats['files_changed'] = int(data.get('files_changed', 0) or 0)
+                        stats['files_unmodified'] = int(data.get('files_unmodified', 0) or 0)
+                        stats['bytes_added'] = int(data.get('data_added', 0) or 0)
+                        stats['bytes_stored'] = int(data.get('data_added_packed', 0) or 0)
+                        stats['bytes_total'] = int(data.get('total_bytes_processed', 0) or 0)
                 except (json.JSONDecodeError, ValueError):
                     pass
 
@@ -1709,6 +1723,17 @@ class TaskManager:
                 if 'bytes_processed' in kwargs:
                     sql += ", bytes_processed = %s"
                     values.append(kwargs['bytes_processed'])
+                # detalhes do registro: só grava o que o motor realmente informou (None = desconhecido)
+                for _col in ('files_new', 'files_changed', 'files_unmodified', 'bytes_added', 'bytes_total'):
+                    if kwargs.get(_col) is not None:
+                        sql += f", {_col} = %s"
+                        values.append(kwargs[_col])
+                if kwargs.get('bytes_added') and kwargs.get('bytes_stored') is not None:
+                    # taxa = tamanho original / tamanho gravado no destino (1.0 = sem compressão/dedup)
+                    stored = kwargs['bytes_stored']
+                    sql += ", compression_ratio = %s, bytes_stored = %s"
+                    values.append(round(kwargs['bytes_added'] / stored, 3) if stored else 0.0)
+                    values.append(stored)
 
                 sql += " WHERE id = %s"
                 values.append(execution_id)

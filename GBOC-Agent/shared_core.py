@@ -580,6 +580,7 @@ class SharedCore:
                     files_changed INTEGER DEFAULT 0,
                     files_unmodified INTEGER DEFAULT 0,
                     bytes_added BIGINT DEFAULT 0,
+                    bytes_stored BIGINT DEFAULT 0,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
                 """)

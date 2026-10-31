@@ -6,7 +6,7 @@ GBOC Agent 14.8.3 - API Repositories
 ✅ Inicialização em background
 """
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Request
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, ConfigDict
 import logging
@@ -257,11 +257,11 @@ def create_repository(repo: RepositoryCreateRequest, background_tasks: Backgroun
 
 
 @router.get("/{repo_id}")
-def get_repository(repo_id: int, show_sensitive: bool = False):
+def get_repository(repo_id: int, show_sensitive: bool = False, request: Request = None):
     """
     Retorna dados de um repositório específico.
     Mascara senha de criptografia por padrão.
-    Se show_sensitive=true (para testes), retorna as senhas reais.
+    Se show_sensitive=true, retorna as senhas reais. Somente administradores (demais perfis recebem 403).
     """
     try:
         from shared_core import get_shared_core
@@ -308,7 +308,10 @@ def get_repository(repo_id: int, show_sensitive: bool = False):
                 if field in config and field not in repo_dict:
                     repo_dict[field] = config[field]
         
-        # Se não estiver em modo de teste, mascarar senhas
+        # Senhas em texto plano só para administradores (antes qualquer usuário autenticado obtinha com ?show_sensitive=true)
+        if show_sensitive:
+            from api.duplicati_native_api import _require_admin
+            _require_admin(request)
         if not show_sensitive:
             # Mascarar senha de criptografia (não remover, frontend precisa saber que existe)
             if 'encryption_password' in repo_dict and repo_dict['encryption_password']:
@@ -330,7 +333,7 @@ def get_repository(repo_id: int, show_sensitive: bool = False):
             logger.warning(f"⚠️ MODO TESTE: Retornando senhas visíveis para repositório {repo_id}. NÃO use em produção!")
             # As senhas já estão em texto plano, apenas registrar
             if 'motor_password' in repo_dict:
-                logger.debug(f"📋 Motor password para repo {repo_id}: {repo_dict.get('motor_password', 'N/A')}")
+                logger.debug(f"📋 Repo {repo_id}: motor_password definida={bool(repo_dict.get('motor_password'))} (valor não registrado)")
         
         logger.info(f"📦 Retornando repositório {repo_id}: {list(repo_dict.keys())}")
         return repo_dict

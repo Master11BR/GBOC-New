@@ -6,6 +6,7 @@ Usa conexão DEDICADA (não do pool) para evitar conflito com transações abort
 """
 
 import logging
+import os
 import queue
 import sys
 import threading
@@ -14,12 +15,14 @@ from datetime import datetime
 from typing import Optional
 
 # Configuração de conexão dedicada para logs
+# Credenciais vêm do ambiente (POSTGRES_*), nunca fixas no código. Sem POSTGRES_PASSWORD o log
+# continua indo para os arquivos; só a gravação em system_logs fica desativada.
 _DB_CONFIG = {
-    'dbname': 'gboc_agent',
-    'user': 'postgres',
-    'password': 'Stoms2025+',
-    'host': 'localhost',
-    'port': 5432,
+    'dbname': os.getenv('POSTGRES_DB', 'gboc_agent'),
+    'user': os.getenv('POSTGRES_USER', 'postgres'),
+    'password': os.getenv('POSTGRES_PASSWORD', ''),
+    'host': os.getenv('POSTGRES_HOST', 'localhost'),
+    'port': int(os.getenv('POSTGRES_PORT', 5432)),
     # Log nunca pode travar o sistema: se system_logs estiver bloqueada (ex.: migração com
     # CREATE INDEX na mesma inicialização), o INSERT desiste em 2 s em vez de esperar para sempre.
     'options': '-c lock_timeout=2000 -c statement_timeout=5000',

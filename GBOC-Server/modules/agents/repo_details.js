@@ -61,7 +61,8 @@
     const card = (icon, title, body, wide) => `<div class="gboc-rd-c${wide ? ' wide' : ''}"><h4><i class="fas ${icon}"></i>${esc(title)}</h4>${body}</div>`;
 
     function cronText(c, en) {
-        if (!c) return 'Manual';
+        if (!c) return 'Manual (só quando você executar)';
+        if (window.GBOCCron) return GBOCCron.html(c, en);
         return esc(c) + (en === false ? ' (pausado)' : '');
     }
 

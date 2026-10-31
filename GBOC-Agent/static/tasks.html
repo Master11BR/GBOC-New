@@ -25,6 +25,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     <script src="/static/gboc-perf.js?v=14.8.3"></script>
     <script src="/static/gboc-layout-manager.js?v=14.8.3"></script>
     <script src="/static/gboc-modal.js?v=14.8.3"></script>
+    <script src="/static/gboc-cron.js?v=14.8.3"></script>
 <script src="/static/sidebar.js"></script>
     <script src="/static/app_v6.js"></script>
     <script src="/static/toast_notifications.js"></script>
@@ -604,36 +605,10 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleString('pt-BR');
     }
 
-    // Converte expressão cron para texto legível em português
+    // Converte expressão cron para texto legível (linguagem simples) — ver gboc-cron.js
     function cronToHuman(cron, enabled) {
-        if (!cron) return 'Sem agendamento';
-        if (enabled === false) return 'Desativado';
-        try {
-            const parts = cron.trim().split(/\s+/);
-            if (parts.length < 5) return cron;
-            const [min, hour, dom, mon, dow] = parts;
-
-            // A cada X minutos / horas
-            if (min.startsWith('*/')) return `A cada ${min.slice(2)} min`;
-            if (hour.startsWith('*/')) return `A cada ${hour.slice(2)}h`;
-
-            const hhmm = `${hour.padStart(2,'0')}:${min.padStart(2,'0')}`;
-
-            // Dias da semana
-            if (dow !== '*' && dom === '*') {
-                const dayNames = {'0':'Dom','1':'Seg','2':'Ter','3':'Qua','4':'Qui','5':'Sex','6':'Sáb','7':'Dom'};
-                const days = dow.split(',').map(d => dayNames[d] || d).join(', ');
-                return `Semanal ${days} às ${hhmm}`;
-            }
-
-            // Dia específico do mês
-            if (dom !== '*' && dow === '*') return `Mensal dia ${dom} às ${hhmm}`;
-
-            // Diário
-            if (dom === '*' && dow === '*') return `Diário às ${hhmm}`;
-
-            return cron;
-        } catch(e) { return cron; }
+        if (window.GBOCCron) return GBOCCron.texto(cron, enabled);
+        return cron ? String(cron) : 'Sem agendamento';
     }
 
     // Versoes reais (snapshots no repositorio) - consultadas no maximo a cada 60 s

@@ -804,7 +804,8 @@ class CentralServerClient:
         """Chama a API local (http://127.0.0.1:AGENT_PORT) com a chave de pareamento."""
         method = str(req.get("method") or "GET").upper()
         path = "/" + str(req.get("path") or "").lstrip("/")
-        if not path.startswith("/api/") or ".." in path or method not in ("GET", "POST", "PUT", "DELETE", "PATCH"):
+        read_schema = method == "GET" and path == "/openapi.json"  # inventário de rotas (somente leitura)
+        if not (path.startswith("/api/") or read_schema) or ".." in path or method not in ("GET", "POST", "PUT", "DELETE", "PATCH"):
             return {"status_code": 400, "body": {"status": "error", "message": "Caminho/método não permitido"}}
         if path.rstrip("/") in ("/api/system/shutdown", "/api/v1/system/shutdown"):
             return {"status_code": 403, "body": {"status": "error", "message": "Desligamento remoto não é permitido por este canal"}}

@@ -46,7 +46,7 @@
         <div id="rm-summary" class="kpi-grid" style="margin-bottom:14px"></div>
         <div id="rm-tabs" style="display:flex;gap:6px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:12px">
             ${[['tasks', 'fa-list-check', 'Tarefas'], ['running', 'fa-spinner', 'Em execução'], ['repos', 'fa-database', 'Repositórios'],
-               ['restore', 'fa-clock-rotate-left', 'Restaurar'], ['operation', 'fa-shield-halved', 'Operação e imutabilidade'],
+               ['console', 'fa-code', 'Console remoto'], ['restore', 'fa-clock-rotate-left', 'Restaurar'], ['operation', 'fa-shield-halved', 'Operação e imutabilidade'],
                ['logs', 'fa-file-lines', 'Logs'], ['alerts', 'fa-bell', 'Alertas'], ['config', 'fa-sliders', 'Sincronização']]
                 .map(([k, i, l]) => `<button class="btn btn-sm ${k === S.tab ? 'btn-primary' : ''}" data-rt="${k}"><i class="fas ${i}"></i> ${l}</button>`).join('')}
             <span id="rm-channel-used" style="margin-left:auto;font-size:.78em;color:var(--text-muted);align-self:center"></span>
@@ -129,7 +129,7 @@
                 ${tasks.map(t => `<tr>
                     <td><strong>${esc(t.name)}</strong><div style="font-size:.78em;color:var(--text-muted)">${esc(paths(t.source_paths).join(', ')).slice(0, 160)}</div></td>
                     <td>${esc(t.engine || '—')}</td><td>${esc(t.repository_name || '—')}</td>
-                    <td>${t.schedule_cron ? `<code>${esc(t.schedule_cron)}</code>${t.schedule_enabled ? '' : ' ' + badge('desativado', 'warn')}` : '<span style="color:var(--text-muted)">manual</span>'}</td>
+                    <td>${t.schedule_cron ? (window.GBOCCron ? GBOCCron.html(t.schedule_cron, t.schedule_enabled) : `<code>${esc(t.schedule_cron)}</code>`) : '<span style="color:var(--text-muted)">Manual (só quando você executar)</span>'}</td>
                     <td><label style="cursor:pointer"><input type="checkbox" data-en="${t.id}" ${t.enabled !== false ? 'checked' : ''}> ${t.enabled !== false ? 'Sim' : 'Não'}</label></td>
                     <td>${t.last_status ? badge(t.last_status, stTone(t.last_status)) : '—'}<div style="font-size:.78em;color:var(--text-muted)">${dt(t.last_run)}</div></td>
                     <td style="text-align:right;white-space:nowrap">
@@ -455,11 +455,134 @@
         } catch (e) { fail(e); }
     }
 
+    // ── Console remoto: qualquer rota da API do agente, como job (fila para agente offline) ──
+    async function remoteJson(path, opts) {
+        const r = await fetch(`${base()}/api/v1/agents/${encodeURIComponent(S.agent)}/remote/${path}`,
+            Object.assign({ headers: { 'Content-Type': 'application/json' } }, opts || {}));
+        let d; try { d = await r.json(); } catch (e) { d = {}; }
+        if (!r.ok) throw new Error((typeof d.detail === 'string' ? d.detail : '') || d.message || ('HTTP ' + r.status));
+        return d;
+    }
+
+    function jobsTable(list) {
+        if (!list || !list.length) return '<p style="color:var(--text-muted)">Nenhum job.</p>';
+        return `<div style="overflow:auto"><table class="table"><thead><tr><th>Quando</th><th>Ação</th><th>Status</th><th>HTTP</th><th>Por</th><th></th></tr></thead><tbody>${
+            list.map(j => `<tr><td>${dt(j.created_at)}</td><td style="font-family:monospace;font-size:.85em">${esc(j.method)} /${esc(j.path)}</td>
+            <td>${badge(j.status, stTone(j.status))}</td><td>${j.http_status ?? '—'}</td><td>${esc(j.created_by || '')}</td>
+            <td>${j.status === 'queued' ? `<button class="btn" data-jcancel="${esc(j.id)}">Cancelar</button>` : ''}</td></tr>`).join('')}</tbody></table></div>`;
+    }
+
+    function bindJobCancel(root) {
+        root.querySelectorAll('[data-jcancel]').forEach(b => b.onclick = async () => {
+            try { await remoteJson(`jobs/${b.dataset.jcancel}`, { method: 'DELETE' }); toast('Job cancelado', 'success'); tabConsoleJobs(); }
+            catch (e) { toast(e.message, 'error'); }
+        });
+    }
+
+    async function tabConsoleJobs() {
+        const box = document.getElementById('rc-jobs');
+        if (!box) return;
+        try { const d = await remoteJson('jobs?limit=20'); box.innerHTML = jobsTable(d.jobs); bindJobCancel(box); }
+        catch (e) { box.innerHTML = `<span style="color:var(--danger)">${esc(e.message)}</span>`; }
+    }
+
+    async function pollJob(jobId, out, msg) {
+        out.innerHTML = `<div style="color:var(--text-muted)">${esc(msg || '')}</div><div id="rc-state" style="margin-top:6px"></div>`;
+        for (let i = 0; i < 900; i++) {
+            const st = document.getElementById('rc-state');
+            if (!st) return; // usuário trocou de aba
+            const j = (await remoteJson(`jobs/${jobId}`)).job;
+            st.innerHTML = `${badge(j.status, stTone(j.status))} HTTP ${esc(j.http_status ?? '—')} · canal ${esc(j.channel || '—')}`;
+            if (['done', 'error', 'cancelled', 'expired'].includes(j.status)) {
+                const payload = j.result ?? j.error ?? null;
+                out.insertAdjacentHTML('beforeend', `<pre style="max-height:360px;overflow:auto;background:var(--bg-input);padding:10px;border-radius:6px;font-size:.8em;white-space:pre-wrap">${esc(JSON.stringify(payload, null, 2))}</pre>`);
+                tabConsoleJobs();
+                return;
+            }
+            await new Promise(r => setTimeout(r, 2000));
+        }
+    }
+
+    function openRoute(r) {
+        const params = [...r.path.matchAll(/\{([^}]+)\}/g)].map(m => m[1]);
+        const box = document.getElementById('rc-form');
+        box.innerHTML = `
+          <div style="border:1px solid var(--border);border-radius:8px;padding:12px">
+            <div style="margin-bottom:6px">${badge(r.method, r.write ? 'warn' : 'ok')} <code>${esc(r.path)}</code></div>
+            <div style="color:var(--text-muted);font-size:.85em;margin-bottom:10px">${esc(r.summary || '')}</div>
+            ${params.map(p => `<label style="display:block;margin-bottom:8px">${esc(p)}<input class="form-control" data-param="${esc(p)}"></label>`).join('')}
+            <label style="display:block;margin-bottom:8px">Query (JSON, opcional)<textarea class="form-control" id="rc-query" rows="2" placeholder='{"limit": 50}'></textarea></label>
+            ${r.has_body ? '<label style="display:block;margin-bottom:8px">Corpo (JSON)<textarea class="form-control" id="rc-body" rows="7" placeholder="{}"></textarea></label>' : ''}
+            <button class="btn btn-primary" id="rc-send"><i class="fas fa-paper-plane"></i> Executar</button>
+            <div id="rc-out" style="margin-top:12px"></div>
+          </div>`;
+        document.getElementById('rc-send').onclick = () => sendRoute(r);
+    }
+
+    async function sendRoute(r) {
+        let path = r.path.replace(/^\//, '');
+        for (const el of document.querySelectorAll('#rc-form [data-param]')) {
+            const v = el.value.trim();
+            if (!v) { toast('Preencha ' + el.dataset.param, 'error'); return; }
+            path = path.replace('{' + el.dataset.param + '}', encodeURIComponent(v));
+        }
+        let query, bodyObj;
+        try {
+            const q = (document.getElementById('rc-query')?.value || '').trim();
+            const b = (document.getElementById('rc-body')?.value || '').trim();
+            query = q ? JSON.parse(q) : undefined;
+            bodyObj = b ? JSON.parse(b) : undefined;
+        } catch (e) { toast('JSON inválido em query/corpo: ' + e.message, 'error'); return; }
+        if (r.write && !confirm(`Executar ${r.method} /${path} no agente?`)) return;
+        const out = document.getElementById('rc-out');
+        out.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando…';
+        try {
+            const created = await remoteJson('jobs', { method: 'POST', body: JSON.stringify({ method: r.method, path, query, body: bodyObj, timeout: 300 }) });
+            await pollJob(created.job_id, out, created.message);
+        } catch (e) { out.innerHTML = `<span style="color:var(--danger)">${esc(e.message)}</span>`; }
+    }
+
+    async function tabConsole() {
+        const body = document.getElementById('rm-body');
+        body.innerHTML = '<p style="color:var(--text-muted)">Carregando rotas do agente…</p>';
+        let inv, jobs;
+        try {
+            [inv, jobs] = await Promise.all([remoteJson('inventory'), remoteJson('jobs?limit=20')]);
+        } catch (e) { return fail(e); }
+        S.inv = inv;
+        const rows = inv.routes.map((r, i) => `<tr data-ri="${i}" style="cursor:pointer">
+            <td>${badge(r.method, r.write ? 'warn' : 'ok')}</td>
+            <td style="font-family:monospace;font-size:.85em">/${esc(r.path)}</td>
+            <td>${esc((r.tags || [])[0] || '')}</td>
+            <td>${r.covered_by_ui ? badge('tela', 'ok') : ''}</td></tr>`).join('');
+        body.innerHTML = `
+          <p style="color:var(--text-muted);font-size:.9em">${inv.total} rotas · ${inv.writes} de escrita · ${inv.covered_by_ui} com tela própria.
+             ${jobs.connected ? '' : 'Agente offline: jobs são enfileirados e executados na reconexão.'}</p>
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px">
+            <div>
+              <input id="rc-filter" class="form-control" placeholder="Filtrar (ex.: tasks, repositories, POST)" style="margin-bottom:8px">
+              <div style="max-height:520px;overflow:auto"><table class="table"><tbody id="rc-rows">${rows}</tbody></table></div>
+            </div>
+            <div id="rc-form"><p style="color:var(--text-muted)">Selecione uma rota.</p></div>
+          </div>
+          <h3 style="margin-top:18px;font-size:1em">Jobs recentes</h3>
+          <div id="rc-jobs">${jobsTable(jobs.jobs)}</div>`;
+        document.getElementById('rc-filter').oninput = (e) => {
+            const q = e.target.value.trim().toLowerCase();
+            document.querySelectorAll('#rc-rows tr').forEach(tr => {
+                const r = S.inv.routes[+tr.dataset.ri];
+                tr.style.display = (!q || (r.method + ' ' + r.path + ' ' + (r.tags || []).join(' ')).toLowerCase().includes(q)) ? '' : 'none';
+            });
+        };
+        document.querySelectorAll('#rc-rows tr').forEach(tr => tr.onclick = () => openRoute(S.inv.routes[+tr.dataset.ri]));
+        bindJobCancel(document.getElementById('rc-jobs'));
+    }
+
     function renderTab() {
         clearInterval(S.timer);
         if (!S.agent) { document.getElementById('rm-body').innerHTML = '<p style="color:var(--text-muted)">Selecione um agente.</p>'; return; }
         ({ tasks: tabTasks, running: tabRunning, repos: tabRepos, logs: tabLogs, alerts: tabAlerts, config: tabConfig,
-           restore: tabRestore, operation: tabOperation }[S.tab] || tabTasks)();
+           restore: tabRestore, operation: tabOperation, console: tabConsole }[S.tab] || tabTasks)();
         if (S.tab === 'running') S.timer = setInterval(() => {
             const t = document.getElementById('tab-remote');
             if (!document.hidden && t && t.classList.contains('active') && S.tab === 'running') tabRunning(); else clearInterval(S.timer);

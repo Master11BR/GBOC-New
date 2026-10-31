@@ -4,6 +4,14 @@ Servidor Central — Real-time Agent Communication + Complete Data Sync + Advanc
 Banco de dados: PostgreSQL (oficial)
 """
 import os
+import sys as _sys
+
+if __name__ == "__main__":
+    # Quando rodado como script, este arquivo é '__main__'. Os routers fazem 'from server_gboc import
+    # manager/get_db' e, sem este alias, REIMPORTAM o arquivo: duplicavam o ConnectionManager (o túnel
+    # WebSocket nunca achava o agente conectado) e o pool de banco. Registra a mesma instância.
+    _sys.modules.setdefault("server_gboc", _sys.modules["__main__"])
+    _sys.modules.setdefault("gboc_server", _sys.modules["__main__"])
 
 try:
     import gboc_encoding_compat  # noqa: F401  Python 3.15+ no Windows: saida dos comandos em cp850/cp1252
@@ -1606,6 +1614,11 @@ async def websocket_endpoint(websocket: WebSocket, agent_id: str):
         await websocket.close(code=4401)
         return
     await manager.connect(websocket, agent_id)
+    try:
+        from modules.agents.remote_jobs import flush_queue as _flush_remote_jobs
+        asyncio.get_running_loop().create_task(_flush_remote_jobs(agent_id))
+    except Exception as _fq_e:
+        logger.warning(f"Fila de jobs remotos não iniciada: {_fq_e}")
     try:
         while True:
             data = await websocket.receive_text()
@@ -3556,6 +3569,11 @@ try:
     from modules.agents.remote_mgmt import router as server_remote_router
     app.include_router(server_remote_router)
 except Exception as _e: logger.warning(f"Remote management router: {_e}")
+
+try:
+    from modules.agents.remote_jobs import router as server_remote_jobs_router
+    app.include_router(server_remote_jobs_router)
+except Exception as _e: logger.warning(f"Console remoto (jobs): {_e}")
 
 try:
     from modules.agents.inventory_sync import router as server_inventory_router

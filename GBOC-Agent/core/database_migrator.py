@@ -336,6 +336,7 @@ def run_auto_migrations(conn):
                 "ALTER TABLE task_executions ADD COLUMN IF NOT EXISTS files_changed INTEGER DEFAULT 0;",
                 "ALTER TABLE task_executions ADD COLUMN IF NOT EXISTS files_unmodified INTEGER DEFAULT 0;",
                 "ALTER TABLE task_executions ADD COLUMN IF NOT EXISTS bytes_added BIGINT DEFAULT 0;",
+                "ALTER TABLE task_executions ADD COLUMN IF NOT EXISTS bytes_stored BIGINT DEFAULT 0;",
                 "ALTER TABLE settings ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'general';",
                 "ALTER TABLE settings ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'string';",
                 "ALTER TABLE settings ADD COLUMN IF NOT EXISTS description TEXT;",
@@ -385,6 +386,7 @@ def run_auto_migrations(conn):
                     files_changed INTEGER DEFAULT 0,
                     files_unmodified INTEGER DEFAULT 0,
                     bytes_added BIGINT DEFAULT 0,
+                    bytes_stored BIGINT DEFAULT 0,
                     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
                 );
             """)
