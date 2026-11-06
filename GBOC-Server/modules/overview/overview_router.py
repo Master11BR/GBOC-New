@@ -50,3 +50,24 @@ def get_dashboard_overview_stats():
         })
     finally:
         if conn and release_db: release_db(conn)
+
+
+@router.get("/system-map")
+def get_system_map(agent_id: str = None):
+    """Mapa do sistema: pastas de origem → tarefas → repositórios → destinos de todos os Agentes (ou de um)."""
+    from modules.overview.system_map import build_system_map
+    conn = None
+    try:
+        conn = get_db()
+        if conn is None:
+            return JSONResponse({"status": "error", "message": "Banco de dados do Server indisponível."}, status_code=503)
+        aid = (agent_id or "").strip()[:255] or None
+        return JSONResponse(build_system_map(conn, aid))
+    except Exception as e:
+        logger.error(f"[SYSTEM-MAP] Falha ao montar o mapa: {e}", exc_info=True)
+        if conn:
+            conn.rollback()
+        return JSONResponse({"status": "error", "message": f"Falha ao montar o mapa do sistema: {str(e)[:200]}"}, status_code=500)
+    finally:
+        if conn:
+            release_db(conn)

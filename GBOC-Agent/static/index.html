@@ -215,6 +215,19 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                     <a href="/docs" target="_blank" class="qcard"><i class="fas fa-book"></i><span>API Docs</span></a>
                 </div>
 
+                <!-- Mapa do Sistema: Origens → Tarefas → Repositórios → Destinos -->
+                <div class="gsm-wrap">
+                    <div class="panel">
+                        <div class="panel-hdr"><h3><i class="fas fa-project-diagram" style="color:var(--success)"></i> Mapa do sistema</h3><span class="gsm-sub" id="gsmUpdated" style="font-size:.78em;color:var(--text-muted)">Passe o mouse para ver o caminho dos dados · clique para abrir</span></div>
+                        <div class="gsm-map" id="gsmMap"><div class="gsm-empty" style="padding:28px;text-align:center;color:var(--text-muted)"><i class="fas fa-spinner fa-spin"></i> Carregando mapa...</div></div>
+                    </div>
+                    <div class="gsm-grid3">
+                        <div class="panel"><div class="panel-hdr"><h3><i class="fas fa-cloud" style="color:var(--success)"></i> Destinos</h3><a href="/repositories.html" class="btn btn-secondary" style="padding:4px 10px;font-size:.8em">Repositórios</a></div><div class="panel-body" id="gsmDest"></div></div>
+                        <div class="panel"><div class="panel-hdr"><h3><i class="fas fa-hdd" style="color:var(--success)"></i> Computador (origens)</h3></div><div class="panel-body" id="gsmComp"></div></div>
+                        <div class="panel"><div class="panel-hdr"><h3><i class="fas fa-calendar-check" style="color:var(--success)"></i> Próximos passos e saúde</h3></div><div class="panel-body" id="gsmHealth"></div></div>
+                    </div>
+                </div>
+
                 <!-- Charts Row -->
                 <div class="dash-grid">
                     <div class="panel">
@@ -262,6 +275,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     <script src="/static/js/heatmap.js"></script>
     <script src="/static/js/timeline.js"></script>
     <script src="/static/js/dashboard-widgets.js"></script>
+    <script src="/static/js/system-map.js?v=14.8.3"></script>
 
     <script>
     // ═══════════════════════════════════════════════════
@@ -292,7 +306,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 
     // ── Data Loading ───────────────────────────────
     async function refreshAll() {
-        await Promise.all([loadOverview(), loadCharts(), loadHeatmapData(), loadTimelineData()]);
+        await Promise.all([loadOverview(), loadCharts(), loadHeatmapData(), loadTimelineData(), window.GBOCSystemMap ? GBOCSystemMap.reload() : null]);
     }
 
     async function loadOverview() {
