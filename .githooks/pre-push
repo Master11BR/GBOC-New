@@ -25,7 +25,11 @@ while read -r local_ref local_sha remote_ref remote_sha; do
                 continue
             fi
         fi
-        range="$remote_sha..$local_sha"
+        if git cat-file -e "$remote_sha^{commit}" 2>/dev/null; then
+            range="$remote_sha..$local_sha"
+        else
+            range="$local_sha --not --remotes"   # commit remoto desconhecido localmente (ex.: historico reescrito)
+        fi
     fi
     for c in $(git rev-list $range 2>/dev/null); do
         git diff-tree --no-commit-id --name-only -r --diff-filter=ACMR "$c" | gboc_check_paths || { echo "   (commit $c)" >&2; rc=1; }
