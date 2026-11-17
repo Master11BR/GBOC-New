@@ -584,7 +584,18 @@ try:
     app.add_middleware(AuthMiddleware)
     logger.info("[OK] Auth middleware loaded")
 except Exception as e:
-    logger.warning(f"[WARN] Auth middleware not loaded: {e}")
+    # Fail-closed: sem o middleware de autenticação a API ficaria aberta. Em vez disso, toda rota /api/
+    # (exceto o ping do watchdog) responde 503 até a falha ser corrigida — o erro aparece no log e na tela.
+    logger.critical(f"[SEGURANÇA] Auth middleware NÃO carregado ({e}) — API bloqueada (fail-closed).")
+    _auth_load_error = str(e)
+
+    @app.middleware("http")
+    async def _gboc_auth_unavailable(request: Request, call_next):
+        _p = request.url.path
+        if _p.startswith("/api/") and _p != "/api/watchdog/ping" and request.method != "OPTIONS":
+            return JSONResponse({"status": "error", "code": "AUTH_UNAVAILABLE",
+                                 "message": f"Autenticação indisponível no Agente: {_auth_load_error}"}, status_code=503)
+        return await call_next(request)
 
 # ==============================================================================
 # 1. ROTAS DE ARQUIVOS ESTÁTICOS (HTML) - PRIORIDADE MÁXIMA

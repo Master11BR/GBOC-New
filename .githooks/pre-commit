@@ -1,0 +1,9 @@
+#!/bin/sh
+# GBOC - impede commit de dados protegidos e segredos.
+HOOK_DIR=$(dirname "$0")
+. "$HOOK_DIR/gboc-protect.sh"
+rc=0
+git diff --cached --name-only --diff-filter=ACMR | gboc_check_paths || rc=1
+git diff --cached -U0 --diff-filter=ACMR | grep -v 'gboc-allow-secret' | gboc_check_content "arquivos do commit" || rc=1
+[ $rc -ne 0 ] && echo "[GBOC] Commit cancelado." >&2
+exit $rc

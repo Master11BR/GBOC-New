@@ -195,3 +195,45 @@ cython_debug/
 
 # Arquivos-isca do Ransomware Guardian: gerados por instalacao (hash guardado no banco local); versionar faz o pull regravar e gera alarme falso
 **/.gboc_canary*
+
+# ==============================================================================
+# GBOC - DADOS PROTEGIDOS (nunca versionar). Ver docs/PROTECAO_DADOS_GIT.md
+# Arquivos ignorados NAO sao apagados pelo git (exceto 'git clean -x': nunca use -x)
+# ==============================================================================
+# Credenciais e segredos
+acessos.txt
+*.env
+.env*
+!.env.example
+*secret*.txt
+*token*.txt
+*credentials*
+*.pfx
+*.p12
+*.kdbx
+
+# Bancos de dados locais (Agent/Server) e arquivos WAL/SHM
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+
+# Dados de runtime, caches e logs
+GBOC-Agent/data/
+GBOC-Server/data/
+/data/
+/logs/
+GBOC-Agent/logs/
+GBOC-Server/logs/
+GBOC-Agent/utils/logs/
+*.log
+*.log.[0-9]*
+
+# Lixo de IDE / pastas obsoletas
+.idea/
+_to_delete/
+_bkp_obsoletos/

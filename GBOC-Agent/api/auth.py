@@ -583,11 +583,33 @@ def login(req: LoginRequest, request: Request):
         raise HTTPException(status_code=500, detail="Erro interno no login")
 
 
+def _setup_origin_allowed(client_ip: str) -> bool:
+    """Primeiro acesso (criação do admin) só a partir da própria máquina ou da rede local/privada.
+    Impede que alguém pela internet "reivindique" um Agente/Servidor recém-instalado e exposto.
+    Para liberar de qualquer origem (ex.: instalação via NAT público): GBOC_SETUP_ALLOW_ANY=1."""
+    import os as _os
+    import ipaddress as _ip
+    if _os.getenv("GBOC_SETUP_ALLOW_ANY", "").strip().lower() in ("1", "true", "yes", "sim"):
+        return True
+    if client_ip in ("localhost", "testclient"):
+        return True
+    try:
+        addr = _ip.ip_address((client_ip or "").split("%", 1)[0])
+        if getattr(addr, "ipv4_mapped", None):
+            addr = addr.ipv4_mapped
+        return addr.is_loopback or addr.is_private or addr.is_link_local
+    except ValueError:
+        return False
+
+
 @_core_router.post("/setup")
 def auth_setup(req: RegisterRequest, request: Request):
     """Criação da primeira conta de administrador (primeiro acesso)"""
     client_ip = request.client.host if request.client else "unknown"
     _check_rate_limit(client_ip)
+    if not _setup_origin_allowed(client_ip):
+        logger.warning(f"[AUTH] Primeiro acesso recusado de origem externa: {client_ip}")
+        raise HTTPException(status_code=403, detail="Primeiro acesso permitido apenas pela própria máquina ou pela rede local (GBOC_SETUP_ALLOW_ANY=1 libera).")
 
     if not req.username or not req.password:
         raise HTTPException(status_code=400, detail="Usuário e senha são obrigatórios")

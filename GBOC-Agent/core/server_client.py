@@ -105,6 +105,11 @@ class CentralServerClient:
         # Sessão HTTP reutilizável — verify=False aceita cert autoassinado local (HTTPS)
         self._session = requests.Session()
         self._session.verify = False
+        try:   # pinning/CA opcionais (GBOC_SERVER_CERT_SHA256 / GBOC_SERVER_CA_BUNDLE); padrão inalterado
+            from core.tls_trust import configure_session as _tls_configure
+            _tls_configure(self._session)
+        except Exception as _tls_err:
+            logger.warning(f"[TLS] Política TLS padrão mantida: {_tls_err}")
         # Suprimir aviso de InsecureRequest para conexões locais
         try:
             import urllib3

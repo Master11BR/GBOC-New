@@ -1012,7 +1012,41 @@ try:
     _hang_watchdog_mod.register(app)      # /api/watchdog/ping (usado pelo serviço GBOCWatchdog)
 except Exception as _hw_reg_e:
     logger.warning(f"[VIGIA] rota de verificação indisponível: {_hw_reg_e}")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+# CORS restrito (antes: allow_origins=["*"], qualquer site podia chamar a API pelo navegador do usuário).
+# Liberado: mesmo host em outra porta (ex.: páginas em :8080/:8079 chamando a API em :8000) e as origens
+# listadas em GBOC_SERVER_CORS_ORIGINS (separadas por vírgula). "*" nessa variável restaura o comportamento antigo.
+import contextvars as _cv
+from urllib.parse import urlsplit as _urlsplit
+_cors_req_host = _cv.ContextVar("gboc_cors_req_host", default="")
+_cors_extra = {o.strip().rstrip("/").lower() for o in os.getenv("GBOC_SERVER_CORS_ORIGINS", "").split(",") if o.strip()}
+
+
+class _GbocSameHostCORS(CORSMiddleware):
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") == "http":
+            host = ""
+            for k, v in scope.get("headers") or ():
+                if k == b"host":
+                    host = v.decode("latin-1")
+                    break
+            _cors_req_host.set(host)
+        await super().__call__(scope, receive, send)
+
+    def is_allowed_origin(self, origin: str) -> bool:
+        o = (origin or "").rstrip("/").lower()
+        if not o:
+            return False
+        if "*" in _cors_extra or o in _cors_extra:
+            return True
+        try:
+            o_host = (_urlsplit(o).hostname or "").lower()
+            req_host = (_urlsplit("//" + _cors_req_host.get()).hostname or "").lower()
+        except ValueError:
+            return False
+        return bool(o_host) and o_host == req_host
+
+
+app.add_middleware(_GbocSameHostCORS, allow_origins=[], allow_methods=["*"], allow_headers=["*"])
 
 _SLOW_THRESHOLD_MS = float(os.getenv("GBOC_SLOW_MS", "250"))
 
@@ -1391,10 +1425,33 @@ def server_auth_oauth_provider(provider: str):
         "message": f"Provedor {name} pronto para autenticação."
     }
 
+def _setup_origin_allowed(client_ip: str) -> bool:
+    """Primeiro acesso (criação do admin) só a partir da própria máquina ou da rede local/privada.
+    Impede que alguém pela internet "reivindique" um Agente/Servidor recém-instalado e exposto.
+    Para liberar de qualquer origem (ex.: instalação via NAT público): GBOC_SETUP_ALLOW_ANY=1."""
+    import os as _os
+    import ipaddress as _ip
+    if _os.getenv("GBOC_SETUP_ALLOW_ANY", "").strip().lower() in ("1", "true", "yes", "sim"):
+        return True
+    if client_ip in ("localhost", "testclient"):
+        return True
+    try:
+        addr = _ip.ip_address((client_ip or "").split("%", 1)[0])
+        if getattr(addr, "ipv4_mapped", None):
+            addr = addr.ipv4_mapped
+        return addr.is_loopback or addr.is_private or addr.is_link_local
+    except ValueError:
+        return False
+
+
 SETUP_MIN_PASSWORD_LENGTH = 6   # mesmo mínimo exigido pela tela de primeiro acesso
 
 @app.post("/api/v1/auth/setup")
-def server_auth_setup(req: ServerSetupRequest):
+def server_auth_setup(req: ServerSetupRequest, request: Request):
+    _client_ip = request.client.host if request.client else "unknown"
+    if not _setup_origin_allowed(_client_ip):
+        logger.warning(f"[AUTH] Primeiro acesso recusado de origem externa: {_client_ip}")
+        raise HTTPException(403, "Primeiro acesso permitido apenas pela própria máquina ou pela rede local (GBOC_SETUP_ALLOW_ANY=1 libera).")
     username = (req.username or "").strip()
     if not username or len(req.password or "") < SETUP_MIN_PASSWORD_LENGTH:
         raise HTTPException(400, f"Usuário e senha (mínimo {SETUP_MIN_PASSWORD_LENGTH} caracteres) são obrigatórios.")

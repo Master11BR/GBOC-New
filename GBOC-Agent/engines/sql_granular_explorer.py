@@ -150,7 +150,7 @@ class SqlGranularExplorer:
             tbl_names = [r[0] for r in cur.fetchall()]
             for name in tbl_names:
                 try:
-                    cur.execute(f"SELECT COUNT(*) FROM [{name}];")
+                    cur.execute("SELECT COUNT(*) FROM [" + str(name).replace("]", "]]") + "];")
                     cnt = cur.fetchone()[0]
                 except Exception:
                     cnt = 0

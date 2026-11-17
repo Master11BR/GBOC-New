@@ -65,7 +65,11 @@ def request_enrollment(server_url: str, token: str, timeout: int = 30) -> Dict[s
     url = server_url.rstrip("/") + "/api/v1/enroll"
     payload = {"token": token, "agent_id": agent_id(), "hostname": socket.gethostname(),
                "os_info": f"{platform.system()} {platform.release()}"}
-    r = requests.post(url, json=payload, timeout=timeout, verify=False)
+    try:
+        from core.tls_trust import new_session as _tls_session
+        r = _tls_session().post(url, json=payload, timeout=timeout)
+    except ImportError:
+        r = requests.post(url, json=payload, timeout=timeout, verify=False)
     try:
         data = r.json()
     except ValueError:

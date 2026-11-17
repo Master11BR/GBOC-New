@@ -1,2 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Hooks de protecao precisam de LF (executados pelo sh do Git for Windows)
+.githooks/* text eol=lf

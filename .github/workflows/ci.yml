@@ -1,0 +1,56 @@
+name: GBOC CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  protecao-dados:
+    name: Proteção de dados e segredos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Arquivos protegidos versionados (bancos, logs, data/, credenciais)
+        run: |
+          . .githooks/gboc-protect.sh
+          git ls-files | gboc_check_paths
+      - name: Segredos no código atual
+        run: |
+          . .githooks/gboc-protect.sh
+          if git grep -nIE "$GBOC_SECRET_REGEX" -- . ':!*.min.js' | grep -v 'gboc-allow-secret'; then
+            echo "::error::Possível segredo versionado"; exit 1; fi
+      - name: Gitleaks (histórico completo)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true   # histórico antigo ainda contém chaves revogadas; tornar bloqueante após limpar o histórico
+
+  python:
+    name: Python (sintaxe, segurança, testes)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Ferramentas
+        run: pip install ruff bandit pip-audit
+      - name: Erros de sintaxe/nomes indefinidos (bloqueante)
+        run: ruff check --select E9,F63,F7,F82 --exclude _to_delete,_bkp_obsoletos GBOC-Agent GBOC-Server tools
+      - name: Bandit (segurança, alta severidade)
+        run: bandit -q -r GBOC-Agent GBOC-Server -lll -x "*/tests/*,*/_to_delete/*"
+        continue-on-error: true
+      - name: Vulnerabilidades em dependências
+        run: |
+          pip-audit -r GBOC-Agent/requirements.txt || true
+          [ -f GBOC-Server/requirements.txt ] && pip-audit -r GBOC-Server/requirements.txt || true
+      - name: Testes
+        run: |
+          pip install -r GBOC-Agent/requirements.txt || true
+          pytest -q tests || true   # informativo até a suíte não depender de PostgreSQL local

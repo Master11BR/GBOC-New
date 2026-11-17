@@ -98,6 +98,14 @@ def setup_process_dirs() -> None:
         kl = LOGS_DIR / "kopia"
         kl.mkdir(parents=True, exist_ok=True)
         os.environ.setdefault("KOPIA_LOG_DIR", str(kl))
+        # Rotacao dos logs do Kopia (antes: padrao do Kopia = ate 1000 logs CLI e 5000 de conteudo, ~30 dias;
+        # a pasta logs/kopia chegava a dezenas de MB). Variaveis nativas do Kopia; sobrescreviveis no ambiente.
+        os.environ.setdefault("KOPIA_LOG_DIR_MAX_FILES", os.environ.get("GBOC_KOPIA_LOG_MAX_FILES", "100"))
+        os.environ.setdefault("KOPIA_LOG_DIR_MAX_AGE", os.environ.get("GBOC_KOPIA_LOG_MAX_AGE", "168h"))
+        os.environ.setdefault("KOPIA_CONTENT_LOG_DIR_MAX_FILES", os.environ.get("GBOC_KOPIA_CONTENT_LOG_MAX_FILES", "100"))
+        os.environ.setdefault("KOPIA_CONTENT_LOG_DIR_MAX_AGE", os.environ.get("GBOC_KOPIA_LOG_MAX_AGE", "168h"))
+        os.environ.setdefault("KOPIA_LOG_DIR_MAX_SIZE_MB", os.environ.get("GBOC_KOPIA_LOG_MAX_MB", "50"))
+        os.environ.setdefault("KOPIA_CONTENT_LOG_DIR_MAX_SIZE_MB", os.environ.get("GBOC_KOPIA_LOG_MAX_MB", "50"))
     except OSError as e:
         logger.warning(f"[PASTAS] Pastas de trabalho nao configuradas: {e}")
 
