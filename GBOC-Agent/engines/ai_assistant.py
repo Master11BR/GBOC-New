@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 14.8.3 - Multi-Provider AI Assistant Engine (GBOC Copilot AI - Agent)
+GBOC 15.0.0 - Multi-Provider AI Assistant Engine (GBOC Copilot AI - Agent)
 
 Provedores: Ollama Local (padrão/fallback), DeepSeek, Groq, Google Gemini, OpenAI,
 Anthropic Claude, xAI Grok, Moonshot Kimi, Mistral e Cohere — via engines/ai_providers.py.
@@ -237,12 +237,24 @@ def query_ai_assistant(prompt: str, provider_override: str | None = None) -> dic
         if kb_ctx:
             system += f"\n\n[GUIA DE USO DO GBOC]:\n{kb_ctx}"
 
+    # 📚 RAG local: trechos reais de casos, falhas, execuções, logs e documentação do GBOC
+    rag_used: list[dict[str, Any]] = []
+    if not is_test:
+        try:
+            from engines import ai_rag
+            rag_ctx, rag_used = ai_rag.build_context(clean_prompt, k=6)
+            if rag_ctx:
+                system += ("\n\n[BASE DE CONHECIMENTO LOCAL DO AGENTE (RAG) — use quando relevante e cite [n]]:\n" + rag_ctx)
+        except Exception as _rag_err:
+            logger.debug(f"RAG indisponível no Copilot: {_rag_err}")
+
     primary, fallback = aip.chat_with_fallback(cfg, system, clean_prompt, provider=provider_override)
     if primary.ok:
         return {
             "status": "success", "is_llm_real": True,
             "provider": f"{primary.provider_label} ({primary.model})", "model": primary.model,
             "answer": primary.answer, "duration_seconds": primary.duration_seconds,
+            "rag_sources": rag_used,
         }
 
     warning = (

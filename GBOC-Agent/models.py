@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-📋 GBOC Agent 14.8.3 - MODELS
+📋 GBOC Agent 15.0.0 - MODELS
 Estrutura de dados e validação Pydantic
 ✅ CORRIGIDO: Modelos de repositório flexíveis para criação/edição
 """
@@ -178,11 +178,21 @@ class TaskBase(BaseModel):
     type: Optional[str] = "backup"
     description: Optional[str] = Field(None, max_length=500)
     repository_id: Optional[int] = None
-    source_paths: Optional[str] = None  # String com paths separados por newline
+    source_paths: Optional[Union[str, List[str]]] = None  # String ou lista de caminhos
     exclude_patterns: Optional[str] = None
     priority: Optional[str] = "normal"
     pre_script: Optional[str] = None
     post_script: Optional[str] = None
+    veracrypt_config: Optional[Union[Dict[str, Any], str]] = None
+    retention_days: Optional[int] = 30
+    retention_weekly: Optional[int] = 4
+    retention_monthly: Optional[int] = 6
+    retention_yearly: Optional[int] = 1
+    retry_enabled: Optional[bool] = False
+    retry_max_attempts: Optional[int] = 3
+    retry_delay_minutes: Optional[int] = 5
+
+    model_config = ConfigDict(extra="allow")
 
 
 class TaskCreate(TaskBase):
@@ -191,11 +201,14 @@ class TaskCreate(TaskBase):
     schedule_enabled: bool = Field(default=False)
     config: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
+    model_config = ConfigDict(extra="allow")
+
 
 class TaskUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     description: Optional[str] = Field(None, max_length=500)
-    source_paths: Optional[str] = None
+    repository_id: Optional[int] = None
+    source_paths: Optional[Union[str, List[str]]] = None
     exclude_patterns: Optional[str] = None
     schedule_cron: Optional[str] = None
     schedule_enabled: Optional[bool] = None
@@ -204,6 +217,16 @@ class TaskUpdate(BaseModel):
     config: Optional[Dict[str, Any]] = None
     pre_script: Optional[str] = None
     post_script: Optional[str] = None
+    veracrypt_config: Optional[Union[Dict[str, Any], str]] = None
+    retention_days: Optional[int] = None
+    retention_weekly: Optional[int] = None
+    retention_monthly: Optional[int] = None
+    retention_yearly: Optional[int] = None
+    retry_enabled: Optional[bool] = None
+    retry_max_attempts: Optional[int] = None
+    retry_delay_minutes: Optional[int] = None
+
+    model_config = ConfigDict(extra="allow")
 
 
 class TaskResponse(BaseModel):

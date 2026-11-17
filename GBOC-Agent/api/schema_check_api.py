@@ -30,7 +30,7 @@ def check_schema() -> Dict[str, Any]:
                 "retention_days", "retention_weekly", "retention_monthly", "retention_yearly",
                 "retry_enabled", "retry_max_attempts", "retry_delay_minutes",
                 "created_at", "updated_at", "last_run", "last_status",
-                "pre_script", "post_script"
+                "pre_script", "post_script", "veracrypt_config"
             ],
             "repositories": [
                 "id", "name", "type", "path", "engine", "password",

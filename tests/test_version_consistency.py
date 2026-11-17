@@ -44,3 +44,23 @@ def test_unifier_fixes_only_product_version(tmp_path):
     VersionUnifier(tmp_path, target="14.8.1", apply=True).unify_versions()
     assert f.read_bytes() == (b'<title>GBOC Agent 14.8.1</title>\r\n"min_server_version": "14.6.0",\r\n'
                               b"<span>GBOC System v14.8.1 Enterprise</span>\r\nAgente 14.7.7+\r\nlib 2.14.6.0\r\n")
+
+
+def test_v15_go_core_and_react_architecture(tmp_path):
+    assert _official() == "15.0.0"
+    assert (ROOT / "go-core/go.mod").is_file()
+    assert (ROOT / "go-core/cmd/gboc-core/main.go").is_file()
+    for react_file in ("gboc-react-core.js", "gboc-react-components.js", "gboc-react.css"):
+        assert (ROOT / "shared-css/ui/react" / react_file).is_file()
+        assert (ROOT / "GBOC-Agent/static/ui/react" / react_file).is_file()
+        assert (ROOT / "GBOC-Server/static/ui/react" / react_file).is_file()
+
+    spec = importlib.util.spec_from_file_location("gboc_go_bridge", ROOT / "GBOC-Agent/core/go_bridge.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    info = mod.go_bridge.get_architecture_info()
+    assert info["version"] == "15.0.0"
+    assert info["go_source_present"] is True
+    repo_res = mod.go_bridge.verify_local_repo(tmp_path)
+    assert repo_res["healthy"] is True
+

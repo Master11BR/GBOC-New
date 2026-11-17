@@ -32,11 +32,25 @@ class BackupProgress:
     bytes_total: int = 0
     
     # Estatísticas
+    files_in_filter: int = 0
     files_new: int = 0
     files_changed: int = 0
     files_unmodified: int = 0
+    files_missing: int = 0
+    files_failed: int = 0
     bytes_added: int = 0
-    
+
+    # Telemetria ao vivo (v15)
+    current_dir: Optional[str] = None
+    current_file_size: int = 0
+    last_completed_file: Optional[str] = None
+    threads: int = 1
+    paused: bool = False
+    paused_seconds: int = 0
+    source_summary: Optional[str] = None
+    target_summary: Optional[str] = None
+    mode_badge: str = "COPY"
+
     # Resultado
     snapshot_id: Optional[str] = None
     error_message: Optional[str] = None
@@ -68,6 +82,7 @@ class RealTimeBackupMonitor:
     def __init__(self, core):
         self.core = core
         self.active_backups: Dict[int, BackupProgress] = {}
+        self._last_db_write: Dict[int, float] = {}
         self.lock = threading.Lock()
         self._callbacks: Dict[str, Callable] = {}
     
@@ -76,7 +91,11 @@ class RealTimeBackupMonitor:
         task_id: int,
         execution_id: int,
         task_name: str,
-        repository_name: str
+        repository_name: str,
+        source_summary: Optional[str] = None,
+        target_summary: Optional[str] = None,
+        mode_badge: str = "COPY",
+        threads: int = 1,
     ) -> BackupProgress:
         """Inicia rastreamento de um backup"""
         
@@ -87,10 +106,15 @@ class RealTimeBackupMonitor:
                 task_name=task_name,
                 repository_name=repository_name,
                 status='preparing',
-                started_at=datetime.now().isoformat()
+                started_at=datetime.now().isoformat(),
+                source_summary=source_summary,
+                target_summary=target_summary or repository_name,
+                mode_badge=mode_badge,
+                threads=threads,
             )
             
             self.active_backups[task_id] = progress
+            self._last_db_write[task_id] = time.monotonic()
             
             # Gravar no banco
             self._save_to_database(progress)
@@ -113,6 +137,8 @@ class RealTimeBackupMonitor:
                 return
             
             progress = self.active_backups[task_id]
+            prev_status = progress.status
+            force_db = bool(kwargs.pop('force_db', False))
             
             # Atualizar campos
             for key, value in kwargs.items():
@@ -123,8 +149,11 @@ class RealTimeBackupMonitor:
             if progress.status == 'preparing' and progress.files_processed > 0:
                 progress.status = 'running'
             
-            # Gravar no banco
-            self._save_to_database(progress)
+            # Gravar no banco no máximo a cada 2.0s (ou em mudança de status) para não bloquear I/O
+            now_m = time.monotonic()
+            if force_db or progress.status != prev_status or (now_m - self._last_db_write.get(task_id, 0.0)) >= 2.0:
+                self._last_db_write[task_id] = now_m
+                self._save_to_database(progress)
             
             logger.debug(f"📊 Progresso {task_id}: {progress.progress_percent:.1f}% ({progress.files_processed}/{progress.files_total})")
             self._trigger_callback('on_progress', progress)

@@ -1,6 +1,6 @@
 /*
 ==============================================================================
-GBOC System v14.8.3 Enterprise — Fernly Runtime (JS puro)
+GBOC System v15.0.0 Enterprise — Fernly Runtime (JS puro)
 Motor Antigravity + grafismos para os estilos Fernly (data-ui-style="fernly*").
 
 - Micro-oscilação assíncrona no eixo Y: cada card tem fase e período próprios.

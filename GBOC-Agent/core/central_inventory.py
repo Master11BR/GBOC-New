@@ -27,7 +27,8 @@ from typing import Any, Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 SENSITIVE_KEYS = {"password", "motor_password", "cloud_password", "encryption_password",
-                  "secret_key", "access_key", "api_key", "token", "passphrase", "pre_script", "post_script"}
+                  "secret_key", "access_key", "api_key", "token", "passphrase", "pre_script", "post_script",
+                  "veracrypt_config", "password_enc"}
 
 
 def _ser(v: Any) -> Any:

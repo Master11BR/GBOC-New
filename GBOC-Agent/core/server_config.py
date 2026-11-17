@@ -21,6 +21,7 @@ class ServerConfigManager:
         self.config_dir = central_dir()
         self.config_file = central_file("central_config.json")
         self._config = {}
+        self._last_mtime_ns: int = 0
         self._load_config()
 
     def _load_config(self):
@@ -29,8 +30,10 @@ class ServerConfigManager:
             self.config_dir.mkdir(parents=True, exist_ok=True)
 
             if self.config_file.exists():
+                st = self.config_file.stat()
                 with open(self.config_file, 'r', encoding='utf-8') as f:
                     self._config = json.load(f)
+                self._last_mtime_ns = st.st_mtime_ns
                 logger.debug("✅ Configuração carregada do arquivo")
             else:
                 logger.info("📝 Arquivo de configuração não encontrado, criando padrão")
@@ -85,14 +88,25 @@ class ServerConfigManager:
         try:
             with open(self.config_file, 'w', encoding='utf-8') as f:
                 json.dump(self._config, f, indent=2, ensure_ascii=False)
+            try:
+                self._last_mtime_ns = self.config_file.stat().st_mtime_ns
+            except Exception:
+                pass
             logger.debug("✅ Configuração salva")
         except Exception as e:
             logger.error(f"Erro ao salvar configuração: {e}")
 
-    def reload(self):
-        """Recarrega configuração do arquivo"""
+    def reload(self, force: bool = False):
+        """Recarrega configuração do arquivo apenas se houve modificação real em disco."""
+        try:
+            if not force and self.config_file.exists():
+                current_mtime = self.config_file.stat().st_mtime_ns
+                if current_mtime == self._last_mtime_ns and self._config:
+                    return
+        except Exception:
+            pass
         self._load_config()
-        logger.info("🔄 Configuração recarregada")
+        logger.debug("🔄 Configuração recarregada")
 
     def get_all(self) -> Dict[str, Any]:
         """Retorna toda a configuração"""

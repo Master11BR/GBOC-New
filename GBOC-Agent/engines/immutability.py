@@ -122,12 +122,12 @@ def _record_check(repo: Dict[str, Any], result: Dict[str, Any]) -> None:
 
 def resolve_region(cfg: Dict[str, Any]) -> str:
     """Região informada; senão extraída do endpoint (s3.<região>.wasabisys.com); senão us-east-1."""
-    if "wasabisys.com" in str(cfg.get("endpoint") or "").lower():
-        from storage_backends.cloud import s3_region            # o endpoint Wasabi define a região da assinatura
-        return s3_region(cfg)
     region = str(cfg.get("region") or "").strip()
     if region:
         return region
+    if "wasabisys.com" in str(cfg.get("endpoint") or "").lower():
+        from storage_backends.cloud import s3_region            # o endpoint Wasabi define a região da assinatura
+        return s3_region(cfg)
     parts = str(cfg.get("endpoint") or "").replace("https://", "").replace("http://", "").split(".")
     if len(parts) >= 3 and parts[0] == "s3" and parts[1] not in ("wasabisys", "amazonaws"):
         return parts[1]

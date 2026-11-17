@@ -1,13 +1,13 @@
 <#
 ==============================================================================
-GBOC System v14.8.3 Enterprise Edition
+GBOC System v15.0.0 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
 #>
 
 # ============================================================================
-# GBOC Agent - Instalador Completo v14.8.3
+# GBOC Agent - Instalador Completo v15.0.0
 # ============================================================================
 # Instala e configura automaticamente, sempre na ULTIMA versao estavel (consultada na hora):
 # - Python (python.org; se as dependencias ainda nao instalarem na mais nova, usa a anterior)
@@ -117,7 +117,7 @@ Write-Host @"
 
 ╔═══════════════════════════════════════════════════════════╗
 ║                                                           ║
-║          GBOC Agent - Instalador Completo v14.8.3           ║
+║          GBOC Agent - Instalador Completo v15.0.0           ║
 ║                                                           ║
 ╚═══════════════════════════════════════════════════════════╝
 
@@ -595,6 +595,33 @@ Write-Success "Variáveis de ambiente criadas"
 
 Write-Step "Instalando GBOC Agent"
 
+# Detectar se ja existe uma instalacao em producao para preservar credenciais e parar servicos antes da copia
+$IsAgentUpgrade = (Test-Path "$AGENT_DIR\agent_gboc.py") -or (Test-Path "$AGENT_DIR\agent_server.py") -or (Test-Path "$AGENT_DIR\.env")
+$AgentUpgradeBackupDir = $null
+if ($IsAgentUpgrade) {
+	$oldVer = "14.x"
+	if (Test-Path "$AGENT_DIR\version.py") {
+		$vm = Select-String -Path "$AGENT_DIR\version.py" -Pattern 'GBOC_VERSION\s*=\s*"([^"]+)"' | Select-Object -First 1
+		if ($vm) { $oldVer = $vm.Matches[0].Groups[1].Value }
+	}
+	Write-Step "[MODO UPGRADE EM PRODUÇÃO DETECTADO: v$oldVer -> v15.0.0 Enterprise]"
+	Stop-Service -Name "GBOCWatchdog" -Force -ErrorAction SilentlyContinue
+	Stop-Service -Name "GBOCAgent" -Force -ErrorAction SilentlyContinue
+	Start-Sleep -Seconds 2
+
+	$ts = Get-Date -Format "yyyyMMdd_HHmmss"
+	$AgentUpgradeBackupDir = "$INSTALL_ROOT\Backups\agent_upgrade_${ts}"
+	New-Item -ItemType Directory -Path $AgentUpgradeBackupDir -Force | Out-Null
+	foreach ($preserveRel in @(".env", "config\global_settings.json", "data\system_config.json", "data\.repo_secrets.key")) {
+		$pFull = Join-Path $AGENT_DIR $preserveRel
+		if (Test-Path $pFull) {
+			$bDest = Join-Path $AgentUpgradeBackupDir ($preserveRel -replace '\\', '_')
+			Copy-Item -Path $pFull -Destination $bDest -Force
+		}
+	}
+	Write-Success "Configurações de produção salvas em $AgentUpgradeBackupDir"
+}
+
 # Copiar arquivos do Agent (instalador na pasta do Agent ou em uma subpasta dela)
 $sourceDir = if (Test-Path "$PSScriptRoot\agent_server.py") { $PSScriptRoot } else { Split-Path -Parent $PSScriptRoot }
 if (Test-Path "$sourceDir\agent_server.py") {
@@ -606,6 +633,20 @@ else {
 	Write-Error "Não foi possível localizar os arquivos do Agent"
 	Write-Host "    Execute este instalador a partir do diretório GBOC-Agent" -ForegroundColor Yellow
 	exit 1
+}
+
+# Restaurar configuracoes se for upgrade em producao
+if ($IsAgentUpgrade -and $AgentUpgradeBackupDir -and (Test-Path $AgentUpgradeBackupDir)) {
+	foreach ($preserveRel in @(".env", "config\global_settings.json", "data\system_config.json", "data\.repo_secrets.key")) {
+		$bSrc = Join-Path $AgentUpgradeBackupDir ($preserveRel -replace '\\', '_')
+		$pDest = Join-Path $AGENT_DIR $preserveRel
+		if (Test-Path $bSrc) {
+			$parentD = Split-Path -Parent $pDest
+			if (-not (Test-Path $parentD)) { New-Item -ItemType Directory -Path $parentD -Force | Out-Null }
+			Copy-Item -Path $bSrc -Destination $pDest -Force
+		}
+	}
+	Write-Success "Credenciais, chaves e configurações da instalação anterior restauradas."
 }
 
 # Instalar dependências Python e Stack de Segurança
@@ -632,11 +673,12 @@ try {
 	Write-Warning "Não foi possível criar a regra de Firewall automaticamente"
 }
 
-# Criar arquivo .env
+# Criar arquivo .env (preserva .env existente em upgrades de producao)
 Write-Step "Configurando variáveis de ambiente"
 
-$envContent = @"
-# GBOC Agent - Configuração
+if (-not (Test-Path "$AGENT_DIR\.env")) {
+	$envContent = @"
+# GBOC Agent v15.0.0 - Configuração
 DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@localhost:5432/${DB_NAME}
 AGENT_PORT=9200
 SECRET_KEY=$(New-Guid)
@@ -645,9 +687,11 @@ KOPIA_PATH=$KOPIA_DIR\kopia.exe
 DUPLICATI_PATH=$DUPLICATI_DIR\Duplicati.CommandLine.exe
 LOG_LEVEL=INFO
 "@
-
-Set-Content -Path "$AGENT_DIR\.env" -Value $envContent
-Write-Success "Arquivo .env criado"
+	Set-Content -Path "$AGENT_DIR\.env" -Value $envContent
+	Write-Success "Arquivo .env criado"
+} else {
+	Write-Success "Arquivo .env existente preservado (Upgrade in-place)"
+}
 
 # start_agent.bat / start_agent.ps1 copiados do pacote escolhem o Python sozinhos (scripts\gboc_python.ps1).
 # Antes era gerado aqui um start_agent.bat com o caminho do python.exe fixo e o ponto de entrada antigo.

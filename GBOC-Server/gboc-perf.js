@@ -1,5 +1,5 @@
 /* ============================================================================
-   GBOC System v14.8.3 — Performance Helpers
+   GBOC System v15.0.0 — Performance Helpers
    Objetivo: Eliminar reflows desnecessarios, debounce de inputs, abort de
    fetch concorrente, polling adaptativo por visibilidade da aba.
 
@@ -9,6 +9,22 @@
 
 (function (global) {
     'use strict';
+
+    // ------------------------------------------------------------------
+    // escapeHtml(text) — helper global único (Server + Agent).
+    // Páginas que já definem a sua própria versão continuam usando a delas.
+    // Sem ele, a lista de logs do Server quebrava (ReferenceError) e ficava vazia.
+    // ------------------------------------------------------------------
+    if (typeof global.escapeHtml !== 'function') {
+        global.escapeHtml = function (text) {
+            return String(text == null ? '' : text)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        };
+    }
 
     // ------------------------------------------------------------------
     // safeRender(el, nextHtml) — evita .innerHTML = mesmo HTML

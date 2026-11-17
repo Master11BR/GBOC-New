@@ -13,18 +13,22 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     <title>GBOC Servidor - Login</title>
     
     
+    
     <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
-    <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/ui/models/modern/components.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/ui/models/modern/layout.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/style.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/gboc-themes.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/gboc-layout.css?v=14.8.3">
-    <script src="/static/gboc-perf.js?v=14.8.3"></script>
-    <script src="/static/gboc-layout-manager.js?v=14.8.3"></script>
-    <script src="/static/gboc-modal.js?v=14.8.3"></script>
+    <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/components.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/layout.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/style.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/gboc-themes.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/gboc-layout.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/ui/react/gboc-react.css?v=15.0.0">
+    <script src="/static/gboc-perf.js?v=15.0.0"></script>
+    <script src="/static/gboc-layout-manager.js?v=15.0.0"></script>
+    <script src="/static/gboc-modal.js?v=15.0.0"></script>
+    <script src="/static/ui/react/gboc-react-core.js?v=15.0.0"></script>
+    <script src="/static/ui/react/gboc-react-components.js?v=15.0.0" defer></script>
 <!-- Tailwind CSS CDN -->
     <link rel="stylesheet" href="/static/vendor/tailwind-login.css">
     <!-- FontAwesome para ícones -->
@@ -515,7 +519,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 
     <!-- Rodapé Corporativo -->
     <footer class="w-full p-4 text-center text-zinc-500 text-[11px] uppercase tracking-widest z-10 relative light-card-muted flex flex-col sm:flex-row items-center justify-center gap-2">
-        <span>GBOC System <span id="gboc-login-version">v14.8.3</span> Enterprise Edition</span>
+        <span>GBOC System <span id="gboc-login-version">v15.0.0</span> Enterprise Edition</span>
         <span class="hidden sm:inline text-zinc-700">•</span>
         <span>&copy; 2026 Master11BR - Propriedade Intelectual & Direitos Reservados.</span>
     </footer>
@@ -529,14 +533,21 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             apple: { enabled: false }
         };
 
-        // ── 1. Tema: apenas aplica o tema já escolhido dentro do sistema (sem seletor no login) ──
+        // ── 1. Tema: aplica ou altera iluminação (compatível com setIllumination) ──
         const VALID_THEMES = ['amber', 'dark', 'light', 'purple', 'ocean', 'red'];
-        function applySavedTheme() {
-            let theme = 'amber';
-            try { theme = localStorage.getItem('gboc-color-theme') || localStorage.getItem('gboc-theme') || 'amber'; } catch (e) { /* armazenamento bloqueado: tema padrão */ }
+        function setIllumination(theme) {
             if (!VALID_THEMES.includes(theme)) theme = 'amber';
             document.documentElement.setAttribute('data-theme', theme);
             document.documentElement.setAttribute('data-color-theme', theme);
+            try {
+                localStorage.setItem('gboc-color-theme', theme);
+                localStorage.setItem('gboc-theme', theme);
+            } catch (e) { /* armazenamento bloqueado */ }
+        }
+        function applySavedTheme() {
+            let theme = 'amber';
+            try { theme = localStorage.getItem('gboc-color-theme') || localStorage.getItem('gboc-theme') || 'amber'; } catch (e) { /* armazenamento bloqueado: tema padrão */ }
+            setIllumination(theme);
         }
 
         // ── 2. Alternância de Formulário com Transição Suave e Perspectiva ──

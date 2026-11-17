@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""GBOC 14.8.3 - Job Alert Monitor API Router"""
+"""GBOC 15.0.0 - Job Alert Monitor API Router"""
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse

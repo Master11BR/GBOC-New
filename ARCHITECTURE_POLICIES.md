@@ -1,8 +1,8 @@
-# 📐 GBOC System v14.8.1 Enterprise — Diretrizes e Políticas de Arquitetura Modular
+# 📐 GBOC System v15.0.0 Enterprise — Diretrizes e Políticas de Arquitetura Modular (Python + Go Core + React 19)
 
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.8.1 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v15.0.0 Enterprise. Todos os direitos reservados. -->
 
-Este documento estabelece as **Políticas de Arquitetura Obrigatórias** para o desenvolvimento e manutenção do **GBOC Server** e do **GBOC Agent**.
+Este documento estabelece as **Políticas de Arquitetura Obrigatórias** para o desenvolvimento e manutenção do **GBOC Server**, **GBOC Agent**, **Go Core (`go-core/`)** e **React 19 UI (`shared-css/ui/react/`)**.
 
 ---
 
@@ -92,3 +92,16 @@ A interface e as APIs do sistema devem obrigatoriamente refletir a taxonomia de 
 > - **Sentry & OpenTelemetry**: Rastreamento distribuído e telemetria contínua.
 > - **Pytest**: Testes unitários e de integração obrigatórios (Zero-Mock test suite).
 > - **Playwright E2E**: Testes End-to-End em navegadores reais.
+
+---
+
+## ⚙️ 11. Arquitetura Híbrida v15.0.0 (Go Core + React 19 UI + Upgrade In-Place)
+
+1. **Motor Nativo Go Core (`go-core/`)**:
+   - Operações intensivas de I/O e concorrência (worker pool SHA-256 de chunks de 4 MiB, empacotamento `GBP1`, verificação física de repositórios locais, sonda HTTP/UDP Hermes do Watchdog e sincronizador canônico SHA-256 de CSS/JS) são providas pelo módulo Go `github.com/master11br/gboc-go-core` (`go-core/cmd/gboc-core`).
+   - A ponte `go_bridge.py` (`GBOC-Agent/core/go_bridge.py` e `GBOC-Server/go_bridge.py`) conecta os serviços FastAPI ao binário nativo `gboc-core` com fallback transparente em Python quando o host opera apenas com interpretador Python.
+2. **Camada React 19 Modular (`shared-css/ui/react/`)**:
+   - Runtime React 19 Air-Gapped (`gboc-react-core.js`) com Virtual DOM, Hooks (`useState`, `useEffect`, `useMemo`, `useCallback`, `useRef`), `createRoot` e gerenciamento de estado reativo estilo Zustand (`createStore`).
+   - Componentes corporativos reutilizáveis (`gboc-react-components.js` + `gboc-react.css`): `GBOCKpiBoard`, `GBOCReactiveTable` e `GBOCSystemSummaryWidget`, sincronizados via `tools/sync_css.py`.
+3. **Upgrade In-Place em Produção (`Setup.ps1` / `install_agent.ps1`)**:
+   - Detecção automática de versões anteriores (`v14.x`) instaladas no diretório alvo, backup preventivo automático em `Backups\upgrade_<timestamp>\`, parada ordenada dos serviços Windows (`GBOCWatchdog`, `GBOCAgent`, `GBOCServer`), atualização de binários/código preservando `.env`, `system_config.json`, `global_settings.json`, `.repo_secrets.key`, bancos de dados e repositórios.

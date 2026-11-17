@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC System v14.8.3 Enterprise Edition
+GBOC System v15.0.0 Enterprise Edition
 Module: Reports Engine Compatibility Layer (v3 -> v4)
 Exposes all Master Report Standard v4.0 functions and schemas with full backward compatibility.
 """

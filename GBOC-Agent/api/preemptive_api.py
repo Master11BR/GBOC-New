@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 14.8.3 - API de Diagnóstico Preemptivo
+GBOC 15.0.0 - API de Diagnóstico Preemptivo
 Consulta PostgreSQL via SharedCore
 """
 

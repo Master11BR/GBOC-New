@@ -1,6 +1,6 @@
 <#
 ==============================================================================
-GBOC System v14.8.3 Enterprise Edition
+GBOC System v15.0.0 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
@@ -164,8 +164,8 @@ function Show-InteractiveMenu {
     Clear-Host
     Write-Host ""
     Write-Host "=================================================================" -ForegroundColor Cyan
-    Write-Host "          GBOC SYSTEM v14.8.2 - INSTALADOR FULL STABLE           " -ForegroundColor Cyan
-    Write-Host "          Servidor Central, Agente e Motores de Backup           " -ForegroundColor Cyan
+    Write-Host "          GBOC SYSTEM v15.0.0 - INSTALADOR E UPGRADE            " -ForegroundColor Cyan
+    Write-Host "      Servidor Central, Agente, Go Core e React 19 UI           " -ForegroundColor Cyan
     Write-Host "=================================================================" -ForegroundColor Cyan
     if ($GbocPackage) {
         Write-Host "  Pacote COMPLETO: programas incluidos (instala sem internet)" -ForegroundColor Green
@@ -268,28 +268,81 @@ Stop-GbocService -Name "GBOCWatchdog" -ToolsDir $ToolsDir          # nao reinici
 if ($InstallMode -in @("Server", "Both")) { Stop-GbocService -Name "GBOCServer" -ToolsDir $ToolsDir }
 if ($InstallMode -in @("Agent", "Both")) { Stop-GbocService -Name "GBOCAgent" -ToolsDir $ToolsDir }
 
-# Configurar selecao de banco de dados (.env e system_config.json)
+# ==============================================================================
+# DETECCAO E PROTECAO DE UPGRADE EM PRODUCAO (v14.x / anteriores -> v15.0.0)
+# ==============================================================================
+$ExistingVersion = $null
+foreach ($vFile in @((Join-Path $ServerDir "version.py"), (Join-Path $AgentDir "version.py"))) {
+    if (Test-Path $vFile) {
+        $vMatch = Select-String -Path $vFile -Pattern 'GBOC_VERSION\s*=\s*"([^"]+)"' | Select-Object -First 1
+        if ($vMatch) {
+            $ExistingVersion = $vMatch.Matches[0].Groups[1].Value
+            break
+        }
+    }
+}
+$IsProductionUpgrade = ($null -ne $ExistingVersion) -or (Test-Path (Join-Path $ServerDir "server_gboc.py")) -or (Test-Path (Join-Path $AgentDir "agent_gboc.py"))
+$UpgradeBackupDir = $null
+
+if ($IsProductionUpgrade) {
+    $prevVerLabel = if ($ExistingVersion) { "v$ExistingVersion" } else { "versao anterior" }
+    $ts = Get-Date -Format "yyyyMMdd_HHmmss"
+    $UpgradeBackupDir = Join-Path $TargetDir "Backups\upgrade_${ts}"
+    New-Item -ItemType Directory -Path $UpgradeBackupDir -Force | Out-Null
+    Write-Step "[MODO UPGRADE EM PRODUCAO DETECTADO: $prevVerLabel -> v15.0.0 Enterprise]"
+    Write-Host "    Preservando configuracoes, chaves criptograficas, bancos e repositorios em: $UpgradeBackupDir" -ForegroundColor Cyan
+
+    $filesToPreserve = @(
+        @{ Src = (Join-Path $TargetDir ".env"); Rel = "root.env" },
+        @{ Src = (Join-Path $ServerDir ".env"); Rel = "server.env" },
+        @{ Src = (Join-Path $ServerDir "system_config.json"); Rel = "server_system_config.json" },
+        @{ Src = (Join-Path $AgentDir ".env"); Rel = "agent.env" },
+        @{ Src = (Join-Path $AgentDir "data\system_config.json"); Rel = "agent_system_config.json" },
+        @{ Src = (Join-Path $AgentDir "config\global_settings.json"); Rel = "agent_global_settings.json" },
+        @{ Src = (Join-Path $AgentDir "data\.repo_secrets.key"); Rel = "repo_secrets.key" }
+    )
+    foreach ($item in $filesToPreserve) {
+        if (Test-Path $item.Src) {
+            Copy-Item -Path $item.Src -Destination (Join-Path $UpgradeBackupDir $item.Rel) -Force
+        }
+    }
+    Write-Success "Snapshot de seguranca de configuracoes concluido."
+}
+
+# Configurar selecao de banco de dados (.env e system_config.json) preservando chaves de producao no upgrade
 Write-Step "Gravando configuracao do banco de dados ($DatabaseEngine)..."
-$envContent = @(
-    "GBOC_DB_ENGINE=$DatabaseEngine",
-    "DB_ENGINE=$DatabaseEngine"
-)
-[System.IO.File]::WriteAllLines((Join-Path $TargetDir ".env"), $envContent)
+$rootEnvPath = Join-Path $TargetDir ".env"
+if (-not (Test-Path $rootEnvPath)) {
+    $envContent = @(
+        "GBOC_DB_ENGINE=$DatabaseEngine",
+        "DB_ENGINE=$DatabaseEngine"
+    )
+    [System.IO.File]::WriteAllLines($rootEnvPath, $envContent)
+} else {
+    Write-Success "Arquivo .env existente preservado em $rootEnvPath"
+}
 
 $cfgObj = @{
     db_engine = $DatabaseEngine
     database_engine = $DatabaseEngine
+    architecture_version = "15.0.0"
 } | ConvertTo-Json
 
 if ($InstallMode -in @("Agent", "Both")) {
     $agentDataDir = Join-Path $AgentDir "data"
     New-Item -ItemType Directory -Path $agentDataDir -Force | Out-Null
-    [System.IO.File]::WriteAllText((Join-Path $agentDataDir "system_config.json"), $cfgObj)
+    $agentSysCfg = Join-Path $agentDataDir "system_config.json"
+    if (-not (Test-Path $agentSysCfg)) {
+        [System.IO.File]::WriteAllText($agentSysCfg, $cfgObj)
+    }
 }
 if ($InstallMode -in @("Server", "Both")) {
-    [System.IO.File]::WriteAllText((Join-Path $ServerDir "system_config.json"), $cfgObj)
+    $serverSysCfg = Join-Path $ServerDir "system_config.json"
+    if (-not (Test-Path $serverSysCfg)) {
+        [System.IO.File]::WriteAllText($serverSysCfg, $cfgObj)
+    }
 }
-Write-Success "Configuracao de banco ($DatabaseEngine) gravada com sucesso!"
+Write-Success "Configuracao de banco ($DatabaseEngine) validada com sucesso!"
 
 # PostgreSQL: ja instalado -> mantido; senao do pacote (ou da internet). O Agente/Servidor criam o proprio banco.
 if ($needPg) {
@@ -391,13 +444,87 @@ if ($reqFileToInstall -and (Test-Path $reqFileToInstall)) {
     & $VenvPip install fastapi uvicorn pydantic sqlalchemy psutil requests httpx websockets cryptography
 }
 
-# 5. Copiando Codigo dos Componentes
+# 5. Copiando Codigo dos Componentes e Removendo Arquivos Obsoletos (Limpeza Pos-Update)
+function Remove-GbocObsoleteFiles {
+    param(
+        [Parameter(Mandatory = $true)][string]$SourceDir,
+        [Parameter(Mandatory = $true)][string]$DestDir,
+        [Parameter(Mandatory = $true)][string]$ComponentName
+    )
+    if (-not (Test-Path $SourceDir) -or -not (Test-Path $DestDir)) { return }
+
+    # Pastas e arquivos de dados em producao que NUNCA devem ser apagados pelo instalador
+    $protectedTopDirs = @("data", "logs", "repositorios", "enc-v1", "updates", "backups", "venv", ".venv", "tools")
+    $protectedRelFiles = @(".env", "system_config.json", "config\global_settings.json", "data\system_config.json", "data\.repo_secrets.key")
+    $protectedExts = @(".db", ".sqlite", ".sqlite3", ".pem", ".key", ".env")
+    $junkDirNames = @("__pycache__", ".pytest_cache", ".ruff_cache", "_bkp_obsoletos", "_to_delete", "temp", "tmp")
+    $junkExts = @(".pyc", ".pyo", ".tmp", ".bak", ".old", ".orig", ".swp")
+
+    $srcRoot = (Resolve-Path $SourceDir).Path.TrimEnd('\')
+    $dstRoot = (Resolve-Path $DestDir).Path.TrimEnd('\')
+
+    $removedFilesCount = 0
+    $removedDirsCount = 0
+
+    # 1. Remover pastas temporarias/cache/obsoletas explicitas
+    Get-ChildItem -Path $dstRoot -Directory -Recurse -Force -ErrorAction SilentlyContinue | ForEach-Object {
+        $rel = $_.FullName.Substring($dstRoot.Length).TrimStart('\')
+        $topSeg = ($rel -split '\\')[0].ToLowerInvariant()
+        if ($protectedTopDirs -contains $topSeg) { return }
+        if ($junkDirNames -contains $_.Name.ToLowerInvariant()) {
+            Remove-Item -Path $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
+            $removedDirsCount++
+        }
+    }
+
+    # 2. Comparar todos os arquivos do destino com o pacote novo e remover os que nao existem mais
+    Get-ChildItem -Path $dstRoot -File -Recurse -Force -ErrorAction SilentlyContinue | ForEach-Object {
+        $rel = $_.FullName.Substring($dstRoot.Length).TrimStart('\')
+        $relLower = $rel.ToLowerInvariant()
+        $topSeg = ($rel -split '\\')[0].ToLowerInvariant()
+        $ext = $_.Extension.ToLowerInvariant()
+
+        # Preservar pastas de runtime e arquivos de configuracao/banco/chaves
+        if ($protectedTopDirs -contains $topSeg) { return }
+        if ($protectedRelFiles -contains $relLower) { return }
+        if ($protectedExts -contains $ext) { return }
+
+        $expectedInSource = Join-Path $srcRoot $rel
+        if (($junkExts -contains $ext) -or (-not (Test-Path $expectedInSource))) {
+            Remove-Item -Path $_.FullName -Force -ErrorAction SilentlyContinue
+            $removedFilesCount++
+        }
+    }
+
+    # 3. Remover subdiretorios que nao existem mais no pacote novo e ficaram vazios (do mais profundo para o mais raso)
+    Get-ChildItem -Path $dstRoot -Directory -Recurse -Force -ErrorAction SilentlyContinue |
+        Sort-Object { $_.FullName.Length } -Descending | ForEach-Object {
+            $rel = $_.FullName.Substring($dstRoot.Length).TrimStart('\')
+            $topSeg = ($rel -split '\\')[0].ToLowerInvariant()
+            if ($protectedTopDirs -contains $topSeg) { return }
+
+            $expectedDirInSource = Join-Path $srcRoot $rel
+            $remainingItems = @(Get-ChildItem -Path $_.FullName -Force -ErrorAction SilentlyContinue)
+            if ((-not (Test-Path $expectedDirInSource)) -and ($remainingItems.Count -eq 0)) {
+                Remove-Item -Path $_.FullName -Force -ErrorAction SilentlyContinue
+                $removedDirsCount++
+            }
+        }
+
+    if ($removedFilesCount -gt 0 -or $removedDirsCount -gt 0) {
+        Write-Success "${ComponentName}: removidos $removedFilesCount arquivo(s) e $removedDirsCount pasta(s) obsoletos/nao utilizados da versao anterior."
+    } else {
+        Write-Success "${ComponentName}: nenhum arquivo obsoleto residual encontrado."
+    }
+}
+
 if ($InstallMode -in @("Server", "Both")) {
     Write-Step "Copiando arquivos do GBOC Server para $ServerDir..."
     $serverSrc = Join-Path $PackageRoot "Server"
     if (Test-Path $serverSrc) {
         Copy-Item -Path "$serverSrc\*" -Destination $ServerDir -Recurse -Force
-        Write-Success "GBOC Server copiado com sucesso."
+        Remove-GbocObsoleteFiles -SourceDir $serverSrc -DestDir $ServerDir -ComponentName "GBOC Server"
+        Write-Success "GBOC Server atualizado e limpo com sucesso."
     } else {
         Write-Fail "Pasta Server nao encontrada no pacote: $serverSrc"
     }
@@ -408,10 +535,52 @@ if ($InstallMode -in @("Agent", "Both")) {
     $agentSrc = Join-Path $PackageRoot "Agent"
     if (Test-Path $agentSrc) {
         Copy-Item -Path "$agentSrc\*" -Destination $AgentDir -Recurse -Force
-        Write-Success "GBOC Agent copiado com sucesso."
+        Remove-GbocObsoleteFiles -SourceDir $agentSrc -DestDir $AgentDir -ComponentName "GBOC Agent"
+        Write-Success "GBOC Agent atualizado e limpo com sucesso."
     } else {
         Write-Fail "Pasta Agent nao encontrada no pacote: $agentSrc"
     }
+}
+
+# Copiar Go Core (v15.0.0) se presente no pacote
+$goCoreSrc = Join-Path $PackageRoot "go-core"
+if (Test-Path $goCoreSrc) {
+    $goCoreDst = Join-Path $TargetDir "go-core"
+    New-Item -ItemType Directory -Path $goCoreDst -Force | Out-Null
+    Copy-Item -Path "$goCoreSrc\*" -Destination $goCoreDst -Recurse -Force
+    Remove-GbocObsoleteFiles -SourceDir $goCoreSrc -DestDir $goCoreDst -ComponentName "GBOC Go Core"
+    Write-Success "Motor Go Core v15.0.0 copiado para $goCoreDst"
+}
+
+# Limpar pastas obsoletas de raiz de instalacoes antigas (ex.: _bkp_obsoletos, __pycache__, .pytest_cache)
+foreach ($legacyRootDir in @("_bkp_obsoletos", "_to_delete", "__pycache__", ".pytest_cache", ".ruff_cache")) {
+    $legacyPath = Join-Path $TargetDir $legacyRootDir
+    if (Test-Path $legacyPath) {
+        Remove-Item -Path $legacyPath -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Success "Pasta legada removida da raiz: $legacyPath"
+    }
+}
+
+# Restaurar configuracoes criticas preservadas durante Upgrade em Producao
+if ($IsProductionUpgrade -and $UpgradeBackupDir -and (Test-Path $UpgradeBackupDir)) {
+    Write-Step "Restaurando configuracoes de producao preservadas e aplicando migracao de schema v15.0.0..."
+    $restoreMap = @(
+        @{ Backup = "server.env"; Dest = (Join-Path $ServerDir ".env") },
+        @{ Backup = "server_system_config.json"; Dest = (Join-Path $ServerDir "system_config.json") },
+        @{ Backup = "agent.env"; Dest = (Join-Path $AgentDir ".env") },
+        @{ Backup = "agent_system_config.json"; Dest = (Join-Path $AgentDir "data\system_config.json") },
+        @{ Backup = "agent_global_settings.json"; Dest = (Join-Path $AgentDir "config\global_settings.json") },
+        @{ Backup = "repo_secrets.key"; Dest = (Join-Path $AgentDir "data\.repo_secrets.key") }
+    )
+    foreach ($rm in $restoreMap) {
+        $bFile = Join-Path $UpgradeBackupDir $rm.Backup
+        if (Test-Path $bFile) {
+            $destParent = Split-Path -Parent $rm.Dest
+            if (-not (Test-Path $destParent)) { New-Item -ItemType Directory -Path $destParent -Force | Out-Null }
+            Copy-Item -Path $bFile -Destination $rm.Dest -Force
+        }
+    }
+    Write-Success "Configuracoes e credenciais da instalacao anterior restauradas intactas."
 }
 
 # 6. Configuracao dos Motores de Backup (Restic & Kopia para Agent)
@@ -437,7 +606,7 @@ Write-Step "Criando scripts de controle e execucao em $TargetDir..."
 if ($InstallMode -in @("Server", "Both")) {
     $sLines = @(
         "@echo off",
-        "title GBOC Server v14.8.2 Enterprise",
+        "title GBOC Server v15.0.0 Enterprise",
         "REM Instalado como servico do Windows: usa o servico (abrir o console disputaria a porta $ServerPort)",
         "sc query GBOCServer >nul 2>&1",
         "if not errorlevel 1 (",
@@ -459,7 +628,7 @@ if ($InstallMode -in @("Server", "Both")) {
 if ($InstallMode -in @("Agent", "Both")) {
     $aLines = @(
         "@echo off",
-        "title GBOC Agent v14.8.2 Enterprise",
+        "title GBOC Agent v15.0.0 Enterprise",
         "REM Instalado como servico do Windows: usa o servico (abrir o console disputaria a porta $AgentPort)",
         "sc query GBOCAgent >nul 2>&1",
         "if not errorlevel 1 (",

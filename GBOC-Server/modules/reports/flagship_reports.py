@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v14.8.3 Enterprise Edition
+# GBOC System v15.0.0 Enterprise Edition
 # Module: Flagship Reports Engine v2.0 (Server)
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # Propriedade Intelectual & Direitos Autorais Registrados.
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 try:
     from version_control import __version__ as SERVER_VERSION
 except Exception:
-    SERVER_VERSION = "14.8.3"
+    SERVER_VERSION = "15.0.0"
 
 def _clean_task_name(raw_name: str) -> str:
     """Remove sufixos técnicos gerados automaticamente de nomes de tasks."""
@@ -118,7 +118,7 @@ FLAGSHIPS_CATALOG_8 = [
         "category": "DR Flagship",
         "substitutes": ["REP-18", "REP-29", "REP-34", "REP-46", "REP-47", "REP-49"],
         "target_audience": "CTO, Arquiteto de DR, Gestor de Continuidade de Negócios",
-        "objective": "Matriz de prontidão para desastres, gaps de RTO/RPO reais vs meta, ordem de boot e simulação de contingência.",
+        "objective": "Matriz de prontidão para desastres, gaps de RTO/RPO reais vs meta, ordem de boot e validação real de contingência.",
         "score_title": "DR READINESS SCORE",
         "icon": "fa-fire-extinguisher"
     }
@@ -891,7 +891,7 @@ def render_flagship_csv(report_data: Dict[str, Any]) -> str:
     """Exporta o relatório Flagship v2.0 em formato tabular CSV estruturado."""
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["GBOC System v14.8.3 Enterprise - Relatório Flagship Executivo"])
+    writer.writerow(["GBOC System v15.0.0 Enterprise - Relatório Flagship Executivo"])
     writer.writerow(["Código", report_data.get("report_id")])
     writer.writerow(["Nome", report_data.get("report_name")])
     writer.writerow(["Categoria", report_data.get("category")])

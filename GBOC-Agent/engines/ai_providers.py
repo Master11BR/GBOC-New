@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v14.8.3 Enterprise Edition
+# GBOC System v15.0.0 Enterprise Edition
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================
 """
@@ -123,6 +123,9 @@ SECRET_FIELDS: tuple[str, ...] = ("api_key", "cloud_api_key", *PROVIDER_KEY_FIEL
 ALLOWED_CONFIG_FIELDS: frozenset[str] = frozenset({
     "provider", "model", "ollama_url", "ollama_host", "custom_endpoint",
     "system_prompt", "task_history_limit", "auto_diagnose_errors", "timeout_seconds",
+    # RAG local / MCP (base de conhecimento da IA)
+    "rag_enabled", "rag_embedding_provider", "rag_embedding_model", "rag_reindex_hours", "rag_execution_days",
+    "mcp_enabled", "finetune_local_enabled",
     *SECRET_FIELDS, *PROVIDER_MODEL_FIELDS.values(),
 })
 
@@ -263,6 +266,16 @@ def sanitize_config_update(update: dict[str, Any], provider_hint: str | None = N
             value = max(1, min(500, int(value)))
         elif key == "timeout_seconds":
             value = max(5, min(600, int(value)))
+        elif key in ("rag_enabled", "mcp_enabled", "finetune_local_enabled"):
+            value = value if isinstance(value, bool) else str(value).strip().lower() in ("1", "true", "sim", "on", "yes")
+        elif key == "rag_reindex_hours":
+            value = max(0.5, min(168.0, float(value)))
+        elif key == "rag_execution_days":
+            value = max(1, min(3650, int(value)))
+        elif key == "rag_embedding_provider":
+            value = str(value).strip().lower()
+            if value not in ("auto", "ollama", "openai", "gemini", "none"):
+                raise ValueError("rag_embedding_provider inválido (auto, ollama, openai, gemini ou none).")
         elif isinstance(value, str):
             value = value.strip()
         clean[key] = value

@@ -311,3 +311,18 @@ def compact_backup(backup_id: str) -> Dict[str, Any]:
     if result.get("status") == "error":
         raise HTTPException(status_code=502, detail=result)
     return result
+
+
+@router.post("/takeover-native")
+def takeover_all_to_native() -> Dict[str, Any]:
+    """Assume todos os backups importados do Duplicati para o motor GBOC Native v4:
+    novas cópias usam objetos individuais AES-256-GCM e o histórico passado do Duplicati permanece restaurável."""
+    service = get_duplicati_native_service()
+    return service.takeover_to_gboc_native()
+
+
+@router.post("/backups/{backup_id}/takeover-native")
+def takeover_single_to_native(backup_id: str) -> Dict[str, Any]:
+    """Assume um job específico do Duplicati para o motor GBOC Native v4."""
+    service = get_duplicati_native_service()
+    return service.takeover_to_gboc_native(backup_id=backup_id)

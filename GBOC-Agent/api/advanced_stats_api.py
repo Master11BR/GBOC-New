@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 14.8.3 - API de Estatísticas Avançadas
+GBOC 15.0.0 - API de Estatísticas Avançadas
 Consulta diretamente o PostgreSQL via SharedCore
 """
 

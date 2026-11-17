@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v14.8.3 Enterprise Edition
+# GBOC System v15.0.0 Enterprise Edition
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # Propriedade Intelectual & Direitos Autorais Registrados.
 # ==============================================================================
@@ -45,7 +45,9 @@ IGNORE_PATTERNS = shutil.ignore_patterns(
     "*.sqlite-shm",
     "*.sqlite-wal",
     "*.db-shm",
-    "*.db-wal"
+    "*.db-wal",
+    "_bkp_obsoletos",
+    "_to_delete"
 )
 
 def create_unified_requirements(server_req_path: Path, agent_req_path: Path, output_path: Path):
@@ -62,7 +64,7 @@ def create_unified_requirements(server_req_path: Path, agent_req_path: Path, out
                         
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as f:
-        f.write("# GBOC System v14.8.2 - Dependencias Consolidadas (Server + Agent)\n")
+        f.write("# GBOC System v15.0.0 - Dependencias Consolidadas (Server + Agent)\n")
         for dep in sorted(dependencies):
             f.write(f"{dep}\n")
     print(f"  [OK] Dependencias consolidadas criadas em: {output_path}")
@@ -118,9 +120,9 @@ def get_current_version(source_root: Path) -> str:
             return f"v{version_control.__version__} Full Stable Enterprise"
         except Exception:
             pass
-    return "v14.8.2 Full Stable Enterprise"
+    return "v15.0.0 Full Stable Enterprise"
 
-def generate_manifest(output_dir: Path, version: str = "v14.8.2 Full Stable Enterprise"):
+def generate_manifest(output_dir: Path, version: str = "v15.0.0 Full Stable Enterprise"):
     """Gera um arquivo de manifesto com metadados do pacote gerado."""
     manifest = {
         "system": "GBOC System",
@@ -135,9 +137,19 @@ def generate_manifest(output_dir: Path, version: str = "v14.8.2 Full Stable Ente
             "GBOC-Agent": {
                 "installed": (output_dir / "Agent").exists(),
                 "default_port": 9200
+            },
+            "GBOC-GoCore": {
+                "installed": (output_dir / "go-core").exists(),
+                "version": "15.0.0"
             }
         },
-        "installer_version": "2.0.0"
+        "architecture": {
+            "core_version": "15.0.0",
+            "go_core": "15.0.0",
+            "react_ui": "19.0.0",
+            "supports_in_place_upgrade": True
+        },
+        "installer_version": "15.0.0"
     }
     
     manifest_path = output_dir / "package_manifest.json"
@@ -189,6 +201,12 @@ def build_package(source_root: Path, output_dir: Path, clean: bool = False):
     agent_dst = output_dir / "Agent"
     copy_component(agent_src, agent_dst, "GBOC-Agent")
     prune_runtime(agent_dst, "GBOC-Agent")
+
+    # 2.1 Copiar Go Core Engine (v15.0.0)
+    go_src = source_root / "go-core"
+    go_dst = output_dir / "go-core"
+    if go_src.exists():
+        copy_component(go_src, go_dst, "GBOC-GoCore")
 
     # 3. Criar pasta Dependencies
     deps_dir = output_dir / "Dependencies"

@@ -39,7 +39,12 @@ def settings(repo_config: Any) -> Dict[str, Any]:
         par = int(cfg.get("parallel_uploads") or 0)
     except (TypeError, ValueError):
         par = 0
-    return {"compression": comp, "parallel": max(0, min(16, par))}
+    return {"compression": comp, "parallel": max(0, min(32, par))}
+
+
+def default_workers(is_cloud: bool = False) -> int:
+    """Paralelismo padrão otimizado para cópia e recuperação de alta velocidade."""
+    return 32 if is_cloud else 8
 
 
 def native_codec(s: Dict[str, Any]):

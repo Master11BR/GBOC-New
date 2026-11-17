@@ -8,6 +8,7 @@
     const base = () => (window.GBOC_API_BASE || '');
     const esc = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     const ST = { ok: '#0ca30c', warn: '#fab219', serious: '#ec835a', bad: '#d03b3b', neutral: '#8a8984' };
+    const PROJ = '#a78bfa';   // projeção/estimativa: violeta, distinto do primário de todos os temas e das cores de status
     const charts = {};
     let days = 14, timer = null, busy = false;
 
@@ -132,9 +133,10 @@
         const st = d.storage;
         const labels = st.labels.concat(st.proj_labels);
         draw('dp-storage', { type: 'line', data: { labels, datasets: [
-            { label: 'Ocupado', data: st.values.concat(st.proj_labels.map(() => null)), borderColor: primary, backgroundColor: primary, borderWidth: 2, pointRadius: 2, spanGaps: true },
+            { label: 'Ocupado', data: st.values.concat(st.proj_labels.map(() => null)), borderColor: primary, backgroundColor: primary, borderWidth: 2, pointRadius: 2, spanGaps: true, skipNull: true },
+            // Projeção com cor própria: o seletor de formato (barras/área) usa a cor da série, então só o tracejado não bastava
             { label: 'Projeção (tendência)', data: st.values.map((v, i) => i === st.values.length - 1 ? v : null).concat(st.projection),
-              borderColor: primary, borderDash: [6, 4], borderWidth: 1.5, pointRadius: 0, spanGaps: true }] },
+              borderColor: PROJ, backgroundColor: PROJ, borderDash: [6, 4], borderWidth: 2, pointRadius: 0, pointStyle: 'rectRot', spanGaps: true, skipNull: true }] },
             options: baseOpts({ plugins: { legend: { labels: { color: css('--text-muted', '#999'), boxWidth: 12 } }, tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${bytes(c.parsed.y)}` } } },
                 scales: { x: { ticks: { color: css('--text-muted', '#999'), maxTicksLimit: 10 }, grid: { display: false } },
                           y: { beginAtZero: true, ticks: { color: css('--text-muted', '#999'), callback: v => bytes(v) }, grid: { color: css('--border', '#333') } } } }) });

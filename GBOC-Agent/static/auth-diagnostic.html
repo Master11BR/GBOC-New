@@ -1,6 +1,6 @@
 <!--
 ==============================================================================
-GBOC System v14.8.3 Enterprise Edition
+GBOC System v15.0.0 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
@@ -12,18 +12,22 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Diagnóstico de Autenticação - GBOC Agent</title>
     
+    
     <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
-    <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/ui/models/modern/components.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/ui/models/modern/layout.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/style.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/gboc-themes.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/gboc-layout.css?v=14.8.3">
-    <script src="/static/gboc-perf.js?v=14.8.3"></script>
-    <script src="/static/gboc-layout-manager.js?v=14.8.3"></script>
-    <script src="/static/gboc-modal.js?v=14.8.3"></script>
+    <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/components.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/layout.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/style.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/gboc-themes.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/gboc-layout.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/ui/react/gboc-react.css?v=15.0.0">
+    <script src="/static/gboc-perf.js?v=15.0.0"></script>
+    <script src="/static/gboc-layout-manager.js?v=15.0.0"></script>
+    <script src="/static/gboc-modal.js?v=15.0.0"></script>
+    <script src="/static/ui/react/gboc-react-core.js?v=15.0.0"></script>
+    <script src="/static/ui/react/gboc-react-components.js?v=15.0.0" defer></script>
 <style>
         .diag-panel { background: var(--bg-card); padding: 20px; border-radius: 10px; margin: 20px; border: 1px solid var(--border); }
         .diag-item { padding: 12px; margin: 8px 0; background: var(--bg-input); border-radius: 6px; display: flex; justify-content: space-between; align-items: center; }
@@ -101,7 +105,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                         <i class="fas fa-sign-out-alt"></i> Testar Função de Logout
                     </button>
                     <button class="btn btn-test btn-warning" onclick="clearStorage()">
-                        <i class="fas fa-trash"></i> Limpar localStorage (simular logout)
+                        <i class="fas fa-trash"></i> Limpar localStorage (forçar reautenticação)
                     </button>
                     <button class="btn btn-test btn-secondary" onclick="runDiagnostics()">
                         <i class="fas fa-sync-alt"></i> Re-executar Diagnóstico
@@ -116,8 +120,8 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         </main>
     </div>
 
-    <script src="/static/auth_interceptor.js?v=14.8.3"></script>
-    <script src="/static/gboc-global.js?v=14.8.3"></script>
+    <script src="/static/auth_interceptor.js?v=15.0.0"></script>
+    <script src="/static/gboc-global.js?v=15.0.0"></script>
     <script>
     let logs = [];
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC Agent 14.8.3 - Task Manager
+GBOC Agent 15.0.0 - Task Manager
 [OK] Usa motor_password para repositórios locais e cloud_password para nuvem
 """
 
@@ -86,6 +86,7 @@ class TaskManager:
         self._current_execution_id = None
         self._max_concurrent_tasks = 1  # Limitar a uma tarefa por enquanto
         self._running_tasks = []  # Lista de tarefas em execução
+        self._task_controls = {}  # {task_id: {"pause": Event, "cancel": Event}}
 
         # Inicializar Monitor com SharedCore
         self.monitor = RealTimeBackupMonitor(self.core)
@@ -440,6 +441,13 @@ class TaskManager:
                 dispatch_job_failure_alert(task_name, str(execution_id), full_error, rec.get("retry_count", 0), rec.get("retry_count", 0) >= cfg.get("escalation_after_failures", 2))
             except Exception as _jf_err:
                 logger.warning(f"Aviso ao sincronizar falha no job_failure_log: {_jf_err}")
+
+            # 🧠 Diagnóstico automático por IA (vira caso na base de conhecimento local)
+            try:
+                from engines import ai_cases
+                ai_cases.auto_diagnose_failure(task_id, execution_id, task_name, engine, error_msg)
+            except Exception as _ad_err:
+                logger.debug(f"Diagnóstico automático indisponível: {_ad_err}")
         except Exception as reg_err:
             logger.error(f"❌ Erro ao registrar falha da tarefa em alertas/logs: {reg_err}")
 
@@ -456,6 +464,8 @@ class TaskManager:
     def create_task(self, data: Dict) -> Dict:
         """Cria uma nova tarefa"""
         try:
+            from engines import veracrypt_mounter
+
             name = data.get('name', '').strip()
             if not name:
                 raise ValueError("Nome da tarefa é obrigatório")
@@ -464,7 +474,22 @@ class TaskManager:
             if not repository_id:
                 raise ValueError("Repositório é obrigatório")
 
+            vc_raw = data.get('veracrypt_config')
+            vc_parsed = veracrypt_mounter.parse_veracrypt_config(vc_raw)
+            vc_enabled = bool(vc_parsed.get('enabled', False))
+            vc_drive_letter = veracrypt_mounter.normalize_drive_letter(vc_parsed.get('drive_letter') or 'V')
+            vc_mount_root = veracrypt_mounter.get_drive_root_path(vc_drive_letter)
+
+            if vc_enabled:
+                vc_vol = str(vc_parsed.get('volume_path') or '').strip()
+                if not vc_vol:
+                    raise ValueError("Volume VeraCrypt (arquivo .hc / .tc ou partição/dispositivo) é obrigatório quando a montagem automática VeraCrypt está ativa")
+                if not veracrypt_mounter.is_device_path(vc_vol) and str(vc_parsed.get('volume_type') or '').lower() != 'device' and not os.path.exists(vc_vol):
+                    raise ValueError(f"Arquivo de volume VeraCrypt não encontrado: {vc_vol}")
+
             source_paths = data.get('source_paths', '')
+            if not source_paths and vc_enabled and vc_mount_root:
+                source_paths = json.dumps([vc_mount_root])
             if not source_paths:
                 raise ValueError("Caminhos de origem são obrigatórios")
 
@@ -472,10 +497,22 @@ class TaskManager:
             try:
                 paths = json.loads(source_paths) if isinstance(source_paths, str) else source_paths
                 if isinstance(paths, list):
+                    if not paths and vc_enabled and vc_mount_root:
+                        paths = [vc_mount_root]
+                        source_paths = json.dumps(paths)
                     for path in paths:
                         # Validar segurança do caminho (prevenir path traversal)
-                        normalized_path = os.path.normpath(path)
-                        if '..' in normalized_path or not os.path.exists(normalized_path):
+                        normalized_path = os.path.normpath(str(path))
+                        if '..' in normalized_path:
+                            logger.warning(f"⚠️ Caminho de origem inválido (path traversal): {path}")
+                            raise ValueError(f"Caminho inválido: {path}")
+                        # Se o caminho pertence à unidade VeraCrypt que será montada antes do backup, não exigir que esteja montada agora
+                        is_vc_path = (
+                            vc_enabled
+                            and vc_drive_letter
+                            and normalized_path.upper().startswith(f"{vc_drive_letter}:")
+                        )
+                        if not is_vc_path and not os.path.exists(normalized_path):
                             logger.warning(f"⚠️ Caminho de origem inválido ou não encontrado: {path}")
                             raise ValueError(f"Caminho inválido ou não encontrado: {path}")
                 else:
@@ -497,6 +534,7 @@ class TaskManager:
             schedule_cron = data.get('schedule_cron', '')
             pre_script = (data.get('pre_script') or '').strip()
             post_script = (data.get('post_script') or '').strip()
+            veracrypt_config_json = veracrypt_mounter.sanitize_and_encrypt_config(vc_raw) if vc_raw else None
 
             # Retention policy
             retention_days = int(data.get('retention_days', 30))
@@ -516,6 +554,7 @@ class TaskManager:
                 try:
                     cursor.execute("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS pre_script TEXT")
                     cursor.execute("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS post_script TEXT")
+                    cursor.execute("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS veracrypt_config TEXT")
                     conn.commit()
                 except Exception:
                     conn.rollback()
@@ -525,14 +564,14 @@ class TaskManager:
                                       schedule_enabled, schedule_cron, status, enabled, created_at, updated_at,
                                       retention_days, retention_weekly, retention_monthly, retention_yearly,
                                       retry_enabled, retry_max_attempts, retry_delay_minutes,
-                                      pre_script, post_script)
+                                      pre_script, post_script, veracrypt_config)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, 'idle', true, %s, %s,
-                            %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, (name, repository_id, source_paths, engine, task_type,
                       schedule_enabled, schedule_cron, now, now,
                       retention_days, retention_weekly, retention_monthly, retention_yearly,
                       retry_enabled, retry_max_attempts, retry_delay_minutes,
-                      pre_script, post_script))
+                      pre_script, post_script, veracrypt_config_json))
                 conn.commit()
                 cursor.execute("SELECT LASTVAL()")
                 task_id = cursor.fetchone()[0]
@@ -550,13 +589,42 @@ class TaskManager:
     def update_task(self, task_id: int, data: Dict) -> Dict:
         """Atualiza uma tarefa com edição completa"""
         try:
+            from engines import veracrypt_mounter
+
+            if 'veracrypt_config' in data and data['veracrypt_config'] is not None:
+                existing_vc_raw = None
+                with self._get_connection() as conn:
+                    cursor = conn.cursor()
+                    try:
+                        cursor.execute("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS veracrypt_config TEXT")
+                        conn.commit()
+                    except Exception:
+                        conn.rollback()
+                    cursor.execute("SELECT veracrypt_config FROM tasks WHERE id = %s", (task_id,))
+                    vc_row = cursor.fetchone()
+                    if vc_row:
+                        existing_vc_raw = vc_row[0]
+
+                vc_parsed = veracrypt_mounter.parse_veracrypt_config(data['veracrypt_config'])
+                if vc_parsed.get('enabled'):
+                    vc_vol = str(vc_parsed.get('volume_path') or '').strip()
+                    if not vc_vol:
+                        raise ValueError("Volume VeraCrypt (arquivo .hc / .tc ou partição/dispositivo) é obrigatório quando a montagem automática VeraCrypt está ativa")
+                    if not veracrypt_mounter.is_device_path(vc_vol) and str(vc_parsed.get('volume_type') or '').lower() != 'device' and not os.path.exists(vc_vol):
+                        raise ValueError(f"Arquivo de volume VeraCrypt não encontrado: {vc_vol}")
+
+                data['veracrypt_config'] = veracrypt_mounter.sanitize_and_encrypt_config(
+                    data['veracrypt_config'],
+                    existing_vc_raw,
+                )
+
             # Campos permitidos para edição completa
             allowed_fields = [
                 'name', 'repository_id', 'source_paths', 'engine', 'type',
                 'enabled', 'schedule_enabled', 'schedule_cron',
                 'retention_days', 'retention_weekly', 'retention_monthly', 'retention_yearly',
                 'retry_enabled', 'retry_max_attempts', 'retry_delay_minutes',
-                'pre_script', 'post_script'
+                'pre_script', 'post_script', 'veracrypt_config'
             ]
 
             updates = []
@@ -791,6 +859,51 @@ class TaskManager:
             logger.error(f"Erro ao forçar parada da tarefa {execution_id}: {e}")
             return {"status": "error", "message": f"Erro interno: {str(e)}"}
 
+    def pause_task(self, task_id: int) -> Dict:
+        """Pausa uma tarefa em execução ao vivo"""
+        ctrl = self._task_controls.get(int(task_id))
+        if ctrl and ctrl.get("pause"):
+            ctrl["pause"].set()
+            if int(task_id) in self.monitor.active_backups:
+                self.monitor.update_progress(int(task_id), paused=True, force_db=True)
+            return {"status": "success", "paused": True, "message": "Tarefa pausada"}
+        return {"status": "error", "message": "Tarefa não está em execução ativa neste processo"}
+
+    def resume_task(self, task_id: int) -> Dict:
+        """Retoma uma tarefa pausada"""
+        ctrl = self._task_controls.get(int(task_id))
+        if ctrl and ctrl.get("pause"):
+            ctrl["pause"].clear()
+            if int(task_id) in self.monitor.active_backups:
+                self.monitor.update_progress(int(task_id), paused=False, force_db=True)
+            return {"status": "success", "paused": False, "message": "Tarefa retomada"}
+        return {"status": "error", "message": "Tarefa não está em execução ativa neste processo"}
+
+    def stop_task(self, task_id: int) -> Dict:
+        """Interrompe uma tarefa em execução pelo task_id"""
+        tid = int(task_id)
+        ctrl = self._task_controls.get(tid)
+        if ctrl:
+            if ctrl.get("cancel"):
+                ctrl["cancel"].set()
+            if ctrl.get("pause"):
+                ctrl["pause"].clear()
+        self._ensure_process_terminated()
+        prog = self.monitor.get_progress(tid)
+        if prog and prog.execution_id:
+            return self.force_stop_task(prog.execution_id)
+        with self._get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT id FROM task_executions
+                WHERE task_id = %s AND status IN ('running', 'preparing', 'queued')
+                ORDER BY started_at DESC LIMIT 1
+            """, (tid,))
+            row = cur.fetchone()
+            if row:
+                return self.force_stop_task(row[0])
+        return {"status": "success", "message": "Sinal de parada enviado"}
+
     def _ensure_process_terminated(self):
         """Garante que processos sejam terminados adequadamente"""
         try:
@@ -858,6 +971,8 @@ class TaskManager:
     def _execute_task(self, task_id: int, execution_id: int):
         """Executa uma tarefa de backup"""
         task_name = "Unknown"
+        _vc_cfg = {}
+        _vc_acquired = False
         try:
             # Buscar dados da tarefa
             with self.core.get_db_connection() as conn:
@@ -910,7 +1025,42 @@ class TaskManager:
             engine = (task.get('repository_engine') or task.get('engine') or 'restic').lower()
             logger.info(f"▶️ Executando tarefa: {task_name} (engine: {engine})")
 
-            self.monitor.start_backup(task_id, execution_id, task_name, task.get('repo_name', 'Unknown'))
+            # Resumo de origem e destino para a barra de progressão ao vivo (ex: "C:\Rede (+3) -> Principal/arfprimesafe")
+            _raw_src = task.get('source_paths') or task.get('sources') or []
+            if isinstance(_raw_src, str):
+                try:
+                    _parsed_src = json.loads(_raw_src)
+                    _src_list = _parsed_src if isinstance(_parsed_src, list) else [s.strip() for s in _raw_src.split(',') if s.strip()]
+                except Exception:
+                    _src_list = [s.strip() for s in _raw_src.split(',') if s.strip()]
+            elif isinstance(_raw_src, list):
+                _src_list = [str(s).strip() for s in _raw_src if str(s).strip()]
+            else:
+                _src_list = []
+            if len(_src_list) > 1:
+                _src_summary = f"{_src_list[0]} (+{len(_src_list) - 1})"
+            elif len(_src_list) == 1:
+                _src_summary = _src_list[0]
+            else:
+                _src_summary = "Origem"
+            _rname = task.get('repo_name') or 'Repositório'
+            _rprefix = str(task.get('prefix') or task.get('repo_path') or '').strip('/')
+            _tgt_summary = f"{_rname}/{_rprefix}" if (_rprefix and _rprefix != _rname and not _rprefix.startswith(_rname)) else _rname
+
+            self._task_controls[int(task_id)] = {
+                "pause": threading.Event(),
+                "cancel": threading.Event(),
+            }
+
+            self.monitor.start_backup(
+                task_id,
+                execution_id,
+                task_name,
+                _rname,
+                source_summary=_src_summary,
+                target_summary=_tgt_summary,
+                mode_badge="COPY",
+            )
 
             # Limite de banda de upload vigente agora (janela/horário configurados no agente ou pela política central)
             try:
@@ -928,6 +1078,46 @@ class TaskManager:
                 task['_upload_mbps'] = 0
                 logger.debug(f"Limite de banda indisponível: {_bw_err}")
 
+            # 🔐 Montagem Automática de Volume VeraCrypt (se configurado na tarefa)
+            from engines import veracrypt_mounter
+            _vc_cfg = veracrypt_mounter.parse_veracrypt_config(task.get('veracrypt_config'))
+            if _vc_cfg.get('enabled'):
+                vc_letter = veracrypt_mounter.normalize_drive_letter(_vc_cfg.get('drive_letter') or 'V')
+                vc_root = veracrypt_mounter.get_drive_root_path(vc_letter)
+                try:
+                    self.monitor.update_progress(
+                        task_id,
+                        phase=f"Montando volume VeraCrypt ({vc_root})...",
+                        current_folder=str(_vc_cfg.get('volume_path') or ''),
+                    )
+                except Exception:
+                    pass
+                mount_res = veracrypt_mounter.acquire_for_task(_vc_cfg, task_id=task_id)
+                _vc_acquired = bool(mount_res.get('success'))
+                if not mount_res.get('success'):
+                    vc_err = mount_res.get('error') or f"Falha ao montar volume VeraCrypt em {vc_root}"
+                    logger.error(f"❌ [VeraCrypt] {vc_err}")
+                    self._update_execution(execution_id, 'failed', error_message=vc_err)
+                    self.monitor.complete_backup(task_id, error_message=vc_err)
+                    self._register_task_error(task_id, execution_id, task_name, engine, vc_err)
+                    return
+
+            # Script Pré-Backup (se configurado)
+            _pre_script = (task.get('pre_script') or '').strip()
+            if _pre_script:
+                try:
+                    logger.info(f"⚙️ Executando script pré-backup da tarefa '{task_name}': {_pre_script}")
+                    subprocess.run(
+                        _pre_script,
+                        shell=True,
+                        capture_output=True,
+                        text=True,
+                        timeout=300,
+                        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == 'nt' else 0,
+                    )
+                except Exception as _pre_err:
+                    logger.warning(f"⚠️ Aviso no script pré-backup: {_pre_err}")
+
             if engine in ('restic', 'restic_native', 'restic native'):
                 result = self._run_restic_backup(task, execution_id)
             elif engine in ('duplicati', 'duplicati_native', 'duplicati native'):
@@ -941,6 +1131,22 @@ class TaskManager:
                 result = {"success": False, "error": f"Motor de backup '{engine}' não reconhecido. Motores suportados: GBOC Native, Restic, Duplicati, Kopia. | {diag}"}
 
             self._ensure_process_terminated()
+
+            # Script Pós-Backup (se configurado)
+            _post_script = (task.get('post_script') or '').strip()
+            if _post_script:
+                try:
+                    logger.info(f"⚙️ Executando script pós-backup da tarefa '{task_name}': {_post_script}")
+                    subprocess.run(
+                        _post_script,
+                        shell=True,
+                        capture_output=True,
+                        text=True,
+                        timeout=300,
+                        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == 'nt' else 0,
+                    )
+                except Exception as _post_err:
+                    logger.warning(f"⚠️ Aviso no script pós-backup: {_post_err}")
 
             if result.get('success'):
                 snapshot_id = result.get('snapshot_id')
@@ -1002,6 +1208,19 @@ class TaskManager:
                 self._register_task_error(task_id, execution_id, task_name, 'unknown', error_msg)
             except Exception as cleanup_error:
                 logger.error(f"❌ Erro ao fazer limpeza: {cleanup_error}")
+        finally:
+            self._task_controls.pop(int(task_id), None)
+            # 🔒 Desmontagem Automática de Volume VeraCrypt pós-backup (mesmo em caso de erro ou cancelamento)
+            # Só desmonta o que o GBOC montou e quando nenhuma outra tarefa ainda estiver usando o volume.
+            try:
+                if _vc_acquired:
+                    from engines import veracrypt_mounter
+                    vc_letter = _vc_cfg.get('drive_letter') or 'V'
+                    dismount_res = veracrypt_mounter.release_for_task(_vc_cfg, task_id=task_id)
+                    if not dismount_res.get('success'):
+                        logger.warning(f"⚠️ [VeraCrypt] Aviso ao desmontar unidade {vc_letter}: {dismount_res.get('error')}")
+            except Exception as _vc_dismount_err:
+                logger.warning(f"⚠️ [VeraCrypt] Erro ao desmontar volume no encerramento da tarefa: {_vc_dismount_err}")
 
     def _run_restic_backup(self, task: Dict, execution_id: int) -> Dict:
         """Executa backup com Restic"""
@@ -1615,7 +1834,7 @@ class TaskManager:
             _codec, _level = _tune.native_codec(_ts)
             _is_cloud = str(repo_cfg.get('type') or 'local').lower() != 'local'
             # limite agora é global (todas as conexões juntas): não precisa mais cair para 1 conexão
-            _workers = _ts['parallel'] or (4 if _is_cloud else 2)
+            _workers = _ts['parallel'] or _tune.default_workers(_is_cloud)
             if _is_cloud and _workers > 1:
                 def _factory(_cfg=dict(repo_cfg)):
                     be = RepositoryManager(self.core)._create_backend_from_config(dict(_cfg))
@@ -1625,10 +1844,11 @@ class TaskManager:
             else:
                 _factory = (lambda: backend)
             _tid = task.get('id')
+            self.monitor.update_progress(_tid, threads=_workers)
 
             def _native_progress(p, _tid=_tid):
                 # barra de progresso ao vivo da tela de tarefas (monitor -> task_executions)
-                self.monitor.update_progress(_tid, **{k: v for k, v in p.items() if k not in ('phase', 'threads')})
+                self.monitor.update_progress(_tid, **{k: v for k, v in p.items() if k != 'phase'})
 
             # VSS: lê de uma cópia de sombra (arquivos abertos/bloqueados copiados); apagada no fim
             _vss = None
@@ -1649,9 +1869,12 @@ class TaskManager:
                     _bc.close_open_share_files(_failed, "motor nativo: VSS indisponível")
             except Exception as _vss_err:
                 logger.warning(f"[VSS] motor nativo: {_vss_err}")
+            _ctrl = self._task_controls.get(int(_tid)) or {}
             engine = GBOCNativeEngine({'source_paths': source_paths, 'compression_v4': _codec,
                                        'compression_level': _level, 'progress_cb': _native_progress,
-                                       'read_map': _vss_map},
+                                       'read_map': _vss_map,
+                                       'pause_event': _ctrl.get('pause'),
+                                       'cancel_event': _ctrl.get('cancel')},
                                       backend, backend_factory=_factory, workers=_workers)
             try:
                 result = engine.run_backup()

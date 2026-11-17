@@ -1,8 +1,19 @@
-<!-- Copyright (c) 2026 Master11BR - GBOC System v14.8.1 Enterprise. Todos os direitos reservados. -->
+<!-- Copyright (c) 2026 Master11BR - GBOC System v15.0.0 Enterprise. Todos os direitos reservados. -->
 
-# 📦 GBOC System v14.8.1 Enterprise — Guia Oficial de Instaladores & Implantação
+# 📦 GBOC System v15.0.0 Enterprise — Guia Oficial de Instaladores, Implantação & Upgrade em Produção
 
-Este guia detalha a instalação e implantação do **GBOC Server (Servidor Central)** e do **GBOC Agent (Agente Local e Remoto LAN)**.
+Este guia detalha a instalação limpa e a **atualização in-place (upgrade em produção)** do **GBOC Server (Servidor Central)** e do **GBOC Agent (Agente Local e Remoto LAN)** para a arquitetura **v15.0.0 (Python + Go Core + React 19 UI)**.
+
+---
+
+## 🔄 0. Atualização (Upgrade In-Place) de Versões Antigas em Produção (`v14.x` → `v15.0.0`)
+
+Os instaladores `Setup.bat` / `Setup.ps1` e `GBOC-Agent\install_agent.ps1` detectam automaticamente instalações existentes em produção (`C:\GBOC`):
+1. **Detecção Automática**: Identifica a versão anterior instalada (`v14.6.x`, `v14.7.x`, `v14.8.x`) e ativa o `[MODO UPGRADE EM PRODUÇÃO]`.
+2. **Backup Preventivo Automático**: Salva instantaneamente todas as configurações e chaves criptográficas (`.env`, `system_config.json`, `config\global_settings.json`, `data\.repo_secrets.key`) em `C:\GBOC\Backups\upgrade_<timestamp>\`.
+3. **Parada Segura de Serviços**: Encerra `GBOCWatchdog`, `GBOCAgent` e `GBOCServer` antes de substituir arquivos em disco.
+4. **Preservação Integral de Dados**: Atualiza o código do Servidor, Agente, Go Core (`go-core\`) e React 19 UI sem sobrescrever senhas do PostgreSQL, chaves de criptografia de repositórios, identidades de agentes inscritos ou snapshots existentes.
+5. **Reinício Automático**: Revalida as dependências Python, aplica migrações automáticas de banco de dados e reinicia os serviços do Windows.
 
 ---
 

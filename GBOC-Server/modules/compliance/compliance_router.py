@@ -1,4 +1,4 @@
-# GBOC System v14.8.3 Enterprise Edition
+# GBOC System v15.0.0 Enterprise Edition
 # Module: Compliance & LGPD Router (Ecosystem: Server + Agents)
 
 import logging

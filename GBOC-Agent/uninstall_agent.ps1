@@ -1,13 +1,13 @@
 <#
 ==============================================================================
-GBOC System v14.8.3 Enterprise Edition
+GBOC System v15.0.0 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
 #>
 
 # ============================================================================
-# GBOC Agent - Desinstalador Completo v14.8.3
+# GBOC Agent - Desinstalador Completo v15.0.0
 # ============================================================================
 
 #Requires -RunAsAdministrator
@@ -45,7 +45,7 @@ Write-Host @"
 
 ╔═══════════════════════════════════════════════════════════╗
 ║                                                           ║
-║         GBOC Agent - Desinstalador Completo v14.8.3        ║
+║         GBOC Agent - Desinstalador Completo v15.0.0        ║
 ║                                                           ║
 ╚═══════════════════════════════════════════════════════════╝
 

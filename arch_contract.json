@@ -1,6 +1,10 @@
 {
   "system": "GBOC System Enterprise",
-  "version": "14.8.1",
+  "version": "15.0.0",
+  "architecture": {
+    "backend_core": "Python 3 + Go Core (gboc-go-core/15.0.0)",
+    "frontend_ui": "React 19 Modular Runtime (gboc-react/19.0.0) + Universal CSS"
+  },
   "strict_modularization": true,
   "rules": [
     {

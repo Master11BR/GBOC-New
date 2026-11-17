@@ -1,6 +1,6 @@
 <!--
 ==============================================================================
-GBOC System v14.8.3 Enterprise Edition
+GBOC System v15.0.0 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
@@ -10,24 +10,28 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GBOC Agent 14.8.3 - API Overview</title>
+    <title>GBOC Agent 15.0.0 - API Overview</title>
+    
     
     <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
-    <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/ui/models/modern/components.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/ui/models/modern/layout.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/style.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/gboc-themes.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/gboc-layout.css?v=14.8.3">
-    <script src="/static/gboc-perf.js?v=14.8.3"></script>
-    <script src="/static/gboc-layout-manager.js?v=14.8.3"></script>
-    <script src="/static/gboc-modal.js?v=14.8.3"></script>
-<link rel="stylesheet" href="/static/gboc-hardware-hud.css?v=14.8.3">
-    <script src="/static/auth_interceptor.js?v=14.8.3"></script>
-    <script src="/static/gboc-global.js?v=14.8.3"></script>
-    <script src="/static/gboc-hardware-hud.js?v=14.8.3"></script>
+    <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/components.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/layout.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/style.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/gboc-themes.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/gboc-layout.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/ui/react/gboc-react.css?v=15.0.0">
+    <script src="/static/gboc-perf.js?v=15.0.0"></script>
+    <script src="/static/gboc-layout-manager.js?v=15.0.0"></script>
+    <script src="/static/gboc-modal.js?v=15.0.0"></script>
+    <script src="/static/ui/react/gboc-react-core.js?v=15.0.0"></script>
+    <script src="/static/ui/react/gboc-react-components.js?v=15.0.0" defer></script>
+<link rel="stylesheet" href="/static/gboc-hardware-hud.css?v=15.0.0">
+    <script src="/static/auth_interceptor.js?v=15.0.0"></script>
+    <script src="/static/gboc-global.js?v=15.0.0"></script>
+    <script src="/static/gboc-hardware-hud.js?v=15.0.0"></script>
     <style>
         .overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 30px; }
         .stat-card { padding: 20px; border-left: 5px solid var(--primary-color, var(--primary)); color: var(--text-primary, var(--text)); transition: transform 0.2s; min-height: 0; }
@@ -140,7 +144,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 </div>
                 <div class="stat-card" style="border-left-color: var(--text-muted);">
                     <div class="stat-header"><h3>Versão GBOC</h3></div>
-                    <div class="stat-value" style="font-size:1.1em">14.8.1</div>
+                    <div class="stat-value" id="gboc-ver-val" style="font-size:1.1em">15.0.0</div>
                 </div>
                 <div class="stat-card" style="border-left-color: #38bdf8; cursor:pointer;" onclick="if(typeof toggleHardwareHUD==='function')toggleHardwareHUD();" title="Clique para abrir Telemetria & S.M.A.R.T.">
                     <div class="stat-header"><h3>Telemetria</h3><i class="fas fa-microchip" style="color:#38bdf8"></i></div>
@@ -225,6 +229,9 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                 const summary = data.backup_summary || data.overview_summary || {};
                 document.getElementById('repo-count').innerText = summary.total_repositories || summary.repositories || 0;
                 document.getElementById('task-count').innerText = summary.active_tasks || summary.tasks || 0;
+                if (data.backup_stats && typeof data.backup_stats.total_data_gb !== 'undefined') {
+                    document.getElementById('total-backups').innerText = `${data.backup_stats.total_data_gb} GB`;
+                }
                 
                 // Engines
                 if(data.engines_status) {
@@ -240,6 +247,8 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                     document.getElementById('os-val').innerText = data.system_info.platform || 'Windows';
                     document.getElementById('ver').innerText = data.system_info.version || '-';
                     document.getElementById('uptime-val').innerText = formatUptime(data.system_info.uptime_seconds || 0);
+                    const gvEl = document.getElementById('gboc-ver-val');
+                    if (gvEl) gvEl.innerText = data.gboc_version || data.system_info.gboc_version || '15.0.0';
                 }
 
             } catch (e) {
@@ -251,6 +260,6 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         setInterval(loadData, 5000);
     </script>
 
-    <script src="/static/sidebar.js?v=14.8.3"></script>
+    <script src="/static/sidebar.js?v=15.0.0"></script>
 </body>
 </html>

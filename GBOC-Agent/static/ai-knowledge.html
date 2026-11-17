@@ -1,0 +1,650 @@
+<!--
+==============================================================================
+GBOC System v15.0.0 Enterprise Edition
+Copyright (c) 2026 Master11BR - Todos os direitos reservados.
+Propriedade Intelectual & Direitos Autorais Registrados.
+==============================================================================
+-->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GBOC Agent 15.0.0 - IA: Conhecimento, MCP e Treino</title>
+    <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
+    <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/components.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/layout.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/style.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/gboc-themes.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/gboc-layout.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/ui/react/gboc-react.css?v=15.0.0">
+    <script src="/static/gboc-perf.js?v=15.0.0"></script>
+    <script src="/static/gboc-layout-manager.js?v=15.0.0"></script>
+    <script src="/static/gboc-modal.js?v=15.0.0"></script>
+    <script src="/static/ui/react/gboc-react-core.js?v=15.0.0"></script>
+    <script src="/static/toast_notifications.js?v=15.0.0"></script>
+<style>
+    .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:22px}
+    .stat-card{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center}
+    .stat-card .val{font-size:1.7em;font-weight:700}
+    .stat-card .lbl{font-size:.8em;color:var(--text-muted);margin-top:4px}
+    .panel{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:18px}
+    .panel-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+    .panel-header h3{margin:0;display:flex;align-items:center;gap:8px;font-size:1em}
+    .panel-body{padding:18px}
+    .ai-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px;border-bottom:1px solid var(--border)}
+    .ai-tab{background:none;border:none;border-bottom:3px solid transparent;color:var(--text-muted);padding:10px 16px;cursor:pointer;font-weight:600;font-size:.92em}
+    .ai-tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+    .ai-pane{display:none}.ai-pane.active{display:block}
+    .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+    .form-group{margin-bottom:12px}
+    .form-group label{display:block;font-size:.84em;color:var(--text-muted);margin-bottom:5px;font-weight:600}
+    .form-group input,.form-group select,.form-group textarea{width:100%;padding:9px 11px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:.9em}
+    .chk{display:flex;align-items:center;gap:8px;font-size:.88em;color:var(--text);cursor:pointer;margin-bottom:8px}
+    table.ai-table{width:100%;border-collapse:collapse;font-size:.86em}
+    table.ai-table th,table.ai-table td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
+    table.ai-table th{color:var(--text-muted);font-weight:600}
+    .pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:.75em;font-weight:700}
+    .pill-ok{background:rgba(78,203,136,.15);color:var(--success)}
+    .pill-warn{background:rgba(240,169,64,.15);color:var(--warning)}
+    .pill-bad{background:rgba(240,107,107,.15);color:var(--danger)}
+    .pill-muted{background:rgba(148,163,184,.15);color:var(--text-muted)}
+    .result{border:1px solid var(--border);border-radius:9px;padding:11px 13px;margin-bottom:10px;background:var(--bg-input)}
+    .result .meta{font-size:.76em;color:var(--text-muted);margin-bottom:5px}
+    .result pre,.code{white-space:pre-wrap;word-break:break-word;font-family:Consolas,monospace;font-size:.8em;margin:0;color:var(--text)}
+    .code{background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:10px 12px}
+    .case{border:1px solid var(--border);border-radius:10px;padding:13px 15px;margin-bottom:11px;background:var(--bg-input)}
+    .case.resolved{border-color:var(--success)}.case.not_resolved{border-color:var(--danger)}
+    .case h4{margin:0 0 6px;font-size:.92em;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .case .txt{font-size:.84em;white-space:pre-wrap;color:var(--text);margin:4px 0}
+    .muted{color:var(--text-muted);font-size:.84em}
+    .row-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center}
+    .token-box{background:rgba(78,203,136,.08);border:1px solid var(--success);border-radius:9px;padding:12px;margin:10px 0;display:none}
+    .progress-line{font-size:.84em;color:var(--primary);margin-top:8px}
+    .inline-select{padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text)}
+</style>
+    <script src="/static/auth_interceptor.js"></script>
+</head>
+<body>
+<div class="app">
+<main class="main-content">
+    <header class="header">
+        <div>
+            <h1 class="page-title"><i class="fas fa-brain" style="color:var(--primary)"></i> IA: Conhecimento, MCP e Treino</h1>
+            <div class="page-subtitle">Base de conhecimento local (RAG) com dados reais deste Agente, servidor MCP para Claude/Antigravity/n8n e treino do modelo de diagnóstico.</div>
+        </div>
+        <div class="header-actions">
+            <button class="btn btn-secondary" onclick="loadAll()"><i class="fas fa-sync-alt"></i> Atualizar</button>
+        </div>
+    </header>
+
+    <div class="stats-row">
+        <div class="stat-card"><div class="val" id="st-chunks">–</div><div class="lbl">Trechos indexados</div></div>
+        <div class="stat-card"><div class="val" id="st-embedded">–</div><div class="lbl">Com vetor (busca semântica)</div></div>
+        <div class="stat-card"><div class="val" id="st-cases" style="color:var(--primary)">–</div><div class="lbl">Casos de diagnóstico</div></div>
+        <div class="stat-card"><div class="val" id="st-verified" style="color:var(--success)">–</div><div class="lbl">Soluções validadas</div></div>
+        <div class="stat-card"><div class="val" id="st-tokens">–</div><div class="lbl">Tokens MCP ativos</div></div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header">
+            <h3><i class="fas fa-microchip" style="color:var(--primary)"></i> Capacidades do ambiente</h3>
+            <div class="row-actions" style="margin:0">
+                <span class="muted" id="caps-host"></span>
+                <button class="btn btn-sm btn-secondary" id="btn-caps" onclick="loadCaps(true)"><i class="fas fa-rotate"></i> Verificar novamente</button>
+            </div>
+        </div>
+        <div class="panel-body">
+            <div class="muted" style="margin-bottom:10px">Ative o que quiser usar. O Agente verifica este servidor: liga o que funciona, informa o que falta e avisa quando algo é impossível neste ambiente.</div>
+            <table class="ai-table"><thead><tr><th style="width:70px">Ativo</th><th>Recurso</th><th>Estado neste servidor</th><th>Funcionando</th><th>Falta</th></tr></thead>
+                <tbody id="caps-body"><tr><td colspan="5" class="muted"><i class="fas fa-spinner fa-spin"></i> Verificando o ambiente...</td></tr></tbody></table>
+        </div>
+    </div>
+
+    <div class="ai-tabs">
+        <button class="ai-tab active" data-tab="rag" onclick="showTab('rag')"><i class="fas fa-book"></i> Base de Conhecimento (RAG)</button>
+        <button class="ai-tab" data-tab="cases" onclick="showTab('cases')"><i class="fas fa-stethoscope"></i> Casos e Validação</button>
+        <button class="ai-tab" data-tab="mcp" onclick="showTab('mcp')"><i class="fas fa-plug"></i> Servidor MCP</button>
+        <button class="ai-tab" data-tab="ft" onclick="showTab('ft')"><i class="fas fa-graduation-cap"></i> Fine-tuning</button>
+    </div>
+
+    <!-- ============ RAG ============ -->
+    <section class="ai-pane active" id="pane-rag">
+        <div class="panel">
+            <div class="panel-header">
+                <h3><i class="fas fa-database" style="color:var(--primary)"></i> Fontes indexadas neste Agente</h3>
+                <div class="row-actions" style="margin:0">
+                    <span id="idx-state" class="muted"></span>
+                    <button class="btn btn-sm btn-primary" id="btn-reindex" onclick="reindex()"><i class="fas fa-rotate"></i> Reindexar agora</button>
+                </div>
+            </div>
+            <div class="panel-body">
+                <table class="ai-table"><thead><tr><th>Fonte</th><th>Trechos</th><th>Com vetor</th><th>Última leitura</th></tr></thead>
+                    <tbody id="rag-sources"><tr><td colspan="4" class="muted">Carregando...</td></tr></tbody></table>
+                <div class="muted" style="margin-top:10px" id="rag-db"></div>
+            </div>
+        </div>
+
+        <div class="grid2">
+            <div class="panel">
+                <div class="panel-header"><h3><i class="fas fa-sliders" style="color:var(--primary)"></i> Configuração</h3></div>
+                <div class="panel-body">
+                    <label class="chk"><input type="checkbox" id="cfg-rag-enabled"> Usar a base de conhecimento no diagnóstico e no Copilot</label>
+                    <label class="chk"><input type="checkbox" id="cfg-auto-diag"> Diagnosticar automaticamente as falhas de tarefas (gera casos)</label>
+                    <div class="form-group">
+                        <label>Busca semântica (embeddings)</label>
+                        <select id="cfg-emb-provider">
+                            <option value="auto">Automático — Ollama local, se houver modelo de embedding</option>
+                            <option value="ollama">Ollama (local)</option>
+                            <option value="openai">OpenAI (nuvem — envia trechos para a API)</option>
+                            <option value="gemini">Gemini (nuvem — envia trechos para a API)</option>
+                            <option value="none">Desativada — somente palavras-chave</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>Modelo de embedding (opcional)</label>
+                        <input id="cfg-emb-model" placeholder="Ollama: nomic-embed-text · OpenAI: text-embedding-3-small · Gemini: text-embedding-004"></div>
+                    <div class="grid2" style="gap:10px">
+                        <div class="form-group"><label>Reindexar a cada (horas)</label><input type="number" id="cfg-reindex-h" min="0.5" step="0.5"></div>
+                        <div class="form-group"><label>Execuções indexadas (dias)</label><input type="number" id="cfg-exec-days" min="1"></div>
+                    </div>
+                    <div class="muted" id="emb-status" style="margin-bottom:10px"></div>
+                    <button class="btn btn-primary btn-sm" onclick="saveConfig()"><i class="fas fa-save"></i> Salvar</button>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-header"><h3><i class="fas fa-magnifying-glass" style="color:var(--primary)"></i> Testar busca</h3></div>
+                <div class="panel-body">
+                    <div class="form-group"><input id="search-q" placeholder="Ex.: repository is already locked / VeraCrypt partição / falha VSS" onkeydown="if(event.key==='Enter')doSearch()"></div>
+                    <div class="row-actions" style="margin:0 0 10px" id="search-sources"></div>
+                    <button class="btn btn-secondary btn-sm" onclick="doSearch()"><i class="fas fa-search"></i> Buscar</button>
+                    <div id="search-info" class="muted" style="margin:10px 0"></div>
+                    <div id="search-results"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============ CASOS ============ -->
+    <section class="ai-pane" id="pane-cases">
+        <div class="panel">
+            <div class="panel-header">
+                <h3><i class="fas fa-stethoscope" style="color:var(--primary)"></i> Diagnósticos registrados</h3>
+                <select id="cases-filter" class="inline-select" onchange="loadCases()">
+                    <option value="pending">Aguardando validação</option>
+                    <option value="">Todos</option>
+                    <option value="resolved">Resolveram</option>
+                    <option value="not_resolved">Não resolveram</option>
+                </select>
+            </div>
+            <div class="panel-body">
+                <div class="muted" style="margin-bottom:12px">Marque <strong>Resolveu</strong> quando a solução funcionou: o caso ganha prioridade nos próximos diagnósticos (RAG) e entra no dataset de treino. Corrija a causa/solução antes de validar se o que resolveu foi diferente.</div>
+                <div id="cases-list"><div class="muted">Carregando...</div></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============ MCP ============ -->
+    <section class="ai-pane" id="pane-mcp">
+        <div class="grid2">
+            <div class="panel">
+                <div class="panel-header"><h3><i class="fas fa-plug" style="color:var(--primary)"></i> Endereço e acesso</h3>
+                    <label class="chk" style="margin:0"><input type="checkbox" id="cfg-mcp-enabled" onchange="saveMcpEnabled()"> Servidor MCP ativo</label></div>
+                <div class="panel-body">
+                    <div class="form-group"><label>URL do servidor MCP (Streamable HTTP)</label><div class="code" id="mcp-url"></div></div>
+                    <div class="muted" style="margin-bottom:12px">Use o endereço pelo qual o cliente de IA alcança este Agente. Cada cliente usa um token próprio: <strong>Consulta</strong> só lê dados; <strong>Operação</strong> também executa/para tarefas e monta/desmonta VeraCrypt. Todas as chamadas ficam registradas na Auditoria.</div>
+                    <div class="grid2" style="gap:10px">
+                        <div class="form-group"><label>Nome do cliente</label><input id="tok-name" placeholder="Ex.: Claude Code - notebook"></div>
+                        <div class="form-group"><label>Perfil</label><select id="tok-role"><option value="read">Consulta (somente leitura)</option><option value="operate">Operação (executa ações)</option></select></div>
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="createToken()"><i class="fas fa-key"></i> Gerar token</button>
+                    <div class="token-box" id="token-box">
+                        <div style="font-weight:700;color:var(--success);margin-bottom:6px"><i class="fas fa-check-circle"></i> Token gerado — copie agora, ele não será exibido novamente</div>
+                        <div class="code" id="token-value"></div>
+                        <div class="row-actions"><button class="btn btn-sm btn-secondary" onclick="copyText(document.getElementById('token-value').textContent)"><i class="fas fa-copy"></i> Copiar token</button></div>
+                    </div>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-header"><h3><i class="fas fa-code" style="color:var(--primary)"></i> Configurar o cliente</h3>
+                    <select id="client-kind" class="inline-select" onchange="renderSnippet()">
+                        <option value="claude-code">Claude Code</option>
+                        <option value="json">Antigravity / Cursor / VS Code (mcp.json)</option>
+                        <option value="desktop">Claude Desktop (ponte stdio)</option>
+                        <option value="n8n">n8n (MCP Client Tool)</option>
+                        <option value="curl">Teste com curl</option>
+                    </select></div>
+                <div class="panel-body">
+                    <div class="code" id="client-snippet"></div>
+                    <div class="row-actions"><button class="btn btn-sm btn-secondary" onclick="copyText(document.getElementById('client-snippet').textContent)"><i class="fas fa-copy"></i> Copiar</button></div>
+                    <div class="muted" id="snippet-note" style="margin-top:8px"></div>
+                </div>
+            </div>
+        </div>
+        <div class="panel">
+            <div class="panel-header"><h3><i class="fas fa-id-card" style="color:var(--primary)"></i> Tokens</h3></div>
+            <div class="panel-body"><table class="ai-table"><thead><tr><th>Cliente</th><th>Perfil</th><th>Token</th><th>Criado</th><th>Último uso</th><th>Usos</th><th></th></tr></thead><tbody id="tokens-body"><tr><td colspan="7" class="muted">Carregando...</td></tr></tbody></table></div>
+        </div>
+        <div class="panel">
+            <div class="panel-header"><h3><i class="fas fa-toolbox" style="color:var(--primary)"></i> Ferramentas expostas</h3></div>
+            <div class="panel-body"><table class="ai-table"><thead><tr><th>Ferramenta</th><th>Perfil</th><th>Descrição</th></tr></thead><tbody id="tools-body"></tbody></table></div>
+        </div>
+    </section>
+
+    <!-- ============ FINE-TUNING ============ -->
+    <section class="ai-pane" id="pane-ft">
+        <div class="grid2">
+            <div class="panel">
+                <div class="panel-header"><h3><i class="fas fa-file-lines" style="color:var(--primary)"></i> 1. Gerar dataset</h3></div>
+                <div class="panel-body">
+                    <div id="ft-summary" class="muted" style="margin-bottom:12px">Carregando...</div>
+                    <div class="form-group"><label>Casos incluídos</label>
+                        <select id="ft-mode"><option value="verified">Somente validados pelo operador (recomendado)</option><option value="verified_recovered">Validados + tarefas que voltaram a concluir após o diagnóstico</option></select></div>
+                    <button class="btn btn-primary btn-sm" onclick="buildDataset()"><i class="fas fa-gears"></i> Gerar dataset</button>
+                    <div style="margin-top:14px"><table class="ai-table"><thead><tr><th>Dataset</th><th>Treino</th><th>Validação</th><th>Arquivos</th></tr></thead><tbody id="ft-datasets"></tbody></table></div>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-header"><h3><i class="fas fa-microchip" style="color:var(--primary)"></i> 2. Treinar (máquina com GPU)</h3></div>
+                <div class="panel-body">
+                    <div class="muted">O treino LoRA roda fora do servidor de backup, numa máquina com GPU NVIDIA (8 GB+ de VRAM para modelos 3B). Copie o <code>.train.jsonl</code> e use o script que acompanha o Agente:</div>
+                    <div class="code" style="margin-top:10px">GBOC-Agent\scripts\finetune\train_lora_gboc.py
+
+pip install unsloth trl datasets
+python train_lora_gboc.py --train gboc_diag_XXXX.train.jsonl --val gboc_diag_XXXX.val.jsonl --export-gguf</div>
+                    <div class="muted" style="margin-top:8px">Detalhes em <code>scripts\finetune\README.md</code>. Recomendado: 30+ casos validados.</div>
+                </div>
+            </div>
+        </div>
+        <div class="panel">
+            <div class="panel-header"><h3><i class="fas fa-bolt" style="color:var(--primary)"></i> Treino local nesta máquina (opcional)</h3></div>
+            <div class="panel-body">
+                <div id="train-availability" class="muted" style="margin-bottom:10px">Verificando...</div>
+                <div id="train-form" style="display:none">
+                    <div class="grid2" style="gap:10px">
+                        <div class="form-group"><label>Dataset</label><select id="train-dataset"></select></div>
+                        <div class="form-group"><label>Modelo base (Hugging Face)</label><input id="train-base" placeholder="unsloth/Qwen2.5-3B-Instruct-bnb-4bit"></div>
+                        <div class="form-group"><label>Épocas</label><input type="number" id="train-epochs" value="3" min="0.5" max="20" step="0.5"></div>
+                    </div>
+                    <label class="chk"><input type="checkbox" id="train-gguf" checked> Exportar .gguf para importar no Ollama</label>
+                    <button class="btn btn-primary btn-sm" onclick="startTrain()"><i class="fas fa-play"></i> Iniciar treino</button>
+                </div>
+                <div class="progress-line" id="train-status"></div>
+                <pre class="code" id="train-log" style="display:none;max-height:220px;overflow:auto;margin-top:8px"></pre>
+            </div>
+        </div>
+        <div class="panel">
+            <div class="panel-header"><h3><i class="fas fa-file-import" style="color:var(--primary)"></i> 3. Importar no Ollama</h3></div>
+            <div class="panel-body">
+                <div class="grid2" style="gap:10px">
+                    <div class="form-group"><label>Nome do modelo no Ollama</label><input id="imp-name" placeholder="gboc-diag:v1"></div>
+                    <div class="form-group"><label>Tipo</label><select id="imp-kind" onchange="document.getElementById('imp-base-wrap').style.display=this.value==='adapter'?'block':'none'"><option value="gguf">Modelo completo (.gguf)</option><option value="adapter">Adapter LoRA (.gguf / .safetensors)</option></select></div>
+                </div>
+                <div class="form-group"><label>Caminho do arquivo no servidor do Agente</label><input id="imp-path" placeholder="D:\IA\saida_gboc\gguf\unsloth.Q4_K_M.gguf"></div>
+                <div class="form-group" id="imp-base-wrap" style="display:none"><label>Modelo base instalado no Ollama (mesma família/tamanho do treino)</label><input id="imp-base" placeholder="qwen2.5:3b"></div>
+                <label class="chk"><input type="checkbox" id="imp-default" checked> Usar este modelo no diagnóstico de falhas depois de importar</label>
+                <button class="btn btn-primary btn-sm" onclick="importModel()"><i class="fas fa-upload"></i> Importar no Ollama</button>
+                <div class="progress-line" id="imp-status"></div>
+            </div>
+        </div>
+    </section>
+</main>
+</div>
+
+<script src="/static/sidebar.js"></script>
+<script>
+const API = '/api/ai-knowledge';
+const SRC = {solucoes:'Soluções e diagnósticos', erros:'Falhas de tarefas', execucoes:'Execuções de backup', logs:'Logs do Agente', docs:'Documentação GBOC'};
+const STATE = {status:null, tokens:[], pollTimer:null, lastToken:null};
+
+const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(msg, type='info'){ if (window.showToast) window.showToast(msg, type); else alert(msg); }
+async function api(path, opts={}) {
+    const o = Object.assign({headers:{'Content-Type':'application/json'}}, opts);
+    if (o.body && typeof o.body !== 'string') o.body = JSON.stringify(o.body);
+    const r = await fetch(API + path, o);
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || d.message || `HTTP ${r.status}`);
+    return d;
+}
+function fmtDate(s){ if(!s) return '—'; const d = new Date(s); return isNaN(d) ? esc(s) : d.toLocaleString('pt-BR'); }
+function copyText(t){ navigator.clipboard?.writeText(t).then(()=>toast('Copiado!','success')).catch(()=>toast('Não foi possível copiar','error')); }
+function showTab(t){
+    document.querySelectorAll('.ai-tab').forEach(b=>b.classList.toggle('active', b.dataset.tab===t));
+    document.querySelectorAll('.ai-pane').forEach(p=>p.classList.toggle('active', p.id==='pane-'+t));
+    if (t==='cases') loadCases();
+    if (t==='mcp') loadTokens();
+    if (t==='ft') loadFinetune();
+    try { history.replaceState(null,'','#'+t); } catch(e){}
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (typeof UnifiedSidebar !== 'undefined') new UnifiedSidebar().initialize();
+    document.getElementById('search-sources').innerHTML = Object.entries(SRC).map(([k,v]) =>
+        `<label class="chk" style="margin:0"><input type="checkbox" class="src-chk" value="${k}" checked> ${esc(v)}</label>`).join('');
+    loadAll();
+    loadCaps(false);
+    const h = (location.hash||'').replace('#','');
+    if (['rag','cases','mcp','ft'].includes(h)) showTab(h);
+});
+
+async function loadAll(){
+    try {
+        const s = await api('/status');
+        STATE.status = s;
+        renderStatus(s);
+    } catch(e) { toast('Falha ao carregar a IA: '+e.message, 'error'); }
+    loadTokens(true);
+}
+
+function renderStatus(s){
+    const rag = s.rag || {}, cfg = s.config || {}, cases = s.cases || {};
+    document.getElementById('st-chunks').textContent = rag.total_chunks ?? 0;
+    document.getElementById('st-embedded').textContent = rag.total_embedded ?? 0;
+    document.getElementById('st-cases').textContent = cases.total ?? 0;
+    document.getElementById('st-verified').textContent = cases.resolved ?? 0;
+    const ix = rag.indexer || {};
+    const lastRes = ix.last_result || {};
+    document.getElementById('rag-sources').innerHTML = Object.entries(rag.sources||{}).map(([k,v]) => {
+        const r = (lastRes.sources||{})[k];
+        const note = r ? (r.error ? `<span class="pill pill-bad">${esc(r.error)}</span>` : `${r.documents ?? 0} registro(s) lido(s)`) : '—';
+        return `<tr><td><strong>${esc(v.label)}</strong></td><td>${v.chunks}</td><td>${v.embedded}</td><td class="muted">${note}</td></tr>`;
+    }).join('');
+    const embRes = lastRes.embeddings;
+    document.getElementById('idx-state').innerHTML = ix.running
+        ? `<i class="fas fa-spinner fa-spin"></i> ${esc(ix.phase||'indexando')}`
+        : (ix.last_run ? `Última indexação: ${fmtDate(ix.last_run)}${lastRes.duration_seconds!=null?` (${lastRes.duration_seconds}s)`:''}${embRes&&embRes.error?` · <span class="pill pill-bad">embeddings: ${esc(embRes.error)}</span>`:''}`
+                       : 'Ainda não indexado neste start (automático 3 min após iniciar o Agente)');
+    document.getElementById('btn-reindex').disabled = !!ix.running;
+    document.getElementById('rag-db').textContent = `Índice local: ${rag.db_path || ''} · ${((rag.db_size_bytes||0)/1048576).toFixed(1)} MB`;
+    const emb = rag.embedding || {};
+    document.getElementById('emb-status').innerHTML = emb.provider && emb.provider !== 'none'
+        ? `<span class="pill pill-ok">Busca semântica ativa</span> ${esc(emb.provider)} · ${esc(emb.model)}`
+        : `<span class="pill pill-warn">Somente palavras-chave</span> ${esc(emb.reason||'')}`;
+    document.getElementById('cfg-rag-enabled').checked = cfg.rag_enabled !== false;
+    document.getElementById('cfg-auto-diag').checked = cfg.auto_diagnose_errors !== false;
+    document.getElementById('cfg-emb-provider').value = cfg.rag_embedding_provider || 'auto';
+    document.getElementById('cfg-emb-model').value = cfg.rag_embedding_model || '';
+    document.getElementById('cfg-reindex-h').value = cfg.rag_reindex_hours || 6;
+    document.getElementById('cfg-exec-days').value = cfg.rag_execution_days || 90;
+    document.getElementById('cfg-mcp-enabled').checked = cfg.mcp_enabled !== false;
+    document.getElementById('tools-body').innerHTML = ((s.mcp||{}).tools||[]).map(t =>
+        `<tr><td><code>${esc(t.name)}</code></td><td>${t.role==='operate'?'<span class="pill pill-warn">Operação</span>':'<span class="pill pill-ok">Consulta</span>'}</td><td>${esc(t.description)}</td></tr>`).join('');
+    document.getElementById('mcp-url').textContent = `${location.protocol}//${location.host}/api/mcp`;
+    renderSnippet();
+    clearTimeout(STATE.pollTimer);
+    if (ix.running) STATE.pollTimer = setTimeout(loadAll, 3000);
+}
+
+async function reindex(){
+    try { const r = await api('/reindex', {method:'POST', body:{}}); toast(r.message, r.status==='busy'?'warning':'success'); setTimeout(loadAll, 800); }
+    catch(e){ toast(e.message,'error'); }
+}
+
+async function saveConfig(){
+    try {
+        await api('/config', {method:'POST', body:{
+            rag_enabled: document.getElementById('cfg-rag-enabled').checked,
+            auto_diagnose_errors: document.getElementById('cfg-auto-diag').checked,
+            rag_embedding_provider: document.getElementById('cfg-emb-provider').value,
+            rag_embedding_model: document.getElementById('cfg-emb-model').value.trim(),
+            rag_reindex_hours: parseFloat(document.getElementById('cfg-reindex-h').value)||6,
+            rag_execution_days: parseInt(document.getElementById('cfg-exec-days').value)||90,
+        }});
+        toast('Configuração salva. Clique em "Reindexar agora" para gerar os vetores com o novo modelo.', 'success');
+        loadAll();
+    } catch(e){ toast(e.message,'error'); }
+}
+
+async function doSearch(){
+    const q = document.getElementById('search-q').value.trim();
+    if (!q) return;
+    const sources = [...document.querySelectorAll('.src-chk:checked')].map(x=>x.value);
+    const box = document.getElementById('search-results');
+    box.innerHTML = '<div class="muted"><i class="fas fa-spinner fa-spin"></i> Buscando...</div>';
+    try {
+        const r = await api('/search', {method:'POST', body:{query:q, sources, k:8}});
+        document.getElementById('search-info').textContent = `${r.results.length} resultado(s) · modo ${r.mode==='hybrid'?'híbrido (palavras + semântica)':'palavras-chave'} · ${r.duration_ms} ms${r.vector_note? ' · '+r.vector_note:''}`;
+        box.innerHTML = r.results.length ? r.results.map(x => `<div class="result">
+            <div class="meta"><span class="pill pill-muted">${esc(x.source_label)}</span> ${x.meta&&x.meta.verified?'<span class="pill pill-ok">validada</span>':''} relevância ${x.score}${x.similarity!=null?' · similaridade '+x.similarity:''}</div>
+            <div style="font-weight:600;font-size:.88em;margin-bottom:4px">${esc(x.title)}</div><pre>${esc(x.content.slice(0,900))}</pre></div>`).join('')
+            : '<div class="muted">Nada encontrado. Se o índice está vazio, clique em "Reindexar agora".</div>';
+    } catch(e){ box.innerHTML = `<div class="muted">${esc(e.message)}</div>`; }
+}
+
+// ---------- Casos ----------
+async function loadCases(){
+    const box = document.getElementById('cases-list');
+    try {
+        const f = document.getElementById('cases-filter').value;
+        const r = await api('/cases?limit=100' + (f!==''?`&feedback=${encodeURIComponent(f)}`:''));
+        if (!r.cases.length) { box.innerHTML = '<div class="muted">Nenhum caso nesta lista. Casos são criados quando uma tarefa falha (diagnóstico automático) ou quando você usa a análise de IA em uma falha.</div>'; return; }
+        box.innerHTML = r.cases.map(c => {
+            const fb = c.feedback || '';
+            const pill = fb==='resolved' ? '<span class="pill pill-ok">Resolveu</span>' : fb==='not_resolved' ? '<span class="pill pill-bad">Não resolveu</span>' : '<span class="pill pill-warn">Aguardando validação</span>';
+            return `<div class="case ${fb}">
+                <h4>#${c.id} ${pill} ${c.task_name?`<span class="muted">tarefa ${esc(c.task_name)}</span>`:''} <span class="muted">${fmtDate(c.created_at)} · ${esc(c.provider||'')}${c.is_llm_real?'':' (sem LLM)'}</span></h4>
+                <div class="txt"><strong>Erro:</strong> ${esc((c.error_text||'').slice(0,700))}</div>
+                <div class="form-group" style="margin-top:8px"><label>Causa</label><textarea rows="2" id="cause-${c.id}">${esc(c.cause||'')}</textarea></div>
+                <div class="form-group"><label>Solução (edite se o que resolveu foi diferente)</label><textarea rows="4" id="sol-${c.id}">${esc(c.solution||'')}</textarea></div>
+                <div class="form-group"><label>Observação do operador</label><input id="note-${c.id}" value="${esc(c.operator_note||'')}" placeholder="O que foi feito na prática"></div>
+                <div class="row-actions">
+                    <button class="btn btn-sm btn-primary" onclick="feedback(${c.id},'resolved')"><i class="fas fa-check"></i> Resolveu</button>
+                    <button class="btn btn-sm btn-secondary" onclick="feedback(${c.id},'not_resolved')"><i class="fas fa-xmark"></i> Não resolveu</button>
+                    ${c.task_id?`<button class="btn btn-sm btn-secondary" onclick="checkRecovery(${c.id}, this)"><i class="fas fa-clock-rotate-left"></i> A tarefa voltou a concluir?</button>`:''}
+                    ${(c.rag_sources||[]).length?`<span class="muted">Usou ${c.rag_sources.length} referência(s) da base local</span>`:''}
+                </div></div>`;
+        }).join('');
+    } catch(e){ box.innerHTML = `<div class="muted">${esc(e.message)}</div>`; }
+}
+async function feedback(id, fb){
+    try {
+        await api(`/cases/${id}/feedback`, {method:'POST', body:{feedback:fb,
+            note: document.getElementById('note-'+id).value, solution: document.getElementById('sol-'+id).value,
+            cause: document.getElementById('cause-'+id).value}});
+        toast(fb==='resolved'?'Solução validada: passa a ser usada nos próximos diagnósticos.':'Registrado como não resolvido.', 'success');
+        loadCases(); loadAll();
+    } catch(e){ toast(e.message,'error'); }
+}
+async function checkRecovery(id, btn){
+    try { const r = await api(`/cases/${id}/recovery`);
+        btn.innerHTML = r.task_recovered===true ? '<i class="fas fa-check"></i> Sim, concluiu depois' : r.task_recovered===false ? '<i class="fas fa-xmark"></i> Ainda não concluiu' : 'Sem informação de execução';
+    } catch(e){ toast(e.message,'error'); }
+}
+
+// ---------- MCP ----------
+async function loadTokens(silent){
+    try {
+        const r = await api('/mcp/tokens');
+        STATE.tokens = r.tokens;
+        document.getElementById('st-tokens').textContent = r.tokens.filter(t=>!t.revoked).length;
+        document.getElementById('tokens-body').innerHTML = r.tokens.length ? r.tokens.map(t => `<tr>
+            <td>${esc(t.name)}</td><td>${t.role==='operate'?'<span class="pill pill-warn">Operação</span>':'<span class="pill pill-ok">Consulta</span>'}</td>
+            <td><code>${esc(t.token_hint)}</code></td><td>${fmtDate(t.created_at)}</td><td>${fmtDate(t.last_used_at)}</td><td>${t.use_count||0}</td>
+            <td>${t.revoked?'<span class="pill pill-bad">Revogado</span>':`<button class="btn btn-sm btn-secondary" onclick="revokeToken(${t.id})"><i class="fas fa-ban"></i> Revogar</button>`}</td></tr>`).join('')
+            : '<tr><td colspan="7" class="muted">Nenhum token criado.</td></tr>';
+    } catch(e){
+        document.getElementById('st-tokens').textContent = '–';
+        document.getElementById('tokens-body').innerHTML = `<tr><td colspan="7" class="muted">${esc(e.message)}</td></tr>`;
+        if (!silent) toast(e.message,'error');
+    }
+}
+async function createToken(){
+    const name = document.getElementById('tok-name').value.trim();
+    if (!name) { toast('Informe o nome do cliente.','warning'); return; }
+    try {
+        const r = await api('/mcp/tokens', {method:'POST', body:{name, role: document.getElementById('tok-role').value}});
+        document.getElementById('token-value').textContent = r.token;
+        document.getElementById('token-box').style.display = 'block';
+        STATE.lastToken = r.token;
+        renderSnippet(); loadTokens();
+    } catch(e){ toast(e.message,'error'); }
+}
+async function revokeToken(id){
+    if (!confirm('Revogar este token? O cliente MCP perde o acesso imediatamente.')) return;
+    try { await api(`/mcp/tokens/${id}`, {method:'DELETE'}); toast('Token revogado.','success'); loadTokens(); } catch(e){ toast(e.message,'error'); }
+}
+async function saveMcpEnabled(){
+    try { await api('/config', {method:'POST', body:{mcp_enabled: document.getElementById('cfg-mcp-enabled').checked}}); toast('Servidor MCP atualizado.','success'); }
+    catch(e){ toast(e.message,'error'); }
+}
+function renderSnippet(){
+    const url = `${location.protocol}//${location.host}/api/mcp`;
+    const tok = STATE.lastToken || 'gboc_mcp_SEU_TOKEN';
+    const kind = document.getElementById('client-kind').value;
+    let txt = '', note = '';
+    if (kind==='claude-code') {
+        txt = `claude mcp add --transport http gboc ${url} --header "Authorization: Bearer ${tok}"`;
+        note = 'Com o HTTPS autoassinado do Agente, deixe o certificado (data\\gboc_tls_cert.pem) confiável na máquina do cliente ou use NODE_EXTRA_CA_CERTS.';
+    } else if (kind==='json') {
+        txt = JSON.stringify({mcpServers:{gboc:{type:'http', url, headers:{Authorization:`Bearer ${tok}`}}}}, null, 2);
+        note = 'Antigravity: mcp_config.json · Cursor: .cursor/mcp.json · VS Code: .vscode/mcp.json (use a chave "servers").';
+    } else if (kind==='desktop') {
+        txt = JSON.stringify({mcpServers:{gboc:{command:'python', args:['C:/GBOC/GBOC-Agent/scripts/mcp/gboc_mcp_stdio_bridge.py'],
+              env:{GBOC_MCP_URL:url, GBOC_MCP_TOKEN:tok, GBOC_MCP_CA:'C:/GBOC/GBOC-Agent/data/gboc_tls_cert.pem'}}}}, null, 2);
+        note = 'Ajuste os caminhos para onde o Agente está instalado. A ponte usa só a biblioteca padrão do Python.';
+    } else if (kind==='n8n') {
+        txt = `Nó "MCP Client Tool"\n  Endpoint: ${url}\n  Server Transport: HTTP Streamable\n  Authentication: Bearer Auth\n  Token: ${tok}`;
+        note = 'Use um token de Operação se o fluxo do n8n for disparar backups.';
+    } else {
+        txt = `curl -k -X POST ${url} -H "Authorization: Bearer ${tok}" -H "Content-Type: application/json" -d "{\\"jsonrpc\\":\\"2.0\\",\\"id\\":1,\\"method\\":\\"tools/list\\"}"`;
+    }
+    document.getElementById('client-snippet').textContent = txt;
+    document.getElementById('snippet-note').textContent = note;
+}
+
+// ---------- Capacidades ----------
+const CAP_TOGGLES = {rag:'rag_enabled', auto_diagnose:'auto_diagnose_errors', mcp:'mcp_enabled', finetune:'finetune_local_enabled'};
+const CAP_STATE = {
+    active: ['pill-ok','Ativo'], partial: ['pill-warn','Parcial'], unavailable: ['pill-bad','Indisponível'], disabled: ['pill-muted','Desligado']
+};
+async function loadCaps(refresh){
+    const btn = document.getElementById('btn-caps');
+    if (btn) btn.disabled = true;
+    try {
+        const r = await api('/capabilities' + (refresh ? '?refresh=true' : ''));
+        renderCaps(r);
+    } catch(e){ document.getElementById('caps-body').innerHTML = `<tr><td colspan="5" class="muted">${esc(e.message)}</td></tr>`; }
+    finally { if (btn) btn.disabled = false; }
+}
+function renderCaps(r){
+    STATE.caps = r;
+    const h = r.host || {}, g = ((r.training||{}).gpu||{}).gpus || [];
+    document.getElementById('caps-host').textContent =
+        `${h.os||''} · ${h.cpu_cores||'?'} núcleos · ${h.ram_gb??'?'} GB RAM · ${h.disk_free_gb??'?'} GB livres · ` +
+        (g.length ? g.map(x=>`${x.name} ${x.vram_gb} GB`).join(', ') : 'sem GPU NVIDIA');
+    document.getElementById('caps-body').innerHTML = (r.features||[]).map(f => {
+        const key = CAP_TOGGLES[f.key];
+        const fineLocal = f.key === 'finetune';
+        const checked = fineLocal ? !!(STATE.status?.config?.finetune_local_enabled) : f.requested;
+        const toggle = key ? `<input type="checkbox" ${checked?'checked':''} onchange="toggleCap('${key}', this.checked)" title="${fineLocal?'Treino local na GPU':'Ativar/desativar'}">` : '<span class="muted">sempre</span>';
+        const [cls, lbl] = CAP_STATE[f.state] || ['pill-muted', f.state];
+        const imp = f.impossible ? ' <span class="pill pill-bad">Impossível neste servidor</span>' : '';
+        return `<tr><td>${toggle}</td><td><strong>${esc(f.label)}</strong>${fineLocal?'<div class="muted">chave = treino local na GPU</div>':''}</td>
+            <td><span class="pill ${cls}">${lbl}</span>${imp}<div class="muted" style="margin-top:4px">${esc(f.message)}</div></td>
+            <td>${(f.works||[]).map(w=>`<span class="pill pill-ok" style="margin:1px">${esc(w)}</span>`).join(' ')||'—'}</td>
+            <td>${(f.missing||[]).map(m=>`<div class="muted">• ${esc(m)}</div>`).join('')||'—'}</td></tr>`;
+    }).join('');
+    renderTrainAvailability();
+}
+async function toggleCap(key, on){
+    try {
+        const r = await api('/config', {method:'POST', body:{[key]: on}});
+        if (STATE.status && STATE.status.config) STATE.status.config[key] = on;
+        if (r.capabilities) renderCaps(r.capabilities);
+        const f = (r.capabilities?.features||[]).find(x => CAP_TOGGLES[x.key] === key);
+        if (on && f && (f.state === 'partial' || f.state === 'unavailable'))
+            toast(`${f.label}: ${f.message}`, f.impossible || f.state === 'unavailable' ? 'error' : 'warning');
+        else toast(on ? 'Recurso ativado.' : 'Recurso desativado.', 'success');
+        loadAll();
+    } catch(e){ toast(e.message,'error'); loadCaps(false); }
+}
+function renderTrainAvailability(){
+    const el = document.getElementById('train-availability'); if (!el || !STATE.caps) return;
+    const ft = (STATE.caps.features||[]).find(f=>f.key==='finetune') || {};
+    const enabled = !!(STATE.status?.config?.finetune_local_enabled);
+    const form = document.getElementById('train-form');
+    if (!enabled) { el.innerHTML = 'Treino local desligado. Ative em <strong>Capacidades do ambiente</strong> (o Agente verifica se este servidor tem GPU NVIDIA, CUDA e os pacotes de treino).'; form.style.display='none'; return; }
+    if (STATE.caps.local_training_available) { el.innerHTML = '<span class="pill pill-ok">Disponível</span> GPU NVIDIA e pacotes de treino encontrados.'; form.style.display='block'; return; }
+    form.style.display = 'none';
+    el.innerHTML = (ft.impossible ? '<span class="pill pill-bad">Impossível neste servidor</span> ' : '<span class="pill pill-warn">Faltam componentes</span> ') +
+        esc(ft.message) + (ft.missing?.length ? '<div style="margin-top:6px">' + ft.missing.map(m=>`• ${esc(m)}`).join('<br>') + '</div>' : '');
+}
+async function startTrain(){
+    const ds = document.getElementById('train-dataset').value;
+    if (!ds) { toast('Gere um dataset antes de treinar.','warning'); return; }
+    try {
+        await api('/finetune/train', {method:'POST', body:{dataset: ds, base_model: document.getElementById('train-base').value.trim() || null,
+            epochs: parseFloat(document.getElementById('train-epochs').value)||3, export_gguf: document.getElementById('train-gguf').checked}});
+        toast('Treino iniciado.','success'); setTimeout(pollImport, 1500);
+    } catch(e){ toast(e.message,'error'); }
+}
+function renderTrain(st){
+    const el = document.getElementById('train-status'), log = document.getElementById('train-log');
+    if (!el) return false;
+    if (st.log_tail && st.log_tail.length) { log.style.display='block'; log.textContent = st.log_tail.join('\n'); log.scrollTop = log.scrollHeight; }
+    if (st.running) { el.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${esc(st.phase)} — ${esc(st.run_dir||'')}`; return true; }
+    if (st.last_error) el.innerHTML = `<span class="pill pill-bad">Falhou</span> ${esc(st.last_error)}`;
+    else if (st.last_result) {
+        const g = (st.last_result.gguf||[])[0];
+        el.innerHTML = `<span class="pill pill-ok">Treino concluído</span> ${esc(st.last_result.run_dir)}` + (g ? ` · GGUF: ${esc(g)}` : '');
+        if (g && !document.getElementById('imp-path').value) document.getElementById('imp-path').value = g;
+    } else el.textContent = '';
+    return false;
+}
+
+// ---------- Fine-tuning ----------
+async function loadFinetune(){
+    try {
+        const r = await api('/finetune/summary');
+        const c = r.cases || {};
+        const ok = r.eligible_verified >= r.min_recommended;
+        document.getElementById('ft-summary').innerHTML =
+            `Casos: ${c.total||0} · validados: <strong>${r.eligible_verified}</strong> · validados + recuperados: ${r.eligible_verified_recovered}<br>` +
+            (ok ? `<span class="pill pill-ok">Quantidade suficiente para treinar</span>` : `<span class="pill pill-warn">Recomendado ${r.min_recommended}+ casos validados (faltam ${r.min_recommended - r.eligible_verified})</span>`);
+        document.getElementById('ft-datasets').innerHTML = (r.datasets||[]).length ? r.datasets.map(d => `<tr>
+            <td>${esc(d.name)}<div class="muted">${fmtDate(d.created_at)} · ${d.mode==='verified'?'validados':'validados + recuperados'}</div></td>
+            <td>${d.train_examples}</td><td>${d.val_examples}</td>
+            <td>${(d.files||[]).map(f=>`<a href="javascript:void(0)" data-file="${esc(f)}" onclick="downloadDataset(this.dataset.file)"><i class="fas fa-download"></i> ${esc(f.split('.').slice(-2).join('.'))}</a>`).join('<br>')}</td></tr>`).join('')
+            : '<tr><td colspan="4" class="muted">Nenhum dataset gerado.</td></tr>';
+        renderImport(r.import || {});
+    } catch(e){ document.getElementById('ft-summary').textContent = e.message; }
+}
+async function buildDataset(){
+    try { const r = await api('/finetune/dataset', {method:'POST', body:{mode: document.getElementById('ft-mode').value}});
+        const d = r.dataset; toast(`Dataset gerado: ${d.train_examples} exemplo(s) de treino${d.val_examples?`, ${d.val_examples} de validação`:''}.`, d.below_recommended?'warning':'success');
+        loadFinetune();
+    } catch(e){ toast(e.message,'error'); }
+}
+async function downloadDataset(name){
+    try {
+        const r = await fetch(`${API}/finetune/datasets/${encodeURIComponent(name)}`);
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const blob = await r.blob(); const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+    } catch(e){ toast('Falha no download: '+e.message,'error'); }
+}
+async function importModel(){
+    const body = {model_name: document.getElementById('imp-name').value.trim(), file_path: document.getElementById('imp-path').value.trim(),
+        kind: document.getElementById('imp-kind').value, base_model: document.getElementById('imp-base').value.trim() || null,
+        set_default: document.getElementById('imp-default').checked};
+    if (!body.model_name || !body.file_path) { toast('Informe o nome do modelo e o caminho do arquivo.','warning'); return; }
+    try { const r = await api('/finetune/import', {method:'POST', body}); toast(r.message, r.status==='busy'?'warning':'success'); setTimeout(pollImport, 1000); }
+    catch(e){ toast(e.message,'error'); }
+}
+function renderImport(st){
+    const el = document.getElementById('imp-status');
+    if (st.running) { el.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${esc(st.phase)}`; return true; }
+    if (st.last_error) el.innerHTML = `<span class="pill pill-bad">Falhou</span> ${esc(st.last_error)}`;
+    else if (st.last_result) el.innerHTML = `<span class="pill pill-ok">Importado</span> ${esc(st.last_result.model)} em ${esc(st.last_result.host)}${st.last_result.set_default?' · em uso no diagnóstico':''}`;
+    else el.textContent = '';
+    return false;
+}
+async function pollImport(){
+    try { const r = await api('/finetune/summary'); if (renderImport(r.import||{})) setTimeout(pollImport, 2000); else loadFinetune(); } catch(e){}
+}
+</script>
+</body>
+</html>

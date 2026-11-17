@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-🔍 GBOC Agent 14.8.3 - API DIAGNOSTICS
+🔍 GBOC Agent 15.0.0 - API DIAGNOSTICS
 Responsável por: Rotas para sistema de diagnóstico
 """
 
@@ -355,7 +355,11 @@ async def router_ai_analyze(request: Request):
     err_msg = body.get("error_message") or body.get("prompt") or "Verificação preventiva de integridade e diagnósticos de rotina."
     from engines.ai_diagnostic_engine import ai_diagnostic_engine
     try:
-        return await ai_diagnostic_engine.analyze_error(str(err_msg))
+        return await ai_diagnostic_engine.analyze_error(
+            str(err_msg),
+            record_case=bool(body.get("error_message")) and body.get("record_case", True) is not False,
+            case_meta={k: body.get(k) for k in ("task_id", "task_name", "execution_id", "engine") if body.get(k) is not None},
+        )
     except Exception as e:
         logger.exception(f"Falha na análise de IA: {e}")
         raise HTTPException(status_code=500, detail="Falha interna ao executar a análise de IA.")

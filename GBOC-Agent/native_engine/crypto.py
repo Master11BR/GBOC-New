@@ -129,10 +129,12 @@ def _read_key_doc(backend) -> Optional[Dict[str, Any]]:
 
 
 def has_data(names: Iterable[str]) -> bool:
-    """Repositório já usado (o que não pode passar a ser criptografado retroativamente)."""
+    """Repositório já usado pelo GBOC Native (o que não pode passar a ser criptografado retroativamente).
+    Ignora arquivos legados do Duplicati (duplicati-*) para que um bucket assumido do Duplicati ative AES-256-GCM."""
     for n in names:
-        n = str(n).replace("\\", "/")
-        if n == KEY_FILE or n.startswith("gboc-dr/"):
+        n = str(n).replace("\\", "/").strip("/")
+        base = n.rsplit("/", 1)[-1].lower()
+        if not n or n == KEY_FILE or n.startswith("gboc-dr/") or base.startswith("duplicati-"):
             continue
         return True
     return False

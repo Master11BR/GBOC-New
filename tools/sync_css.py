@@ -52,6 +52,7 @@ JS_FILES = [
 CSS_DIRS = [
     os.path.join("ui", "design-system"),
     os.path.join("ui", "models", "modern"),
+    os.path.join("ui", "react"),
 ]
 
 
@@ -165,6 +166,17 @@ def main():
 
     div_ag, miss_ag, cp_ag = sync_one("Agent", AGENT_STATIC, verify_only)
     div_sv, miss_sv, cp_sv = sync_one("Server", SERVER_STATIC, verify_only)
+
+    # Mantem espelhos na raiz do GBOC-Server sincronizados quando presentes
+    server_root = os.path.join(REPO_ROOT, "GBOC-Server")
+    if not verify_only and os.path.isdir(server_root):
+        for fname in CSS_FILES + JS_FILES:
+            src_f = os.path.join(SHARED, fname)
+            dst_f = os.path.join(server_root, fname)
+            if os.path.isfile(src_f) and os.path.isfile(dst_f):
+                if not filecmp.cmp(src_f, dst_f, shallow=False):
+                    shutil.copy2(src_f, dst_f)
+
     print()
     print("=== Resumo ===")
     print(f"  Agent:  divergentes={div_ag}, faltantes={miss_ag}, copiados/atualizados={cp_ag}")

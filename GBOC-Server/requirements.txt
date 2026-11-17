@@ -1,4 +1,4 @@
-# GBOC Server v14.8.3 - Dependências
+# GBOC Server v15.0.0 - Dependências
 fastapi>=0.135.0
 uvicorn[standard]>=0.41.0
 httptools>=0.9.0

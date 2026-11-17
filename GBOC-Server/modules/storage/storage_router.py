@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC Server v14.8.3 — Storage Usage & Growth Monitor APIRouter
+GBOC Server v15.0.0 — Storage Usage & Growth Monitor APIRouter
 Módulo estrito para gerenciamento de armazenamento centralizado.
 """
 

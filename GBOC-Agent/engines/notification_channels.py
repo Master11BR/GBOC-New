@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 14.8.3 - Notification Channels Engine
+GBOC 15.0.0 - Notification Channels Engine
 Multi-channel notification delivery: Slack, Teams, Discord, Telegram, custom webhooks.
 Each channel has its own payload format and delivery logic.
 """

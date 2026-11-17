@@ -976,9 +976,41 @@ exit 4
             "discovered": discovered,
         }
 
+    _DETAILED_EXTRACT_CACHE: Dict[str, Any] = {"sig": None, "ts": 0.0, "items": None}
+    _SQLITE_READ_CACHE: Dict[str, Any] = {"sig": None, "ts": 0.0, "items": None}
+
+    def _duplicati_db_signature(self) -> tuple:
+        """Retorna assinatura (path, mtime_ns, size) dos bancos SQLite do Duplicati para invalidação instantânea de cache."""
+        db_paths = [
+            os.path.expandvars(r"%LOCALAPPDATA%\Duplicati\Duplicati-server.sqlite"),
+            os.path.expandvars(r"%APPDATA%\Duplicati\Duplicati-server.sqlite"),
+            r"C:\ProgramData\Duplicati\Duplicati-server.sqlite",
+            "/var/lib/duplicati/Duplicati-server.sqlite",
+            os.path.expanduser("~/.config/Duplicati/Duplicati-server.sqlite"),
+        ]
+        db_paths += _other_profile_duplicati_dbs(db_paths)
+        sig = []
+        for p in db_paths:
+            try:
+                if os.path.isfile(p):
+                    st = os.stat(p)
+                    sig.append((p, st.st_mtime_ns, st.st_size))
+            except Exception:
+                pass
+        return tuple(sig)
+
     def _read_duplicati_server_db(self) -> List[Dict[str, Any]]:
         """Lê os backups e todas as métricas detalhadas do arquivo SQLite local do Duplicati."""
         import sqlite3
+        import time as _time
+        sig = self._duplicati_db_signature()
+        now = _time.monotonic()
+        if (
+            self._SQLITE_READ_CACHE["items"] is not None
+            and self._SQLITE_READ_CACHE["sig"] == sig
+            and (now - self._SQLITE_READ_CACHE["ts"]) < 60.0
+        ):
+            return list(self._SQLITE_READ_CACHE["items"])
         db_paths = [
             os.path.expandvars(r"%LOCALAPPDATA%\Duplicati\Duplicati-server.sqlite"),
             os.path.expandvars(r"%APPDATA%\Duplicati\Duplicati-server.sqlite"),
@@ -1106,22 +1138,35 @@ exit 4
                         })
                     conn.close()
                     if backups:
-                        logger.info(f"✅ {len(backups)} backup(s) enriquecido(s) do SQLite do Duplicati ({path})")
+                        self._SQLITE_READ_CACHE = {"sig": sig, "ts": now, "items": list(backups)}
+                        logger.debug(f"✅ {len(backups)} backup(s) enriquecido(s) do SQLite do Duplicati ({path})")
                         return backups
                 except Exception as e:
                     logger.warning(f"Erro ao ler banco do Duplicati em {path}: {e}")
 
         return []
 
-    def extract_all_duplicati_backups_detailed(self) -> List[Dict[str, Any]]:
+    def extract_all_duplicati_backups_detailed(self, force: bool = False) -> List[Dict[str, Any]]:
         """
         Extrai todos os backups do Duplicati com decifragem nativa de credenciais via ServerUtil.exe
         ou com fallback avançado via SQLite (com Sources e Options) e HTTP API.
+        Usa cache em memória invalidado por mtime/size do SQLite para evitar spawnar ServerUtil.exe repetidamente.
         """
         import subprocess
         import tempfile
         import shutil
+        import time as _time
         from pathlib import Path
+
+        sig = self._duplicati_db_signature()
+        now = _time.monotonic()
+        if (
+            not force
+            and self._DETAILED_EXTRACT_CACHE["items"] is not None
+            and self._DETAILED_EXTRACT_CACHE["sig"] == sig
+            and (now - self._DETAILED_EXTRACT_CACHE["ts"]) < 120.0
+        ):
+            return list(self._DETAILED_EXTRACT_CACHE["items"])
 
         serverutil_path = self.find_serverutil()
 
@@ -1197,11 +1242,14 @@ exit 4
                 shutil.rmtree(tmp_dir, ignore_errors=True)
 
         if backups:
+            self._DETAILED_EXTRACT_CACHE = {"sig": sig, "ts": now, "items": list(backups)}
             logger.info(f"✅ {len(backups)} backup(s) Duplicati extraído(s) e decifrado(s) com sucesso via ServerUtil.")
             return backups
 
         # Fallback via SQLite
         sqlite_items = self._read_duplicati_server_db()
+        if sqlite_items:
+            self._DETAILED_EXTRACT_CACHE = {"sig": sig, "ts": now, "items": list(sqlite_items)}
         return sqlite_items
 
     def _normalize_backup_item(self, raw_item: Dict[str, Any]) -> Dict[str, Any]:
@@ -1903,13 +1951,16 @@ exit 4
             "id": new_id
         }
 
-    def sync_to_gboc(self, core: Any = None, force: bool = False) -> Dict[str, Any]:
+    def sync_to_gboc(self, core: Any = None, force: bool = False, takeover_native: bool = False) -> Dict[str, Any]:
         """
         Sincroniza os backups e execuções reais do Duplicati Native com o banco de dados do GBOC.
         Garante que cada backup tenha seu repositório criado em 'repositories' e vinculado via 'repository_id' em 'tasks'.
+        Quando takeover_native=True (ou se o repositório já foi migrado para 'gboc_native'),
+        as novas cópias passam a rodar pelo motor GBOC Native enquanto o histórico passado do Duplicati
+        continua disponível para restauração a partir da nuvem.
         """
         import time as _py_time
-        if not force and hasattr(self, '_last_sync_ts'):
+        if not force and not takeover_native and hasattr(self, '_last_sync_ts'):
             if _py_time.time() - self._last_sync_ts < 15.0:
                 return getattr(self, '_last_sync_result', {"status": "success", "cached": True})
 
@@ -1973,7 +2024,12 @@ exit 4
                         creds_info = parse_duplicati_target_and_creds(raw_target, passphrase, settings)
                         repo_type = creds_info["repo_type"]
                         clean_path = creds_info["clean_path"]
-                        config_json = json.dumps(creds_info["config"])
+                        cfg_dict = dict(creds_info["config"] or {})
+                        cfg_dict["legacy_duplicati"] = True
+                        cfg_dict["duplicati_id"] = b_id
+                        cfg_dict["target_url"] = raw_target
+                        cfg_dict["db_path"] = str(item.get("db_path") or b_obj.get("DBPath") or "")
+                        config_json = json.dumps(cfg_dict)
                         pwd = creds_info["password"] or None
                         m_pwd = creds_info["motor_password"] or None
                         enc_pwd = creds_info["encryption_password"] or None
@@ -1984,18 +2040,21 @@ exit 4
 
                         # Criar ou atualizar repositório com credenciais e configs 100% completas
                         cur.execute("""
-                            SELECT id FROM repositories 
+                            SELECT id, engine FROM repositories 
                             WHERE name = %s OR path = %s OR path = %s OR id = (
                                 SELECT repository_id FROM tasks WHERE name IN (%s, %s, %s) LIMIT 1
                             )
                         """, (repo_name, clean_path, raw_target, f"Nativo_Duplicati_{b_name}", b_name, f"Duplicati_{b_name}"))
                         r_row = cur.fetchone()
 
+                        existing_engine = str(r_row[1] or "").lower() if (r_row and len(r_row) > 1) else ""
+                        target_engine = "gboc_native" if (takeover_native or existing_engine in ("gboc_native", "native")) else "duplicati"
+
                         if r_row:
                             repo_id = r_row[0]
                             cur.execute("""
                                 UPDATE repositories 
-                                SET name = %s, type = %s, path = %s, engine = 'duplicati',
+                                SET name = %s, type = %s, path = %s, engine = %s,
                                     status = 'active', enabled = true, initialized = true,
                                     password = COALESCE(%s, password),
                                     motor_password = COALESCE(%s, motor_password),
@@ -2003,13 +2062,13 @@ exit 4
                                     cloud_password = COALESCE(%s, cloud_password),
                                     config = %s, updated_at = %s
                                 WHERE id = %s
-                            """, (repo_name, repo_type, clean_path, pwd, m_pwd, enc_pwd, c_pwd, config_json, now_str, repo_id))
+                            """, (repo_name, repo_type, clean_path, target_engine, pwd, m_pwd, enc_pwd, c_pwd, config_json, now_str, repo_id))
                         else:
                             cur.execute("""
                                 INSERT INTO repositories (name, type, path, engine, status, enabled, initialized, password, motor_password, encryption_password, cloud_password, config, created_at, updated_at)
-                                VALUES (%s, %s, %s, 'duplicati', 'active', true, true, %s, %s, %s, %s, %s, %s, %s)
+                                VALUES (%s, %s, %s, %s, 'active', true, true, %s, %s, %s, %s, %s, %s, %s)
                                 RETURNING id
-                            """, (repo_name, repo_type, clean_path, pwd, m_pwd, enc_pwd, c_pwd, config_json, now_str, now_str))
+                            """, (repo_name, repo_type, clean_path, target_engine, pwd, m_pwd, enc_pwd, c_pwd, config_json, now_str, now_str))
                             repo_id = cur.fetchone()[0]
 
                         clean_sources = normalize_sources_list(sources)
@@ -2036,7 +2095,7 @@ exit 4
                             cur.execute("""
                                 UPDATE tasks 
                                 SET repository_id = %s,
-                                    engine = 'duplicati', 
+                                    engine = %s, 
                                     source_paths = %s, 
                                     status = 'idle', 
                                     enabled = true, 
@@ -2047,16 +2106,16 @@ exit 4
                                     last_status = 'completed',
                                     updated_at = %s
                                 WHERE id = %s
-                            """, (repo_id, sources_json, cron, _ret['days'], _ret['weekly'], _ret['monthly'], _ret['yearly'],
+                            """, (repo_id, target_engine, sources_json, cron, _ret['days'], _ret['weekly'], _ret['monthly'], _ret['yearly'],
                                   last_run_dt or now_str, now_str, task_id))
                         else:
                             task_name = f"Nativo_Duplicati_{b_name}"
                             cur.execute("""
                                 INSERT INTO tasks (name, repository_id, engine, source_paths, status, enabled, schedule_enabled, schedule_cron,
                                                    retention_days, retention_weekly, retention_monthly, retention_yearly, last_run, last_status, created_at, updated_at)
-                                VALUES (%s, %s, 'duplicati', %s, 'idle', true, true, %s, %s, %s, %s, %s, %s, 'completed', %s, %s)
+                                VALUES (%s, %s, %s, %s, 'idle', true, true, %s, %s, %s, %s, %s, %s, 'completed', %s, %s)
                                 RETURNING id
-                            """, (task_name, repo_id, sources_json, cron, _ret['days'], _ret['weekly'], _ret['monthly'], _ret['yearly'],
+                            """, (task_name, repo_id, target_engine, sources_json, cron, _ret['days'], _ret['weekly'], _ret['monthly'], _ret['yearly'],
                                   last_run_dt or now_str, now_str, now_str))
                             task_id = cur.fetchone()[0]
 
@@ -2136,6 +2195,67 @@ exit 4
         except Exception as e:
             logger.error(f"Erro ao sincronizar Duplicati com PostgreSQL: {e}")
             return {"status": "error", "message": str(e)}
+
+    def takeover_to_gboc_native(self, backup_id: Optional[str] = None, core: Any = None) -> Dict[str, Any]:
+        """
+        Assume o(s) backup(s) importado(s) do Duplicati para o motor GBOC Native v4:
+        1. Sincroniza todas as credenciais de nuvem, senhas e histórico de snapshots do Duplicati.
+        2. Converte o motor do repositório ('repositories.engine') e da tarefa ('tasks.engine') para 'gboc_native'
+           mantendo 'legacy_duplicati=true' em config para restauração transparente do histórico passado.
+        """
+        sync_res = self.sync_to_gboc(core=core, force=True, takeover_native=(backup_id is None))
+        if core is None:
+            from shared_core import get_shared_core
+            core = get_shared_core()
+
+        migrated_repos = 0
+        migrated_tasks = 0
+        now_str = datetime.now().isoformat()
+        with core.get_db_connection() as conn:
+            cur = conn.cursor()
+            if backup_id:
+                cur.execute("""
+                    SELECT id, config FROM repositories
+                    WHERE config LIKE %s OR name LIKE %s
+                """, (f'%"duplicati_id": "{backup_id}"%', f'%{backup_id}%'))
+            else:
+                cur.execute("""
+                    SELECT id, config FROM repositories
+                    WHERE engine = 'duplicati' OR config LIKE '%"legacy_duplicati": true%'
+                """)
+            rows = cur.fetchall()
+            for r_id, r_cfg in rows:
+                try:
+                    cdict = json.loads(r_cfg) if isinstance(r_cfg, str) and r_cfg else (r_cfg if isinstance(r_cfg, dict) else {})
+                except Exception:
+                    cdict = {}
+                cdict["legacy_duplicati"] = True
+                if backup_id and not cdict.get("duplicati_id"):
+                    cdict["duplicati_id"] = str(backup_id)
+                cur.execute("""
+                    UPDATE repositories
+                    SET engine = 'gboc_native', config = %s, updated_at = %s
+                    WHERE id = %s
+                """, (json.dumps(cdict), now_str, r_id))
+                migrated_repos += 1
+                cur.execute("""
+                    UPDATE tasks
+                    SET engine = 'gboc_native', updated_at = %s
+                    WHERE repository_id = %s
+                """, (now_str, r_id))
+                migrated_tasks += cur.rowcount
+            conn.commit()
+
+        return {
+            "status": "success",
+            "migrated_repositories": migrated_repos,
+            "migrated_tasks": migrated_tasks,
+            "sync": sync_res,
+            "message": (
+                f"Assunção concluída: {migrated_tasks} tarefa(s) e {migrated_repos} repositório(s) agora realizam "
+                "novas cópias pelo GBOC Native v4 (objetos individuais AES-256-GCM) mantendo o histórico do Duplicati para restore."
+            ),
+        }
 
 
 _service: Optional[DuplicatiNativeService] = None

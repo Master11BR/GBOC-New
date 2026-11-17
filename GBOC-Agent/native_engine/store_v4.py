@@ -48,7 +48,7 @@ INDEX_DIR = "index"
 PACK_TARGET_SIZE = 8 * 1024 * 1024       # pacote fechado e enviado ao atingir ~8 MiB
 PACK_BLOB_MAX = 512 * 1024               # blocos (já compactados) até 512 KiB vão para pacote; maiores, objeto próprio
 PACK_MAGIC = b"GBP1"                     # rodapé do pacote: <índice compactado><tamanho u32 LE><GBP1>
-PACK_CACHE_SLOTS = 6                     # pacotes mantidos em memória na leitura (restauração/verificação)
+PACK_CACHE_SLOTS = 16                    # pacotes mantidos em memória na leitura (restauração/verificação rápida)
 
 try:
     import zstandard as _zstd          # opcional (requirements.txt); sem ele usa zlib
@@ -387,6 +387,17 @@ class ObjectStore:
     def pool(self) -> ThreadPoolExecutor:
         return ThreadPoolExecutor(max_workers=self.workers, thread_name_prefix="gboc-native",
                                   initializer=_low_priority_thread)
+
+    def sort_key_for_restore(self, entry: Dict[str, Any]) -> Tuple[str, int, str]:
+        """Ordena entradas de restauração por pacote (pack_id, offset) para maximizar cache hit."""
+        self.known()
+        chunks = entry.get("chunks") or []
+        if chunks:
+            loc = self._located.get(chunks[0])
+            if loc:
+                return (loc[0], int(loc[1]), entry.get("path", ""))
+            return ("~obj", 0, chunks[0])
+        return ("", 0, entry.get("path", ""))
 
 
 def _low_priority_thread() -> None:

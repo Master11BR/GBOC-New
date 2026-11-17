@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v14.8.3 Full Stable Enterprise Edition
+# GBOC System v15.0.0 Full Stable Enterprise Edition
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # Propriedade Intelectual & Direitos Autorais Registrados.
 # A cópia, distribuição ou modificação não autorizada é estritamente proibida.
@@ -22,9 +22,9 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 VERSION_FILE = os.path.join(BASE_DIR, "data", "version_info.json")
 
 # Configuração Base SemVer
-MAJOR = 14
-MINOR = 8
-PATCH = 3
+MAJOR = 15
+MINOR = 0
+PATCH = 0
 PRERELEASE = "stable"
 
 _GIT_INFO_CACHE: Optional[Dict[str, Any]] = None
@@ -200,7 +200,14 @@ def get_version_info() -> Dict[str, Any]:
         "compatibility": {
             "min_server_version": "14.6.0",
             "recommended_server_version": raw_version,
-            "protocol_version": "2.1"
+            "protocol_version": "2.1",
+            "supports_in_place_upgrade_from": ["14.6.x", "14.7.x", "14.8.x"]
+        },
+        "architecture": {
+            "core_version": "15.0.0",
+            "go_core_engine": "gboc-go-core/15.0.0",
+            "react_ui_layer": "gboc-react/19.0.0",
+            "css_architecture": "universal-shared-stack"
         }
     }
     _VERSION_INFO_CACHE = res

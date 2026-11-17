@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v14.8.3 Enterprise Edition
+# GBOC System v15.0.0 Enterprise Edition
 # Module: Granular Item-Level Recovery Engine (SQL Server, PostgreSQL & SQLite)
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================

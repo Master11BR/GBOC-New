@@ -1,6 +1,6 @@
 /*
 ==============================================================================
-GBOC System v14.8.3 Enterprise Edition
+GBOC System v15.0.0 Enterprise Edition
 Layout & Navigation Manager — Controls Dual Layout Engine (Vertical/Horizontal)
 and Color Themes across all resolutions (1024px, 720p HD, 1080p FHD, 4K UHD).
 Zero-Overflow & Smart Sidebar Presence Detection.
@@ -11,15 +11,16 @@ Zero-Overflow & Smart Sidebar Presence Detection.
     'use strict';
 
     // Auto-inject Enterprise Modal & Dialog Framework se ainda não estiver presente na página
-    if (!window.GBOCModal && !document.getElementById('gboc-modal-script')) {
+    if (!window.GBOCModal && !document.getElementById('gboc-modal-script') && !document.querySelector('script[src*="gboc-modal.js"]')) {
         const m = document.createElement('script');
         m.id = 'gboc-modal-script';
-        m.src = '/static/gboc-modal.js?v=14.8.3';
+        m.src = '/static/gboc-modal.js?v=15.0.0';
+        m.defer = true;
         if (document.head) {
             document.head.appendChild(m);
         } else {
             document.addEventListener('DOMContentLoaded', function () {
-                if (document.head && !document.getElementById('gboc-modal-script')) {
+                if (document.head && !document.getElementById('gboc-modal-script') && !document.querySelector('script[src*="gboc-modal.js"]')) {
                     document.head.appendChild(m);
                 }
             });
@@ -130,7 +131,7 @@ Zero-Overflow & Smart Sidebar Presence Detection.
         if (window.GBOCAntigravity || document.getElementById('gboc-fernly-js')) return;
         const sc = document.createElement('script');
         sc.id = 'gboc-fernly-js';
-        sc.src = '/static/gboc-fernly.js?v=14.8.3';
+        sc.src = '/static/gboc-fernly.js?v=15.0.0';
         sc.defer = true;
         (document.head || document.documentElement).appendChild(sc);
     }
@@ -384,11 +385,13 @@ Zero-Overflow & Smart Sidebar Presence Detection.
 
     async function _updateDynamicVersion() {
         try {
+            // Se GBOCStatus já estiver ativo no Agente, evita uma segunda chamada de versão duplicada
+            const badge = document.getElementById('serverVersionBadge');
+            if (!badge) return;
             const r = await fetch('/api/v2/system/version');
             if (r.ok) {
                 const res = await r.json();
                 const data = res.data || res;
-                const badge = document.getElementById('serverVersionBadge');
                 if (badge && (data.raw_version || data.semver)) {
                     badge.textContent = `v${data.raw_version}`;
                     badge.title = data.semver || `GBOC System v${data.raw_version}`;
@@ -490,27 +493,29 @@ Zero-Overflow & Smart Sidebar Presence Detection.
     // ── Inject AI Assistant script if missing ────────────────────────────────
     function _ensureAiAssistantLoaded() {
         if (_isAuthPage()) return;
-        if (!window.GBOC_AI_Assistant && !document.getElementById('gboc-ai-script')) {
+        if (!window.GBOC_AI_Assistant && !document.getElementById('gboc-ai-script') && !document.querySelector('script[src*="ai_assistant.js"]')) {
             const script = document.createElement('script');
             script.id = 'gboc-ai-script';
-            script.src = '/static/ai_assistant.js';
+            script.src = '/static/ai_assistant.js?v=15.0.0';
+            script.defer = true;
             document.head.appendChild(script);
         }
     }
 
     function _ensureHardwareHudLoaded() {
         if (_isAuthPage()) return;
-        if (!window.toggleHardwareHUD && !document.getElementById('gboc-hw-script')) {
+        if (!window.toggleHardwareHUD && !document.getElementById('gboc-hw-script') && !document.querySelector('script[src*="gboc-hardware-hud.js"]')) {
             const script = document.createElement('script');
             script.id = 'gboc-hw-script';
-            script.src = '/static/gboc-hardware-hud.js';
+            script.src = '/static/gboc-hardware-hud.js?v=15.0.0';
+            script.defer = true;
             document.head.appendChild(script);
         }
-        if (!document.getElementById('gboc-hw-style')) {
+        if (!document.getElementById('gboc-hw-style') && !document.querySelector('link[href*="gboc-hardware-hud.css"]')) {
             const link = document.createElement('link');
             link.id = 'gboc-hw-style';
             link.rel = 'stylesheet';
-            link.href = '/static/gboc-hardware-hud.css';
+            link.href = '/static/gboc-hardware-hud.css?v=15.0.0';
             document.head.appendChild(link);
         }
     }
@@ -597,6 +602,9 @@ Zero-Overflow & Smart Sidebar Presence Detection.
     // ── Badge: check failed jobs ──────────────────────────────────────────────
     async function _checkFailedJobsBadge() {
         try {
+            const isAgentApp = window.location.port === '9200' || window.location.port === '8081' ||
+                (document.getElementById('gboc-topbar')?.dataset?.gbocApp === 'agent');
+            if (isAgentApp) return;
             const r = await fetch(window.GBOC_API_BASE + '/api/v1/jobs/failed?limit=10');
             if (r.ok) {
                 const data = await r.json();
@@ -732,10 +740,10 @@ Zero-Overflow & Smart Sidebar Presence Detection.
     // ── Inject stylesheets if not already present ─────────────────────────────
     // Opções dos gráficos (período, formato, tabela, exportar) — vale para todo gráfico Chart.js do sistema
     function _injectChartsScript() {
-        if (document.getElementById('gboc-charts-js') || window.GBOCCharts) return;
+        if (document.getElementById('gboc-charts-js') || window.GBOCCharts || document.querySelector('script[src*="gboc-charts.js"]')) return;
         const sc = document.createElement('script');
         sc.id = 'gboc-charts-js';
-        sc.src = '/static/gboc-charts.js?v=14.8.3-c3';
+        sc.src = '/static/gboc-charts.js?v=15.0.0-c3';
         sc.defer = true;
         document.head.appendChild(sc);
     }
@@ -743,12 +751,12 @@ Zero-Overflow & Smart Sidebar Presence Detection.
     function _injectStylesheets() {
         _injectChartsScript();
         const needed = [
-            { id: 'gboc-themes-css',  href: '/static/gboc-themes.css' },
-            { id: 'gboc-layout-css',  href: '/static/gboc-layout.css' },
-            { id: 'gboc-fernly-css',  href: '/static/gboc-fernly.css?v=14.8.3' }
+            { id: 'gboc-themes-css', match: 'gboc-themes.css', href: '/static/gboc-themes.css?v=15.0.0' },
+            { id: 'gboc-layout-css', match: 'gboc-layout.css', href: '/static/gboc-layout.css?v=15.0.0' },
+            { id: 'gboc-fernly-css', match: 'gboc-fernly.css', href: '/static/gboc-fernly.css?v=15.0.0' }
         ];
-        needed.forEach(({ id, href }) => {
-            if (!document.getElementById(id)) {
+        needed.forEach(({ id, match, href }) => {
+            if (!document.getElementById(id) && !document.querySelector(`link[href*="${match}"]`)) {
                 const link = document.createElement('link');
                 link.id = id; link.rel = 'stylesheet'; link.href = href;
                 document.head.appendChild(link);

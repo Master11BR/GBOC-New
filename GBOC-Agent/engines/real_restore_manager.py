@@ -437,8 +437,12 @@ class RestoreManager:
         """Worker que executa a restauração em background"""
         start_time = time.time()
         try:
+            active = self.active_restores.setdefault(restore_id, {"logs": [], "progress": 0, "status": "running"})
+            active["started_ts"] = start_time
             self._append_restore_log(restore_id, f"Iniciando worker de restauração para snapshot {snapshot_id}")
-            result = self.restore_files(repository_id, snapshot_id, files, target_path, options)
+            opts = dict(options or {})
+            opts["_restore_id"] = restore_id
+            result = self.restore_files(repository_id, snapshot_id, files, target_path, opts)
             duration = time.time() - start_time
             status = result.get('status', 'completed')
             error_message = result.get('error_message')
@@ -484,8 +488,22 @@ class RestoreManager:
             logger.error(f"❌ Erro ao listar snapshots: {e}")
             raise
 
+    @staticmethod
+    def _is_duplicati_snapshot_id(snapshot_id: Any) -> bool:
+        """Identifica se um snapshot_id pertence ao histórico legado do Duplicati (ex: 'dup_0', 'v0', '0')
+        em vez de um snapshot do GBOC Native (timestamp de 14 dígitos YYYYMMDDHHMMSS)."""
+        s = str(snapshot_id or '').strip()
+        if not s:
+            return False
+        if s.lower().startswith(('dup_', 'v', 'version_')):
+            return True
+        if s.isdigit() and len(s) < 14:
+            return True
+        return False
+
     def _list_native_snapshots(self, repo: Dict) -> List[Dict]:
-        """Lista snapshots para o motor GBOC Native."""
+        """Lista snapshots para o motor GBOC Native e, quando o repositório assumiu um histórico do Duplicati
+        no mesmo bucket/pasta, inclui também os snapshots históricos do Duplicati para restauração transparente."""
         logger.info(f"Listando snapshots para o motor nativo no repositório '{repo['name']}'")
         if not self.core or not hasattr(self.core, 'repository_manager'):
             raise RuntimeError("RepositoryManager não está disponível no core.")
@@ -516,8 +534,31 @@ class RestoreManager:
                 })
             except ValueError:
                 continue # Ignora diretórios que não são timestamps válidos
+
+        # Verificar se há histórico passado do Duplicati no mesmo repositório/bucket (transição híbrida)
+        has_dup_files = any(
+            str(f).replace('\\', '/').rsplit('/', 1)[-1].lower().startswith('duplicati-')
+            and 'dlist' in str(f).lower()
+            for f in (all_files or [])
+        )
+        if repo.get('legacy_duplicati') or repo.get('duplicati_id') or has_dup_files:
+            try:
+                dup_snaps = self._list_duplicati_snapshots(repo) or []
+                for ds in dup_snaps:
+                    raw_id = str(ds.get('id') if ds.get('id') is not None else ds.get('version', '0'))
+                    prefixed_id = raw_id if raw_id.startswith('dup_') else f"dup_{raw_id}"
+                    snap_copy = dict(ds)
+                    snap_copy['id'] = prefixed_id
+                    snap_copy['full_id'] = prefixed_id
+                    snap_copy['engine'] = 'duplicati_legacy'
+                    snap_copy['legacy_source'] = 'duplicati'
+                    snapshots.append(snap_copy)
+                if dup_snaps:
+                    logger.info(f"🔗 {len(dup_snaps)} snapshot(s) históricos do Duplicati mesclados ao repositório GBOC Native")
+            except Exception as _dup_err:
+                logger.warning(f"Não foi possível listar histórico legado do Duplicati em '{repo.get('name')}': {_dup_err}")
         
-        logger.info(f"✅ {len(snapshots)} snapshots nativos encontrados")
+        logger.info(f"✅ {len(snapshots)} snapshots totais encontrados (Nativo + Histórico)")
         return snapshots
     
     def _list_restic_snapshots(self, repo: Dict) -> List[Dict]:
@@ -1087,7 +1128,9 @@ class RestoreManager:
                 return self._list_kopia_files(repo, snapshot_id, path)
             elif engine == 'duplicati':
                 return self._list_duplicati_files(repo, snapshot_id, path)
-            elif engine == 'gboc_native':
+            elif engine in ('gboc_native', 'native'):
+                if self._is_duplicati_snapshot_id(snapshot_id):
+                    return self._list_duplicati_files(repo, snapshot_id, path)
                 return self._list_native_files(repo, snapshot_id, path)
             else:
                 raise ValueError(f"Engine '{engine}' não suportado para listagem")
@@ -1441,6 +1484,8 @@ class RestoreManager:
         restore_options = {
             'overwrite': options.get('overwrite', False) if options else False,
             'preserve_permissions': options.get('preserve_permissions', True) if options else True,
+            'file_filter': options.get('file_filter') if options else None,
+            '_restore_id': options.get('_restore_id') if options else None,
         }
         
         repo = self._load_repository(repository_id)
@@ -1456,7 +1501,9 @@ class RestoreManager:
                 return self._restore_kopia_files(repo, snapshot_id, files, target_path, restore_options)
             elif engine == 'duplicati':
                 return self._restore_duplicati_files(repo, snapshot_id, files, target_path, restore_options)
-            elif engine == 'gboc_native':
+            elif engine in ('gboc_native', 'native'):
+                if self._is_duplicati_snapshot_id(snapshot_id):
+                    return self._restore_duplicati_files(repo, snapshot_id, files, target_path, restore_options)
                 return self._restore_native_files(repo, snapshot_id, files, target_path, restore_options)
             else:
                 raise ValueError(f"Engine '{engine}' não suportado para restauração")
@@ -1487,21 +1534,49 @@ class RestoreManager:
             raise RuntimeError("RepositoryManager não está disponível no core.")
 
         from native_engine.engine import GBOCNativeEngine
+        from engines import engine_tuning as _tune
 
         backend = self.core.repository_manager.get_backend(repo['id'])
-        # Formato 4: download paralelo (uma conexão por thread na nuvem; 2 em disco local)
+        # Formato 4: download paralelo (32 threads na nuvem; 8 em disco local)
         _cloud = str(repo.get('type') or 'local').lower() != 'local'
+        _workers = _tune.default_workers(_cloud)
         _rm = self.core.repository_manager
         _factory = (lambda: _rm.get_backend(repo['id'])) if _cloud else (lambda: backend)
         engine = GBOCNativeEngine(task_config={'repository': repo}, storage_backend=backend,
-                                  backend_factory=_factory, workers=4 if _cloud else 2)
+                                  backend_factory=_factory, workers=_workers)
+
+        _rid = options.get('_restore_id') if isinstance(options, dict) else None
+
+        def _on_restore_progress(p: Dict[str, Any]):
+            if _rid is None or _rid not in self.active_restores:
+                return
+            act = self.active_restores[_rid]
+            fr = int(p.get('files_restored') or 0)
+            ft = int(p.get('files_total') or 0)
+            br = int(p.get('bytes_restored') or 0)
+            bt = int(p.get('bytes_total') or 0)
+            pct = int(min(100, round(br * 100 / bt))) if bt > 0 else (int(min(100, round(fr * 100 / ft))) if ft > 0 else 0)
+            act.update({
+                'files_restored': fr,
+                'total_files': ft,
+                'bytes_restored': br,
+                'bytes_total': bt,
+                'current_file': p.get('current_file'),
+                'current_file_size': int(p.get('current_file_size') or 0),
+                'current_dir': p.get('current_dir'),
+                'last_completed_file': p.get('last_completed_file'),
+                'errors': int(p.get('errors') or 0),
+                'threads': int(p.get('threads') or _workers),
+                'progress': pct,
+            })
 
         # O restore do motor nativo pode não precisar da lista de 'files' se ele restaura o snapshot inteiro
         restore_config = {
             'snapshot_id': snapshot_id,
             'destination_path': target_path,
             'files': files,
-            'options': options
+            'options': options,
+            'progress_cb': _on_restore_progress,
         }
         
         result = engine.run_restore(restore_config)
@@ -2085,7 +2160,8 @@ class RestoreManager:
                     config = json.loads(config_str) if isinstance(config_str, str) else config_str
                     for field in ['bucket', 'region', 'endpoint', 'prefix', 'access_key', 'secret_key',
                                   'aws_access_key', 'aws_secret_key', 'b2_account_id', 'b2_account_key',
-                                  'azure_account_name', 'azure_account_key']:
+                                  'azure_account_name', 'azure_account_key', 'legacy_duplicati',
+                                  'duplicati_id', 'target_url', 'db_path', 'passphrase']:
                         if field in config and config[field] and (field not in repo or not repo.get(field)):
                             repo[field] = config[field]
                     if isinstance(config, dict) and config.get('secret_enc'):
@@ -2128,6 +2204,19 @@ class RestoreManager:
             if data.get('status') == 'success':
                 data['status'] = 'completed'
             active = self.active_restores.get(restore_id) or {}
+            for k in (
+                'files_restored', 'total_files', 'bytes_restored', 'bytes_total',
+                'current_file', 'current_file_size', 'current_dir', 'last_completed_file',
+                'errors', 'threads',
+            ):
+                if active.get(k) is not None:
+                    data[k] = active[k]
+            elapsed = max(0.0, time.time() - active['started_ts']) if active.get('started_ts') else float(data.get('duration_seconds') or 0)
+            data['elapsed_seconds'] = int(elapsed)
+            br = int(data.get('bytes_restored') or 0)
+            fr = int(data.get('files_restored') or 0)
+            data['bytes_per_sec'] = round(br / elapsed, 1) if elapsed >= 1 else 0.0
+            data['files_per_sec'] = round(fr / elapsed, 2) if elapsed >= 1 else 0.0
             if active.get('status'):
                 data['status'] = 'completed' if active.get('status') == 'success' else active.get('status')
             if active.get('progress'):

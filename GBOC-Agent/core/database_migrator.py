@@ -301,6 +301,7 @@ def run_auto_migrations(conn):
                 "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ;",
                 "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS pre_script TEXT;",
                 "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS post_script TEXT;",
+                "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS veracrypt_config TEXT;",
                 # Bases antigas criaram "alerts" sem estas colunas (HTTP 500 em /api/alerts/)
                 "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS acknowledged BOOLEAN DEFAULT FALSE;",
                 "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS resolved BOOLEAN DEFAULT FALSE;",

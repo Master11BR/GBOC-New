@@ -222,23 +222,33 @@ def _load_cache() -> None:
         logger.debug(f"[ENGINE][CACHE] falha ao carregar cache persistente: {e}")
 
 
+_detect_all_cache: list[dict] | None = None
+_detect_all_cache_ts: float = 0.0
+
+
 def _set_cache(key: str, path: str | None, source: str | None) -> None:
+    global _detect_all_cache, _detect_all_cache_ts
+    prev_path = _cache.get(key, "__MISSING__")
+    prev_source = _cache_source.get(key, "__MISSING__")
     _cache[key] = path
     _cache_source[key] = source
-    _persist_cache()
+    _detect_all_cache = None
+    _detect_all_cache_ts = 0.0
+    if prev_path != path or prev_source != source:
+        _persist_cache()
 
 
 def get_engine_path(engine_name: str, allow_scan: bool = False) -> str | None:
     key = engine_name.lower()
 
     with _cache_lock:
-        cached = _cache.get(key)
-        if cached is not None:
+        if key in _cache:
+            cached = _cache[key]
             if cached and os.path.isfile(cached):
                 logger.debug(f"[ENGINE][CACHE] hit {key}: {cached}")
                 return cached
 
-            if not cached:
+            if cached is None and not allow_scan:
                 logger.debug(f"[ENGINE][CACHE] miss persistente para {key}")
                 return None
 
@@ -270,6 +280,11 @@ def get_engine_path_or_raise(engine_name: str) -> str:
 
 
 def detect_all_engines(allow_scan: bool = False) -> list[dict]:
+    global _detect_all_cache, _detect_all_cache_ts
+    now = time.monotonic()
+    if not allow_scan and _detect_all_cache is not None and (now - _detect_all_cache_ts) < 120.0:
+        return [dict(item) for item in _detect_all_cache]
+
     total_start = time.perf_counter()
     results = []
     for name in _ENGINE_LIST:
@@ -284,21 +299,30 @@ def detect_all_engines(allow_scan: bool = False) -> list[dict]:
             "source": _cache_source.get(name)
         })
     total_elapsed_ms = round((time.perf_counter() - total_start) * 1000, 2)
-    logger.info(f"[PERF][ENGINE] detect_all_engines concluído em {total_elapsed_ms} ms")
+    if not allow_scan:
+        _detect_all_cache = [dict(item) for item in results]
+        _detect_all_cache_ts = now
+    logger.debug(f"[PERF][ENGINE] detect_all_engines concluído em {total_elapsed_ms} ms")
     return results
 
 
 def clear_cache():
     """Limpa o cache (útil se o PATH mudar em runtime)."""
+    global _detect_all_cache, _detect_all_cache_ts
     with _cache_lock:
         _cache.clear()
         _cache_source.clear()
+        _detect_all_cache = None
+        _detect_all_cache_ts = 0.0
 
 
 def rescan_all_engines() -> list[dict]:
+    global _detect_all_cache, _detect_all_cache_ts
     with _cache_lock:
         _cache.clear()
         _cache_source.clear()
+        _detect_all_cache = None
+        _detect_all_cache_ts = 0.0
     logger.info("[ENGINE][CACHE] rescan completo solicitado")
     return detect_all_engines(allow_scan=True)
 

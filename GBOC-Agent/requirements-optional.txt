@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v14.8.3 - Dependencias Opcionais de Alta Performance
+# GBOC System v15.0.0 - Dependencias Opcionais de Alta Performance
 # ==============================================================================
 # Pacotes com extensoes nativas em C/C++ que oferecem aceleracao de hardware.
 # O GBOC possui fallback automatico e transparente para modulos nativos da biblioteca

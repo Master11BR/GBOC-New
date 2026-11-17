@@ -2,10 +2,10 @@
 GBOC Server — Version Module
 Fonte única de verdade para versão do sistema.
 """
-GBOC_VERSION = "14.8.3"
+GBOC_VERSION = "15.0.0"
 GBOC_BUILD = "stable"
 GBOC_EDITION = "Enterprise"
-GBOC_RELEASE_DATE = "2026-10-24"
+GBOC_RELEASE_DATE = "2026-11-07"
 GBOC_PLATFORM = "Server"
 
 def version_string() -> str:

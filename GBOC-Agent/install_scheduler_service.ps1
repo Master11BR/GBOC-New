@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v14.8.3 Enterprise Edition
+# GBOC System v15.0.0 Enterprise Edition
 # Service Installer: GBOC Scheduler Agent (Windows Scheduled Task / Service)
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # ==============================================================================
@@ -55,7 +55,7 @@ Register-ScheduledTask `
     -Trigger $TriggerBoot `
     -Settings $Settings `
     -Principal $Principal `
-    -Description "GBOC System v14.8.3 - Agente Autonomo de Backup e Restore Agendado (Execucao Continua em Segundo Plano)"
+    -Description "GBOC System v15.0.0 - Agente Autonomo de Backup e Restore Agendado (Execucao Continua em Segundo Plano)"
 
 Write-Host ""
 Write-Host "======================================================================" -ForegroundColor Green

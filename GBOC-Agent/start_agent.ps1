@@ -1,13 +1,13 @@
 <#
 ==============================================================================
-GBOC System v14.8.3 Enterprise Edition
+GBOC System v15.0.0 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
 #>
 
 # ========================================
-# GBOC Agent 14.8.3 - Inicializacao
+# GBOC Agent 15.0.0 - Inicializacao
 # ========================================
 # -Service: execucao pelo servico do Windows (NSSM). Sem perguntas; o codigo de saida e repassado
 # para o servico reiniciar o Agente. O servico chama ESTE script (e nao um python.exe fixo), entao
@@ -19,7 +19,7 @@ $ErrorActionPreference = "Continue"
 Set-Location -Path $PSScriptRoot
 
 Write-Host "`n========================================" -ForegroundColor Cyan
-Write-Host "  GBOC Agent 14.8.3 - Iniciando..." -ForegroundColor Cyan
+Write-Host "  GBOC Agent 15.0.0 - Iniciando..." -ForegroundColor Cyan
 Write-Host "========================================`n" -ForegroundColor Cyan
 
 function Resolve-GbocPython([string]$Root, [string]$Component) {

@@ -1,5 +1,5 @@
 """
-GBOC Server 14.8.3
+GBOC Server 15.0.0
 Servidor Central — Real-time Agent Communication + Complete Data Sync + Advanced Analytics
 Banco de dados: PostgreSQL (oficial)
 """
@@ -92,7 +92,7 @@ try:
     from version_control import __version__ as SERVER_VERSION, get_version_info, auto_increment_build
     auto_increment_build()
 except Exception:
-    SERVER_VERSION = "14.8.3"
+    SERVER_VERSION = "15.0.0"
     def get_version_info():
         return {"raw_version": SERVER_VERSION, "semver": SERVER_VERSION}
 
@@ -100,17 +100,20 @@ DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # Configuração do Banco PostgreSQL
+_raw_srv_pg_host = os.getenv('POSTGRES_HOST', '127.0.0.1').strip()
 DB_CONFIG = {
-    'host': os.getenv('POSTGRES_HOST', 'localhost'),
+    'host': '127.0.0.1' if _raw_srv_pg_host.lower() == 'localhost' else _raw_srv_pg_host,
     'port': int(os.getenv('POSTGRES_PORT', 5432)),
     'database': os.getenv('POSTGRES_DB', 'gboc'),
     'user': os.getenv('POSTGRES_USER', 'postgres'),
     'password': os.getenv('POSTGRES_PASSWORD', 'Stoms2025+'),
+    'client_encoding': 'UTF8',
     # lock_timeout: nenhuma consulta espera lock para sempre (transação esquecida aberta) — erro em 30 s em vez de travar
     'options': f"-c timezone=America/Sao_Paulo -c lock_timeout={int(os.getenv('GBOC_DB_LOCK_TIMEOUT_MS', 30000))}"
 }
 
 connection_pool = None
+_srv_conn_verified_at: Dict[int, float] = {}
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -216,18 +219,24 @@ def get_db():
         raise HTTPException(503, "Pool de conexões não inicializado")
     try:
         conn = connection_pool.getconn()
-        conn.set_client_encoding('UTF8')
-        # Verificar se a conexão está viva
+        now_mono = time.monotonic()
+        last_ok = _srv_conn_verified_at.get(id(conn), 0.0)
         try:
-            conn.cursor().execute("SELECT 1")
+            if conn.closed:
+                raise Exception("closed")
+            if (now_mono - last_ok) > 30.0:
+                conn.set_client_encoding('UTF8')
+                conn.cursor().execute("SELECT 1")
+                _srv_conn_verified_at[id(conn)] = now_mono
         except Exception:
-            # Conexão morta, descartar e pegar nova
+            _srv_conn_verified_at.pop(id(conn), None)
             try:
                 connection_pool.putconn(conn, close=True)
             except Exception:
                 pass
             conn = connection_pool.getconn()
             conn.set_client_encoding('UTF8')
+            _srv_conn_verified_at[id(conn)] = time.monotonic()
         return conn
     except psycopg2.pool.PoolError:
         # Pool esgotado: aguarda uma conexão ser devolvida. NÃO recria o pool — closeall() fechava as conexões
@@ -1016,47 +1025,57 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 
 _SLOW_THRESHOLD_MS = float(os.getenv("GBOC_SLOW_MS", "250"))
 
-@app.middleware("http")
-async def _gboc_asset_revalidate(request: Request, call_next):
-    """JS/CSS/HTML sempre revalidados (ETag → 304): os HTML usam ?v= fixo e, sem isso,
-    o navegador seguia com scripts antigos depois de uma atualização do GBOC."""
-    r = await call_next(request)
-    p = request.url.path.lower()
-    if p.endswith(".html") or p in ("/", ""):
-        r.headers["Cache-Control"] = "no-cache"
-    elif p.endswith((".js", ".css")):
-        # Antes "no-cache": cada troca de tela revalidava ~20 arquivos (um pedido ao servidor por arquivo).
-        # 5 minutos em cache: navegação rápida; uma atualização do GBOC aparece em até 5 min (ou Ctrl+F5).
-        r.headers["Cache-Control"] = "private, max-age=300"
-    elif p.endswith((".woff2", ".woff", ".ttf", ".png", ".jpg", ".jpeg", ".svg", ".ico", ".webp", ".gif")):
-        r.headers["Cache-Control"] = "private, max-age=86400"
-    return r
 
-@app.middleware("http")
-async def _gboc_timing_middleware(request: Request, call_next):
-    """Medidor de performance das rotas HTTP no GBOC Server.
-    Qualquer rota com tempo > GBOC_SLOW_MS (padrão 250 ms) é logada com WARNING.
-    """
-    t0 = time.perf_counter()
-    try:
-        r = await call_next(request)
-        return r
-    finally:
-        dt_ms = (time.perf_counter() - t0) * 1000.0
-        if dt_ms >= _SLOW_THRESHOLD_MS:
-            try:
-                method = request.method
-                path = request.url.path
-                query = request.url.query
-                full = f"{method} {path}"
-                if query:
-                    full += f"?{query}"
-                logger.warning(
-                    "[PERF-SLOW] %s — %.0f ms (threshold=%.0f ms).",
-                    full, dt_ms, _SLOW_THRESHOLD_MS,
-                )
-            except Exception:
-                pass
+class _GbocServerFastAsgiMiddleware:
+    """Middleware ASGI puro (zero BaseHTTPMiddleware stream overhead) unificando Cache-Control e medição de latência."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        t0 = time.perf_counter()
+        raw_path = scope.get("path") or ""
+        p = raw_path.lower()
+        cache_header: Optional[bytes] = None
+        if p.endswith(".html") or p in ("/", ""):
+            cache_header = b"no-cache"
+        elif p.endswith((".js", ".css")):
+            cache_header = b"private, max-age=300"
+        elif p.endswith((".woff2", ".woff", ".ttf", ".png", ".jpg", ".jpeg", ".svg", ".ico", ".webp", ".gif")):
+            cache_header = b"private, max-age=86400"
+
+        async def _send_wrapper(message):
+            if cache_header is not None and message["type"] == "http.response.start":
+                headers = [
+                    (k, v) for (k, v) in message.get("headers", [])
+                    if k.lower() != b"cache-control"
+                ]
+                headers.append((b"cache-control", cache_header))
+                message = {**message, "headers": headers}
+            await send(message)
+
+        try:
+            await self.app(scope, receive, _send_wrapper)
+        finally:
+            dt_ms = (time.perf_counter() - t0) * 1000.0
+            if dt_ms >= _SLOW_THRESHOLD_MS:
+                try:
+                    method = scope.get("method", "GET")
+                    qs = (scope.get("query_string") or b"").decode("latin-1", errors="ignore")
+                    full = f"{method} {raw_path}" + (f"?{qs}" if qs else "")
+                    logger.warning(
+                        "[PERF-SLOW] %s — %.0f ms (threshold=%.0f ms).",
+                        full, dt_ms, _SLOW_THRESHOLD_MS,
+                    )
+                except Exception:
+                    pass
+
+
+app.add_middleware(_GbocServerFastAsgiMiddleware)
 
 # Guarda global de autenticação das rotas /api/ (sessão de usuário ou chave de pareamento do agente)
 from modules.users.auth_guard import install as _install_auth_guard

@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC System v14.8.3 Enterprise Edition
+# GBOC System v15.0.0 Enterprise Edition
 # Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 # Propriedade Intelectual & Direitos Autorais Registrados.
 # A cópia, distribuição ou modificação não autorizada é estritamente proibida.
@@ -123,7 +123,8 @@ class AIDiagnosticEngine:
 
     # ── Análise ──────────────────────────────────────────────────────────────
     async def analyze_error(self, error_context: str, system_logs: list[str] | None = None,
-                            telemetry: dict[str, Any] | None = None) -> dict[str, Any]:
+                            telemetry: dict[str, Any] | None = None, record_case: bool = False,
+                            case_meta: dict[str, Any] | None = None) -> dict[str, Any]:
         cfg = self.config
         provider = aip.normalize_provider(cfg.get("provider"))
         error_context = (error_context or "").strip() or "Verificação geral do Agente"
@@ -147,16 +148,55 @@ class AIDiagnosticEngine:
             f"LOGS RECENTES:\n{json.dumps(logs, ensure_ascii=False, indent=1)}\n\n"
             f"TELEMETRIA REAL DO HOST:\n{json.dumps(telemetry, ensure_ascii=False)}"
         )
+
+        # 📚 RAG local: casos já diagnosticados/validados, falhas anteriores e documentação deste ambiente
+        rag_ctx, rag_used = "", []
+        try:
+            import asyncio
+            from engines import ai_rag
+            rag_ctx, rag_used = await asyncio.to_thread(
+                ai_rag.build_context, error_context, 5, ("solucoes", "erros", "docs", "logs"))
+        except Exception as _rag_err:
+            logger.debug(f"RAG indisponível no diagnóstico: {_rag_err}")
+        if rag_ctx:
+            prompt += (
+                "\n\nBASE DE CONHECIMENTO LOCAL (casos e documentação reais deste ambiente; soluções marcadas como "
+                "validadas já resolveram este tipo de falha aqui — use somente se forem relevantes e cite [n]):\n"
+                f"{rag_ctx}"
+            )
+
         result = await aip.achat(cfg, DIAGNOSTIC_SYSTEM_PROMPT, prompt, provider=provider)
         if result.ok:
             parsed = self._parse_ai_response(result.answer, error_context)
-            parsed.update({"is_llm_real": True, "provider": result.provider_label, "model": result.model})
+            parsed.update({"is_llm_real": True, "provider": result.provider_label, "model": result.model,
+                           "rag_sources": rag_used})
+            self._record_case(record_case, error_context, parsed, case_meta, rag_used)
             return parsed
 
         res = self._rule_based_ai_analysis(error_context, telemetry)
+        validated = [s for s in rag_used if s.get("verified")]
+        if validated:
+            res["analysis"] = (res.get("analysis") or "") + "\n\n📚 **Soluções já validadas neste ambiente para falhas parecidas:**\n" + \
+                "\n".join(f"• {s['title']}: {s.get('excerpt', '')[:300]}" for s in validated[:3])
         res.update({"is_llm_real": False, "provider": f"Heurística GBOC Agent (LLM indisponível: {result.provider_label})",
-                    "model": "gboc-heuristic", "llm_error": result.error})
+                    "model": "gboc-heuristic", "llm_error": result.error, "rag_sources": rag_used})
+        self._record_case(record_case, error_context, res, case_meta, rag_used)
         return res
+
+    def _record_case(self, enabled: bool, error_context: str, res: dict[str, Any],
+                     meta: dict[str, Any] | None, rag_used: list[dict[str, Any]]) -> None:
+        """Registra o diagnóstico como caso (base do RAG de soluções e do dataset de fine-tuning)."""
+        if not enabled:
+            return
+        try:
+            from engines import ai_cases
+            meta = meta or {}
+            res["case_id"] = ai_cases.record_case(
+                error_context, res, origin=meta.get("origin") or "diagnostico", task_id=meta.get("task_id"),
+                task_name=meta.get("task_name"), execution_id=meta.get("execution_id"), engine=meta.get("engine"),
+                rag_sources=rag_used)
+        except Exception as e:
+            logger.debug(f"Caso de diagnóstico não registrado: {e}")
 
     def _rule_based_ai_analysis(self, error_text: str, telemetry: dict[str, Any] | None = None) -> dict[str, Any]:
         """Heurística determinística: palavras-chave do erro + telemetria real do host."""

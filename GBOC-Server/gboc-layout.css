@@ -1,5 +1,5 @@
 /* ============================================================================
-   GBOC System v14.8.3 — Master Responsive Layout Engine
+   GBOC System v15.0.0 — Master Responsive Layout Engine
    Dual Layout Architecture: Vertical Sidebar (CRMHQ) & Horizontal Topbar (AdminVoice)
    Fully Adaptive across: 1024px, 720p HD, 1080p FHD, 2K & 4K UHD Displays.
    Zero Horizontal Overflow & Zero Content Cropping Guarantee.
@@ -56,7 +56,10 @@ body.layout-horizontal {
     width: 100%;
     max-width: 100%;
     position: relative;
+    /* clip (e não hidden): com hidden o navegador torna overflow-y "auto" e o .app virava um 2º contêiner de
+       rolagem dentro da página — duas barras e cabeçalho/painéis rolando separados */
     overflow-x: hidden;
+    overflow-x: clip;
 }
 
 .main-content {
@@ -78,15 +81,18 @@ body.layout-horizontal {
     top: 0 !important;
     left: 0 !important;
     right: 0 !important;
-    height: var(--gboc-topbar-height) !important;
+    height: var(--gboc-topbar-height, 58px) !important;
     width: 100% !important;
     max-width: 100vw !important;
     z-index: 2000 !important;
     display: flex !important;
-    align-items: center;
-    padding: 0 20px;
-    background: var(--topbar-bg, #0b1329);
-    border-bottom: 1px solid var(--topbar-border, var(--border, rgba(255,255,255,0.08)));
+    align-items: center !important;
+    justify-content: space-between !important;
+    flex-wrap: nowrap !important;
+    overflow: visible !important;
+    padding: 0 16px !important;
+    background: var(--bg-topbar, #0f172a) !important;
+    border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.1)) !important;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
@@ -160,24 +166,6 @@ body.layout-horizontal {
 .tb-search input::placeholder { color: var(--text-muted, #64748b); }
 .tb-search i { color: var(--text-muted, #64748b); font-size: 0.85em; }
 
-.gboc-topbar {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    flex-wrap: nowrap !important;
-    overflow: visible !important;
-    max-width: 100vw !important;
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    height: var(--gboc-topbar-height, 58px) !important;
-    background: var(--bg-topbar, #0f172a) !important;
-    border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.1)) !important;
-    padding: 0 16px !important;
-    z-index: 2000 !important;
-}
-
 .tb-nav {
     display: flex !important;
     align-items: center !important;
@@ -220,6 +208,14 @@ body.layout-horizontal {
 }
 .tb-nav-link i.tb-arrow { font-size: 0.72em; margin-left: 2px; transition: transform 0.2s ease; }
 .tb-dropdown:hover .tb-arrow, .tb-dropdown.active .tb-arrow { transform: rotate(180deg); }
+
+/* Menu do usuário (avatar, canto direito) e menus que passariam da borda: abrem alinhados à direita.
+   O "left: 0 !important" abaixo vencia o style="right:0;left:auto" do _topbar.html e o menu saía da tela. */
+.tb-dropdown-menu.tb-user-menu,
+.tb-dropdown-menu.tb-align-right {
+    left: auto !important;
+    right: 0 !important;
+}
 
 /* SUBMENU DROPDOWN BLINDADO E ISOLADO */
 .tb-dropdown-menu {
@@ -498,12 +494,12 @@ body.sidebar-collapsed .sidebar .nav-link i {
     color: var(--text-primary, #f8fafc);
 }
 .sidebar .nav-group-header.has-active-child {
-    background: var(--primary-soft, rgba(99, 102, 241, 0.16)) !important;
-    color: var(--primary-color, #6366f1) !important;
+    background: var(--group-soft, rgba(99, 102, 241, 0.16)) !important;
+    color: var(--group-accent, var(--primary-color, #6366f1)) !important;
     font-weight: 700 !important;
 }
 .sidebar .nav-group-header.has-active-child .nav-group-arrow {
-    color: var(--primary-color, #6366f1) !important;
+    color: var(--group-accent, var(--primary-color, #6366f1)) !important;
 }
 .sidebar .nav-group-arrow {
     font-size: 0.72em;
@@ -516,65 +512,221 @@ body.sidebar-collapsed .sidebar .nav-link i {
 .sidebar .nav-group-items {
     display: none;
     flex-direction: column;
-    margin-left: 12px;
-    padding-left: 8px;
+    margin-left: 10px;
+    padding-left: 6px;
     border-left: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
 }
 .sidebar .nav-group-items.open {
     display: flex;
 }
 
+/* ── Universal Menu Group Accent Identity ───────────────────────────────── */
+.nav-group,
+.sidebar .nav-group {
+    --group-accent: var(--primary-color, #6366f1);
+    --group-glow: var(--primary-glow, rgba(99, 102, 241, 0.4));
+    --group-soft: var(--primary-soft, rgba(99, 102, 241, 0.14));
+}
+
+/* 1. Visão Geral (Overview) - Royal Blue */
+.nav-group[data-group="overview"],
+.sidebar #grp-overview,
+.sidebar #sgrp-overview {
+    --group-accent: #3b82f6;
+    --group-glow: rgba(59, 130, 246, 0.45);
+    --group-soft: rgba(59, 130, 246, 0.16);
+}
+
+/* 2. Backup & Políticas (Jobs, Cargas, Repositórios, Restore) - Amber / Golden Orange (User Standard) */
+.nav-group[data-group="backup"],
+.sidebar #grp-backup,
+.sidebar #sgrp-backup {
+    --group-accent: #f59e0b;
+    --group-glow: rgba(245, 158, 11, 0.45);
+    --group-soft: rgba(245, 158, 11, 0.16);
+}
+
+/* 3. Disaster Recovery - Vibrant Red */
+.nav-group[data-group="dr"],
+.sidebar #grp-dr,
+.sidebar #sgrp-dr {
+    --group-accent: #ef4444;
+    --group-glow: rgba(239, 68, 68, 0.45);
+    --group-soft: rgba(239, 68, 68, 0.16);
+}
+
+/* 4. Proteção & Segurança (Ransomware, Compliance, Auditoria) - Emerald Green */
+.nav-group[data-group="defense"],
+.nav-group[data-group="security"],
+.sidebar #grp-defense,
+.sidebar #sgrp-security {
+    --group-accent: #10b981;
+    --group-glow: rgba(16, 185, 129, 0.45);
+    --group-soft: rgba(16, 185, 129, 0.16);
+}
+
+/* 5. Virtualização e Cloud (VMware, Hyper-V, M365, SaaS) - Cyan / Sky */
+.nav-group[data-group="virt"],
+.sidebar #grp-virt,
+.sidebar #sgrp-virt {
+    --group-accent: #06b6d4;
+    --group-glow: rgba(6, 182, 212, 0.45);
+    --group-soft: rgba(6, 182, 212, 0.16);
+}
+
+/* 6. Operações (Alertas, Falhas, Logs, Diagnósticos, Relatórios) - Vibrant Coral Orange */
+.nav-group[data-group="ops"],
+.sidebar #grp-ops,
+.sidebar #sgrp-ops {
+    --group-accent: #f97316;
+    --group-glow: rgba(249, 115, 22, 0.45);
+    --group-soft: rgba(249, 115, 22, 0.16);
+}
+
+/* 7. Configuração & Sistema (Users, Notificações, Motores, Temas) - Purple / Violet */
+.nav-group[data-group="config"],
+.nav-group[data-group="system"],
+.sidebar #grp-config,
+.sidebar #sgrp-system {
+    --group-accent: #a855f7;
+    --group-glow: rgba(168, 85, 247, 0.45);
+    --group-soft: rgba(168, 85, 247, 0.16);
+}
+
+/* ── Botão de Navegação / Menu Item Padrão Unificado ───────────────────── */
 .sidebar .nav-link {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 8px 12px;
-    margin: 2px 0;
-    border-radius: 8px;
+    gap: 12px;
+    padding: 9px 14px 9px 18px;
+    margin: 3px 6px;
+    border-radius: var(--btn-radius, 8px);
     font-family: inherit;
     font-size: 0.84em;
     font-weight: 500;
     color: var(--text-secondary, #cbd5e1);
     text-decoration: none;
-    transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+    transition: background 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+                color 0.2s ease,
+                transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+                box-shadow 0.2s ease,
+                border-color 0.2s ease;
     cursor: pointer;
     position: relative;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    border: 1px solid transparent;
+    user-select: none;
+    -webkit-user-select: none;
 }
+
 .sidebar .nav-link.nav-sub {
-    padding-left: 12px !important;
+    padding-left: 20px !important;
     font-size: 0.82em;
 }
+
 .sidebar .nav-link i {
-    font-size: 1em;
-    width: 18px;
+    font-size: 1.05em;
+    width: 20px;
     text-align: center;
-    color: var(--primary-color, #6366f1);
+    color: var(--group-accent, var(--primary-color, #6366f1));
     flex-shrink: 0;
-    transition: transform 0.15s ease, color 0.15s ease;
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s ease, filter 0.2s ease;
+    opacity: 0.88;
 }
-.sidebar .nav-link:hover {
-    background: var(--primary-soft, rgba(99, 102, 241, 0.14));
-    color: var(--text-primary, #f8fafc);
-}
-.sidebar .nav-link:hover i { transform: scale(1.1); color: var(--primary-color, #6366f1); }
-.sidebar .nav-link.active {
-    background: var(--primary-soft, rgba(99, 102, 241, 0.22)) !important;
-    color: var(--text-primary, #ffffff) !important;
-    font-weight: 700 !important;
-}
-.sidebar .nav-link.active::before {
+
+/* ── Detalhe do Lado Esquerdo (Extruded Pill Tab - User Master Standard) ── */
+.sidebar .nav-link::before {
     content: '';
     position: absolute;
     left: 0;
-    top: 4px;
-    bottom: 4px;
-    width: 3px;
-    border-radius: 0 4px 4px 0;
-    background: var(--primary-color, #6366f1);
-    box-shadow: 0 0 8px var(--primary-glow);
+    top: 0;
+    bottom: 0;
+    width: 6px;
+    border-top-left-radius: inherit;
+    border-bottom-left-radius: inherit;
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+    background: var(--group-accent, var(--primary-color, #6366f1));
+    opacity: 0;
+    transform: scaleY(0.3);
+    transition: opacity 0.2s ease,
+                transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+                box-shadow 0.25s ease,
+                width 0.2s ease;
+    box-shadow: 0 0 10px var(--group-glow, rgba(99, 102, 241, 0.4));
+    pointer-events: none;
+    z-index: 2;
+}
+
+/* Hover state */
+.sidebar .nav-link:hover {
+    background: var(--group-soft, rgba(99, 102, 241, 0.12));
+    color: var(--text-primary, #f8fafc);
+}
+.sidebar .nav-link:hover::before {
+    opacity: 0.55;
+    transform: scaleY(0.75);
+}
+.sidebar .nav-link:hover i {
+    opacity: 1;
+    transform: scale(1.12);
+    color: var(--group-accent, var(--primary-color, #6366f1));
+}
+
+/* Active & In-Focus State (Permanece até a próxima mudança) */
+.sidebar .nav-link.active,
+.sidebar .nav-link.in-focus,
+.sidebar .nav-link:focus-visible {
+    background: var(--group-soft, rgba(99, 102, 241, 0.22)) !important;
+    color: #ffffff !important;
+    font-weight: 700 !important;
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+    outline: none !important;
+}
+
+.sidebar .nav-link.active::before,
+.sidebar .nav-link.in-focus::before,
+.sidebar .nav-link:focus-visible::before {
+    opacity: 1 !important;
+    transform: scaleY(1) !important;
+    width: 7px !important;
+    background: var(--group-accent, var(--primary-color, #6366f1)) !important;
+    box-shadow: 0 0 14px var(--group-glow, rgba(99, 102, 241, 0.5)), 0 0 4px var(--group-accent) !important;
+}
+
+.sidebar .nav-link.active i,
+.sidebar .nav-link.in-focus i {
+    opacity: 1 !important;
+    color: var(--group-accent, var(--primary-color, #6366f1)) !important;
+    transform: scale(1.14);
+    filter: drop-shadow(0 0 6px var(--group-glow));
+}
+
+.sidebar .nav-link.active span,
+.sidebar .nav-link.in-focus span {
+    color: #ffffff !important;
+    font-weight: 700 !important;
+}
+
+/* Light Theme High Contrast Override */
+[data-theme="light"] .sidebar .nav-link.active,
+[data-theme="light"] .sidebar .nav-link.in-focus,
+[data-color-theme="light"] .sidebar .nav-link.active,
+[data-color-theme="light"] .sidebar .nav-link.in-focus {
+    background: var(--group-soft, rgba(59, 130, 246, 0.15)) !important;
+    color: var(--text-primary, #0f172a) !important;
+    border-color: rgba(0, 0, 0, 0.08) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+}
+[data-theme="light"] .sidebar .nav-link.active span,
+[data-theme="light"] .sidebar .nav-link.in-focus span,
+[data-color-theme="light"] .sidebar .nav-link.active span,
+[data-color-theme="light"] .sidebar .nav-link.in-focus span {
+    color: var(--text-primary, #0f172a) !important;
+    font-weight: 700 !important;
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -1068,3 +1220,912 @@ table, .data-table {
     0%, 100% { opacity: 1; transform: scale(1); }
     50% { opacity: 0.75; transform: scale(1.02); }
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   9. GBOC UI CONTRACT v15.0.0 — PADRONIZAÇÃO FINAL (Server + Agent)
+   ----------------------------------------------------------------------------
+   Este bloco é a ÚLTIMA palavra visual do sistema: fica no fim do último CSS
+   carregado e usa o escopo  body[class*="layout-"]  (especificidade 0,1,1) para
+   prevalecer sobre CSS embutido nas páginas, sem afetar a tela de login.
+   Regras:
+     • Uma única família de tokens (tokens.css / gboc-themes.css). Os nomes
+       legados (--primary, --text, --border...) viram apelidos dos canônicos.
+     • Fonte, tamanhos e alturas de controles iguais em todas as telas.
+     • Raio/sombra/fundo de cards, botões e inputs continuam vindo das
+       variáveis do Estilo de UI (--card-*, --btn-*, --input-*).
+     • Menu lateral e topbar: item ativo fixo e visível; submenus retráteis;
+       modo horizontal em duas linhas (sem sobreposição com os botões).
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ── 9.1 Tokens canônicos + apelidos legados ─────────────────────────────── */
+:root {
+    --font-sans: 'Inter', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', Arial, sans-serif;
+    --font-mono: 'JetBrains Mono', 'Cascadia Code', Consolas, 'Courier New', monospace;
+    --fs-xs: 0.75rem;     /* 12px — legendas, badges        */
+    --fs-sm: 0.8125rem;   /* 13px — menus, tabelas, labels  */
+    --fs-md: 0.875rem;    /* 14px — botões, inputs, texto   */
+    --fs-lg: 1.0625rem;   /* 17px — título de painel        */
+    --fs-xl: 1.25rem;     /* 20px — subtítulo de página     */
+    --fs-2xl: 1.5rem;     /* 24px — título de página        */
+    --control-h: 36px;
+    --control-h-sm: 30px;
+    --control-h-lg: 42px;
+    --nav-item-h: 34px;
+    --nav-header-h: 38px;
+    --gboc-navrow-height: 46px;
+
+    /* Apelidos legados -> tokens canônicos (fim da mistura azul/índigo/âmbar) */
+    --primary: var(--primary-color);
+    --success: var(--success-color);
+    --danger: var(--danger-color);
+    --warning: var(--warning-color);
+    --info: var(--info-color);
+    --text: var(--text-primary);
+    --border: var(--border-color);
+    --bg-dark: var(--bg-main);
+    --bg: var(--bg-main);
+    --surface: var(--bg-card);
+    --bg-topbar: var(--topbar-bg);
+    --topbar-text: var(--text-primary);
+    --on-primary: #ffffff;
+    --on-warning: #111827;
+
+    /* Fallbacks sem color-mix (navegadores antigos) */
+    --primary-soft: rgba(127, 127, 127, 0.14);
+    --card-hover: var(--bg-input);
+    --bg-hover: var(--bg-input);
+    --border-hover: var(--primary-color);
+    --success-soft: rgba(16, 185, 129, 0.16);
+    --danger-soft: rgba(239, 68, 68, 0.16);
+    --warning-soft: rgba(245, 158, 11, 0.16);
+    --info-soft: rgba(6, 182, 212, 0.16);
+    --hero-bg: var(--bg-card);
+}
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+    :root {
+        --primary-soft: color-mix(in srgb, var(--primary-color) 16%, transparent);
+        --card-hover: color-mix(in srgb, var(--primary-color) 7%, var(--bg-card));
+        --bg-hover: color-mix(in srgb, var(--primary-color) 9%, transparent);
+        --border-hover: color-mix(in srgb, var(--primary-color) 55%, var(--border-color));
+        --success-soft: color-mix(in srgb, var(--success-color) 16%, transparent);
+        --danger-soft: color-mix(in srgb, var(--danger-color) 16%, transparent);
+        --warning-soft: color-mix(in srgb, var(--warning-color) 16%, transparent);
+        --info-soft: color-mix(in srgb, var(--info-color) 16%, transparent);
+        --hero-bg: linear-gradient(135deg, color-mix(in srgb, var(--primary-color) 30%, var(--bg-main)) 0%, var(--bg-main) 85%);
+    }
+}
+/* Primária clara (âmbar/laranja): texto escuro para manter contraste */
+[data-color-theme="amber"], [data-color-theme="orange"] { --on-primary: #111827; }
+
+/* ── 9.2 Tipografia base ──────────────────────────────────────────────────── */
+body[class*="layout-"] {
+    font-family: var(--font-sans);
+    line-height: 1.5;
+    text-rendering: optimizeLegibility;
+}
+body[class*="layout-"] :is(button, input, select, textarea, optgroup) {
+    font-family: inherit;
+}
+body[class*="layout-"] :is(code, pre, kbd, samp, .mono, .font-mono) {
+    font-family: var(--font-mono);
+}
+body[class*="layout-"] .main-content :is(.page-title, .header > h1, .page-header h1) {
+    font-size: var(--fs-2xl);
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+}
+body[class*="layout-"] .main-content :is(.panel, .card, .chart-panel, .settings-card) > :is(h2, h3):first-child,
+body[class*="layout-"] .main-content :is(.panel-header, .card-header) :is(h2, h3) {
+    font-size: var(--fs-lg);
+    font-weight: 600;
+    line-height: 1.3;
+}
+body[class*="layout-"] .main-content .page-subtitle { font-size: var(--fs-md); color: var(--text-muted); }
+
+/* ── 9.3 Botões ───────────────────────────────────────────────────────────── */
+body[class*="layout-"] .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: var(--control-h);
+    padding: 0 16px;
+    font-size: var(--fs-md);
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+    border-radius: var(--btn-radius, 6px);
+    border: 1px solid var(--border-color);
+    background: var(--bg-input);
+    color: var(--text-primary);
+    box-shadow: var(--btn-shadow, none);
+    cursor: pointer;
+    text-decoration: none;
+    transition: background-color .18s ease, color .18s ease, border-color .18s ease, box-shadow .18s ease, transform .18s ease, opacity .18s ease;
+}
+body[class*="layout-"] .btn:hover:not(:disabled) {
+    border-color: var(--border-hover);
+    background: var(--bg-hover);
+    transform: var(--btn-transform-hover, translateY(-1px));
+    opacity: 1;
+}
+body[class*="layout-"] .btn:active:not(:disabled) { transform: var(--btn-transform-active, none); }
+body[class*="layout-"] .btn:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+body[class*="layout-"] .btn:disabled, body[class*="layout-"] .btn.disabled { opacity: .5; cursor: not-allowed; transform: none; }
+body[class*="layout-"] .btn i { font-size: 0.95em; }
+body[class*="layout-"] :is(.btn-sm, .btn-small) { min-height: var(--control-h-sm); padding: 0 12px; font-size: var(--fs-sm); gap: 6px; }
+body[class*="layout-"] .btn-lg { min-height: var(--control-h-lg); padding: 0 22px; font-size: var(--fs-base, 0.9375rem); }
+
+body[class*="layout-"] :is(.btn-primary, .btn-blue, .btn-primary-custom) { background: var(--primary-color); border-color: transparent; color: var(--on-primary); }
+body[class*="layout-"] :is(.btn-success, .btn-green) { background: var(--success-color); border-color: transparent; color: #ffffff; }
+body[class*="layout-"] :is(.btn-danger, .btn-red, .btn-danger-custom) { background: var(--danger-color); border-color: transparent; color: #ffffff; }
+body[class*="layout-"] :is(.btn-warning, .btn-yellow, .btn-warning-custom) { background: var(--warning-color); border-color: transparent; color: var(--on-warning); }
+body[class*="layout-"] .btn-info { background: var(--info-color); border-color: transparent; color: #ffffff; }
+body[class*="layout-"] :is(.btn-primary, .btn-blue, .btn-success, .btn-green, .btn-danger, .btn-red, .btn-warning, .btn-yellow, .btn-info):hover:not(:disabled) {
+    filter: brightness(1.08);
+    border-color: transparent;
+}
+body[class*="layout-"] .btn-primary:hover:not(:disabled) { background: var(--primary-hover, var(--primary-color)); }
+body[class*="layout-"] .btn-success:hover:not(:disabled) { background: var(--success-color); }
+body[class*="layout-"] .btn-danger:hover:not(:disabled) { background: var(--danger-color); }
+body[class*="layout-"] .btn-warning:hover:not(:disabled) { background: var(--warning-color); }
+body[class*="layout-"] .btn-info:hover:not(:disabled) { background: var(--info-color); }
+body[class*="layout-"] :is(.btn-secondary, .btn-secondary-custom) { background: var(--bg-input); border-color: var(--border-color); color: var(--text-primary); }
+body[class*="layout-"] .btn-outline-primary { background: transparent; border-color: var(--primary-color); color: var(--primary-color); }
+body[class*="layout-"] .btn-outline-danger { background: transparent; border-color: var(--danger-color); color: var(--danger-color); }
+body[class*="layout-"] :is(.btn-outline-primary, .btn-outline-danger):hover:not(:disabled) { background: var(--bg-hover); }
+body[class*="layout-"] .btn.active:not(.btn-primary) { background: var(--primary-soft); border-color: var(--primary-color); color: var(--primary-color); }
+body[class*="layout-"] .btn-outline-primary.active { background: var(--primary-color); color: var(--on-primary); }
+
+/* ── 9.4 Formulários ──────────────────────────────────────────────────────── */
+body[class*="layout-"] :is(.form-control, .form-select, select.form-control, .gboc-input) {
+    min-height: var(--control-h);
+    font-size: var(--fs-md);
+    color: var(--text-primary);
+    background: var(--input-bg, var(--bg-input));
+    border: var(--input-border, 1px solid var(--border-color));
+    border-radius: var(--input-radius, 6px);
+    box-shadow: var(--input-shadow, none);
+}
+body[class*="layout-"] textarea.form-control { min-height: 80px; line-height: 1.5; }
+body[class*="layout-"] :is(.form-control, .form-select):focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px var(--primary-soft);
+}
+body[class*="layout-"] :is(.form-group label, .form-label, .setting-item > label) {
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--text-secondary, var(--text-muted));
+}
+body[class*="layout-"] :is(input, select, textarea)::placeholder { color: var(--text-muted); opacity: 1; }
+
+/* ── 9.5 Badges / status (cor sempre do token do tema) ────────────────────── */
+body[class*="layout-"] :is(.badge, .status-badge) {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    line-height: 1.4;
+    letter-spacing: .02em;
+    white-space: nowrap;
+}
+body[class*="layout-"] :is(.badge-success, .badge-ok, .badge-green, .badge-compliant, .status-active) { background: var(--success-soft); color: var(--success-color); }
+body[class*="layout-"] :is(.badge-danger, .badge-error, .badge-crit, .badge-fail, .badge-non_compliant, .status-error) { background: var(--danger-soft); color: var(--danger-color); }
+body[class*="layout-"] :is(.badge-warning, .badge-warn, .badge-yellow, .badge-at_risk, .status-pending) { background: var(--warning-soft); color: var(--warning-color); }
+body[class*="layout-"] :is(.badge-info, .badge-run) { background: var(--info-soft); color: var(--info-color); }
+body[class*="layout-"] .badge-primary { background: var(--primary-soft); color: var(--primary-color); }
+[data-theme="light"] body[class*="layout-"] :is(.badge-success, .badge-ok, .badge-danger, .badge-crit, .badge-warning, .badge-warn, .badge-info) { filter: saturate(1.1) brightness(.85); }
+
+/* ── 9.6 Tabelas ──────────────────────────────────────────────────────────── */
+body[class*="layout-"] :is(.data-table, .table) { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+body[class*="layout-"] :is(.data-table, .table) th {
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--text-muted);
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+body[class*="layout-"] :is(.data-table, .table) td { color: var(--text-primary); border-bottom: 1px solid var(--border-color); }
+body[class*="layout-"] :is(.data-table, .table) tbody tr:hover { background: var(--bg-hover); }
+
+/* ── 9.7 Botões de seleção: abas, filtros, períodos, estilos — UM padrão para todo o sistema ──────────
+   Mesmo visual dos botões de período (Diagnóstico/Logs): contorno e texto na cor do tema; selecionado = fundo suave.
+   Antes cada página desenhava o seu (sublinhado, botão sólido, cartão) e o texto chegava a sumir (vermelho sobre vermelho).
+   O raio acompanha o estilo de UI escolhido (--btn-radius). Páginas que trocam .btn-primary/.btn-secondary
+   nas abas continuam funcionando: o estado visual vem de .active / aria-selected. */
+body[class*="layout-"] :is(.tab-btn, .gboc-tab, .tab-button, .selector-btn, .period-btn, .dr-tab-btn, .saas-tab-btn, .pow-tab-btn, .ad-tab-btn, .ent-tab-btn, .mode-btn) {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: var(--control-h-sm, 32px) !important;
+    padding: 0 14px !important;
+    font-size: var(--fs-sm, 0.8125rem) !important;
+    font-weight: 600 !important;
+    line-height: 1.2;
+    text-align: center;
+    white-space: normal;
+    background: transparent !important;
+    border: 1px solid var(--primary-color) !important;
+    border-radius: var(--btn-radius, 6px) !important;
+    color: var(--primary-color) !important;
+    cursor: pointer;
+    transition: background-color .18s ease, color .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+body[class*="layout-"] :is(.tab-btn, .gboc-tab, .tab-button, .selector-btn, .period-btn, .dr-tab-btn, .saas-tab-btn, .pow-tab-btn, .ad-tab-btn, .ent-tab-btn, .mode-btn):hover:not(:disabled) {
+    background: var(--bg-hover) !important;
+}
+body[class*="layout-"] :is(.tab-btn, .gboc-tab, .tab-button, .selector-btn, .period-btn, .dr-tab-btn, .saas-tab-btn, .pow-tab-btn, .ad-tab-btn, .ent-tab-btn, .mode-btn):is(.active, [aria-selected="true"]) {
+    background: var(--primary-soft) !important;
+    border-color: var(--primary-color) !important;
+    color: var(--primary-color) !important;
+}
+body[class*="layout-"] :is(.tab-btn, .gboc-tab, .tab-button, .selector-btn, .period-btn, .dr-tab-btn, .saas-tab-btn, .pow-tab-btn, .ad-tab-btn, .ent-tab-btn, .mode-btn) i {
+    color: inherit !important;
+}
+
+/* ── 9.7b Botões de ação do cabeçalho (padrão único, Agente e Servidor) ─────────
+   Antes cada página misturava botão sólido com gradiente, contorno, tamanhos e alturas diferentes
+   (ex.: "Manutenção" mais alto, "IA Diagnóstico" laranja sólido ao lado de botões de contorno).
+   Padrão: mesma altura, raio, fonte e espaçamento; neutro por padrão; .btn-primary é a ação principal
+   (preenchimento suave na cor do tema); ações perigosas em vermelho; warning/success/info mantêm só
+   a cor do ícone. Vale só para as barras de ação de cabeçalho/aba — botões dentro do conteúdo não mudam. */
+body[class*="layout-"] :is(.header-actions, .gboc-header-promoted, .gboc-spa-global-actions, .gboc-spa-tab-head, .page-actions, .main-content > .header, .main-content > header.header)
+  :is(a.btn, button.btn):not(.tab-btn, .gboc-tab, .tab-button, .selector-btn, .period-btn, .mode-btn, .dropdown-item, .btn-icon) {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center;
+    gap: 8px;
+    height: var(--control-h, 36px) !important;
+    min-height: 0 !important;
+    padding: 0 14px !important;
+    margin: 0 !important;
+    font-size: var(--fs-sm, 0.8125rem) !important;
+    font-weight: 600 !important;
+    line-height: 1 !important;
+    white-space: nowrap;
+    vertical-align: middle;
+    text-decoration: none !important;
+    background: var(--bg-input, transparent) !important;
+    background-image: none !important;
+    border: 1px solid var(--border-color, var(--border)) !important;
+    border-radius: var(--btn-radius, 8px) !important;
+    color: var(--text-primary, var(--text)) !important;
+    box-shadow: none !important;
+    transform: none !important;
+    transition: background-color .18s ease, border-color .18s ease, color .18s ease;
+}
+body[class*="layout-"] :is(.header-actions, .gboc-header-promoted, .gboc-spa-global-actions, .gboc-spa-tab-head, .page-actions, .main-content > .header, .main-content > header.header)
+  :is(a.btn, button.btn):not(.tab-btn, .gboc-tab, .tab-button, .selector-btn, .period-btn, .mode-btn, .dropdown-item, .btn-icon):hover:not(:disabled) {
+    background: var(--bg-hover) !important;
+    border-color: var(--primary-color) !important;
+    transform: none !important;
+}
+body[class*="layout-"] :is(.header-actions, .gboc-header-promoted, .gboc-spa-global-actions, .gboc-spa-tab-head, .page-actions, .main-content > .header, .main-content > header.header)
+  :is(a.btn, button.btn) i { color: inherit !important; font-size: .95em; }
+/* ação principal */
+body[class*="layout-"] :is(.header-actions, .gboc-header-promoted, .gboc-spa-global-actions, .gboc-spa-tab-head, .page-actions, .main-content > .header, .main-content > header.header)
+  :is(a.btn, button.btn).btn-primary {
+    background: var(--primary-soft) !important;
+    border-color: var(--primary-color) !important;
+    color: var(--primary-color) !important;
+}
+/* ações perigosas (excluir, desligar, reset) */
+body[class*="layout-"] :is(.header-actions, .gboc-header-promoted, .gboc-spa-global-actions, .gboc-spa-tab-head, .page-actions, .main-content > .header, .main-content > header.header)
+  :is(a.btn, button.btn):is(.btn-danger, .btn-outline-danger, [style*="danger"]) {
+    background: transparent !important;
+    border-color: var(--danger-color, #ef4444) !important;
+    color: var(--danger-color, #ef4444) !important;
+}
+body[class*="layout-"] :is(.header-actions, .gboc-header-promoted, .gboc-spa-global-actions, .gboc-spa-tab-head, .page-actions, .main-content > .header, .main-content > header.header)
+  :is(a.btn, button.btn):is(.btn-danger, .btn-outline-danger, [style*="danger"]):hover:not(:disabled) {
+    background: color-mix(in srgb, var(--danger-color, #ef4444) 14%, transparent) !important;
+}
+/* cor semântica só no ícone */
+body[class*="layout-"] :is(.header-actions, .gboc-header-promoted, .gboc-spa-global-actions, .gboc-spa-tab-head, .page-actions, .main-content > .header, .main-content > header.header)
+  :is(a.btn, button.btn):is(.btn-warning, .btn-outline-warning) i { color: var(--warning-color, #f59e0b) !important; }
+body[class*="layout-"] :is(.header-actions, .gboc-header-promoted, .gboc-spa-global-actions, .gboc-spa-tab-head, .page-actions, .main-content > .header, .main-content > header.header)
+  :is(a.btn, button.btn):is(.btn-success, .btn-outline-success) i { color: var(--success-color, #10b981) !important; }
+body[class*="layout-"] :is(.header-actions, .gboc-header-promoted, .gboc-spa-global-actions, .gboc-spa-tab-head, .page-actions, .main-content > .header, .main-content > header.header)
+  :is(a.btn, button.btn):is(.btn-info, .btn-outline-info) i { color: var(--info-color, #3b82f6) !important; }
+/* a linha de ações alinha tudo pelo centro, com o mesmo espaçamento */
+body[class*="layout-"] :is(.header-actions, .gboc-spa-global-actions) { display: flex; align-items: center !important; gap: 8px !important; flex-wrap: wrap; }
+
+/* ── 9.8 Cartões de indicadores ───────────────────────────────────────────── */
+body[class*="layout-"] :is(.kpi-value, .stat-card .val, .status-value) { font-weight: 700; line-height: 1.15; color: var(--text-primary); }
+body[class*="layout-"] :is(.kpi-sub, .stat-card .lbl, .status-label, .kpi-header span) { font-size: var(--fs-xs); color: var(--text-muted); }
+
+/* ── 9.9 Topbar (comum aos dois modos) ────────────────────────────────────── */
+@keyframes tbDropIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+body[class*="layout-"] .gboc-topbar { background: var(--topbar-bg) !important; border-bottom-color: var(--border-color) !important; }
+body[class*="layout-"] .tb-logo { color: var(--text-primary); font-size: 1rem; }
+body[class*="layout-"] .tb-logo-icon { color: var(--primary-color); filter: drop-shadow(0 0 6px var(--primary-glow, transparent)); }
+body[class*="layout-"] .tb-search {
+    height: 34px;
+    border-radius: 999px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    padding: 0 12px;
+    gap: 8px;
+}
+body[class*="layout-"] .tb-search input {
+    height: 100%;
+    font-size: var(--fs-sm);
+    color: var(--text-primary);
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    padding: 0;
+    min-height: 0;
+}
+body[class*="layout-"] .tb-search:focus-within { border-color: var(--primary-color); box-shadow: 0 0 0 3px var(--primary-soft); }
+body[class*="layout-"] :is(.tbr-icon, .tb-avatar) { color: var(--text-secondary, var(--text-muted)); }
+body[class*="layout-"] .tbr-icon:hover { background: var(--primary-soft); color: var(--primary-color); transform: none; }
+body[class*="layout-"] .tb-avatar { border-color: var(--primary-color); color: var(--primary-color); background: var(--primary-soft); }
+body[class*="layout-"] .tb-right { border-left-color: var(--border-color) !important; }
+
+/* Links da navegação horizontal */
+body[class*="layout-"] .tb-nav-link {
+    gap: 7px !important;
+    height: 34px;
+    padding: 0 12px !important;
+    border-radius: 8px !important;
+    font-size: var(--fs-sm) !important;
+    font-weight: 600 !important;
+    color: var(--text-secondary, var(--text-muted)) !important;
+}
+body[class*="layout-"] .tb-nav-link i:not(.tb-arrow) { font-size: 14px; width: 16px; text-align: center; }
+body[class*="layout-"] :is(.tb-nav-link:hover, .tb-dropdown:hover > .tb-nav-link, .tb-dropdown.active > .tb-nav-link) {
+    background: var(--primary-soft) !important;
+    color: var(--text-primary) !important;
+}
+/* Ativo: permanece destacado até a próxima navegação */
+body[class*="layout-"] .tb-nav-link.active {
+    background: var(--primary-soft) !important;
+    color: var(--primary-color) !important;
+    box-shadow: inset 0 -2px 0 var(--primary-color);
+}
+/* Submenu suspenso */
+body[class*="layout-"] .tb-dropdown-menu {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border-color) !important;
+    min-width: 240px !important;
+    max-width: min(420px, calc(100vw - 24px)) !important;
+    padding: 6px !important;
+}
+/* Ponte invisível: o mouse não "perde" o submenu ao atravessar o espaço de 4px */
+body[class*="layout-"] .tb-dropdown:hover::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    height: 8px;
+}
+body[class*="layout-"] .tb-dropdown.tb-suppress > .tb-dropdown-menu { display: none !important; }
+body[class*="layout-"] .tb-dropdown-item {
+    gap: 10px !important;
+    min-height: var(--nav-item-h);
+    padding: 7px 12px !important;
+    font-size: var(--fs-sm) !important;
+    color: var(--text-secondary, var(--text-muted)) !important;
+    white-space: normal !important;
+    line-height: 1.35;
+    transform: none !important;
+}
+body[class*="layout-"] .tb-dropdown-item:hover { background: var(--primary-soft) !important; color: var(--text-primary) !important; }
+body[class*="layout-"] .tb-dropdown-item.active {
+    background: var(--primary-soft) !important;
+    color: var(--primary-color) !important;
+    font-weight: 700 !important;
+    box-shadow: inset 3px 0 0 var(--primary-color);
+}
+
+/* ── 9.10 MODO HORIZONTAL: navegação em segunda linha ────────────────────── */
+body.layout-horizontal {
+    padding-top: calc(var(--gboc-topbar-height) + var(--gboc-navrow-height)) !important;
+}
+body.layout-horizontal .tb-nav {
+    position: fixed !important;
+    top: var(--gboc-topbar-height) !important;
+    left: 0 !important;
+    right: 0 !important;
+    height: var(--gboc-navrow-height) !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 16px !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    gap: 4px !important;
+    background: var(--topbar-bg) !important;
+    border-bottom: 1px solid var(--border-color) !important;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+    z-index: 1990 !important;
+}
+body.layout-horizontal .gboc-topbar { box-shadow: none; }
+body.layout-horizontal .gboc-hero-bg {
+    top: calc(var(--gboc-topbar-height) + var(--gboc-navrow-height));
+    background: var(--hero-bg);
+    opacity: .55;
+    border-radius: 0 0 18px 18px;
+}
+/* Telas médias: ícone + texto menor; abaixo de 1180px só ícones (title mostra o nome) */
+@media (max-width: 1440px) {
+    body.layout-horizontal .tb-nav-link { padding: 0 9px !important; }
+}
+@media (max-width: 1180px) {
+    body.layout-horizontal .tb-nav { justify-content: space-around !important; }
+    body.layout-horizontal .tb-nav-link { font-size: 0 !important; gap: 4px !important; padding: 0 12px !important; }
+    body.layout-horizontal .tb-nav-link i:not(.tb-arrow) { font-size: 16px; }
+    body.layout-horizontal .tb-nav-link i.tb-arrow { font-size: 10px !important; }
+}
+/* Celular: a linha de navegação vira painel aberto pelo botão ☰ */
+@media (max-width: 768px) {
+    body.layout-horizontal { padding-top: var(--gboc-topbar-height) !important; }
+    body.layout-horizontal .tb-nav { display: none !important; }
+    body.layout-horizontal.tb-nav-open .tb-nav {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        justify-content: flex-start !important;
+        height: auto !important;
+        max-height: calc(100vh - var(--gboc-topbar-height));
+        overflow-y: auto !important;
+        padding: 8px !important;
+    }
+    body.layout-horizontal.tb-nav-open .tb-nav-link { font-size: var(--fs-md) !important; width: 100%; justify-content: flex-start; }
+    body.layout-horizontal.tb-nav-open .tb-dropdown { display: block !important; width: 100%; }
+    body.layout-horizontal.tb-nav-open .tb-dropdown-menu {
+        position: static !important;
+        box-shadow: none !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        margin: 2px 0 6px 18px;
+    }
+    body.layout-horizontal.tb-nav-open .tb-dropdown:hover::after { display: none; }
+}
+
+/* ── 9.11 MODO VERTICAL: menu lateral ─────────────────────────────────────── */
+body.layout-vertical aside.sidebar,
+body.layout-vertical .sidebar {
+    padding: 0 !important;
+    background: var(--sidebar-bg) !important;
+    border-right: 1px solid var(--border-color) !important;
+}
+body[class*="layout-"] .sidebar .nav {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px !important;
+    padding: 12px 10px 24px !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+}
+body[class*="layout-"] .sidebar .nav-group { margin: 0 0 2px !important; }
+
+/* Cabeçalho do grupo (submenu retrátil) */
+body[class*="layout-"] .sidebar .nav-group-header {
+    width: 100% !important;
+    min-height: var(--nav-header-h) !important;
+    padding: 0 10px !important;
+    margin: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    border: 0 !important;
+    border-radius: 8px !important;
+    background: transparent !important;
+    font-family: inherit !important;
+    font-size: var(--fs-sm) !important;
+    font-weight: 600 !important;
+    color: var(--text-secondary, var(--text-muted)) !important;
+    text-align: left !important;
+    cursor: pointer !important;
+}
+body[class*="layout-"] .sidebar .nav-group-header > span {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+body[class*="layout-"] .sidebar .nav-group-header .nav-icon {
+    width: 18px;
+    flex-shrink: 0;
+    text-align: center;
+    font-size: 14px;
+    color: var(--group-accent) !important;
+}
+body[class*="layout-"] .sidebar .nav-group-header:hover { background: var(--group-soft, var(--primary-soft)) !important; color: var(--text-primary) !important; }
+body[class*="layout-"] .sidebar .nav-group-header.has-active-child { color: var(--text-primary) !important; font-weight: 700 !important; background: transparent !important; }
+body[class*="layout-"] .sidebar .nav-group-header.has-active-child > span::after {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--group-accent);
+    box-shadow: 0 0 8px var(--group-glow);
+    flex-shrink: 0;
+}
+body[class*="layout-"] .sidebar .nav-group-arrow {
+    flex-shrink: 0;
+    font-size: 10px !important;
+    color: var(--text-muted) !important;
+    transform: none !important;
+    transition: transform .2s ease !important;
+}
+body[class*="layout-"] .sidebar .nav-group-header.open .nav-group-arrow { transform: rotate(180deg) !important; }
+
+/* Itens do grupo */
+body[class*="layout-"] .sidebar .nav-group-items {
+    display: none !important;
+    flex-direction: column !important;
+    gap: 1px !important;
+    max-height: none !important;
+    overflow: visible !important;
+    margin: 2px 0 6px 18px !important;
+    padding: 0 0 0 8px !important;
+    border-left: 1px solid var(--border-color) !important;
+}
+body[class*="layout-"] .sidebar .nav-group-items.open {
+    display: flex !important;
+    animation: gbocNavOpen .18s ease-out;
+}
+@keyframes gbocNavOpen { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+
+body[class*="layout-"] .sidebar .nav-link,
+body[class*="layout-"] .sidebar .nav-link.nav-sub {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    min-height: var(--nav-item-h) !important;
+    margin: 0 !important;
+    padding: 0 10px 0 12px !important;
+    border-radius: 8px !important;
+    font-size: var(--fs-sm) !important;
+    font-weight: 500 !important;
+    line-height: 1.25 !important;
+    color: var(--text-secondary, var(--text-muted)) !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-decoration: none !important;
+    background: transparent;
+}
+body[class*="layout-"] .sidebar .nav-link > span {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+body[class*="layout-"] .sidebar .nav-link > i,
+body[class*="layout-"] .sidebar .nav-link > .nav-icon {
+    width: 16px !important;
+    flex-shrink: 0 !important;
+    font-size: 13px !important;
+    text-align: center;
+    color: var(--group-accent) !important;
+    transform: none !important;
+}
+body[class*="layout-"] .sidebar .nav-link:hover { background: var(--group-soft, var(--primary-soft)) !important; color: var(--text-primary) !important; }
+body[class*="layout-"] .sidebar .nav-link::before { width: 3px !important; border-radius: 0 3px 3px 0 !important; }
+
+/* Item ativo: fixo, visível e destacado até a próxima navegação */
+body[class*="layout-"] .sidebar :is(.nav-link.active, .nav-link.in-focus) {
+    background: var(--group-soft, var(--primary-soft)) !important;
+    color: var(--text-primary) !important;
+    font-weight: 700 !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+}
+body[class*="layout-"] .sidebar :is(.nav-link.active, .nav-link.in-focus)::before {
+    opacity: 1 !important;
+    transform: none !important;
+    width: 3px !important;
+    background: var(--group-accent) !important;
+}
+body[class*="layout-"] .sidebar :is(.nav-link.active, .nav-link.in-focus) span { color: var(--text-primary) !important; }
+/* Foco por teclado não deve "roubar" o destaque do item ativo */
+body[class*="layout-"] .sidebar .nav-link:focus-visible:not(.active):not(.in-focus) {
+    background: transparent !important;
+    outline: 2px solid var(--group-accent) !important;
+    outline-offset: -2px;
+    font-weight: 500 !important;
+}
+body[class*="layout-"] .sidebar .nav-link:focus-visible:not(.active):not(.in-focus)::before { opacity: 0 !important; }
+
+/* Sidebar recolhida (68px): só ícones, nome no tooltip */
+body.sidebar-collapsed .sidebar .nav { padding: 10px 6px !important; }
+body.sidebar-collapsed .sidebar .nav-group-header { justify-content: center !important; padding: 0 !important; }
+body.sidebar-collapsed .sidebar .nav-group-header > span { display: flex !important; font-size: 0 !important; gap: 0; justify-content: center; }
+body.sidebar-collapsed .sidebar .nav-group-header > span::after { display: none; }
+body.sidebar-collapsed .sidebar .nav-group-header .nav-icon { font-size: 15px !important; }
+body.sidebar-collapsed .sidebar .nav-group-items { margin: 2px 0 6px !important; padding: 0 !important; border-left: 0 !important; }
+body.sidebar-collapsed .sidebar .nav-link,
+body.sidebar-collapsed .sidebar .nav-link.nav-sub { justify-content: center !important; padding: 0 !important; }
+body.sidebar-collapsed .sidebar .nav-link > span { display: none !important; }
+@media (max-width: 1024px) and (min-width: 769px) {
+    body.layout-vertical .sidebar .nav-group-header > span { display: flex !important; font-size: 0 !important; justify-content: center; }
+    body.layout-vertical .sidebar .nav-group-header .nav-icon { font-size: 15px !important; }
+    body.layout-vertical .sidebar .nav-group-items { margin: 2px 0 6px !important; padding: 0 !important; border-left: 0 !important; }
+}
+/* Celular: menu lateral fora da tela, aberto pelo ☰ (body.sidebar-open) */
+@media (max-width: 768px) {
+    body.layout-vertical .sidebar { width: 280px !important; min-width: 280px !important; }
+    body.layout-vertical.sidebar-open::after {
+        content: '';
+        position: fixed;
+        inset: var(--gboc-topbar-height) 0 0 0;
+        background: rgba(0, 0, 0, .45);
+        z-index: 999;
+    }
+}
+
+/* ── 9.12 Movimento ─────────────────────────────────────────────────────────
+   Animações e efeitos ficam sempre ativos (servidores Windows/RDP costumam ter
+   "Mostrar animações" desligado, o que antes zerava todos os efeitos do sistema). */
+
+/* ── 9.13 Estilos de UI acompanham o TEMA de cor ──────────────────────────────
+   Antes Command Sentinel / Cyber 3D / Nexus Glass tinham fundos azul-marinho fixos
+   (#0f172a, #020617, rgba(30,41,59)) e ignoravam os temas Red/Amber/Purple/Ocean. */
+html[data-ui-style="command-sentinel"] {
+    --font-sans: 'JetBrains Mono', 'Cascadia Code', Consolas, 'Courier New', monospace;
+    --card-bg: var(--bg-card);
+    --input-bg: var(--bg-input);
+    --input-border: 1px solid var(--border-color);
+}
+html[data-ui-style="cyber-3d"] { --card-bg: var(--bg-card); }
+html[data-ui-style="nexus-glass"] { --card-bg: var(--bg-card); }
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+    html[data-ui-style="command-sentinel"] { --card-bg: color-mix(in srgb, var(--bg-card) 94%, var(--primary-color)); }
+    html[data-ui-style="cyber-3d"] {
+        --card-bg: linear-gradient(135deg, color-mix(in srgb, var(--bg-card) 88%, var(--primary-color)) 0%, var(--bg-card) 100%);
+    }
+    html[data-ui-style="nexus-glass"] { --card-bg: color-mix(in srgb, var(--bg-card) 72%, transparent); }
+}
+html[data-ui-style="command-sentinel"] body .sidebar .nav-link {
+    background: var(--bg-input) !important;
+    border: 1px solid var(--border-color) !important;
+}
+html[data-ui-style="command-sentinel"] body .sidebar .nav-link:hover { border-color: var(--group-accent) !important; }
+html[data-ui-style="command-sentinel"] body .sidebar :is(.nav-link.active, .nav-link.in-focus) {
+    background: var(--bg-main) !important;
+    border-color: var(--group-accent) !important;
+    box-shadow: 0 0 12px var(--group-glow) !important;
+}
+html:is([data-ui-style="cyber-3d"], [data-ui-style="nexus-glass"]) body .sidebar .nav-link {
+    background: var(--bg-input) !important;
+    border: 1px solid var(--border-color) !important;
+}
+html:is([data-ui-style="cyber-3d"], [data-ui-style="nexus-glass"]) body .sidebar :is(.nav-link.active, .nav-link.in-focus) {
+    background: var(--bg-card) !important;
+    border-color: var(--group-accent) !important;
+    box-shadow: 0 0 16px var(--group-glow) !important;
+}
+
+/* ── 9.14 Central de Logs / Notificações (Server + Agent) ────────────────────
+   Superfícies seguem o tema; as cores de nível (sucesso/info/aviso/erro) viram
+   MARCADORES — barra lateral, ícone e contorno — como os grupos do menu. */
+body[class*="layout-"] :is(.log-toast-panel, .toast-panel) {
+    background: var(--card-bg, var(--bg-card)) !important;
+    border: var(--card-border, 1px solid var(--border-color)) !important;
+    border-radius: var(--card-radius, 12px) !important;
+    box-shadow: var(--card-shadow, none) !important;
+}
+body[class*="layout-"] :is(.filter, .toast-filter) {
+    --mk: var(--primary-color);
+    min-height: var(--control-h-sm);
+    padding: 0 14px;
+    gap: 7px;
+    font-size: var(--fs-sm);
+    font-weight: 700;
+    color: var(--text-primary) !important;
+    background: var(--bg-input) !important;
+    border: 1px solid var(--border-color);
+    border-radius: var(--btn-radius, 8px);
+    box-shadow: inset 3px 0 0 var(--mk);
+}
+body[class*="layout-"] :is(.filter, .toast-filter)[data-filter="success"] { --mk: var(--success-color); }
+body[class*="layout-"] :is(.filter, .toast-filter)[data-filter="info"]    { --mk: var(--info-color); }
+body[class*="layout-"] :is(.filter, .toast-filter)[data-filter="warning"] { --mk: var(--warning-color); }
+body[class*="layout-"] :is(.filter, .toast-filter)[data-filter="error"]   { --mk: var(--danger-color); }
+body[class*="layout-"] :is(.filter, .toast-filter) i { color: var(--mk); }
+body[class*="layout-"] :is(.filter, .toast-filter):hover {
+    border-color: var(--mk);
+    transform: translateY(-1px);
+    filter: none;
+}
+body[class*="layout-"] :is(.filter, .toast-filter).active {
+    border-color: var(--mk);
+    background: var(--bg-card) !important;
+    box-shadow: inset 3px 0 0 var(--mk), 0 0 0 1px var(--mk), 0 0 14px var(--primary-glow, transparent);
+}
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+    body[class*="layout-"] :is(.filter, .toast-filter).active {
+        background: color-mix(in srgb, var(--mk) 16%, var(--bg-input)) !important;
+        box-shadow: inset 3px 0 0 var(--mk), 0 0 0 1px var(--mk), 0 0 14px color-mix(in srgb, var(--mk) 35%, transparent);
+    }
+}
+body[class*="layout-"] :is(.toolbar, .toast-toolbar) { color: var(--text-muted); font-size: var(--fs-xs); }
+body[class*="layout-"] :is(.toolbar, .toast-toolbar) button { color: var(--text-muted); font-size: var(--fs-xs); }
+body[class*="layout-"] :is(.toolbar, .toast-toolbar) button:hover { color: var(--primary-color); }
+
+body[class*="layout-"] .toast {
+    --mk: var(--info-color);
+    color: var(--text-primary) !important;
+    background: var(--bg-input) !important;
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--mk);
+    border-radius: 10px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+}
+body[class*="layout-"] .toast:is([data-type="success"], .success) { --mk: var(--success-color); }
+body[class*="layout-"] .toast:is([data-type="info"], .info)       { --mk: var(--info-color); }
+body[class*="layout-"] .toast:is([data-type="warning"], .warning) { --mk: var(--warning-color); }
+body[class*="layout-"] .toast:is([data-type="error"], .error)     { --mk: var(--danger-color); }
+body[class*="layout-"] .toast:hover { border-color: var(--mk); transform: translateX(2px); }
+body[class*="layout-"] .toast::before { background: var(--primary-soft); opacity: .45; box-shadow: none; }
+body[class*="layout-"] .toast::after  { background: var(--primary-soft); opacity: .3; }
+body[class*="layout-"] .toast .icon {
+    color: var(--mk);
+    background: var(--bg-card);
+    border: 1px solid var(--mk);
+    box-shadow: 0 0 10px var(--primary-glow, transparent);
+}
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+    body[class*="layout-"] .toast { background: color-mix(in srgb, var(--mk) 7%, var(--bg-input)) !important; }
+    body[class*="layout-"] .toast::before { background: color-mix(in srgb, var(--mk) 12%, transparent); opacity: 1; }
+    body[class*="layout-"] .toast::after  { background: color-mix(in srgb, var(--mk) 8%, transparent); opacity: 1; }
+    body[class*="layout-"] .toast .icon {
+        background: color-mix(in srgb, var(--mk) 16%, transparent);
+        box-shadow: 0 0 12px color-mix(in srgb, var(--mk) 30%, transparent);
+    }
+}
+body[class*="layout-"] .toast .copy,
+body[class*="layout-"] .toast .copy strong { color: var(--text-primary); }
+body[class*="layout-"] .toast .copy strong > span:first-child { color: var(--mk); }
+body[class*="layout-"] .toast .copy > span { color: var(--text-secondary, var(--text-muted)); }
+body[class*="layout-"] .toast .meta-badge {
+    color: var(--text-secondary, var(--text-muted));
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+}
+body[class*="layout-"] .toast :is(.dismiss, .ai-btn) {
+    color: var(--text-muted);
+    background: transparent;
+    border: 1px solid var(--border-color);
+}
+body[class*="layout-"] .toast :is(.dismiss, .ai-btn):hover { color: var(--mk); border-color: var(--mk); background: var(--bg-card); }
+body[class*="layout-"] :is(.empty, .empty-logs) { background: var(--bg-input); border-color: var(--border-color); color: var(--text-muted); }
+
+/* ── 9.15 Contraste do texto secundário (WCAG AA ≥ 4.5:1) ────────────────────
+   O "texto apagado" dos temas escuros coloridos ficava abaixo de 4,5:1
+   (âmbar #b45309 = 3,9:1; roxo #9333ea = 3,7:1). Mantém a mesma cor-base do tema. */
+html[data-color-theme="amber"], html[data-color-theme="orange"] { --text-muted: #c98a3e !important; }
+html[data-color-theme="red"], html[data-color-theme="crimson"]  { --text-muted: #e57373 !important; }
+html[data-color-theme="purple"]                                 { --text-muted: #b388f5 !important; }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   NOME DO MÓDULO NO TOPBAR + BUSCA GLOBAL (gboc-layout-manager.js → GBOCPageHeader)
+   ════════════════════════════════════════════════════════════════════════════ */
+.tb-page-title {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+    flex: 0 1 auto;
+    max-width: 46vw;
+    margin: 0 12px 0 2px;
+    padding-left: 12px;
+    border-left: 1px solid var(--border-color, rgba(255,255,255,0.08));
+    line-height: 1.2;
+    overflow: hidden;
+}
+.tb-page-title[hidden] { display: none !important; }
+.tb-pt-main {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+.tb-pt-main i { color: var(--primary-color); font-size: 0.9em; flex-shrink: 0; }
+.tb-pt-crumb { color: var(--text-muted); font-weight: 600; flex-shrink: 0; }
+.tb-pt-sep { color: var(--text-muted); opacity: 0.6; flex-shrink: 0; }
+.tb-pt-name { overflow: hidden; text-overflow: ellipsis; }
+.tb-pt-sub {
+    margin-top: 2px;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+body.layout-horizontal .tb-page-title { display: none !important; }
+@media (max-width: 1200px) { .tb-pt-sub, .tb-pt-crumb, .tb-pt-sep { display: none; } }
+@media (max-width: 860px)  { .tb-page-title { display: none !important; } }
+
+/* Cabeçalho da página após promover o título: só as ações, compacto, no fluxo normal (não sobrepõe nada) */
+.gboc-promoted-hide, .gboc-dup-hidden { display: none !important; }
+.gboc-header-empty, .main-content .gboc-header-promoted.gboc-header-empty { display: none !important; }
+.main-content .gboc-header-promoted {
+    position: static !important;
+    display: flex !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    gap: 8px;
+    flex-wrap: wrap;
+    min-height: 0 !important;
+    margin: 0 0 14px 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    transform: none !important;
+}
+.main-content .gboc-header-promoted::before,
+.main-content .gboc-header-promoted::after { display: none !important; }
+
+/* Resultados da busca global */
+.tb-search { position: relative; }
+.tb-search-results {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    width: max(100%, 340px);
+    max-height: min(420px, calc(100vh - 90px));
+    overflow-y: auto;
+    padding: 6px;
+    background: var(--bg-card, #1e293b);
+    border: 1px solid var(--border-color, #2a3f5f);
+    border-radius: 12px;
+    box-shadow: 0 16px 45px rgba(0, 0, 0, 0.45);
+    z-index: 10000;
+}
+.tb-search-results[hidden] { display: none !important; }
+.tb-search-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    text-align: left;
+    cursor: pointer;
+}
+.tb-search-item i { width: 16px; text-align: center; color: var(--primary-color); }
+.tb-search-item:hover, .tb-search-item.active { background: var(--primary-soft, rgba(127,127,127,0.14)); }
+.tb-si-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tb-si-group { font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; }
+
+/* SPA do Server: ações gerais (IA Diagnóstico, Push Sync) na mesma linha das ações da aba */
+.gboc-spa-global-actions { display: flex !important; gap: 8px; align-items: center; flex-wrap: wrap; }
+.gboc-spa-tab-head { justify-content: flex-end !important; }
+.gboc-spa-tab-head > div:not(.gboc-promoted-hide) { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* Espaço vazio acima do conteúdo: o <body> já desconta a altura do topbar (padding-top: var(--gboc-topbar-height))
+   e ui/models/modern/layout.css somava mais 64px ao conteúdo (de quando o topbar não era descontado no body).
+   Fica só o respiro normal do conteúdo. */
+body.layout-vertical .main-content, body.layout-vertical main.main-content,
+body.layout-horizontal .main-content, body.layout-horizontal main.main-content {
+    padding-top: var(--gboc-content-top, 24px);
+}
+@media (max-width: 768px) { :root { --gboc-content-top: 16px; } }

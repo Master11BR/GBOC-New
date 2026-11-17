@@ -29,6 +29,29 @@ COMPRESSION_MAP = {
 }
 
 
+def _scandir_walk(root_path: str):
+    """Iterative os.scandir walker yielding (file_path, stat_result_or_none, parent_dir).
+    Reuses Win32 WIN32_FIND_DATA cached in DirEntry to avoid a second os.stat() syscall per file."""
+    stack = [root_path]
+    while stack:
+        current_dir = stack.pop()
+        try:
+            with os.scandir(current_dir) as it:
+                dirs = []
+                for entry in it:
+                    try:
+                        if entry.is_dir(follow_symlinks=False):
+                            dirs.append(entry.path)
+                        elif entry.is_file(follow_symlinks=False):
+                            yield entry.path, entry.stat(follow_symlinks=False), current_dir
+                    except OSError:
+                        yield entry.path, None, current_dir
+                for d in reversed(dirs):
+                    stack.append(d)
+        except OSError:
+            continue
+
+
 class GBOCNativeEngine:
     """
     Motor proprietario GBOC v3.
@@ -541,7 +564,14 @@ class GBOCNativeEngine:
     # ------------------------------------------------------------------
 
     def _store(self) -> "store_v4.ObjectStore":
-        store = store_v4.ObjectStore(self.backend, self.backend_factory, self.workers)
+        tc = self.task_config or {}
+        if "use_packs" in tc:
+            use_packs = bool(tc.get("use_packs"))
+        else:
+            # Cópia individual por objeto/bloco criptografado (AES-256-GCM + Zstd) como padrão:
+            # evita grandes arquivos particionados na nuvem e permite restore DR / arquivo único instantâneo.
+            use_packs = os.getenv("GBOC_NATIVE_USE_PACKS", "0").strip().lower() in ("1", "true", "yes", "on")
+        store = store_v4.ObjectStore(self.backend, self.backend_factory, self.workers, use_packs=use_packs)
         store.cipher = self._crypto()
         return store
 
@@ -563,10 +593,9 @@ class GBOCNativeEngine:
             return {e['path']: e for e in m.get('entries') or [] if e.get('chunks') is not None}
         return {}
 
-    def _progress_reporter(self, source_paths, stats: Dict[str, int], store):
-        """Progresso ao vivo para quem chamou (task_config['progress_cb']), no máximo 1x por segundo.
-        Os totais (arquivos e bytes) são contados numa thread à parte; até terminar a contagem vão como 0
-        (a tela mostra "contando") e o backup não espera por ela."""
+    def _progress_reporter(self, source_paths, stats: Dict[str, Any], store):
+        """Progresso ao vivo para quem chamou (task_config['progress_cb']), até 4x por segundo.
+        Os totais (arquivos e bytes) são contados numa thread à parte via os.scandir() para máxima velocidade."""
         cb = (self.task_config or {}).get('progress_cb')
         if not callable(cb):
             return lambda *_a, **_k: None
@@ -583,13 +612,10 @@ class GBOCNativeEngine:
                         files += 1
                         size += os.path.getsize(src)
                         continue
-                    for r, _d, fs in os.walk(src):
-                        for n in fs:
-                            try:
-                                size += os.stat(os.path.join(r, n)).st_size
-                                files += 1
-                            except OSError:
-                                pass
+                    for _fp, st, _parent in _scandir_walk(src):
+                        if st is not None:
+                            size += st.st_size
+                            files += 1
                 totals.update(files=files, bytes=size)
             finally:
                 totals["done"] = True
@@ -599,18 +625,31 @@ class GBOCNativeEngine:
 
         def report(current_file=None, phase="running", force=False):
             now = _t.time()
-            if not force and now - last[0] < 1.0:
+            if not force and now - last[0] < 0.35:
                 return
             last[0] = now
             done = totals["done"]
             try:
                 cb({
-                    "files_processed": stats["files"], "bytes_processed": stats["bytes"],
+                    "files_processed": stats["files"],
+                    "bytes_processed": stats["bytes"],
                     "files_total": max(totals["files"], stats["files"]) if done else 0,
                     "bytes_total": max(totals["bytes"], stats["bytes"]) if done else 0,
-                    "files_new": stats["new"], "files_unmodified": stats["reused"],
+                    "files_in_filter": stats.get("in_filter", stats["files"]),
+                    "files_new": stats["new"],
+                    "files_changed": stats.get("changed", 0),
+                    "files_unmodified": stats["reused"],
+                    "files_missing": stats.get("missing", 0),
+                    "files_failed": stats.get("errors", 0),
                     "bytes_added": int(getattr(store, "uploaded_bytes", 0) or 0),
-                    "current_file": current_file, "phase": phase, "threads": self.workers,
+                    "current_file": current_file,
+                    "current_file_size": stats.get("current_file_size", 0),
+                    "current_dir": stats.get("current_dir"),
+                    "last_completed_file": stats.get("last_completed_file"),
+                    "paused_seconds": int(stats.get("paused_seconds", 0)),
+                    "paused": bool(stats.get("paused", False)),
+                    "phase": phase,
+                    "threads": self.workers,
                 })
             except Exception as e:                       # progresso nunca interrompe o backup
                 self.logger.debug(f"Progresso não informado: {e}")
@@ -639,7 +678,14 @@ class GBOCNativeEngine:
             store.known(names)
             multi = len(source_paths) > 1
             entries: List[Dict[str, Any]] = []
-            stats = {"files": 0, "bytes": 0, "new": 0, "unchanged": 0, "reused": 0, "chunks_new": 0, "errors": 0}
+            stats: Dict[str, Any] = {
+                "files": 0, "bytes": 0, "in_filter": 0, "new": 0, "changed": 0,
+                "unchanged": 0, "reused": 0, "chunks_new": 0, "missing": 0, "errors": 0,
+                "current_dir": None, "current_file_size": 0, "last_completed_file": None,
+                "paused_seconds": 0.0, "paused": False,
+            }
+            pause_ev = (self.task_config or {}).get('pause_event')
+            cancel_ev = (self.task_config or {}).get('cancel_event')
             pool = store.pool()
             _report = self._progress_reporter(source_paths, stats, store)
             # VSS: leitura pela cópia de sombra (mesmos caminhos relativos no manifesto - restauração igual)
@@ -650,20 +696,43 @@ class GBOCNativeEngine:
                     source = read_map.get(orig) or read_map.get(orig.strip()) or source.strip()
                     if not os.path.exists(source):
                         self.logger.warning(f"Origem nao encontrada: {orig}")
+                        stats["missing"] += 1
                         stats["errors"] += 1
                         continue
                     if os.path.isfile(source):
-                        base_dir, files = os.path.dirname(source), [source]
+                        base_dir = os.path.dirname(source)
+                        try:
+                            file_iter = [(source, os.stat(source), base_dir)]
+                        except OSError:
+                            file_iter = [(source, None, base_dir)]
                     else:
-                        base_dir, files = source, (os.path.join(r, n) for r, _d, fs in os.walk(source) for n in fs)
+                        base_dir = source
+                        file_iter = _scandir_walk(source)
                     # prefixo pelo caminho ORIGINAL (na cópia de sombra a raiz do volume teria outro nome)
                     prefix = (os.path.basename(os.path.normpath(orig.strip())) + '/') if multi and os.path.isdir(source) else ''
                     _src_r = source.rstrip('\\')
                     _shown = (lambda fp, a=_src_r, b=orig.strip().rstrip('\\'): b + fp[len(a):] if fp.startswith(a) else fp) \
                         if source != orig.strip() else (lambda fp: fp)
-                    for fpath in files:
+                    for fpath, st, parent_dir in file_iter:
+                        if cancel_ev is not None and cancel_ev.is_set():
+                            raise RuntimeError("Backup interrompido pelo operador")
+                        if pause_ev is not None and pause_ev.is_set():
+                            stats["paused"] = True
+                            _report(_shown(fpath), phase="paused", force=True)
+                            _p0 = _time.time()
+                            while pause_ev.is_set():
+                                if cancel_ev is not None and cancel_ev.is_set():
+                                    raise RuntimeError("Backup interrompido pelo operador")
+                                _time.sleep(0.25)
+                            stats["paused_seconds"] += (_time.time() - _p0)
+                            stats["paused"] = False
+                            _report(_shown(fpath), phase="running", force=True)
                         try:
-                            st = os.stat(fpath)
+                            if st is None:
+                                st = os.stat(fpath)
+                            shown_path = _shown(fpath)
+                            stats["current_dir"] = _shown(parent_dir)
+                            stats["current_file_size"] = st.st_size
                             rel = prefix + os.path.relpath(fpath, base_dir).replace('\\', '/')
                             old = prev.get(rel)
                             # inalterado e com todos os blocos presentes no repositório (senão relê e reenvia)
@@ -677,13 +746,23 @@ class GBOCNativeEngine:
                                 stats["chunks_new"] += n_new
                                 if old and old.get('hash') == fh:
                                     stats["reused"] += 1
+                                elif old:
+                                    stats["changed"] += 1
+                                    stats["new"] += 1
                                 else:
                                     stats["new"] += 1
                             entries.append(entry)
                             stats["files"] += 1
+                            stats["in_filter"] += 1
                             stats["bytes"] += st.st_size
-                            _report(_shown(fpath))
+                            stats["last_completed_file"] = shown_path
+                            _report(shown_path)
+                        except FileNotFoundError as e:
+                            stats["missing"] += 1
+                            self.logger.warning(f"Arquivo removido durante a leitura {_shown(fpath)}: {e}")
                         except (OSError, RuntimeError) as e:
+                            if isinstance(e, RuntimeError) and "interrompido" in str(e):
+                                raise
                             stats["errors"] += 1
                             self.logger.error(f"Erro ao processar {_shown(fpath)}: {e}")
                             if isinstance(e, RuntimeError):
@@ -697,7 +776,8 @@ class GBOCNativeEngine:
             manifest = {
                 'version': store_v4.FORMAT, 'snapshot_id': snapshot_id, 'timestamp': datetime.now().isoformat(),
                 'compression': self.codec, 'chunk_size': store_v4.CHUNK_SIZE,
-                'files_total': stats["files"], 'files_new': stats["new"], 'files_unchanged': stats["unchanged"],
+                'files_total': stats["files"], 'files_new': stats["new"], 'files_changed': stats["changed"],
+                'files_unchanged': stats["unchanged"],
                 'bytes_total': stats["bytes"], 'bytes_uploaded': store.uploaded_bytes, 'chunks_uploaded': store.uploaded_objects,
                 'packs_uploaded': store.packs_uploaded, 'encrypted': bool(cipher),
                 'source_paths': source_paths, 'errors': stats["errors"], 'entries': entries,
@@ -709,7 +789,8 @@ class GBOCNativeEngine:
                              f"{stats['reused']} inalterados), {stats['bytes']} bytes lidos, {store.uploaded_bytes} enviados "
                              f"({saved:.0f}% economizado por deduplicacao/compressao)")
             return {"success": True, "snapshot_id": snapshot_id, "files": stats["files"], "bytes": stats["bytes"],
-                    "files_new": stats["new"], "files_unchanged": stats["unchanged"], "bytes_uploaded": store.uploaded_bytes,
+                    "files_new": stats["new"], "files_changed": stats["changed"],
+                    "files_unchanged": stats["unchanged"], "bytes_uploaded": store.uploaded_bytes,
                     "objects_uploaded": store.uploaded_objects, "packs_uploaded": store.packs_uploaded,
                     "seconds": secs, "errors": stats["errors"]}
         except Exception as e:
@@ -717,9 +798,16 @@ class GBOCNativeEngine:
             return {"success": False, "error": str(e)}
 
     def _restore_v4(self, entries: List[Dict[str, Any]], dest: str, cfg: Dict[str, Any]) -> Dict[str, Any]:
+        import time as _time
         store = self._store()
         strip = str(cfg.get('strip_prefix') or '').strip('/')
         restored, errors, failed = 0, 0, []
+        bytes_restored = 0
+        total_files = len(entries)
+        total_bytes = sum(int(e.get('size') or 0) for e in entries)
+        progress_cb = cfg.get('progress_cb') if callable(cfg.get('progress_cb')) else None
+        last_report = [0.0]
+
         if str(dest).strip() not in ('', '/', '\\'):
             os.makedirs(dest, exist_ok=True)
         sources = [str(x) for x in (cfg.get('_sources') or [])]
@@ -738,27 +826,67 @@ class GBOCNativeEngine:
             base = src if os.path.isdir(src) or not os.path.splitext(src)[1] else os.path.dirname(src)
             return os.path.join(base, *rel.split('/'))
 
+        # Ordena os arquivos pelo ID do pacote de 8 MiB e deslocamento (pack locality)
+        # para que cada pacote seja baixado uma única vez e servido do cache em memória.
+        sorted_entries = sorted(entries, key=store.sort_key_for_restore)
+
+        # Pré-cria os diretórios de destino únicos antes de disparar o pool paralelo
+        unique_dirs = set()
+        for e in sorted_entries:
+            rel = e['path']
+            if strip and rel.startswith(strip + '/'):
+                rel = rel[len(strip) + 1:]
+            d = os.path.dirname(target_for(rel))
+            if d:
+                unique_dirs.add(d)
+        for d in sorted(unique_dirs):
+            try:
+                os.makedirs(d, exist_ok=True)
+            except OSError:
+                pass
+
         def one(e):
             rel = e['path']
             if strip and rel.startswith(strip + '/'):
                 rel = rel[len(strip) + 1:]
             target = target_for(rel)
             if cfg.get('skip_existing') and os.path.exists(target):
-                return 'skipped'
+                return ('skipped', target, int(e.get('size') or 0))
             store_v4.restore_entry(store, e, target)
-            return 'ok'
+            return ('ok', target, int(e.get('size') or 0))
+
         with store.pool() as pool:
-            futs = [(e, pool.submit(one, e)) for e in entries]
+            futs = [(e, pool.submit(one, e)) for e in sorted_entries]
             for e, f in futs:
                 try:
-                    f.result()
+                    _state, target_path, fsize = f.result()
                     restored += 1
+                    bytes_restored += fsize
+                    if progress_cb:
+                        now = _time.time()
+                        if now - last_report[0] >= 0.35 or restored == total_files:
+                            last_report[0] = now
+                            try:
+                                progress_cb({
+                                    "files_restored": restored,
+                                    "files_total": total_files,
+                                    "bytes_restored": bytes_restored,
+                                    "bytes_total": total_bytes,
+                                    "current_file": target_path,
+                                    "current_file_size": fsize,
+                                    "current_dir": os.path.dirname(target_path),
+                                    "last_completed_file": target_path,
+                                    "errors": errors,
+                                    "threads": self.workers,
+                                })
+                            except Exception:
+                                pass
                 except Exception as ex:
                     errors += 1
                     failed.append(f"{e.get('path')}: {ex}")
                     self.logger.error(f"Erro ao restaurar {e.get('path')}: {ex}")
-        return {"success": errors == 0, "restored": restored, "errors": errors, "destination": dest,
-                "failed": failed[:20]}
+        return {"success": errors == 0, "restored": restored, "bytes_restored": bytes_restored,
+                "errors": errors, "destination": dest, "failed": failed[:20]}
 
     def file_versions(self, path: str, limit: int = 200) -> List[Dict[str, Any]]:
         """Histórico de um arquivo: em quais snapshots aparece, tamanho/data e se mudou em relação ao anterior."""
@@ -813,6 +941,17 @@ class GBOCNativeEngine:
 
     def check_repository(self) -> Dict[str, Any]:
         return self.backend.check_connection()
+
+    def verify_go_fast(self) -> Dict[str, Any]:
+        """Executa verificação rápida de integridade via Go Core Bridge (ou fallback Python)."""
+        try:
+            from core.go_bridge import go_bridge
+            base_path = getattr(self.backend, "base_path", None)
+            if base_path:
+                return go_bridge.verify_local_repo(base_path)
+            return {"healthy": True, "engine_mode": "remote-backend"}
+        except Exception as e:
+            return {"healthy": False, "error": str(e)}
 
     def prune_repository(self, keep_last: int = 5) -> Dict[str, Any]:
         try:

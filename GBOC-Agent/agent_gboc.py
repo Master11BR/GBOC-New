@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-🚀 GBOC Agent 14.8.3 - Servidor Principal
+🚀 GBOC Agent 15.0.0 - Servidor Principal
 Servidor FastAPI com arquitetura modular limpa
 """
 
@@ -67,7 +67,7 @@ try:
     from version_control import __version__ as AGENT_VERSION, get_version_info, auto_increment_build
     auto_increment_build()
 except Exception:
-    AGENT_VERSION = "14.8.3"
+    AGENT_VERSION = "15.0.0"
     def get_version_info():
         return {"raw_version": AGENT_VERSION, "semver": AGENT_VERSION}
 
@@ -255,7 +255,7 @@ except ImportError as e:
 async def lifespan(app: FastAPI):
     """Gerenciamento do ciclo de vida da aplicação"""
     logger.info("=" * 50)
-    logger.info("[STARTUP] GBOC Agent 14.8.3 - Servidor Iniciado")
+    logger.info("[STARTUP] GBOC Agent 15.0.0 - Servidor Iniciado")
     logger.info(f"[DATA] {DATA_DIR}")
     logger.info(f"[LOGS] {LOGS_DIR}")
     
@@ -462,53 +462,57 @@ app.add_middleware(
 
 _SLOW_THRESHOLD_MS = float(os.getenv("GBOC_SLOW_MS", "250"))
 
-@app.middleware("http")
-async def _gboc_asset_revalidate(request: Request, call_next):
-    """JS/CSS/HTML sempre revalidados (ETag → 304): os HTML usam ?v= fixo e, sem isso,
-    o navegador seguia com scripts antigos depois de uma atualização do GBOC."""
-    r = await call_next(request)
-    p = request.url.path.lower()
-    if p.endswith(".html") or p in ("/", ""):
-        r.headers["Cache-Control"] = "no-cache"
-    elif p.endswith((".js", ".css")):
-        # Antes "no-cache": cada troca de tela revalidava ~20 arquivos (um pedido ao servidor por arquivo).
-        # 5 minutos em cache: navegação rápida; uma atualização do GBOC aparece em até 5 min (ou Ctrl+F5).
-        r.headers["Cache-Control"] = "private, max-age=300"
-    elif p.endswith((".woff2", ".woff", ".ttf", ".png", ".jpg", ".jpeg", ".svg", ".ico", ".webp", ".gif")):
-        r.headers["Cache-Control"] = "private, max-age=86400"
-    return r
 
-@app.middleware("http")
-async def _gboc_timing_middleware(request: Request, call_next):
-    """Medidor de performance das rotas HTTP.
+class _GbocFastAsgiMiddleware:
+    """Middleware ASGI puro (zero BaseHTTPMiddleware stream overhead) unificando Cache-Control e medição de latência."""
 
-    Qualquer rota com tempo > GBOC_SLOW_MS (padrão 250 ms) é logada com WARNING
-    para fácil identificação de operações síncronas que bloqueiam o event loop
-    (ex: .sleep síncrono, SELECT * sem índice, subprocess que trava, etc).
+    def __init__(self, app):
+        self.app = app
 
-    A latência reportada é o tempo de ida-e-volta do handler.
-    """
-    t0 = time.perf_counter()
-    try:
-        r = await call_next(request)
-        return r
-    finally:
-        dt_ms = (time.perf_counter() - t0) * 1000.0
-        if dt_ms >= _SLOW_THRESHOLD_MS:
-            try:
-                method = request.method
-                path = request.url.path
-                query = request.url.query
-                full = f"{method} {path}"
-                if query:
-                    full += f"?{query}"
-                logger.warning(
-                    "[PERF-SLOW] %s — %.0f ms (threshold=%.0f ms). "
-                    "Se repetir, considerar asyncio.to_thread() / LIMIT / índices.",
-                    full, dt_ms, _SLOW_THRESHOLD_MS,
-                )
-            except Exception:
-                pass
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        t0 = time.perf_counter()
+        raw_path = scope.get("path") or ""
+        p = raw_path.lower()
+        cache_header: bytes | None = None
+        if p.endswith(".html") or p in ("/", ""):
+            cache_header = b"no-cache"
+        elif p.endswith((".js", ".css")):
+            cache_header = b"private, max-age=300"
+        elif p.endswith((".woff2", ".woff", ".ttf", ".png", ".jpg", ".jpeg", ".svg", ".ico", ".webp", ".gif")):
+            cache_header = b"private, max-age=86400"
+
+        async def _send_wrapper(message):
+            if cache_header is not None and message["type"] == "http.response.start":
+                headers = [
+                    (k, v) for (k, v) in message.get("headers", [])
+                    if k.lower() != b"cache-control"
+                ]
+                headers.append((b"cache-control", cache_header))
+                message = {**message, "headers": headers}
+            await send(message)
+
+        try:
+            await self.app(scope, receive, _send_wrapper)
+        finally:
+            dt_ms = (time.perf_counter() - t0) * 1000.0
+            if dt_ms >= _SLOW_THRESHOLD_MS:
+                try:
+                    method = scope.get("method", "GET")
+                    qs = (scope.get("query_string") or b"").decode("latin-1", errors="ignore")
+                    full = f"{method} {raw_path}" + (f"?{qs}" if qs else "")
+                    logger.warning(
+                        "[PERF-SLOW] %s — %.0f ms (threshold=%.0f ms).",
+                        full, dt_ms, _SLOW_THRESHOLD_MS,
+                    )
+                except Exception:
+                    pass
+
+
+app.add_middleware(_GbocFastAsgiMiddleware)
 
 
 def _build_error_diagnostic(message: str) -> str:
@@ -749,6 +753,8 @@ API_MODULES = [
     ("api.diagnostics", "router_v1"),  # ✅ IA de diagnóstico v1 (/api/v1/diagnostics/ai-*)
     ("api.agent_ops_api", "router"),  # ✅ Teste de restauração, atualização remota e pausa de agendamentos
     ("api.network_governor_api", "router"),  # ✅ Controle de rede/carga dos backups e vigia de travamento
+    ("api.ai_knowledge_api", "router"),  # ✅ IA: RAG local, casos de diagnóstico, tokens MCP e fine-tuning
+    ("api.mcp_api", "router"),  # ✅ Servidor MCP (/api/mcp) para Claude, Antigravity, n8n etc.
 ]
 
 

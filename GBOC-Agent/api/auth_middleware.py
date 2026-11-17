@@ -90,6 +90,18 @@ def _is_server_call(request: Request) -> bool:
         return False
 
 
+def _is_internal_call(request: Request) -> bool:
+    """Chamada interna das ferramentas MCP ao próprio Agente (chave aleatória que só existe na memória do processo)."""
+    key = request.headers.get("X-GBOC-Internal-Key")
+    if not key:
+        return False
+    try:
+        from engines.mcp_server import is_internal_key
+        return is_internal_key(key)
+    except Exception:
+        return False
+
+
 def _rate_key(request: Request, client_ip: str):
     auth = request.headers.get("Authorization", "")
     token = auth[7:].strip() if auth.startswith("Bearer ") else (request.cookies.get("gboc_agent_token") or "")
@@ -106,7 +118,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # ── Rate limiting (API calls only) ────────────────────────
         # O GBOC Server (chave de pareamento) não entra no limite: ele consulta vários
         # endpoints do agente a partir de um único IP.
-        if path.startswith('/api/') and not _is_server_call(request):
+        if path.startswith('/api/') and not _is_server_call(request) and not _is_internal_call(request):
             now = time.time()
             rkey, rmax = _rate_key(request, client_ip)
             bucket = [t for t in _api_requests.get(rkey, ()) if now - t < API_RATE_LIMIT_WINDOW]
@@ -143,13 +155,43 @@ class AuthMiddleware(BaseHTTPMiddleware):
             request.state.user = {"username": "gboc-server", "role": "server", "via": "pairing-key"}
             return await call_next(request)
 
+        # Ferramentas do servidor MCP chamando endpoints do próprio Agente (loopback em processo)
+        if _is_internal_call(request):
+            request.state.user = {"username": request.headers.get("X-GBOC-Internal-User") or "mcp",
+                                  "role": "internal", "via": "mcp-internal"}
+            return await call_next(request)
+
+        # Servidor MCP: token próprio (Authorization: Bearer gboc_mcp_...) aceito somente em /api/mcp
+        if path.rstrip('/') == '/api/mcp':
+            _auth_hdr = request.headers.get("Authorization", "")
+            if _auth_hdr.startswith("Bearer gboc_mcp_"):
+                try:
+                    from engines.mcp_server import authenticate_mcp_request
+                    from starlette.concurrency import run_in_threadpool as _rtp
+                    _mcp_user = await _rtp(authenticate_mcp_request, request.headers)
+                except Exception as _mcp_err:
+                    logger.error(f"MCP auth error: {_mcp_err}")
+                    _mcp_user = None
+                if _mcp_user:
+                    request.state.user = _mcp_user
+                    return await call_next(request)
+                return JSONResponse({"jsonrpc": "2.0", "id": None,
+                                     "error": {"code": -32001, "message": "Token MCP inválido ou revogado."}},
+                                    status_code=401, headers={"WWW-Authenticate": "Bearer"})
+
         try:
-            from api.auth import is_auth_enabled, get_current_user
+            from api.auth import is_auth_enabled, get_current_user, get_current_user_fast
             from starlette.concurrency import run_in_threadpool
+
+            # Fast-path 100% em memória (evita threadpool hop quando sessão está ativa em memória)
+            fast_enabled, fast_user = get_current_user_fast(request)
+            if fast_enabled is True and fast_user is not None:
+                request.state.user = fast_user
+                return await call_next(request)
 
             # Se ainda não há usuário configurado, manter apenas tela/login setup e estáticos públicos.
             # Isso força a abertura da tela de login/setup no startup.
-            if not await run_in_threadpool(is_auth_enabled):
+            if fast_enabled is not True and not await run_in_threadpool(is_auth_enabled):
                 if path.startswith('/api/'):
                     return JSONResponse(
                         {"status": "error", "message": "Configuração inicial necessária", "code": "AUTH_SETUP_REQUIRED"},

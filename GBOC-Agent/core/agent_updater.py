@@ -129,8 +129,10 @@ def apply_package(path: str, expected_sha256: str, restart: bool = True) -> Dict
         backup = os.path.join(UPDATES_DIR, f"backup_{current_version()}_{stamp}")
         os.makedirs(backup, exist_ok=True)
         written = 0
+        removed_obsolete = 0
         with zipfile.ZipFile(path) as zf:
             members = _members(zf)
+            new_rel_set = {os.path.normcase(os.path.normpath(rel)) for _name, rel in members}
             for _name, rel in members:                         # 1) cópia de segurança dos atuais
                 cur = os.path.join(AGENT_DIR, rel)
                 if os.path.isfile(cur):
@@ -145,8 +147,56 @@ def apply_package(path: str, expected_sha256: str, restart: bool = True) -> Dict
                     shutil.copyfileobj(src, out)
                 os.replace(tmp, dst)
                 written += 1
+
+            # 3) Remove arquivos que não são mais utilizados na nova versão (preservando dados/configs e salvando no backup de rollback)
+            for root_dir, dirs, files in os.walk(AGENT_DIR, topdown=True):
+                rel_root = os.path.relpath(root_dir, AGENT_DIR)
+                if rel_root == ".":
+                    dirs[:] = [
+                        d for d in dirs
+                        if d.lower() not in PROTECTED_TOP and not d.startswith(".")
+                    ]
+                else:
+                    # Limpa diretórios de cache em subpastas de código
+                    for d in list(dirs):
+                        if d in ("__pycache__", ".pytest_cache", ".ruff_cache", "_bkp_obsoletos"):
+                            shutil.rmtree(os.path.join(root_dir, d), ignore_errors=True)
+                            dirs.remove(d)
+
+                for fn in files:
+                    ext = os.path.splitext(fn)[1].lower()
+                    if ext in PROTECTED_EXT or fn.lower() in ("system_config.json", ".env"):
+                        continue
+                    full_p = os.path.join(root_dir, fn)
+                    rel_p = os.path.normpath(os.path.relpath(full_p, AGENT_DIR))
+                    if os.path.normcase(rel_p) not in new_rel_set:
+                        # Guarda no backup antes de remover para permitir rollback íntegro
+                        bkp_dst = os.path.join(backup, rel_p)
+                        os.makedirs(os.path.dirname(bkp_dst), exist_ok=True)
+                        try:
+                            shutil.copy2(full_p, bkp_dst)
+                            os.remove(full_p)
+                            removed_obsolete += 1
+                        except OSError:
+                            pass
+
+            # Remove diretórios de código que ficaram vazios após a remoção de arquivos obsoletos
+            for root_dir, dirs, files in os.walk(AGENT_DIR, topdown=False):
+                rel_root = os.path.relpath(root_dir, AGENT_DIR)
+                if rel_root == ".":
+                    continue
+                top_seg = rel_root.replace("\\", "/").split("/", 1)[0].lower()
+                if top_seg in PROTECTED_TOP or top_seg.startswith("."):
+                    continue
+                try:
+                    if not os.listdir(root_dir):
+                        os.rmdir(root_dir)
+                except OSError:
+                    pass
+
         state = {"from_version": current_version(), "to_version": info.get("version"), "sha256": digest,
-                 "applied_at": datetime.now().isoformat(sep=" ", timespec="seconds"), "files": written, "backup": backup,
+                 "applied_at": datetime.now().isoformat(sep=" ", timespec="seconds"), "files": written,
+                 "removed_obsolete": removed_obsolete, "backup": backup,
                  "status": "applied"}
         os.makedirs(UPDATES_DIR, exist_ok=True)
         with open(STATE_FILE, "w", encoding="utf-8") as f:

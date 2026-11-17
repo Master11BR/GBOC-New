@@ -1,6 +1,6 @@
 <!--
 ==============================================================================
-GBOC System v14.8.3 Enterprise Edition
+GBOC System v15.0.0 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
@@ -12,18 +12,22 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GBOC Agent - Repositórios</title>
     
+    
     <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
-    <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/ui/models/modern/components.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/ui/models/modern/layout.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/style.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/gboc-themes.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/gboc-layout.css?v=14.8.3">
-    <script src="/static/gboc-perf.js?v=14.8.3"></script>
-    <script src="/static/gboc-layout-manager.js?v=14.8.3"></script>
-    <script src="/static/gboc-modal.js?v=14.8.3"></script>
+    <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/components.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/layout.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/style.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/gboc-themes.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/gboc-layout.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/ui/react/gboc-react.css?v=15.0.0">
+    <script src="/static/gboc-perf.js?v=15.0.0"></script>
+    <script src="/static/gboc-layout-manager.js?v=15.0.0"></script>
+    <script src="/static/gboc-modal.js?v=15.0.0"></script>
+    <script src="/static/ui/react/gboc-react-core.js?v=15.0.0"></script>
+    <script src="/static/ui/react/gboc-react-components.js?v=15.0.0" defer></script>
 <style>
         .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
         .empty-icon { font-size: 3em; margin-bottom: 15px; opacity: 0.5; }
@@ -100,7 +104,32 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                     <span class="gboc-legend-item"><span class="gboc-legend-swatch" style="background:#9f7aea"></span>SFTP</span>
                 </div>
 
-                <div id="reposContainer" class="gboc-box-grid">
+                <!-- Barra de Visualização & Filtro Rápido (Box / Compacto / Linhas / Tabela) -->
+                <div class="gboc-view-bar" aria-label="Opções de visualização de repositórios">
+                    <div class="gboc-view-filters">
+                        <div class="gboc-view-search">
+                            <i class="fas fa-search"></i>
+                            <input type="search" id="repo-search-input" placeholder="Filtrar por nome, nuvem ou bucket/caminho..." autocomplete="off">
+                        </div>
+                        <span id="repo-view-count" class="gboc-view-count">0 repositórios</span>
+                    </div>
+                    <div class="gboc-view-switcher" id="repo-view-switcher" role="group" aria-label="Modo de exibição">
+                        <button type="button" class="gboc-view-btn active" data-view="box" onclick="setRepoViewMode('box')" title="Exibir em Cards (Box)">
+                            <i class="fas fa-th-large"></i> <span>Box</span>
+                        </button>
+                        <button type="button" class="gboc-view-btn" data-view="compact" onclick="setRepoViewMode('compact')" title="Exibir em Mini-Boxes Compactos">
+                            <i class="fas fa-grip"></i> <span>Compacto</span>
+                        </button>
+                        <button type="button" class="gboc-view-btn" data-view="rows" onclick="setRepoViewMode('rows')" title="Exibir em Linhas Horizontais">
+                            <i class="fas fa-bars"></i> <span>Linhas</span>
+                        </button>
+                        <button type="button" class="gboc-view-btn" data-view="table" onclick="setRepoViewMode('table')" title="Exibir em Tabela Detalhada">
+                            <i class="fas fa-table"></i> <span>Tabela</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="reposContainer" class="gboc-box-grid" data-view="box">
                     <div class="empty-state">
                         <div class="empty-icon"><i class="fas fa-inbox"></i></div>
                         <p>Nenhum repositório configurado</p>
@@ -230,8 +259,8 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     </div>
 
     <script src="/static/sidebar.js"></script>
-    <script src="/static/gboc-cron.js?v=14.8.3"></script>
-    <script src="/static/repo-details.js?v=14.8.3"></script>
+    <script src="/static/gboc-cron.js?v=15.0.0"></script>
+    <script src="/static/repo-details.js?v=15.0.0"></script>
     <script>
         let currentEditingRepoId = null;
 
@@ -341,8 +370,25 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             syncEndpointFromRegion(forceEndpoint);
         }
 
+        let allRepositories = [];
+        let currentRepoViewMode = localStorage.getItem('gboc_repos_view_mode') || 'box';
+
+        function setRepoViewMode(mode) {
+            if (!['box', 'compact', 'rows', 'table'].includes(mode)) mode = 'box';
+            currentRepoViewMode = mode;
+            try { localStorage.setItem('gboc_repos_view_mode', mode); } catch (e) {}
+            const container = document.getElementById('reposContainer');
+            if (container) container.setAttribute('data-view', mode);
+            document.querySelectorAll('#repo-view-switcher .gboc-view-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.getAttribute('data-view') === mode);
+            });
+            renderRepositories();
+        }
+
         // Carregar repositórios ao iniciar
         document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('repo-search-input')?.addEventListener('input', renderRepositories);
+            setRepoViewMode(currentRepoViewMode);
             loadRepositories();
             const regionEl = document.getElementById('region');
             const endpointEl = document.getElementById('endpoint');
@@ -357,32 +403,81 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         async function loadRepositories() {
             try {
                 const response = await fetch('/api/repositories/');
-                const repos = await response.json();
+                allRepositories = await response.json();
+                renderRepositories();
+            } catch (error) {
+                console.error('Erro ao carregar repositórios:', error);
+                document.getElementById('reposContainer').innerHTML = `
+                    <div class="empty-state" style="grid-column:1/-1;">
+                        <div class="empty-icon"><i class="fas fa-exclamation-circle"></i></div>
+                        <p>Erro ao carregar repositórios</p>
+                        <p style="font-size: 0.9em; margin-top: 10px;">Tente novamente mais tarde</p>
+                    </div>
+                `;
+            }
+        }
 
-                const container = document.getElementById('reposContainer');
+        function renderRepositories() {
+            const container = document.getElementById('reposContainer');
+            if (!container) return;
+            container.setAttribute('data-view', currentRepoViewMode);
 
-                if (!repos || repos.length === 0) {
-                    container.innerHTML = `
-                        <div class="empty-state" style="grid-column:1/-1;">
-                            <div class="empty-icon"><i class="fas fa-inbox"></i></div>
-                            <p>Nenhum repositório configurado</p>
-                            <p style="font-size: 0.9em; margin-top: 10px;">Clique em "Novo Repositório" para começar</p>
-                        </div>
-                    `;
-                    return;
-                }
+            const q = (document.getElementById('repo-search-input')?.value || '').trim().toLowerCase();
+            const repos = (allRepositories || []).filter(repo => {
+                if (!q) return true;
+                const hay = `${repo.name || ''} ${repo.type || ''} ${repo.engine || ''} ${repo.path || ''} ${repo.bucket || ''}`.toLowerCase();
+                return hay.includes(q);
+            });
 
-                const typeLabels = {
-                    'local': 'Local',
-                    'b2': 'Backblaze B2',
-                    'wasabi': 'Wasabi',
-                    'gcs': 'Google Cloud',
-                    'sftp': 'SFTP/Rede',
-                    's3': 'Amazon S3',
-                    'azure': 'Azure Blob'
-                };
+            const countEl = document.getElementById('repo-view-count');
+            if (countEl) {
+                const total = (allRepositories || []).length;
+                countEl.textContent = repos.length === total
+                    ? `${total} ${total === 1 ? 'repositório' : 'repositórios'}`
+                    : `${repos.length} de ${total} repositórios`;
+            }
 
-                container.innerHTML = repos.map(repo => {
+            if (!repos || repos.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state" style="grid-column:1/-1;">
+                        <div class="empty-icon"><i class="fas fa-inbox"></i></div>
+                        <p>${(allRepositories && allRepositories.length > 0) ? 'Nenhum repositório corresponde ao filtro' : 'Nenhum repositório configurado'}</p>
+                        <p style="font-size: 0.9em; margin-top: 10px;">Clique em "Novo Repositório" para começar</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const typeLabels = {
+                'local': 'Local',
+                'b2': 'Backblaze B2',
+                'wasabi': 'Wasabi',
+                'gcs': 'Google Cloud',
+                'sftp': 'SFTP/Rede',
+                's3': 'Amazon S3',
+                'azure': 'Azure Blob'
+            };
+
+            const buildRepoActions = (repo, storageType) => `
+                <button class="gboc-action-btn" style="background:rgba(66,153,225,.15);color:#4299e1" onclick="GBOCRepoDetails.open(${repo.id})" title="Ver todas as configurações${storageType !== 'local' ? ' (inclusive as do bucket na nuvem)' : ''}">
+                    <i class="fas fa-info-circle"></i>
+                </button>
+                <button class="gboc-action-btn act-test" onclick="initializeRepository(${repo.id},'${repo.name}', ${repo.initialized ? 'true' : 'false'})" title="${repo.initialized ? 'Reinicializar Repositório' : 'Inicializar Repositório'}" style="background:${repo.initialized ? 'rgba(237,137,54,.15)' : 'rgba(72,187,120,.15)'};color:${repo.initialized ? 'var(--warning)' : 'var(--success)'}">
+                    <i class="fas fa-rocket"></i>
+                </button>
+                <button class="gboc-action-btn act-test" onclick="testConnection(${repo.id})" title="Testar Conexão">
+                    <i class="fas fa-plug"></i>
+                </button>
+                <button class="gboc-action-btn act-edit" onclick="editRepository(${repo.id})" title="Editar">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="gboc-action-btn act-delete" onclick="deleteRepository(${repo.id})" title="Excluir">
+                    <i class="fas fa-trash"></i>
+                </button>
+            `;
+
+            if (currentRepoViewMode === 'table') {
+                const rowsHtml = repos.map(repo => {
                     const engine = (repo.engine || 'restic').toLowerCase();
                     const storageType = (repo.type || 'local').toLowerCase();
                     const storageLabel = typeLabels[storageType] || storageType.toUpperCase();
@@ -394,48 +489,71 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                     const displayPath = repo.path || repo.bucket || '-';
 
                     return `
-                    <div class="gboc-box engine-${engine} storage-${storageType}">
-                        <div class="gboc-box-title">${repo.name}</div>
-                        <div class="gboc-box-info">
-                            <div class="gboc-box-row"><i class="fas fa-cloud"></i><span class="row-value">${storageLabel}</span></div>
-                            <div class="gboc-box-row"><i class="fas fa-folder-open"></i><span class="row-value" title="${displayPath}">${displayPath}</span></div>
-                            <div class="gboc-box-row"><i class="fas fa-cogs"></i><span class="row-value">${engine}</span></div>
-                            <div class="gboc-box-row"><i class="fas ${initIcon}" style="color:${initColor}"></i><span class="row-value">${initText}</span></div>
-                            <div class="gboc-box-row">
-                                <span class="gboc-box-status">
-                                    <span class="status-dot ${status}"></span> ${statusLabel}
-                                </span>
+                    <tr>
+                        <td style="font-weight:700; color:var(--text);" title="${repo.name}">${repo.name}</td>
+                        <td><span class="gboc-tbl-pill">${storageLabel}</span></td>
+                        <td title="${displayPath}" style="font-family:ui-monospace,Consolas,monospace; font-size:0.84em; color:var(--text-muted);">${displayPath}</td>
+                        <td><span class="gboc-tbl-pill">${engine}</span></td>
+                        <td><i class="fas ${initIcon}" style="color:${initColor};margin-right:6px"></i>${initText}</td>
+                        <td><span class="gboc-box-status"><span class="status-dot ${status}"></span> ${statusLabel}</span></td>
+                        <td style="text-align:right; white-space:nowrap;">
+                            <div class="gboc-box-actions" style="margin:0;padding:0;border:none;justify-content:flex-end;">
+                                ${buildRepoActions(repo, storageType)}
                             </div>
-                        </div>
-                        <div class="gboc-box-actions">
-                            <button class="gboc-action-btn" style="background:rgba(66,153,225,.15);color:#4299e1" onclick="GBOCRepoDetails.open(${repo.id})" title="Ver todas as configurações${storageType !== 'local' ? ' (inclusive as do bucket na nuvem)' : ''}">
-                                <i class="fas fa-info-circle"></i>
-                            </button>
-                            <button class="gboc-action-btn act-test" onclick="initializeRepository(${repo.id},'${repo.name}', ${repo.initialized ? 'true' : 'false'})" title="${repo.initialized ? 'Reinicializar Repositório' : 'Inicializar Repositório'}" style="background:${repo.initialized ? 'rgba(237,137,54,.15)' : 'rgba(72,187,120,.15)'};color:${repo.initialized ? 'var(--warning)' : 'var(--success)'}">
-                                <i class="fas fa-rocket"></i>
-                            </button>
-                            <button class="gboc-action-btn act-test" onclick="testConnection(${repo.id})" title="Testar Conexão">
-                                <i class="fas fa-plug"></i>
-                            </button>
-                            <button class="gboc-action-btn act-edit" onclick="editRepository(${repo.id})" title="Editar">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button class="gboc-action-btn act-delete" onclick="deleteRepository(${repo.id})" title="Excluir">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
-                    </div>`;
+                        </td>
+                    </tr>`;
                 }).join('');
-            } catch (error) {
-                console.error('Erro ao carregar repositórios:', error);
-                document.getElementById('reposContainer').innerHTML = `
-                    <div class="empty-state" style="grid-column:1/-1;">
-                        <div class="empty-icon"><i class="fas fa-exclamation-circle"></i></div>
-                        <p>Erro ao carregar repositórios</p>
-                        <p style="font-size: 0.9em; margin-top: 10px;">Tente novamente mais tarde</p>
-                    </div>
-                `;
+
+                container.innerHTML = `
+                <div class="gboc-view-table-wrap">
+                    <table class="gboc-view-table">
+                        <thead>
+                            <tr>
+                                <th>Repositório</th>
+                                <th>Armazenamento</th>
+                                <th>Caminho / Bucket</th>
+                                <th>Motor</th>
+                                <th>Inicialização</th>
+                                <th>Status</th>
+                                <th style="text-align:right;">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rowsHtml}</tbody>
+                    </table>
+                </div>`;
+                return;
             }
+
+            container.innerHTML = repos.map(repo => {
+                const engine = (repo.engine || 'restic').toLowerCase();
+                const storageType = (repo.type || 'local').toLowerCase();
+                const storageLabel = typeLabels[storageType] || storageType.toUpperCase();
+                const status = repo.status || 'active';
+                const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
+                const initIcon = repo.initialized ? 'fa-check-circle' : 'fa-times-circle';
+                const initColor = repo.initialized ? 'var(--success)' : 'var(--danger)';
+                const initText = repo.initialized ? 'Inicializado' : 'Não inicializado';
+                const displayPath = repo.path || repo.bucket || '-';
+
+                return `
+                <div class="gboc-box engine-${engine} storage-${storageType}">
+                    <div class="gboc-box-title" title="${repo.name}">${repo.name}</div>
+                    <div class="gboc-box-info">
+                        <div class="gboc-box-row"><i class="fas fa-cloud"></i><span class="row-value">${storageLabel}</span></div>
+                        <div class="gboc-box-row"><i class="fas fa-folder-open"></i><span class="row-value" title="${displayPath}">${displayPath}</span></div>
+                        <div class="gboc-box-row"><i class="fas fa-cogs"></i><span class="row-value">${engine}</span></div>
+                        <div class="gboc-box-row"><i class="fas ${initIcon}" style="color:${initColor}"></i><span class="row-value">${initText}</span></div>
+                        <div class="gboc-box-row">
+                            <span class="gboc-box-status">
+                                <span class="status-dot ${status}"></span> ${statusLabel}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="gboc-box-actions">
+                        ${buildRepoActions(repo, storageType)}
+                    </div>
+                </div>`;
+            }).join('');
         }
 
         function openCreateModal() {

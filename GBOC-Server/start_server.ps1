@@ -1,13 +1,13 @@
 <#
 ==============================================================================
-GBOC System v14.8.3 Enterprise Edition
+GBOC System v15.0.0 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
 #>
 
 # ========================================
-# GBOC Server v14.8.3 - Inicializacao
+# GBOC Server v15.0.0 - Inicializacao
 # ========================================
 
 Set-Location -Path $PSScriptRoot
@@ -16,7 +16,7 @@ $env:PYTHONIOENCODING = "utf-8"
 if (-not $env:PYTHONUTF8) { $env:PYTHONUTF8 = "0" }
 
 Write-Host "`n========================================" -ForegroundColor Cyan
-Write-Host "  GBOC Server v14.8.3 - Iniciando..." -ForegroundColor Cyan
+Write-Host "  GBOC Server v15.0.0 - Iniciando..." -ForegroundColor Cyan
 Write-Host "========================================`n" -ForegroundColor Cyan
 
 function Resolve-GbocPython([string]$Root, [string]$Component) {

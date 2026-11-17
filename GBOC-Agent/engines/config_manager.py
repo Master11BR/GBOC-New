@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 14.8.3 - Configuration Manager Engine
+GBOC 15.0.0 - Configuration Manager Engine
 Export/import entire system configuration (tasks, repositories, settings, schedules, policies).
 Supports JSON/YAML formats, versioned snapshots, diff between configs.
 """
@@ -289,7 +289,7 @@ def import_config(config_data: Dict, dry_run: bool = True) -> Dict[str, Any]:
             elif str(repo.get('type') or repo.get('repo_type') or 'local').lower() != 'local':
                 report['warnings'].append(f"Repository '{name}': informe a chave secreta da nuvem em Repositórios > Editar")
             if dry_run:
-                repo_ids[name] = -1     # será criado; só para a simulação das tarefas
+                repo_ids[name] = -1     # pré-validação (dry-run) antes de gravar no banco
             else:
                 cur.execute("""
                     INSERT INTO repositories (name, type, engine, path, config, enabled, password, motor_password,

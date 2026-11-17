@@ -39,24 +39,25 @@ except Exception:
     try:
         from version_control import __version__ as TARGET_VERSION
     except Exception:
-        TARGET_VERSION = "14.8.3"
+        TARGET_VERSION = "15.0.0"
 
 TARGET_EXTENSIONS = {".py", ".html", ".js", ".css", ".ps1", ".bat", ".txt"}
 EXCLUDE_DIRS = {".git", ".vs", "__pycache__", ".venv", "venv", "logs", "data", "node_modules", "tests", "_claude_sync",
-                "python_embed", "dist", "build", ".ruff_cache", ".pytest_cache", "docs"}
+                "python_embed", "dist", "build", ".ruff_cache", ".pytest_cache", "docs", "repositorios", "_bkp_obsoletos"}
 EXCLUDE_FILES = {"CHANGELOG.md", "build_installer_package.bat", "build_installer_package.ps1", "version_unifier.py"}
 TOP_DIRS = ("GBOC-Agent", "GBOC-Server", "shared-css")
 
-_KEEP_LINE = re.compile(rb"min_(server|agent)_version|\d+\.\d+(\.\d+)?\+|_ver_tuple")
+_KEEP_LINE = re.compile(rb"min_(server|agent)_version|supports_in_place_upgrade_from|\d+\.\d+(\.\d+)?\+|_ver_tuple")
 _CONTEXT = re.compile(rb"gboc|version|vers\xc3\xa3o|release|user-agent|\?v=", re.I)
 
 
 def _patterns(target: str):
     major = re.escape(target.split(".")[0]).encode()
+    majors = rb"(?:14|" + major + rb")" if major != b"14" else major
     t = target.encode()
-    # 14.x.y completo (com ou sem "v") e "GBOC ... v14.x" curto
-    full = re.compile(rb"(?<![\d.])(v?)(" + major + rb"\.\d+\.\d+)(?![\d.])")
-    short = re.compile(rb"(GBOC[^\n\"'<]{0,20}?v)(" + major + rb"\.\d+)(?![\d.])")
+    # 14.x.y / 15.x.y completo (com ou sem "v") e "GBOC ... v14.x / v15.x" curto
+    full = re.compile(rb"(?<![\d.])(v?)(" + majors + rb"\.\d+\.\d+)(?![\d.])")
+    short = re.compile(rb"(GBOC[^\n\"'<]{0,20}?v)(" + majors + rb"\.\d+)(?![\d.])")
 
     def fix_full(m):
         return m.group(0) if m.group(2) == t else m.group(1) + t
@@ -109,7 +110,8 @@ class VersionUnifier:
         except OSError as e:
             self.failed_updates.append(f"{path}: {e}")
             return
-        if self.target.split(".")[0].encode() + b"." not in data:
+        target_major_prefix = self.target.split(".")[0].encode() + b"."
+        if b"14." not in data and target_major_prefix not in data:
             return
         lines = data.split(b"\n")
         changed = 0

@@ -103,6 +103,10 @@ def list_tasks() -> Dict[str, Any]:
             columns = [desc[0] for desc in cursor.description]
             tasks = [dict(zip(columns, row)) for row in rows]
 
+        from engines import veracrypt_mounter
+        for t in tasks:
+            t["veracrypt_config"] = veracrypt_mounter.mask_config_for_client(t.get("veracrypt_config"))
+
         return {"status": "success", "tasks": tasks, "count": len(tasks)}
     except Exception as e:
         logger.error(f"❌ List tasks: {e}", exc_info=True)
@@ -429,6 +433,150 @@ def get_task_errors_report(days: int = 7) -> Dict[str, Any]:
 
 
 # ============================================================
+# VeraCrypt Volume Auto-Mount / Auto-Dismount Endpoints
+# ============================================================
+
+class VeraCryptMountRequest(BaseModel):
+    task_id: Optional[int] = None
+    volume_path: Optional[str] = None
+    volume_type: Optional[str] = None
+    drive_letter: Optional[str] = "V"
+    password: Optional[str] = None
+    pim: Optional[Union[int, str]] = None
+    keyfile: Optional[str] = None
+    readonly: Optional[bool] = True
+    executable_path: Optional[str] = None
+
+
+class VeraCryptDismountRequest(BaseModel):
+    task_id: Optional[int] = None
+    drive_letter: Optional[str] = None
+    force: Optional[bool] = False
+    executable_path: Optional[str] = None
+
+
+@router.get("/veracrypt/status")
+def get_veracrypt_status_endpoint(executable_path: Optional[str] = None) -> Dict[str, Any]:
+    """Retorna status real do VeraCrypt no host e letras de unidades livres/montadas."""
+    try:
+        from engines import veracrypt_mounter
+        info = veracrypt_mounter.get_veracrypt_status(executable_path)
+        return {"status": "success", **info}
+    except Exception as e:
+        logger.error(f"❌ VeraCrypt status error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/veracrypt/devices")
+def list_veracrypt_devices_endpoint() -> Dict[str, Any]:
+    """Lista partições/dispositivos reais do host para montagem VeraCrypt por partição."""
+    try:
+        from engines import veracrypt_mounter
+        res = veracrypt_mounter.list_block_devices()
+        if not res.get("success"):
+            raise HTTPException(status_code=500, detail=res.get("error") or "Falha ao listar partições")
+        return {"status": "success", **res}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ VeraCrypt devices error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/veracrypt/mount")
+def mount_veracrypt_volume_endpoint(req: VeraCryptMountRequest, request: Request) -> Dict[str, Any]:
+    """Monta manualmente ou para teste o volume VeraCrypt de uma tarefa ou configuração informada."""
+    try:
+        from engines import veracrypt_mounter
+        from shared_core import get_shared_core
+
+        cfg: Dict[str, Any] = {}
+        if req.task_id:
+            core = get_shared_core()
+            with core.get_db_connection() as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT veracrypt_config FROM tasks WHERE id = %s", (req.task_id,))
+                row = cur.fetchone()
+                if row and row[0]:
+                    cfg = veracrypt_mounter.parse_veracrypt_config(row[0])
+
+        if req.volume_path is not None and str(req.volume_path).strip():
+            cfg["volume_path"] = str(req.volume_path).strip()
+        if req.volume_type is not None and str(req.volume_type).strip():
+            cfg["volume_type"] = str(req.volume_type).strip().lower()
+        if req.drive_letter is not None and str(req.drive_letter).strip():
+            cfg["drive_letter"] = str(req.drive_letter).strip()
+        if req.password is not None and str(req.password) != "":
+            cfg["password"] = str(req.password)
+        if req.pim is not None:
+            cfg["pim"] = req.pim
+        if req.keyfile is not None:
+            cfg["keyfile"] = str(req.keyfile).strip()
+        if req.readonly is not None:
+            cfg["readonly"] = bool(req.readonly)
+        if req.executable_path is not None and str(req.executable_path).strip():
+            cfg["executable_path"] = str(req.executable_path).strip()
+
+        res = veracrypt_mounter.mount_volume(cfg)
+        if not res.get("success"):
+            raise HTTPException(status_code=400, detail=res.get("error") or "Falha ao montar volume VeraCrypt")
+
+        return {"status": "success", **res}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ VeraCrypt mount error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/veracrypt/dismount")
+def dismount_veracrypt_volume_endpoint(req: VeraCryptDismountRequest, request: Request) -> Dict[str, Any]:
+    """Desmonta uma unidade VeraCrypt montada."""
+    try:
+        from engines import veracrypt_mounter
+        from shared_core import get_shared_core
+
+        drive_letter = req.drive_letter
+        exe_path = req.executable_path
+        if req.task_id and not drive_letter:
+            core = get_shared_core()
+            with core.get_db_connection() as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT veracrypt_config FROM tasks WHERE id = %s", (req.task_id,))
+                row = cur.fetchone()
+                if row and row[0]:
+                    cfg = veracrypt_mounter.parse_veracrypt_config(row[0])
+                    drive_letter = cfg.get("drive_letter")
+                    if not exe_path:
+                        exe_path = cfg.get("executable_path")
+
+        _usage = veracrypt_mounter.get_volume_usage(drive_letter or "")
+        if _usage.get("in_use", 0) > 0:
+            _ids = ", ".join(f"#{i}" for i in _usage.get("task_ids") or [])
+            raise HTTPException(
+                status_code=409,
+                detail=f"Unidade {veracrypt_mounter.get_drive_root_path(drive_letter)} em uso por backup em andamento"
+                       + (f" (tarefa {_ids})" if _ids else "")
+                       + ". Ela será desmontada automaticamente ao final.",
+            )
+
+        res = veracrypt_mounter.dismount_volume(
+            drive_letter or "",
+            force=bool(req.force),
+            custom_executable=exe_path,
+        )
+        if not res.get("success"):
+            raise HTTPException(status_code=400, detail=res.get("error") or "Falha ao desmontar unidade VeraCrypt")
+
+        return {"status": "success", **res}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ VeraCrypt dismount error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================
 # Dynamic routes below — /{task_id} catches any path segment
 # ============================================================
 
@@ -492,8 +640,10 @@ def _live_row(ex: Dict[str, Any]) -> Dict[str, Any]:
         percent = min(100.0, fp * 100.0 / ft)
     else:
         percent = None                                   # total ainda desconhecido (contando / motor sem progresso)
-    bps = bp / elapsed if elapsed >= 1 else 0.0
-    fps = fp / elapsed if elapsed >= 1 else 0.0
+    paused_sec = int(ex.get("paused_seconds") or 0)
+    working_sec = max(0.0, elapsed - paused_sec)
+    bps = bp / working_sec if working_sec >= 1 else 0.0
+    fps = fp / working_sec if working_sec >= 1 else 0.0
     eta = None
     if finished:
         pass                                             # concluído: sem tempo restante
@@ -502,11 +652,32 @@ def _live_row(ex: Dict[str, Any]) -> Dict[str, Any]:
     elif ft > fp and fps > 0 and not bt:
         eta = int((ft - fp) / fps)
     ex.update({
-        "elapsed_seconds": int(elapsed), "percent": None if percent is None else round(percent, 1),
-        "bytes_per_sec": round(bps, 1), "files_per_sec": round(fps, 2), "eta_seconds": eta,
-        "files_processed": fp, "files_total": ft, "bytes_processed": bp, "bytes_total": bt,
-        "files_new": int(ex.get("files_new") or 0), "files_unmodified": int(ex.get("files_unmodified") or 0),
+        "elapsed_seconds": int(elapsed),
+        "paused_seconds": paused_sec,
+        "working_seconds": int(working_sec),
+        "paused": bool(ex.get("paused", False)),
+        "percent": None if percent is None else round(percent, 1),
+        "bytes_per_sec": round(bps, 1),
+        "files_per_sec": round(fps, 2),
+        "eta_seconds": eta,
+        "files_processed": fp,
+        "files_total": ft,
+        "files_in_filter": int(ex.get("files_in_filter") if ex.get("files_in_filter") is not None else fp),
+        "bytes_processed": bp,
+        "bytes_total": bt,
+        "files_new": int(ex.get("files_new") or 0),
+        "files_changed": int(ex.get("files_changed") or 0),
+        "files_unmodified": int(ex.get("files_unmodified") or 0),
+        "files_missing": int(ex.get("files_missing") or 0),
+        "files_failed": int(ex.get("files_failed") or 0),
         "bytes_added": int(ex.get("bytes_added") or 0),
+        "current_dir": ex.get("current_dir"),
+        "current_file_size": int(ex.get("current_file_size") or 0),
+        "last_completed_file": ex.get("last_completed_file"),
+        "threads": int(ex.get("threads") or 8),
+        "source_summary": ex.get("source_summary"),
+        "target_summary": ex.get("target_summary") or ex.get("repository_name"),
+        "mode_badge": ex.get("mode_badge") or "COPY",
     })
     return ex
 
@@ -514,15 +685,15 @@ def _live_row(ex: Dict[str, Any]) -> Dict[str, Any]:
 @router.get("/running/live")
 def get_running_tasks_live() -> Dict[str, Any]:
     """Backups em andamento para a barra de progresso ao vivo da tela de tarefas, mais os que terminaram
-    há no máximo 5 minutos (resultado final; depois somem). Lê do banco (o monitor grava lá), então inclui
-    backups disparados pelo processo do agendador."""
+    há no máximo 5 minutos (resultado final; depois somem). Combina estado em memória (latência zero)
+    com os registros do banco (inclui tarefas do processo do agendador)."""
     try:
         from shared_core import get_shared_core
         core = get_shared_core()
         base = """
             SELECT te.id AS execution_id, te.task_id, te.status, te.started_at, te.completed_at, te.error_message,
                    te.files_processed, te.bytes_processed, te.current_file, te.progress{extra},
-                   t.name AS task_name, {engine} AS engine, r.name AS repository_name
+                   t.name AS task_name, t.source_paths AS source_paths, {engine} AS engine, r.name AS repository_name
             FROM task_executions te
             LEFT JOIN tasks t ON te.task_id = t.id
             LEFT JOIN repositories r ON t.repository_id = r.id
@@ -530,9 +701,15 @@ def get_running_tasks_live() -> Dict[str, Any]:
                OR (te.completed_at IS NOT NULL AND te.completed_at >= NOW() - INTERVAL '5 minutes')
             ORDER BY te.started_at
         """
-        extra = (", te.files_total, te.bytes_total, te.files_new, te.files_unmodified, te.bytes_added")
+        extra = (", te.files_total, te.bytes_total, te.files_new, te.files_changed, te.files_unmodified, te.bytes_added")
+        extra_fallback = (", te.files_total, te.bytes_total, te.files_new, te.files_unmodified, te.bytes_added")
         rows, cols = [], []
-        for ex_cols, eng in ((extra, "COALESCE(r.engine, t.engine)"), ("", "COALESCE(r.engine, t.engine)"), ("", "t.engine")):
+        for ex_cols, eng in (
+            (extra, "COALESCE(r.engine, t.engine)"),
+            (extra_fallback, "COALESCE(r.engine, t.engine)"),
+            ("", "COALESCE(r.engine, t.engine)"),
+            ("", "t.engine"),
+        ):
             try:
                 with core.get_db_connection() as conn:
                     cur = conn.cursor()
@@ -542,7 +719,51 @@ def get_running_tasks_live() -> Dict[str, Any]:
                 break
             except Exception as e:                       # banco antigo sem alguma coluna: consulta mais simples
                 logger.debug(f"running/live: {e}")
-        items = [_live_row(dict(zip(cols, r))) for r in rows]
+
+        active_mem = {}
+        try:
+            tm = getattr(core, "task_manager", None)
+            if tm and getattr(tm, "monitor", None):
+                active_mem = tm.monitor.get_all_active()
+        except Exception:
+            active_mem = {}
+
+        raw_dicts = []
+        for r in rows:
+            d = dict(zip(cols, r))
+            tid = d.get("task_id")
+            # Construir source_summary se vier do banco
+            if not d.get("source_summary") and d.get("source_paths"):
+                sp = d.get("source_paths")
+                if isinstance(sp, str):
+                    try:
+                        import json as _json
+                        parsed = _json.loads(sp)
+                        sp_list = parsed if isinstance(parsed, list) else [x.strip() for x in sp.split(",") if x.strip()]
+                    except Exception:
+                        sp_list = [x.strip() for x in sp.split(",") if x.strip()]
+                elif isinstance(sp, list):
+                    sp_list = sp
+                else:
+                    sp_list = []
+                if len(sp_list) > 1:
+                    d["source_summary"] = f"{sp_list[0]} (+{len(sp_list) - 1})"
+                elif len(sp_list) == 1:
+                    d["source_summary"] = str(sp_list[0])
+            # Sobrescrever com telemetria ao vivo em RAM quando disponível neste processo
+            if tid in active_mem and d.get("status") in ("running", "preparing"):
+                mp = active_mem[tid].to_dict()
+                for k in (
+                    "files_processed", "files_total", "files_in_filter", "bytes_processed", "bytes_total",
+                    "files_new", "files_changed", "files_unmodified", "files_missing", "files_failed",
+                    "bytes_added", "current_file", "current_file_size", "current_dir", "last_completed_file",
+                    "threads", "paused", "paused_seconds", "source_summary", "target_summary", "mode_badge",
+                ):
+                    if mp.get(k) is not None:
+                        d[k] = mp[k]
+            raw_dicts.append(d)
+
+        items = [_live_row(d) for d in raw_dicts]
         # Execução em "preparando" sem nenhum arquivo há mais de 6 h é órfã (processo caiu antes de começar):
         # não vira barra de progresso eterna. A limpeza ao iniciar o TaskManager as marca como interrompidas.
         items = [i for i in items if i["finished"] or not (i.get("status") == "preparing"
@@ -590,6 +811,8 @@ def get_task(task_id: int) -> Dict[str, Any]:
         # Para PostgreSQL, converter tupla para dicionário
         columns = [desc[0] for desc in cursor.description]
         task_dict = dict(zip(columns, row))
+        from engines import veracrypt_mounter
+        task_dict["veracrypt_config"] = veracrypt_mounter.mask_config_for_client(task_dict.get("veracrypt_config"))
         return {"status": "success", "task": task_dict}
     except HTTPException:
         raise
@@ -766,6 +989,39 @@ def stop_task(execution_id: int) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"❌ Stop task: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{task_id}/pause")
+def pause_running_task(task_id: int) -> Dict[str, Any]:
+    """Pausa uma tarefa em execução ao vivo"""
+    from shared_core import get_shared_core
+    core = get_shared_core()
+    tm = getattr(core, "task_manager", None)
+    if not tm:
+        raise HTTPException(status_code=503, detail="TaskManager não está disponível")
+    return tm.pause_task(task_id)
+
+
+@router.post("/{task_id}/resume")
+def resume_running_task(task_id: int) -> Dict[str, Any]:
+    """Retoma uma tarefa pausada"""
+    from shared_core import get_shared_core
+    core = get_shared_core()
+    tm = getattr(core, "task_manager", None)
+    if not tm:
+        raise HTTPException(status_code=503, detail="TaskManager não está disponível")
+    return tm.resume_task(task_id)
+
+
+@router.post("/{task_id}/stop")
+def stop_running_task_by_id(task_id: int) -> Dict[str, Any]:
+    """Interrompe uma tarefa em execução pelo task_id"""
+    from shared_core import get_shared_core
+    core = get_shared_core()
+    tm = getattr(core, "task_manager", None)
+    if not tm:
+        raise HTTPException(status_code=503, detail="TaskManager não está disponível")
+    return tm.stop_task(task_id)
 
 
 @router.get("/{task_id}/history")

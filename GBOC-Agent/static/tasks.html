@@ -1,6 +1,6 @@
 <!--
 ==============================================================================
-GBOC System v14.8.3 Enterprise Edition
+GBOC System v15.0.0 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
@@ -13,56 +13,31 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     <title>GBOC Agent - Tarefas</title>
 
     
+    
     <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
-    <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/ui/models/modern/components.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/ui/models/modern/layout.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/style.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/gboc-themes.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/gboc-layout.css?v=14.8.3">
-    <script src="/static/gboc-perf.js?v=14.8.3"></script>
-    <script src="/static/gboc-layout-manager.js?v=14.8.3"></script>
-    <script src="/static/gboc-modal.js?v=14.8.3"></script>
-    <script src="/static/gboc-cron.js?v=14.8.3"></script>
+    <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/components.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/layout.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/style.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/gboc-themes.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/gboc-layout.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/ui/react/gboc-react.css?v=15.0.0">
+    <script src="/static/gboc-perf.js?v=15.0.0"></script>
+    <script src="/static/gboc-layout-manager.js?v=15.0.0"></script>
+    <script src="/static/gboc-modal.js?v=15.0.0"></script>
+    <script src="/static/ui/react/gboc-react-core.js?v=15.0.0"></script>
+    <script src="/static/ui/react/gboc-react-components.js?v=15.0.0" defer></script>
+<script src="/static/gboc-cron.js?v=15.0.0"></script>
 <script src="/static/sidebar.js"></script>
     <script src="/static/app_v6.js"></script>
     <script src="/static/toast_notifications.js"></script>
-    <script src="/static/auth_interceptor.js?v=14.8.3"></script>
-    <script src="/static/gboc-global.js?v=14.8.3"></script>
+    <script src="/static/auth_interceptor.js?v=15.0.0"></script>
+    <script src="/static/gboc-global.js?v=15.0.0"></script>
 <style>
 /* Barra de progresso ao vivo dos backups em execução */
-.gl-wrap { display:flex; flex-direction:column; gap:12px; margin-bottom:24px; }
-.gl-wrap[hidden] { display:none; }
-.gl-title-row { display:flex; align-items:center; gap:8px; color:var(--text); font-weight:600; font-size:1.02em; }
-.gl-dot { width:8px; height:8px; border-radius:50%; background:var(--success,#10b981); box-shadow:0 0 0 0 rgba(16,185,129,.6); animation:gl-pulse 1.6s infinite; }
-@keyframes gl-pulse { 70% { box-shadow:0 0 0 8px rgba(16,185,129,0); } 100% { box-shadow:0 0 0 0 rgba(16,185,129,0); } }
-.gl-card { display:grid; grid-template-columns:auto minmax(0,1fr) minmax(0,1.4fr) auto; gap:18px; align-items:center;
-  background:var(--bg-card); border:1px solid var(--border, rgba(255,255,255,.08)); border-radius:12px; padding:16px 20px; }
-.gl-icon { width:52px; height:52px; border-radius:12px; display:grid; place-items:center; font-size:1.25em;
-  color:#38bdf8; background:rgba(56,189,248,.08); border:1px solid rgba(56,189,248,.25); }
-.gl-name { display:flex; align-items:center; gap:10px; flex-wrap:wrap; color:var(--text); font-weight:600; font-size:1.08em; }
-.gl-badge { font-size:.68em; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:3px 9px; border-radius:999px;
-  color:#38bdf8; background:rgba(56,189,248,.12); border:1px solid rgba(56,189,248,.3); }
-.gl-meta { margin-top:6px; color:var(--text-muted); font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:.86em;
-  display:flex; flex-wrap:wrap; gap:6px 12px; }
-.gl-file { margin-top:4px; color:var(--text-muted); font-size:.8em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.gl-top { display:flex; justify-content:space-between; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:.88em; color:var(--text); }
-.gl-pct { color:#34d399; font-weight:700; }
-.gl-bar { position:relative; height:10px; margin:8px 0; border-radius:999px; background:rgba(148,163,184,.18); overflow:hidden; }
-.gl-fill { height:100%; border-radius:999px; background:linear-gradient(90deg,#10b981,#38bdf8); transition:width .6s ease; }
-.gl-bar.gl-indet .gl-fill { width:35% !important; position:absolute; animation:gl-slide 1.4s ease-in-out infinite; }
-@keyframes gl-slide { 0% { left:-35%; } 100% { left:100%; } }
-.gl-stats { display:flex; justify-content:space-between; flex-wrap:wrap; gap:4px 14px; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:.82em; color:var(--text-muted); }
-.gl-stats .gl-new { color:#34d399; } .gl-stats .gl-upd { color:#38bdf8; }
-.gl-card.gl-done { opacity:.92; } .gl-card.gl-done .gl-icon { color:#34d399; background:rgba(52,211,153,.08); border-color:rgba(52,211,153,.3); }
-.gl-card.gl-fail .gl-icon { color:#f87171; background:rgba(248,113,113,.08); border-color:rgba(248,113,113,.3); }
-.gl-card.gl-fail .gl-fill { background:linear-gradient(90deg,#ef4444,#f87171); } .gl-card.gl-fail .gl-pct { color:#f87171; }
-.gl-actions { min-width:96px; display:flex; justify-content:flex-end; }
-.gl-err { margin-top:6px; color:#f87171; font-size:.8em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-@media (max-width: 900px) { .gl-card { grid-template-columns:auto minmax(0,1fr); } .gl-prog, .gl-actions { grid-column:1 / -1; } .gl-actions { justify-content:flex-start; min-width:0; } .gl-actions:empty { display:none; } }
-/* Faixa compacta da tela de tarefas */
+/* Faixa compacta da tela de tarefas (.gl-* vive em style.css universal) */
 .tk-strip { display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px; margin-bottom:18px; }
 .tk-kpi { display:inline-flex; align-items:center; gap:8px; padding:8px 14px; border-radius:10px; background:var(--bg-card);
   border:1px solid var(--border, rgba(255,255,255,.08)); border-left:4px solid var(--success,#48bb78); font-size:.9em; color:var(--text-muted); }
@@ -71,18 +46,6 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 .tk-kpi-sep { width:1px; height:18px; background:var(--border, rgba(255,255,255,.15)); margin:0 4px; }
 .tk-kpi-eta { color:var(--text); font-weight:600; }
 .tk-strip .tk-legend { margin:0; flex:1 1 auto; }
-/* Progresso ao vivo compacto */
-.gl-wrap { gap:8px; margin:0 0 24px; }
-.gl-card { gap:12px; padding:10px 14px; border-radius:10px; }
-.gl-icon { width:36px; height:36px; border-radius:9px; font-size:1em; }
-.gl-name { font-size:.95em; gap:8px; }
-.gl-meta { margin-top:3px; font-size:.78em; }
-.gl-file { margin-top:2px; font-size:.75em; }
-.gl-top { font-size:.8em; }
-.gl-bar { height:7px; margin:5px 0; }
-.gl-stats { font-size:.75em; }
-.gl-title-row { font-size:.95em; }
-@media (prefers-reduced-motion: reduce) { .gl-dot, .gl-bar.gl-indet .gl-fill { animation:none; } .gl-fill { transition:none; } }
 </style>
 </head>
 <body>
@@ -128,7 +91,39 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         </div>
         </div>
 
-        <div id="task-list" class="gboc-box-grid">
+        <!-- Barra de Visualização & Filtro Rápido (Box / Compacto / Linhas / Tabela) -->
+        <div class="gboc-view-bar" aria-label="Opções de visualização de tarefas">
+            <div class="gboc-view-filters">
+                <div class="gboc-view-search">
+                    <i class="fas fa-search"></i>
+                    <input type="search" id="task-search-input" placeholder="Filtrar por nome, repositório ou pasta..." autocomplete="off">
+                </div>
+                <select id="task-engine-filter" class="gboc-view-select" title="Filtrar por motor">
+                    <option value="">Todos os motores</option>
+                    <option value="restic">Restic</option>
+                    <option value="kopia">Kopia</option>
+                    <option value="duplicati">Duplicati</option>
+                    <option value="gboc_native">GBOC Native</option>
+                </select>
+                <span id="task-view-count" class="gboc-view-count">0 tarefas</span>
+            </div>
+            <div class="gboc-view-switcher" id="task-view-switcher" role="group" aria-label="Modo de exibição">
+                <button type="button" class="gboc-view-btn active" data-view="box" onclick="setTaskViewMode('box')" title="Exibir em Cards (Box)">
+                    <i class="fas fa-th-large"></i> <span>Box</span>
+                </button>
+                <button type="button" class="gboc-view-btn" data-view="compact" onclick="setTaskViewMode('compact')" title="Exibir em Mini-Boxes Compactos">
+                    <i class="fas fa-grip"></i> <span>Compacto</span>
+                </button>
+                <button type="button" class="gboc-view-btn" data-view="rows" onclick="setTaskViewMode('rows')" title="Exibir em Linhas Horizontais">
+                    <i class="fas fa-bars"></i> <span>Linhas</span>
+                </button>
+                <button type="button" class="gboc-view-btn" data-view="table" onclick="setTaskViewMode('table')" title="Exibir em Tabela Detalhada">
+                    <i class="fas fa-table"></i> <span>Tabela</span>
+                </button>
+            </div>
+        </div>
+
+        <div id="task-list" class="gboc-box-grid" data-view="box">
             <p style="color:var(--text-muted)">Carregando tarefas...</p>
         </div>
 
@@ -254,6 +249,141 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                     <button type="button" class="btn btn-sm btn-secondary" onclick="openGbocFilePicker(document.getElementById('paths').value, function(arr){ document.getElementById('paths').value = arr.join('\n'); }); setTimeout(function(){ if(window.addPickerPreset) window.addPickerPreset('db'); }, 200)">
                         <i class="fas fa-database"></i> + Banco de Dados
                     </button>
+                </div>
+            </div>
+
+            <!-- 🔐 FACILIDADE VERACRYPT: MONTAGEM AUTOMÁTICA DE VOLUMES CRIPTOGRAFADOS -->
+            <div class="schedule-box" style="margin-top:14px; margin-bottom:18px; border:1px solid rgba(56, 189, 248, 0.28); background:linear-gradient(180deg, rgba(14, 165, 233, 0.06), rgba(15, 23, 42, 0.35));">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+                    <h4 style="margin:0; color:#38bdf8; font-size:0.95em; display:flex; align-items:center; gap:8px;">
+                        <i class="fas fa-shield-halved"></i> Volume Criptografado VeraCrypt (Auto-Mount)
+                    </h4>
+                    <span id="vc-host-status" style="font-size:0.75rem; padding:3px 9px; border-radius:999px; background:rgba(148,163,184,0.15); color:var(--text-muted);">
+                        Verificando VeraCrypt...
+                    </span>
+                </div>
+
+                <label style="display:flex; align-items:center; gap:9px; cursor:pointer; margin-bottom:8px;">
+                    <input type="checkbox" id="vc_enabled" style="width:18px; height:18px; accent-color:#38bdf8;">
+                    <span style="color:var(--text); font-size:0.9em; font-weight:600;">
+                        Montar volume VeraCrypt automaticamente antes do backup
+                    </span>
+                </label>
+
+                <div id="vc-options-panel" style="display:none; margin-top:12px; padding-top:12px; border-top:1px solid var(--border);">
+                    <div class="form-group" style="margin-bottom:12px;">
+                        <label class="form-label" style="font-size:0.84em;">Tipo de Volume VeraCrypt</label>
+                        <div style="display:flex; flex-wrap:wrap; gap:16px; margin-bottom:8px;">
+                            <label style="display:flex; align-items:center; gap:7px; cursor:pointer; font-size:0.86em; color:var(--text);">
+                                <input type="radio" name="vc_volume_type" id="vc_type_file" value="file" checked style="accent-color:#38bdf8;" onchange="setVeraCryptVolumeType('file')">
+                                <i class="fas fa-file-shield"></i> Arquivo Container (.hc / .tc)
+                            </label>
+                            <label style="display:flex; align-items:center; gap:7px; cursor:pointer; font-size:0.86em; color:var(--text);">
+                                <input type="radio" name="vc_volume_type" id="vc_type_device" value="device" style="accent-color:#38bdf8;" onchange="setVeraCryptVolumeType('device')">
+                                <i class="fas fa-hard-drive"></i> Partição / Dispositivo Criptografado
+                            </label>
+                        </div>
+
+                        <div id="vc-device-picker" style="display:none; margin-bottom:8px;">
+                            <div style="display:flex; gap:8px; align-items:center;">
+                                <select id="vc_device_select" class="form-control" style="flex:1;" onchange="onVeraCryptDeviceSelected()">
+                                    <option value="">Clique em "Atualizar" para listar as partições do servidor...</option>
+                                </select>
+                                <button type="button" class="btn btn-sm btn-secondary" id="btn-vc-refresh-devices" onclick="loadVeraCryptDevices()" title="Listar partições e discos do servidor/agente">
+                                    <i class="fas fa-rotate"></i> Atualizar
+                                </button>
+                            </div>
+                            <small style="display:block; margin-top:5px; font-size:0.76rem; color:var(--text-muted);">
+                                Partições criptografadas aparecem como <strong>sem sistema de arquivos (RAW)</strong> e são listadas primeiro.
+                                Partições de sistema/boot ficam bloqueadas. Montar partição exige o Agente rodando como Administrador/Serviço.
+                            </small>
+                        </div>
+
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <input type="text" id="vc_volume_path" class="form-control" style="flex:1;" placeholder="Ex: D:\Cofre\Financeiro.hc">
+                            <button type="button" class="btn btn-sm btn-secondary" id="btn-vc-browse-file" onclick="browseVeraCryptFile('vc_volume_path')" title="Selecionar arquivo container no disco">
+                                <i class="fas fa-file-shield"></i> Procurar
+                            </button>
+                        </div>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+                        <div>
+                            <label class="form-label" style="font-size:0.84em;">Letra da Unidade de Montagem</label>
+                            <div style="display:flex; gap:6px;">
+                                <select id="vc_drive_letter" class="form-control" style="flex:1;">
+                                    <option value="V">V: (Padrão VeraCrypt)</option>
+                                    <option value="Z">Z:</option>
+                                    <option value="X">X:</option>
+                                    <option value="W">W:</option>
+                                    <option value="U">U:</option>
+                                    <option value="T">T:</option>
+                                    <option value="S">S:</option>
+                                    <option value="R">R:</option>
+                                    <option value="Q">Q:</option>
+                                    <option value="P">P:</option>
+                                    <option value="O">O:</option>
+                                    <option value="M">M:</option>
+                                </select>
+                                <button type="button" class="btn btn-sm btn-secondary" onclick="useVeraCryptDriveAsSource()" title="Adicionar a unidade montada na lista de Pastas de Origem do Backup">
+                                    <i class="fas fa-arrow-up"></i> Usar na Origem
+                                </button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="form-label" style="font-size:0.84em;">
+                                Senha do Volume <span id="vc-password-saved-badge" style="display:none; color:var(--success); font-size:0.8em; font-weight:600;">(Salva no cofre)</span>
+                            </label>
+                            <input type="password" id="vc_password" class="form-control" placeholder="Senha para abrir o volume" autocomplete="new-password">
+                        </div>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:1fr 2fr; gap:12px; margin-bottom:12px;">
+                        <div>
+                            <label class="form-label" style="font-size:0.84em;">PIM (Opcional)</label>
+                            <input type="number" id="vc_pim" class="form-control" min="0" placeholder="Padrão (vazio)">
+                        </div>
+                        <div>
+                            <label class="form-label" style="font-size:0.84em;">Keyfile / Arquivo-Chave (Opcional)</label>
+                            <div style="display:flex; gap:8px;">
+                                <input type="text" id="vc_keyfile" class="form-control" style="flex:1;" placeholder="Ex: C:\Chaves\keyfile.bin">
+                                <button type="button" class="btn btn-sm btn-secondary" onclick="browseVeraCryptFile('vc_keyfile')">
+                                    <i class="fas fa-key"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="vc-exe-custom-wrap" style="display:none; margin-bottom:12px;">
+                        <label class="form-label" style="font-size:0.84em;">Caminho do Executável VeraCrypt.exe (Opcional)</label>
+                        <input type="text" id="vc_executable_path" class="form-control" placeholder="C:\Program Files\VeraCrypt\VeraCrypt.exe">
+                    </div>
+
+                    <div style="display:flex; flex-wrap:wrap; gap:16px; margin-bottom:12px;">
+                        <label style="display:flex; align-items:center; gap:7px; cursor:pointer; font-size:0.85em; color:var(--text);">
+                            <input type="checkbox" id="vc_readonly" checked style="accent-color:#38bdf8;">
+                            Montar em Somente Leitura (Recomendado para Backup)
+                        </label>
+                        <label style="display:flex; align-items:center; gap:7px; cursor:pointer; font-size:0.85em; color:var(--text);">
+                            <input type="checkbox" id="vc_auto_dismount" checked style="accent-color:#38bdf8;">
+                            Desmontar automaticamente ao concluir o backup
+                        </label>
+                    </div>
+
+                    <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px; padding-top:8px; border-top:1px dashed var(--border);">
+                        <span id="vc-modal-mount-feedback" style="font-size:0.8rem; color:var(--text-muted);">
+                            A senha é protegida com criptografia Fernet (AES-128-CBC + HMAC).
+                        </span>
+                        <div style="display:flex; gap:8px;">
+                            <button type="button" class="btn btn-sm btn-primary" id="btn-vc-mount-now" onclick="testMountVeraCryptInModal()">
+                                <i class="fas fa-unlock"></i> Montar Agora
+                            </button>
+                            <button type="button" class="btn btn-sm btn-secondary" id="btn-vc-dismount-now" onclick="testDismountVeraCryptInModal()">
+                                <i class="fas fa-lock"></i> Desmontar
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -449,12 +579,34 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     let taskListListenerAttached = false;
     let runningExecByTaskId = {};
     let runningDetailedEndpointAvailable = true;
+    let currentTaskViewMode = localStorage.getItem('gboc_tasks_view_mode') || 'box';
+
+    function setTaskViewMode(mode) {
+        if (!['box', 'compact', 'rows', 'table'].includes(mode)) mode = 'box';
+        currentTaskViewMode = mode;
+        try { localStorage.setItem('gboc_tasks_view_mode', mode); } catch (e) {}
+        const list = document.getElementById('task-list');
+        if (list) list.setAttribute('data-view', mode);
+        document.querySelectorAll('#task-view-switcher .gboc-view-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.getAttribute('data-view') === mode);
+        });
+        renderTasks();
+        _paintVersions();
+    }
 
     // Folder browser state
     let folderBrowsePath = null;
     let folderSelectedPath = null;
 
     document.addEventListener('DOMContentLoaded', () => {
+        // Inicializar modo de visualização salvo e busca via query string (?search=...)
+        const urlSearch = new URLSearchParams(window.location.search).get('search');
+        const searchInp = document.getElementById('task-search-input');
+        if (searchInp && urlSearch) searchInp.value = urlSearch;
+        searchInp?.addEventListener('input', () => { renderTasks(); _paintVersions(); });
+        document.getElementById('task-engine-filter')?.addEventListener('change', () => { renderTasks(); _paintVersions(); });
+        setTaskViewMode(currentTaskViewMode);
+
         loadTasks();
         loadTaskErrorsPanel();
         attachStaticListeners();
@@ -481,7 +633,285 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             const opts = document.getElementById('retry-options');
             if (opts) opts.style.display = this.checked ? 'grid' : 'none';
         });
+
+        // Toggle VeraCrypt options
+        document.getElementById('vc_enabled')?.addEventListener('change', function() {
+            const panel = document.getElementById('vc-options-panel');
+            if (panel) panel.style.display = this.checked ? 'block' : 'none';
+            const pathsEl = document.getElementById('paths');
+            if (pathsEl) {
+                if (this.checked) pathsEl.removeAttribute('required');
+                else pathsEl.setAttribute('required', 'required');
+            }
+            if (this.checked) {
+                refreshVeraCryptHostStatus();
+                if (getVeraCryptVolumeType() === 'device') loadVeraCryptDevices();
+            }
+        });
     });
+
+    async function refreshVeraCryptHostStatus(selectedLetter) {
+        const badge = document.getElementById('vc-host-status');
+        const sel = document.getElementById('vc_drive_letter');
+        const exeWrap = document.getElementById('vc-exe-custom-wrap');
+        try {
+            const customExe = document.getElementById('vc_executable_path')?.value || '';
+            const q = customExe ? `?executable_path=${encodeURIComponent(customExe)}` : '';
+            const res = await fetch(`/api/tasks/veracrypt/status${q}`);
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Falha ao consultar VeraCrypt');
+
+            if (badge) {
+                if (data.installed) {
+                    badge.textContent = 'VeraCrypt Detectado';
+                    badge.title = data.executable_path || '';
+                    badge.style.background = 'rgba(78, 203, 136, 0.16)';
+                    badge.style.color = '#4ecb88';
+                    if (exeWrap && !customExe) exeWrap.style.display = 'none';
+                } else {
+                    badge.textContent = 'VeraCrypt Não Detectado (informe o caminho)';
+                    badge.style.background = 'rgba(240, 169, 64, 0.16)';
+                    badge.style.color = '#f0a940';
+                    if (exeWrap) exeWrap.style.display = 'block';
+                }
+            }
+
+            if (sel) {
+                const curVal = (selectedLetter || sel.value || 'V').toUpperCase().replace(/[^A-Z]/g, '') || 'V';
+                const usedSet = new Set((data.used_letters || []).map(x => String(x).toUpperCase()));
+                const letters = ['V','Z','X','W','U','T','S','R','Q','P','O','N','M','L','K','J','I','H','G','F','E','D'];
+                sel.innerHTML = letters.map(ch => {
+                    const isMounted = usedSet.has(ch);
+                    const tag = isMounted ? 'Montada / Em uso' : 'Livre';
+                    const defTag = ch === 'V' ? ' · Padrão' : '';
+                    return `<option value="${ch}" ${ch === curVal ? 'selected' : ''}>${ch}: (${tag}${defTag})</option>`;
+                }).join('');
+            }
+        } catch (err) {
+            if (badge) {
+                badge.textContent = 'Status indisponível';
+                badge.style.color = 'var(--text-muted)';
+            }
+        }
+    }
+
+    function getVeraCryptVolumeType() {
+        return document.getElementById('vc_type_device')?.checked ? 'device' : 'file';
+    }
+
+    function setVeraCryptVolumeType(type, opts = {}) {
+        const isDevice = type === 'device';
+        const rFile = document.getElementById('vc_type_file');
+        const rDev = document.getElementById('vc_type_device');
+        if (rFile) rFile.checked = !isDevice;
+        if (rDev) rDev.checked = isDevice;
+        const picker = document.getElementById('vc-device-picker');
+        const browseBtn = document.getElementById('btn-vc-browse-file');
+        const input = document.getElementById('vc_volume_path');
+        if (picker) picker.style.display = isDevice ? 'block' : 'none';
+        if (browseBtn) browseBtn.style.display = isDevice ? 'none' : '';
+        if (input) {
+            input.placeholder = isDevice
+                ? 'Ex: \\Device\\Harddisk1\\Partition2  ou  \\\\?\\Volume{GUID}\\  ou  /dev/sdb1'
+                : 'Ex: D:\\Cofre\\Financeiro.hc';
+        }
+        if (isDevice && !opts.skipLoad) loadVeraCryptDevices(input?.value || '');
+    }
+
+    async function loadVeraCryptDevices(selectedPath) {
+        const sel = document.getElementById('vc_device_select');
+        const btn = document.getElementById('btn-vc-refresh-devices');
+        if (!sel) return;
+        const current = (selectedPath ?? document.getElementById('vc_volume_path')?.value ?? '').trim();
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
+        sel.innerHTML = '<option value="">Listando partições do servidor...</option>';
+        const esc = (t) => String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        try {
+            const res = await fetch('/api/tasks/veracrypt/devices');
+            if (res.status === 404) {
+                throw new Error('Função de listagem de partições não carregada no Agente — reinicie o serviço do GBOC Agent');
+            }
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.detail || 'Falha ao listar partições');
+            const devs = data.devices || [];
+            if (!devs.length) {
+                sel.innerHTML = '<option value="">Nenhuma partição/dispositivo encontrado no servidor</option>';
+                return;
+            }
+            let found = false;
+            const opts = devs.map(d => {
+                const isSel = current && (current === d.path || current === d.device_path || current === d.volume_guid);
+                if (isSel) found = true;
+                const where = d.kind === 'disk'
+                    ? `Disco ${d.disk ?? ''} inteiro`
+                    : (d.disk !== undefined && d.partition !== undefined ? `Disco ${d.disk} · Partição ${d.partition}` : d.device_path);
+                const fsTxt = d.filesystem ? `${d.filesystem}${d.label ? ' "' + d.label + '"' : ''}` : 'RAW / sem sistema de arquivos';
+                const letterTxt = d.letter ? ` · ${d.letter}${/^[A-Z]$/i.test(d.letter) ? ':' : ''}` : '';
+                const tags = [];
+                if (d.likely_veracrypt) tags.push('🔐 Possível VeraCrypt');
+                if (d.type_label) tags.push(d.type_label);
+                if (d.is_system) tags.push('Sistema/Boot (bloqueada)');
+                const label = `${where} — ${d.size_human || ''} — ${fsTxt}${letterTxt}${d.model ? ' — ' + d.model : ''}${d.bus ? ' (' + d.bus + ')' : ''}${tags.length ? ' — ' + tags.join(' · ') : ''}`;
+                return `<option value="${esc(d.path)}" data-device="${esc(d.device_path)}" ${d.selectable ? '' : 'disabled'} ${isSel ? 'selected' : ''}>${esc(label)}</option>`;
+            });
+            const head = found || !current
+                ? '<option value="">Selecione a partição/dispositivo criptografado...</option>'
+                : `<option value="${esc(current)}" selected>Configurado: ${esc(current)} (não encontrado agora)</option>`;
+            sel.innerHTML = head + opts.join('');
+        } catch (err) {
+            sel.innerHTML = `<option value="">Erro ao listar: ${esc(err.message)}</option>`;
+            showToast(err.message || 'Falha ao listar partições', 'error');
+        } finally {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-rotate"></i> Atualizar'; }
+        }
+    }
+
+    function onVeraCryptDeviceSelected() {
+        const sel = document.getElementById('vc_device_select');
+        const input = document.getElementById('vc_volume_path');
+        if (sel && input && sel.value) {
+            input.value = sel.value;
+            const opt = sel.options[sel.selectedIndex];
+            const dev = opt?.getAttribute('data-device');
+            if (dev && dev !== sel.value) input.title = `Dispositivo: ${dev}`;
+        }
+    }
+
+    function browseVeraCryptFile(targetInputId) {
+        const inputEl = document.getElementById(targetInputId);
+        if (!inputEl) return;
+        if (typeof window.openGbocFilePicker === 'function') {
+            window.openGbocFilePicker(inputEl.value || '', function(selectedArr) {
+                if (Array.isArray(selectedArr) && selectedArr.length > 0) {
+                    inputEl.value = selectedArr[0];
+                }
+            });
+        } else {
+            showToast('Digite o caminho completo do arquivo no campo.', 'info');
+            inputEl.focus();
+        }
+    }
+
+    function useVeraCryptDriveAsSource() {
+        const letter = (document.getElementById('vc_drive_letter')?.value || 'V').toUpperCase().replace(/[^A-Z]/g, '') || 'V';
+        const rootPath = `${letter}:\\`;
+        const pathsEl = document.getElementById('paths');
+        if (!pathsEl) return;
+        const current = (pathsEl.value || '').split('\n').map(x => x.trim()).filter(Boolean);
+        if (!current.some(p => p.toUpperCase() === rootPath || p.toUpperCase() === `${letter}:`)) {
+            current.push(rootPath);
+            pathsEl.value = current.join('\n');
+            showToast(`Unidade ${rootPath} adicionada às Pastas de Origem!`, 'success');
+        } else {
+            showToast(`Unidade ${rootPath} já está na lista de origem.`, 'info');
+        }
+    }
+
+    async function testMountVeraCryptInModal() {
+        const btn = document.getElementById('btn-vc-mount-now');
+        const fb = document.getElementById('vc-modal-mount-feedback');
+        const taskId = document.getElementById('taskId')?.value || null;
+        const volume_path = (document.getElementById('vc_volume_path')?.value || '').trim();
+        const drive_letter = document.getElementById('vc_drive_letter')?.value || 'V';
+        const password = document.getElementById('vc_password')?.value || '';
+        const pim = document.getElementById('vc_pim')?.value || null;
+        const keyfile = (document.getElementById('vc_keyfile')?.value || '').trim();
+        const readonly = document.getElementById('vc_readonly')?.checked ?? true;
+        const executable_path = (document.getElementById('vc_executable_path')?.value || '').trim();
+
+        if (!volume_path) {
+            showToast(getVeraCryptVolumeType() === 'device'
+                ? 'Selecione a partição/dispositivo VeraCrypt'
+                : 'Informe o caminho do arquivo/volume VeraCrypt (.hc / .tc)', 'warning');
+            return;
+        }
+
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Montando...'; }
+        if (fb) { fb.textContent = `Montando volume em ${drive_letter}:\\ ...`; fb.style.color = '#38bdf8'; }
+
+        try {
+            const res = await fetch('/api/tasks/veracrypt/mount', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    task_id: taskId ? parseInt(taskId) : null,
+                    volume_path,
+                    volume_type: getVeraCryptVolumeType(),
+                    drive_letter,
+                    password: password || null,
+                    pim: pim || null,
+                    keyfile: keyfile || null,
+                    readonly,
+                    executable_path: executable_path || null
+                })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || data.error || 'Falha ao montar volume VeraCrypt');
+
+            showToast(data.message || `Unidade ${drive_letter}:\\ montada com sucesso!`, 'success');
+            if (fb) { fb.textContent = data.message || `Unidade ${drive_letter}:\\ montada e pronta.`; fb.style.color = '#4ecb88'; }
+            useVeraCryptDriveAsSource();
+            await refreshVeraCryptHostStatus(drive_letter);
+            loadTasks();
+        } catch (err) {
+            showToast(err.message, 'error');
+            if (fb) { fb.textContent = err.message; fb.style.color = '#f06b6b'; }
+        } finally {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-unlock"></i> Montar Agora'; }
+        }
+    }
+
+    async function testDismountVeraCryptInModal() {
+        const btn = document.getElementById('btn-vc-dismount-now');
+        const fb = document.getElementById('vc-modal-mount-feedback');
+        const taskId = document.getElementById('taskId')?.value || null;
+        const drive_letter = document.getElementById('vc_drive_letter')?.value || 'V';
+        const executable_path = (document.getElementById('vc_executable_path')?.value || '').trim();
+
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Desmontando...'; }
+        try {
+            const res = await fetch('/api/tasks/veracrypt/dismount', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    task_id: taskId ? parseInt(taskId) : null,
+                    drive_letter,
+                    force: true,
+                    executable_path: executable_path || null
+                })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || data.error || 'Falha ao desmontar unidade');
+            showToast(data.message || `Unidade ${drive_letter}:\\ desmontada.`, 'success');
+            if (fb) { fb.textContent = data.message || `Unidade ${drive_letter}:\\ desmontada.`; fb.style.color = 'var(--text-muted)'; }
+            await refreshVeraCryptHostStatus(drive_letter);
+            loadTasks();
+        } catch (err) {
+            showToast(err.message, 'error');
+            if (fb) { fb.textContent = err.message; fb.style.color = '#f06b6b'; }
+        } finally {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-lock"></i> Desmontar'; }
+        }
+    }
+
+    async function toggleTaskVeraCryptMount(taskId, currentlyMounted) {
+        const endpoint = currentlyMounted ? '/api/tasks/veracrypt/dismount' : '/api/tasks/veracrypt/mount';
+        const actionLabel = currentlyMounted ? 'Desmontando' : 'Montando';
+        showToast(`${actionLabel} volume VeraCrypt da tarefa #${taskId}...`, 'info');
+        try {
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ task_id: taskId, force: true })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || data.error || 'Operação VeraCrypt falhou');
+            showToast(data.message || 'Operação VeraCrypt concluída!', 'success');
+            loadTasks();
+        } catch (err) {
+            showToast(err.message, 'error');
+        }
+    }
 
     // Fallback no-op para builds/parciais sem módulo de browser/histórico
     if (typeof attachFolderBrowser !== 'function') {
@@ -536,10 +966,25 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             document.getElementById('interval-start-time').value = '02:00';
             document.getElementById('pre_script').value = '';
             document.getElementById('post_script').value = '';
+            document.getElementById('vc_enabled').checked = false;
+            document.getElementById('vc-options-panel').style.display = 'none';
+            document.getElementById('vc_volume_path').value = '';
+            setVeraCryptVolumeType('file', { skipLoad: true });
+            document.getElementById('vc_drive_letter').value = 'V';
+            document.getElementById('vc_password').value = '';
+            document.getElementById('vc_password').placeholder = 'Senha para abrir o volume';
+            document.getElementById('vc-password-saved-badge').style.display = 'none';
+            document.getElementById('vc_pim').value = '';
+            document.getElementById('vc_keyfile').value = '';
+            document.getElementById('vc_executable_path').value = '';
+            document.getElementById('vc_readonly').checked = true;
+            document.getElementById('vc_auto_dismount').checked = true;
+            document.getElementById('paths')?.setAttribute('required', 'required');
         } else {
             document.getElementById('modalTitle').innerText = 'Editar Tarefa';
         }
 
+        refreshVeraCryptHostStatus(document.getElementById('vc_drive_letter')?.value || 'V');
         toggleSchedule();
         document.getElementById('modal').classList.add('active');
     }
@@ -656,9 +1101,35 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     function renderTasks() {
         const list = document.getElementById('task-list');
         if (!list) return;
+        list.setAttribute('data-view', currentTaskViewMode);
 
-        if (!tasks || tasks.length === 0) {
-            const emptyHtml = '<p style="color:var(--text-muted); grid-column:1/-1; text-align:center;">Nenhuma tarefa configurada.</p>';
+        const q = (document.getElementById('task-search-input')?.value || '').trim().toLowerCase();
+        const engFilter = (document.getElementById('task-engine-filter')?.value || '').trim().toLowerCase();
+
+        const filteredTasks = (tasks || []).filter(task => {
+            const tEng = (task.engine || 'restic').toLowerCase();
+            const rEng = (task.repository_engine || task.engine || 'restic').toLowerCase();
+            if (engFilter && tEng !== engFilter && rEng !== engFilter && !(engFilter === 'gboc_native' && (tEng.includes('native') || rEng.includes('native')))) {
+                return false;
+            }
+            if (!q) return true;
+            const hay = `${task.name || ''} ${task.repository_name || ''} ${task.repository_type || ''} ${task.source_paths || ''} ${tEng} ${rEng}`.toLowerCase();
+            return hay.includes(q);
+        });
+
+        const countEl = document.getElementById('task-view-count');
+        if (countEl) {
+            const total = (tasks || []).length;
+            countEl.textContent = filteredTasks.length === total
+                ? `${total} ${total === 1 ? 'tarefa' : 'tarefas'}`
+                : `${filteredTasks.length} de ${total} tarefas`;
+        }
+
+        if (!filteredTasks || filteredTasks.length === 0) {
+            const emptyMsg = (tasks && tasks.length > 0)
+                ? 'Nenhuma tarefa corresponde ao filtro informado.'
+                : 'Nenhuma tarefa configurada.';
+            const emptyHtml = `<p style="color:var(--text-muted); grid-column:1/-1; text-align:center; padding:24px 0;">${emptyMsg}</p>`;
             if (window.gbocPerf?.safeRender) {
                 window.gbocPerf.safeRender(list, emptyHtml);
             } else {
@@ -667,7 +1138,173 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             return;
         }
 
-        const cardsHtml = tasks.map(task => {
+        const typeLabels = {
+            'local': 'Local',
+            'b2': 'Backblaze B2',
+            'wasabi': 'Wasabi',
+            'gcs': 'Google Cloud',
+            'sftp': 'SFTP/Rede',
+            's3': 'Amazon S3',
+            'azure': 'Azure Blob'
+        };
+        const engineColors = {
+            'restic': '#4fa3e8',
+            'kopia': '#9f7aea',
+            'duplicati': '#f0a940',
+            'gboc_native': '#4ecb88',
+            'native': '#4ecb88'
+        };
+        const storageColors = {
+            'local': '#94a3b8',
+            'b2': '#f06b6b',
+            's3': '#f0a940',
+            'wasabi': '#38c6c0',
+            'azure': '#4fa3e8',
+            'gcs': '#ecc94b',
+            'sftp': '#9f7aea'
+        };
+
+        const buildVeraCryptBadge = (task, compact = false) => {
+            const vc = task.veracrypt_config;
+            if (!vc || !vc.enabled) return '';
+            const letter = (vc.drive_letter || 'V').toUpperCase();
+            const mounted = !!vc.currently_mounted;
+            const color = mounted ? '#4ecb88' : '#38bdf8';
+            const bg = mounted ? 'rgba(78,203,136,0.14)' : 'rgba(56,189,248,0.14)';
+            const icon = mounted ? 'fa-unlock' : 'fa-shield-halved';
+            const stateTxt = mounted ? 'Montada' : 'Auto-Mount';
+            const titleTxt = `Volume VeraCrypt: ${vc.volume_path || ''} → ${letter}:\\ (${stateTxt}). Clique para ${mounted ? 'desmontar' : 'montar agora'}.`;
+            if (compact) {
+                return `<span class="gboc-tbl-pill" onclick="toggleTaskVeraCryptMount(${task.id}, ${mounted})" style="cursor:pointer; border-color:${color}44; background:${bg}; color:${color}; margin-left:6px;" title="${titleTxt}">
+                    <i class="fas ${icon}"></i> ${letter}:
+                </span>`;
+            }
+            return `<div class="gboc-box-row" title="${titleTxt}">
+                <i class="fas ${icon}" style="color:${color}"></i>
+                <span class="row-value" style="display:flex;align-items:center;justify-content:space-between;gap:6px;width:100%;">
+                    <span>VeraCrypt <strong>${letter}:\\</strong> (${stateTxt})</span>
+                    <button type="button" onclick="toggleTaskVeraCryptMount(${task.id}, ${mounted})" style="background:${bg};border:1px solid ${color}55;color:${color};border-radius:6px;padding:1px 7px;font-size:0.74rem;cursor:pointer;font-weight:600;">
+                        ${mounted ? 'Desmontar' : 'Montar'}
+                    </button>
+                </span>
+            </div>`;
+        };
+
+        const buildActionsHtml = (task, isRunning) => `
+            ${isRunning ? `
+                <button class="gboc-action-btn act-monitor task-monitor-btn" data-task-id="${task.id}" title="Monitor">
+                    <i class="fas fa-chart-line"></i>
+                </button>
+            ` : ''}
+            <button class="gboc-action-btn act-edit task-edit-btn" data-task-id="${task.id}" title="Editar">
+                <i class="fas fa-edit"></i>
+            </button>
+            <button class="gboc-action-btn act-history task-history-btn" data-task-id="${task.id}" title="Histórico">
+                <i class="fas fa-history"></i>
+            </button>
+            ${isRunning ?
+                `<button class="gboc-action-btn act-stop task-cancel-btn" data-task-id="${task.id}" title="Interromper">
+                    <i class="fas fa-stop"></i>
+                </button>` :
+                `<button class="gboc-action-btn act-run task-run-btn" data-task-id="${task.id}" title="Executar">
+                    <i class="fas fa-play"></i>
+                </button>`
+            }
+            <button class="gboc-action-btn act-delete task-delete-btn" data-task-id="${task.id}" title="Excluir">
+                <i class="fas fa-trash"></i>
+            </button>
+        `;
+
+        if (currentTaskViewMode === 'table') {
+            const rowsHtml = filteredTasks.map(task => {
+                const repoName = task.repository_name || `Repo #${task.repository_id}`;
+                const repoType = (task.repository_type || 'local').toLowerCase();
+                const taskEngine = (task.engine || 'restic').toLowerCase();
+                const repoEngine = (task.repository_engine || task.engine || 'restic').toLowerCase();
+                const status = task.status || 'idle';
+                const runningExec = runningExecByTaskId[String(task.id)];
+                const isRunning = !!runningExec || status === 'running';
+                const storageTypeLabel = typeLabels[repoType] || repoType.toUpperCase();
+                const engColor = engineColors[taskEngine] || '#4fa3e8';
+                const stColor = storageColors[repoType] || '#94a3b8';
+
+                let displayPaths = 'Nenhum caminho';
+                if (task.source_paths) {
+                    try {
+                        const paths = JSON.parse(task.source_paths);
+                        if (Array.isArray(paths) && paths.length > 0) displayPaths = paths.join(', ');
+                    } catch (e) {
+                        displayPaths = task.source_paths;
+                    }
+                }
+                const scheduleText = cronToHuman(task.schedule_cron, task.schedule_enabled);
+
+                return `
+                <tr>
+                    <td style="font-weight:700; color:var(--text);" title="${task.name}">
+                        <span style="display:inline-flex;align-items:center;gap:8px;">
+                            <span class="gboc-tbl-dot" style="background:${engColor}"></span>
+                            ${task.name}
+                            ${buildVeraCryptBadge(task, true)}
+                        </span>
+                    </td>
+                    <td title="${repoName}"><i class="fas fa-server" style="color:var(--text-muted);margin-right:6px"></i>${repoName}</td>
+                    <td>
+                        <span class="gboc-tbl-pill">
+                            <span class="gboc-tbl-dot" style="background:${stColor}"></span>
+                            ${storageTypeLabel}
+                        </span>
+                    </td>
+                    <td title="${displayPaths}" style="color:var(--text-muted); font-family:ui-monospace,Consolas,monospace; font-size:0.84em;">${displayPaths}</td>
+                    <td>
+                        <span class="gboc-tbl-pill" title="Tarefa: ${taskEngine} | Repo: ${repoEngine}">
+                            <span class="gboc-tbl-dot" style="background:${engColor}"></span>
+                            ${taskEngine}${repoEngine !== taskEngine ? ` → ${repoEngine}` : ''}
+                        </span>
+                    </td>
+                    <td title="${scheduleText}" style="color:var(--text-muted);">${scheduleText}</td>
+                    <td><span class="task-versions" data-task-id="${task.id}">${_versionsLabel(task.id)}</span></td>
+                    <td>
+                        <span class="gboc-box-status">
+                            <span class="status-dot ${status}"></span> ${status.toUpperCase()}
+                        </span>
+                    </td>
+                    <td style="text-align:right; white-space:nowrap;">
+                        <div class="gboc-box-actions" style="margin:0;padding:0;border:none;justify-content:flex-end;">
+                            ${buildActionsHtml(task, isRunning)}
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+
+            const tableHtml = `
+            <div class="gboc-view-table-wrap">
+                <table class="gboc-view-table">
+                    <thead>
+                        <tr>
+                            <th>Tarefa</th>
+                            <th>Repositório</th>
+                            <th>Nuvem / Destino</th>
+                            <th>Origem</th>
+                            <th>Motor</th>
+                            <th>Agendamento</th>
+                            <th>Versões</th>
+                            <th>Status</th>
+                            <th style="text-align:right;">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rowsHtml}</tbody>
+                </table>
+            </div>`;
+            if (window.gbocPerf?.safeRender) {
+                window.gbocPerf.safeRender(list, tableHtml);
+            } else {
+                list.innerHTML = tableHtml;
+            }
+            return;
+        }
+
+        const cardsHtml = filteredTasks.map(task => {
             const repoName = task.repository_name || `Repo #${task.repository_id}`;
             const repoType = task.repository_type || (task.repository_id ? 'tipo não cadastrado' : 'sem repositório');
             const taskEngine = (task.engine || 'restic').toLowerCase();
@@ -676,30 +1313,21 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             const runningExec = runningExecByTaskId[String(task.id)];
             const isRunning = !!runningExec || status === 'running';
 
-            const typeLabels = {
-                'local': 'Local',
-                'b2': 'Backblaze B2',
-                'wasabi': 'Wasabi',
-                'gcs': 'Google Cloud',
-                'sftp': 'SFTP/Rede',
-                's3': 'Amazon S3',
-                'azure': 'Azure Blob'
-            };
             const storageTypeLabel = typeLabels[repoType] || repoType.toUpperCase();
             const storageClass = `storage-${(task.repository_type || 'none').replace(/[^\w-]/g, '')}`;
 
             let displayPaths = 'Nenhum caminho';
+            let fullPaths = 'Nenhum caminho';
             if (task.source_paths) {
                 try {
                     const paths = JSON.parse(task.source_paths);
                     if (Array.isArray(paths) && paths.length > 0) {
-                        displayPaths = paths.join(', ');
-                        if (displayPaths.length > 50) {
-                            displayPaths = displayPaths.substring(0, 47) + '...';
-                        }
+                        fullPaths = paths.join(', ');
+                        displayPaths = fullPaths.length > 50 ? fullPaths.substring(0, 47) + '...' : fullPaths;
                     }
                 } catch (e) {
-                    displayPaths = task.source_paths;
+                    fullPaths = task.source_paths;
+                    displayPaths = fullPaths;
                 }
             }
 
@@ -708,14 +1336,15 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 
             return `
             <div class="gboc-box engine-${taskEngine} ${storageClass}">
-                <div class="gboc-box-title">${task.name}</div>
+                <div class="gboc-box-title" title="${task.name}">${task.name}</div>
                 <div class="gboc-box-info">
-                    <div class="gboc-box-row"><i class="fas fa-server"></i><span class="row-value">${repoName}</span></div>
-                    <div class="gboc-box-row"><i class="fas fa-cloud"></i><span class="row-value">${storageTypeLabel}</span></div>
-                    <div class="gboc-box-row"><i class="fas fa-folder-open"></i><span class="row-value" title="${displayPaths}">${displayPaths}</span></div>
+                    <div class="gboc-box-row" title="Repositório: ${repoName}"><i class="fas fa-server"></i><span class="row-value">${repoName}</span></div>
+                    <div class="gboc-box-row" title="Armazenamento: ${storageTypeLabel}"><i class="fas fa-cloud"></i><span class="row-value">${storageTypeLabel}</span></div>
+                    <div class="gboc-box-row" title="${fullPaths}"><i class="fas fa-folder-open"></i><span class="row-value">${displayPaths}</span></div>
+                    ${buildVeraCryptBadge(task, false)}
                     <div class="gboc-box-row"><i class="fas fa-cogs"></i><span class="row-value">Tarefa: ${taskEngine}</span></div>
                     <div class="gboc-box-row"><i class="fas fa-database"></i><span class="row-value">Repo: ${repoEngine}</span></div>
-                    <div class="gboc-box-row"><i class="fas ${scheduleIcon}"></i><span class="row-value">${scheduleText}</span></div>
+                    <div class="gboc-box-row" title="${scheduleText}"><i class="fas ${scheduleIcon}"></i><span class="row-value">${scheduleText}</span></div>
                     <div class="gboc-box-row"><i class="fas fa-layer-group"></i><span class="row-value task-versions" data-task-id="${task.id}">${_versionsLabel(task.id)}</span></div>
                     <div class="gboc-box-row">
                         <span class="gboc-box-status">
@@ -724,29 +1353,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                     </div>
                 </div>
                 <div class="gboc-box-actions">
-                    ${isRunning ? `
-                        <button class="gboc-action-btn act-monitor task-monitor-btn" data-task-id="${task.id}" title="Monitor">
-                            <i class="fas fa-chart-line"></i>
-                        </button>
-                    ` : ''}
-
-                    <button class="gboc-action-btn act-edit task-edit-btn" data-task-id="${task.id}" title="Editar">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    <button class="gboc-action-btn act-history task-history-btn" data-task-id="${task.id}" title="Histórico">
-                        <i class="fas fa-history"></i>
-                    </button>
-                    ${isRunning ?
-                        `<button class="gboc-action-btn act-stop task-cancel-btn" data-task-id="${task.id}" title="Interromper">
-                            <i class="fas fa-stop"></i>
-                        </button>` :
-                        `<button class="gboc-action-btn act-run task-run-btn" data-task-id="${task.id}" title="Executar">
-                            <i class="fas fa-play"></i>
-                        </button>` 
-                    }
-                    <button class="gboc-action-btn act-delete task-delete-btn" data-task-id="${task.id}" title="Excluir">
-                        <i class="fas fa-trash"></i>
-                    </button>
+                    ${buildActionsHtml(task, isRunning)}
                 </div>
             </div>`;
         }).join('');
@@ -831,10 +1438,30 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             .filter(Boolean)
             .join('\n');
 
+        const vcEnabled = document.getElementById('vc_enabled')?.checked || false;
+        const vcDrive = (document.getElementById('vc_drive_letter')?.value || 'V').toUpperCase().replace(/[^A-Z]/g, '') || 'V';
+        let normalizedPaths = paths;
+        if (vcEnabled && !normalizedPaths) {
+            normalizedPaths = `${vcDrive}:\\`;
+        }
+
+        const veracryptConfig = {
+            enabled: vcEnabled,
+            volume_path: (document.getElementById('vc_volume_path')?.value || '').trim(),
+            volume_type: getVeraCryptVolumeType(),
+            drive_letter: vcDrive,
+            password: document.getElementById('vc_password')?.value || '',
+            pim: document.getElementById('vc_pim')?.value || null,
+            keyfile: (document.getElementById('vc_keyfile')?.value || '').trim(),
+            readonly: document.getElementById('vc_readonly')?.checked ?? true,
+            auto_dismount: document.getElementById('vc_auto_dismount')?.checked ?? true,
+            executable_path: (document.getElementById('vc_executable_path')?.value || '').trim()
+        };
+
         const payload = {
             name: document.getElementById('name').value,
             repository_id: parseInt(document.getElementById('repository').value),
-            source_paths: paths,
+            source_paths: normalizedPaths,
             schedule_cron: schedule,
             schedule_enabled: schedule !== null,
             type: 'backup',
@@ -846,7 +1473,8 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             retry_max_attempts: parseInt(document.getElementById('retry_max_attempts').value) || 3,
             retry_delay_minutes: parseInt(document.getElementById('retry_delay_minutes').value) || 5,
             pre_script: document.getElementById('pre_script').value || '',
-            post_script: document.getElementById('post_script').value || ''
+            post_script: document.getElementById('post_script').value || '',
+            veracrypt_config: veracryptConfig
         };
 
         try {
@@ -1119,6 +1747,32 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             document.getElementById('retry_delay_minutes').value = task.retry_delay_minutes ?? 5;
             document.getElementById('pre_script').value = task.pre_script || '';
             document.getElementById('post_script').value = task.post_script || '';
+
+            const vc = task.veracrypt_config || {};
+            const vcActive = !!vc.enabled;
+            document.getElementById('vc_enabled').checked = vcActive;
+            document.getElementById('vc-options-panel').style.display = vcActive ? 'block' : 'none';
+            document.getElementById('vc_volume_path').value = vc.volume_path || '';
+            setVeraCryptVolumeType(vc.volume_type === 'device' ? 'device' : 'file', { skipLoad: !vcActive });
+            document.getElementById('vc_drive_letter').value = (vc.drive_letter || 'V').toUpperCase();
+            document.getElementById('vc_password').value = '';
+            document.getElementById('vc_password').placeholder = vc.has_password
+                ? '•••••••• (Senha criptografada salva — deixe vazio para manter)'
+                : 'Senha para abrir o volume';
+            document.getElementById('vc-password-saved-badge').style.display = vc.has_password ? 'inline' : 'none';
+            document.getElementById('vc_pim').value = vc.pim || '';
+            document.getElementById('vc_keyfile').value = vc.keyfile || '';
+            document.getElementById('vc_executable_path').value = vc.executable_path || '';
+            document.getElementById('vc_readonly').checked = vc.readonly !== false;
+            document.getElementById('vc_auto_dismount').checked = vc.auto_dismount !== false;
+            if (vc.executable_path) {
+                document.getElementById('vc-exe-custom-wrap').style.display = 'block';
+            }
+            const pathsEl = document.getElementById('paths');
+            if (pathsEl) {
+                if (vcActive) pathsEl.removeAttribute('required');
+                else pathsEl.setAttribute('required', 'required');
+            }
 
             openModal(true);
 
@@ -1749,7 +2403,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     </script>
     <script src="/static/gboc-file-picker.js"></script>
 <script>
-/* Barra de progresso ao vivo: dados reais do monitor gravados em task_executions */
+/* Barra de progresso ao vivo v15: telemetria real em memória + task_executions */
 (function () {
     const box = document.getElementById('live-backups');
     if (!box) return;
@@ -1758,69 +2412,142 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         do { b /= 1024; i++; } while (b >= 1024 && i < u.length - 1); return b.toFixed(b >= 100 ? 0 : 1) + ' ' + u[i]; };
     const fmtNum = n => (Number(n) || 0).toLocaleString('pt-BR');
     const fmtDur = s => { s = Math.max(0, Math.round(Number(s) || 0)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
-        return h ? `${h}h ${String(m).padStart(2,'0')}m` : (m ? `${m}m ${String(x).padStart(2,'0')}s` : `${x}s`); };
-    const ENGINE = { gboc_native: 'Nativo', native: 'Nativo', gboc: 'Nativo', local: 'Nativo', restic: 'Restic',
-                     kopia: 'Kopia', duplicati: 'Duplicati' };
-    const engineLabel = e => { const k = String(e || '').toLowerCase(); for (const key in ENGINE) if (k.startsWith(key)) return ENGINE[key]; return e || 'Backup'; };
-
+        return h ? `${h}h ${m}min ${x}s` : (m ? `${m}min ${x}s` : `${x}s`); };
+    const truncPath = (p, maxLen = 84) => {
+        const s = String(p || '');
+        if (!s || s.length <= maxLen) return s;
+        return '…' + s.slice(s.length - maxLen + 1);
+    };
     const ago = s => { s = Number(s) || 0; return s < 60 ? 'há menos de 1 min' : `há ${Math.floor(s / 60)} min`; };
+
+    window.gbocTogglePauseTask = async function (taskId, currentlyPaused) {
+        try {
+            const action = currentlyPaused ? 'resume' : 'pause';
+            const res = await fetch(`/api/tasks/${Number(taskId)}/${action}`, { method: 'POST' });
+            const d = await res.json().catch(() => ({}));
+            if (typeof showToast === 'function') {
+                showToast(d.message || (currentlyPaused ? 'Tarefa retomada' : 'Tarefa pausada'), res.ok ? 'info' : 'error');
+            }
+            if (window.gbocRefreshLiveBackups) window.gbocRefreshLiveBackups();
+        } catch (e) {
+            if (typeof showToast === 'function') showToast('Falha ao alternar pausa: ' + e.message, 'error');
+        }
+    };
+
+    window.gbocStopLiveTask = async function (taskId) {
+        try {
+            const res = await fetch(`/api/tasks/${Number(taskId)}/stop`, { method: 'POST' });
+            const d = await res.json().catch(() => ({}));
+            if (typeof showToast === 'function') {
+                showToast(d.message || 'Parada solicitada', res.ok ? 'warning' : 'error');
+            }
+            if (window.gbocRefreshLiveBackups) window.gbocRefreshLiveBackups();
+            if (typeof loadTasks === 'function') setTimeout(loadTasks, 800);
+        } catch (e) {
+            if (typeof showToast === 'function') showToast('Falha ao parar tarefa: ' + e.message, 'error');
+        }
+    };
+
     function card(ex) {
         const finished = !!ex.finished;
+        const paused = !!ex.paused && !finished;
         const ok = finished && ex.status === 'completed';
         const failLabel = { cancelled: 'Cancelado', interrupted: 'Interrompido' }[ex.status] || 'Falhou';
         let pct = ex.percent;                         // null = total ainda desconhecido
         if (ok) pct = 100;
         const indet = !finished && (pct === null || pct === undefined);
         if (finished && (pct === null || pct === undefined)) pct = 0;
-        const nativo = engineLabel(ex.engine) === 'Nativo';
         const preparing = ex.status === 'preparing' && !ex.files_processed;
+        const threads = Number(ex.threads) || 32;
+        const badge = ex.mode_badge || 'COPY';
+        const srcRoute = ex.source_summary || 'Origem';
+        const tgtRoute = ex.target_summary || ex.repository_name || 'Repositório';
+
         const meta = [
             `${fmtBytes(ex.bytes_per_sec)}/s`,
             `${(Number(ex.files_per_sec) || 0).toFixed(1)} arq/s`,
-            `<i class="far fa-clock"></i> ${fmtDur(ex.elapsed_seconds)}`,
+            `<span><i class="fas fa-gear"></i> ${threads} threads</span>`,
+            `<span><i class="far fa-clock"></i> ${fmtDur(ex.elapsed_seconds)}</span>`,
         ];
-        if (ex.eta_seconds && !finished) meta.push(`restam ~${fmtDur(ex.eta_seconds)}`);
-        if (finished) meta[2] = `<i class="far fa-clock"></i> durou ${fmtDur(ex.elapsed_seconds)}`;
-        const stats = [finished
-            ? `<span>${fmtNum(ex.files_processed)} arquivos</span>`
-            : `<span>${fmtNum(ex.files_processed)} de ${ex.files_total ? fmtNum(ex.files_total) : (nativo ? 'contando…' : '?')} arquivos</span>`];
-        if (ex.files_new || nativo) stats.push(`<span class="gl-new"><i class="far fa-check-circle"></i> ${fmtNum(ex.files_new)} novos/alterados</span>`);
-        if (ex.files_unmodified || nativo) stats.push(`<span class="gl-upd"><i class="fas fa-rotate"></i> ${fmtNum(ex.files_unmodified)} inalterados</span>`);
-        stats.push(`<span><i class="fas fa-database"></i> ${fmtBytes(ex.bytes_processed)}${ex.bytes_total ? ' de ' + fmtBytes(ex.bytes_total) : ''}</span>`);
-        if (ex.bytes_added) stats.push(`<span><i class="fas fa-cloud-arrow-up"></i> ${fmtBytes(ex.bytes_added)} enviados</span>`);
+        if (ex.eta_seconds && !finished && !paused) meta.push(`restam ~${fmtDur(ex.eta_seconds)}`);
+
         const label = finished
             ? (ok ? `<i class="fas fa-check"></i> Concluído ${ago(ex.finished_seconds_ago)}` : `<i class="fas fa-xmark"></i> ${failLabel} ${ago(ex.finished_seconds_ago)}`)
-            : (preparing ? 'Preparando…' : 'Progresso Geral');
-        const pctText = finished && !ok ? failLabel : (indet ? '' : Math.floor(pct) + '%');
+            : (paused ? '<i class="fas fa-pause"></i> Em pausa…' : (preparing ? 'Preparando varredura…' : 'Varrendo o disco e enviando...'));
+        const pctText = finished && !ok ? failLabel : (indet ? '…' : Math.floor(pct) + '%');
         const icon = finished ? (ok ? 'fa-circle-check' : 'fa-circle-xmark') : 'fa-wave-square';
-        const fileLine = finished && !ok && ex.error_message
+
+        const readDisk = fmtNum(ex.files_processed);
+        const inFilter = fmtNum(ex.files_in_filter ?? ex.files_processed);
+        const copied = fmtNum(ex.files_new);
+        const updated = fmtNum(ex.files_changed);
+        const inCloud = fmtNum(ex.files_unmodified);
+        const missing = fmtNum(ex.files_missing);
+        const failedCount = Number(ex.files_failed) || 0;
+
+        const curDir = ex.current_dir || (ex.current_file ? String(ex.current_file).replace(/[\\/][^\\/]+$/, '') : srcRoute);
+        const curFile = ex.current_file || '—';
+        const lastDone = ex.last_completed_file || ex.current_file || '—';
+        const volSent = fmtBytes(ex.bytes_added || 0);
+        const volTotal = ex.bytes_total ? fmtBytes(ex.bytes_total) : fmtBytes(ex.bytes_processed);
+
+        const errHtml = finished && !ok && ex.error_message
             ? `<div class="gl-err" title="${esc(ex.error_message)}">${esc(ex.error_message)}</div>`
-            : `<div class="gl-file" title="${esc(ex.current_file)}">${!finished && ex.current_file ? esc(ex.current_file) : (ex.repository_name ? 'Repositório: ' + esc(ex.repository_name) : '')}</div>`;
+            : '';
+
+        const actionsHtml = finished ? '' : `
+            <button type="button" class="gl-btn gl-btn-pause" onclick="window.gbocTogglePauseTask(${Number(ex.task_id)}, ${paused})">
+                <i class="fas ${paused ? 'fa-play' : 'fa-pause'}"></i> ${paused ? 'Retomar' : 'Pausar'}
+            </button>
+            <button type="button" class="gl-btn gl-btn-stop" onclick="window.gbocStopLiveTask(${Number(ex.task_id)})">
+                <i class="far fa-square"></i> Parar
+            </button>`;
+
         return `<div class="gl-card ${finished ? (ok ? 'gl-done' : 'gl-fail') : ''}">
             <div class="gl-icon"><i class="fas ${icon}"></i></div>
             <div style="min-width:0">
-                <div class="gl-name">${esc(ex.task_name || ('Tarefa ' + ex.task_id))} <span class="gl-badge">${esc(engineLabel(ex.engine))}</span></div>
+                <div class="gl-name">${esc(ex.task_name || ('Tarefa ' + ex.task_id))} <span class="gl-badge">${esc(badge)}</span></div>
+                <div class="gl-route" title="${esc(srcRoute + ' → ' + tgtRoute)}">${esc(srcRoute)} → ${esc(tgtRoute)}</div>
                 <div class="gl-meta">${meta.join('<span aria-hidden="true">•</span>')}</div>
-                ${fileLine}
+                ${errHtml}
             </div>
             <div class="gl-prog">
                 <div class="gl-top"><span>${label}</span><span class="gl-pct">${pctText}</span></div>
                 <div class="gl-bar ${indet ? 'gl-indet' : ''}" role="progressbar" aria-valuemin="0" aria-valuemax="100" ${indet ? '' : `aria-valuenow="${Math.floor(pct)}"`}>
-                    <div class="gl-fill" style="width:${indet ? 35 : (finished ? pct : Math.max(1, pct))}%"></div></div>
-                <div class="gl-stats">${stats.join('')}</div>
+                    <div class="gl-fill" style="width:${indet ? 35 : (finished ? pct : Math.max(1, pct))}%"></div>
+                </div>
+                <div class="gl-kpi-grid">
+                    <div class="gl-kpi-box"><div class="gl-kpi-lbl">LIDOS NO DISCO</div><div class="gl-kpi-val">${readDisk}</div></div>
+                    <div class="gl-kpi-box"><div class="gl-kpi-lbl">NO FILTRO</div><div class="gl-kpi-val">${inFilter}</div></div>
+                    <div class="gl-kpi-box"><div class="gl-kpi-lbl">COPIADOS</div><div class="gl-kpi-val gl-val-green">${copied}</div></div>
+                    <div class="gl-kpi-box"><div class="gl-kpi-lbl">ATUALIZADOS</div><div class="gl-kpi-val gl-val-cyan">${updated}</div></div>
+                    <div class="gl-kpi-box"><div class="gl-kpi-lbl">JÁ NA NUVEM</div><div class="gl-kpi-val">${inCloud}</div></div>
+                    <div class="gl-kpi-box"><div class="gl-kpi-lbl">NÃO ENCONTRADOS</div><div class="gl-kpi-val">${missing}</div></div>
+                    <div class="gl-kpi-box"><div class="gl-kpi-lbl">FALHAS</div><div class="gl-kpi-val ${failedCount ? 'gl-val-red' : ''}">${fmtNum(failedCount)}</div></div>
+                </div>
+                <div class="gl-timing-row">
+                    <span>Decorrido <strong>${fmtDur(ex.elapsed_seconds)}</strong></span>
+                    <span>Em pausa <strong>${fmtDur(ex.paused_seconds || 0)}</strong></span>
+                    <span>Trabalhando <strong>${fmtDur(ex.working_seconds ?? ex.elapsed_seconds)}</strong></span>
+                    <span>Volume <strong>${volSent}</strong> de ${volTotal}</span>
+                </div>
+                <div class="gl-activity-list">
+                    <div class="gl-act-line"><i class="far fa-folder-open" style="color:#fbbf24"></i><span class="gl-act-lbl">Lendo pasta</span><span class="gl-act-path" title="${esc(curDir)}">${esc(truncPath(curDir, 86))}</span></div>
+                    <div class="gl-act-line"><i class="fas fa-circle-notch ${!finished && !paused ? 'fa-spin' : ''}" style="color:#38bdf8"></i><span class="gl-act-lbl">Enviando (${threads} em paralelo)</span><span class="gl-act-path" title="${esc(curFile)}">${esc(truncPath(curFile, 74))}</span>${ex.current_file_size ? `<span class="gl-act-size">${fmtBytes(ex.current_file_size)}</span>` : ''}</div>
+                    <div class="gl-act-line"><i class="far fa-check-circle" style="color:#10b981"></i><span class="gl-act-lbl">Último concluído</span><span class="gl-act-path" title="${esc(lastDone)}">${esc(truncPath(lastDone, 82))}</span></div>
+                </div>
             </div>
-            <div class="gl-actions">${finished ? '' : `<button class="btn btn-sm btn-secondary" onclick="viewLiveProgress(${Number(ex.task_id)})"><i class="fas fa-eye"></i> Detalhes</button>`}</div>
+            <div class="gl-actions">${actionsHtml}</div>
         </div>`;
     }
 
     let timer = null;
     async function refresh() {
-        let next = 8000;
+        let next = 6000;
         try {
             const res = await fetch('/api/tasks/running/live', { cache: 'no-store' });
             if (res.ok) {
                 const data = await res.json();
-                // concluídos ficam no máximo 5 min (a API já filtra; aqui garante mesmo com relógio/atraso)
                 const list = (data.executions || []).filter(x => !x.finished || (Number(x.finished_seconds_ago) || 0) <= 300);
                 const running = list.filter(x => !x.finished).length;
                 if (list.length) {
@@ -1829,7 +2556,7 @@ Propriedade Intelectual & Direitos Autorais Registrados.
                         : `<i class="fas fa-flag-checkered" style="color:var(--text-muted)"></i>Concluídos recentemente`;
                     box.innerHTML = `<div class="gl-title-row">${title}</div>` + list.map(card).join('');
                     box.hidden = false;
-                    next = running ? 2000 : 10000;
+                    next = running ? 1200 : 8000;
                 } else {
                     box.hidden = true;
                     box.innerHTML = '';
@@ -1838,7 +2565,6 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         } catch (e) { /* rede/sessão: tenta de novo no próximo ciclo */ }
         if (!document.hidden) timer = setTimeout(refresh, next);
     }
-    // após "Executar agora" o painel aparece em ~2s sem esperar o ciclo lento
     window.gbocRefreshLiveBackups = () => { clearTimeout(timer); refresh(); };
     document.addEventListener('visibilitychange', () => { if (!document.hidden) { clearTimeout(timer); refresh(); } });
     refresh();

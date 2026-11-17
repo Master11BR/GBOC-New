@@ -1,4 +1,4 @@
-# GBOC System v14.8.3 Enterprise Edition
+# GBOC System v15.0.0 Enterprise Edition
 # Module: Server RMM & Remote Terminal Router
 # Remote Agent Execution Dispatcher, WebSocket/HTTP Proxy & Local Execution Fallback
 
@@ -20,7 +20,7 @@ import httpx
 try:
     from version_control import __version__ as SERVER_VERSION
 except Exception:
-    SERVER_VERSION = "14.8.3"
+    SERVER_VERSION = "15.0.0"
 
 try:
     import psutil

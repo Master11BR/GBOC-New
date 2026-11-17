@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-GBOC Agent 14.8.3 - SHARED CORE (Refactored)
+GBOC Agent 15.0.0 - SHARED CORE (Refactored)
 Arquitetura centralizada para inicialização de componentes
 """
 
@@ -51,7 +51,7 @@ KOPIA_CONFIGS_DIR = os.path.join(DATA_DIR, "engine_data", "kopia_configs")
 try:
     from version_control import __version__ as GBOC_VERSION
 except Exception:
-    GBOC_VERSION = "14.8.3"
+    GBOC_VERSION = "15.0.0"
 
 # Configuração de logging (ANTES de usar logger)
 os.makedirs(LOGS_DIR, exist_ok=True)
@@ -89,8 +89,9 @@ USE_POSTGRESQL = (DB_ENGINE == 'postgresql') and PSYCOPG2_AVAILABLE
 SQLITE_DB_PATH = os.path.join(DATA_DIR, "gboc.db")
 
 # PostgreSQL Configuration - AGENTE
+_raw_pg_host = os.getenv('POSTGRES_HOST', '127.0.0.1').strip()
 DB_CONFIG = {
-    'host': os.getenv('POSTGRES_HOST', 'localhost'),
+    'host': '127.0.0.1' if _raw_pg_host.lower() == 'localhost' else _raw_pg_host,
     'port': int(os.getenv('POSTGRES_PORT', 5432)),
     'database': os.getenv('POSTGRES_DB', 'gboc_agent'),  # ← Banco do AGENTE
     'user': os.getenv('POSTGRES_USER', 'postgres'),
@@ -123,9 +124,12 @@ class ConnectionPool:
         self.timeout = timeout
         self._pool = Queue(maxsize=max_connections)
         self._local = threading.local()
+        self._conn_verified_at: Dict[int, float] = {}
 
         for _ in range(max_connections):
-            self._pool.put(self._create_connection())
+            conn = self._create_connection()
+            self._conn_verified_at[id(conn)] = time.monotonic()
+            self._pool.put(conn)
 
     def _create_connection(self):
         """Cria uma nova conexão com o banco de dados PostgreSQL"""
@@ -162,20 +166,27 @@ class ConnectionPool:
         conn = None
         try:
             conn = self._pool.get(block=True, timeout=self.timeout)
-            # Verificar se a conexão está viva
+            # Verificar se a conexão está viva (evita SELECT 1 se usada nos últimos 30s)
+            now_mono = time.monotonic()
+            last_ok = self._conn_verified_at.get(id(conn), 0.0)
             try:
                 if conn.closed:
                     raise Exception("closed")
-                conn.cursor().execute("SELECT 1")
+                if (now_mono - last_ok) > 30.0:
+                    conn.cursor().execute("SELECT 1")
+                    self._conn_verified_at[id(conn)] = now_mono
             except Exception:
                 # Conexão morta, recriar
+                self._conn_verified_at.pop(id(conn), None)
                 try:
                     conn.close()
                 except Exception:
                     pass
                 conn = self._create_connection()
+                self._conn_verified_at[id(conn)] = time.monotonic()
             self._local.connection = conn
             yield conn
+            self._conn_verified_at[id(conn)] = time.monotonic()
         except Empty:
             raise TimeoutError("Não foi possível obter uma conexão do pool. O pool está esgotado.")
         except Exception:
@@ -639,6 +650,7 @@ class SharedCore:
                         "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS last_status TEXT",
                         "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS pre_script TEXT",
                         "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS post_script TEXT",
+                        "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS veracrypt_config TEXT",
                         "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'backup'",
                         "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS engine TEXT DEFAULT 'restic'",
                         "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS source_paths TEXT",

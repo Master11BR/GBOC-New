@@ -194,3 +194,54 @@ def test_restic_file_versions(tmp_path, monkeypatch):
     res = rm.file_versions(1, str(src / "doc.txt"))
     assert [v["changed"] for v in res["versions"]] == [True, False, True]
     assert rm.verify_repository(1)["success"]
+
+
+def test_duplicati_takeover_and_encrypted_individual_objects(data, monkeypatch):
+    from engines.real_restore_manager import RestoreManager as RealRestoreManager
+
+    tmp, src = data
+    repo = tmp / "repo_hybrid"
+    repo.mkdir(parents=True)
+    # Simula arquivos existentes de histórico do Duplicati no mesmo bucket/pasta
+    (repo / "duplicati-20261001T020000Z.dlist.zip.aes").write_bytes(b"dup-dlist")
+    (repo / "duplicati-b12345.dblock.zip.aes").write_bytes(b"dup-dblock")
+
+    eng = _engine(repo, src, cfg={"motor_password": "SenhaForteDuplicati!2026"})
+    res = eng.run_backup()
+    assert res["success"] and res["packs_uploaded"] == 0
+    # Chave AES-256-GCM criada mesmo com arquivos duplicati-* preexistentes
+    assert (repo / "gboc-key.json").exists()
+    # Objetos gravados individualmente e criptografados (tag 'E')
+    objs = _objects(repo)
+    assert len(objs) == 5
+    assert all(p.read_bytes()[:1] == b"E" for p in objs)
+    # Arquivos legados do Duplicati permanecem intactos
+    assert (repo / "duplicati-20261001T020000Z.dlist.zip.aes").exists()
+
+    # RestoreManager unifica snapshots GBOC Native + Histórico Duplicati e roteia cada um para o motor correto
+    rm = RealRestoreManager.__new__(RealRestoreManager)
+    be = LocalStorageBackend({"path": str(repo)})
+    rm.core = type("C", (), {"repository_manager": type("RM", (), {"get_backend": lambda _s, _id: be})()})()
+    repo_row = {"id": 7, "name": "HybridRepo", "engine": "gboc_native", "type": "local",
+                "path": str(repo), "motor_password": "SenhaForteDuplicati!2026", "legacy_duplicati": True}
+    monkeypatch.setattr(rm, "_load_repository", lambda _id: repo_row, raising=False)
+    monkeypatch.setattr(rm, "_list_duplicati_snapshots",
+                        lambda _r: [{"id": "0", "time": "2026-10-01T02:00:00", "hostname": "dup", "paths": ["/"]}])
+    monkeypatch.setattr(rm, "_restore_duplicati_files",
+                        lambda _r, sid, fls, tgt, opts: {"status": "success", "engine": "duplicati", "snapshot_id": sid, "files_restored": 3})
+
+    snaps = rm.list_snapshots(7)
+    engines = {s["id"]: s["engine"] for s in snaps}
+    assert res["snapshot_id"] in engines and engines[res["snapshot_id"]] == "gboc_native"
+    assert "dup_0" in engines and engines["dup_0"] == "duplicati_legacy"
+
+    # Restore de snapshot histórico do Duplicati vai para _restore_duplicati_files
+    r_dup = rm.restore_files(7, "dup_0", ["*"], str(tmp / "out_dup"))
+    assert r_dup["status"] == "success" and r_dup["engine"] == "duplicati"
+
+    # Restore de snapshot novo vai para o GBOC Native (descriptografando objetos individuais AES-256-GCM)
+    out_nat = tmp / "out_nat"
+    r_nat = rm.restore_files(7, res["snapshot_id"], ["*"], str(out_nat))
+    assert r_nat["status"] == "success" and r_nat["engine"] == "gboc_native"
+    assert (out_nat / "texto.txt").read_bytes() == (src / "texto.txt").read_bytes()
+

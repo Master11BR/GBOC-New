@@ -1,6 +1,6 @@
 /**
- * GBOC System v14.8.3 Enterprise Edition
- * Widget: Hardware, CPU, Disks, Ambient Weather & S.M.A.R.T. Telemetry HUD
+ * GBOC System v15.0.0 Enterprise Edition
+ * Widget: Hardware, CPU, Disks, Ambient Weather & S.M.A.R.T. Telemetry HUD (Agent)
  */
 
 (function() {
@@ -274,8 +274,16 @@
             _isHudOpen = true;
             await refreshHardwareHUD();
             
-            if (_hudTimer) clearInterval(_hudTimer);
-            _hudTimer = setInterval(refreshHardwareHUD, 5000);
+            if (_hudTimer) {
+                if (_hudTimer.stop) _hudTimer.stop();
+                else clearInterval(_hudTimer);
+                _hudTimer = null;
+            }
+            if (window.gbocPerf?.smartInterval) {
+                _hudTimer = window.gbocPerf.smartInterval(refreshHardwareHUD, 5000);
+            } else {
+                _hudTimer = setInterval(refreshHardwareHUD, 5000);
+            }
         }
     };
 
@@ -285,7 +293,8 @@
             backdrop.classList.remove('show');
             _isHudOpen = false;
             if (_hudTimer) {
-                clearInterval(_hudTimer);
+                if (_hudTimer.stop) _hudTimer.stop();
+                else clearInterval(_hudTimer);
                 _hudTimer = null;
             }
         }

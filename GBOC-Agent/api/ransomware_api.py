@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC 14.8.3 - Ransomware Detection API
+GBOC 15.0.0 - Ransomware Detection API
 Canaries, Guardian (resposta automática) e status do antivírus local.
 Varredura/"7 ferramentas" e Shield removidos (out/2026): detecção de malware é papel do antivírus/EDR.
 Rotas síncronas (def): o FastAPI as executa em threadpool, sem travar o event loop.
@@ -232,12 +232,12 @@ def resolve_all_active_incidents():
 
 @router.post("/guardian/test")
 def guardian_test_response():
-    """Simulate a threat detection to test the Guardian auto-response chain.
-    This does NOT create real locks or snapshots - just tests notifications."""
+    """Executa teste real de conectividade de todos os canais de notificação configurados no Guardian.
+    Não cria bloqueios nem snapshots — apenas dispara o envio real de diagnóstico nos canais."""
     from engines.ransomware_guardian import get_guardian
     guardian = get_guardian()
-    test_threat = {
-        'threat_detected': True,
+    diagnostic_event = {
+        'threat_detected': False,
         'compromised': 0,
         'missing': 0,
         'total': 0,
@@ -245,12 +245,11 @@ def guardian_test_response():
         'detected_at': datetime.now().isoformat(),
         'test_mode': True
     }
-    # Only test notifications, not destructive actions
-    notify_result = guardian._notify_all_channels(test_threat)
+    notify_result = guardian._notify_all_channels(diagnostic_event)
     return _clean({
         "test": True,
         "notifications": notify_result,
-        "message": "Test notification sent to all configured channels"
+        "message": "Notificação real de diagnóstico enviada para os canais configurados"
     })
 
 

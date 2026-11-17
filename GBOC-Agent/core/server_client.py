@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-🌐 GBOC Agent 14.8.3 - CENTRAL SERVER CLIENT
+🌐 GBOC Agent 15.0.0 - CENTRAL SERVER CLIENT
 Cliente para comunicação com servidor GBOC central
 """
 
@@ -39,7 +39,7 @@ from shared_core import SharedCore
 try:
     from version_control import __version__ as AGENT_VERSION
 except Exception:
-    AGENT_VERSION = "14.8.3"
+    AGENT_VERSION = "15.0.0"
 
 logger = logging.getLogger(__name__)
 
@@ -760,14 +760,14 @@ class CentralServerClient:
             # Executar comando de terminal RMM enviado pelo Servidor Central
             try:
                 from modules.rmm.rmm_router import rmm_execute_command
-                class DummyRequest:
+                class _InternalJsonPayloadRequest:
                     def __init__(self, data):
                         self._data = data
                     async def json(self):
                         return self._data
 
                 payload = command.get("data") or command
-                req = DummyRequest(payload)
+                req = _InternalJsonPayloadRequest(payload)
                 res = await rmm_execute_command(req)
 
                 reply_msg = {

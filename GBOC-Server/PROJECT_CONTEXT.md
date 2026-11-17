@@ -1,7 +1,7 @@
-# PROJECT_CONTEXT - GBOC System v14.8.1 Enterprise
+# PROJECT_CONTEXT - GBOC System v15.0.0 Enterprise (Python + Go Core + React 19)
 
 ## 🎯 OBJETIVO
-Sistema corporativo de gerenciamento de backups, monitoramento e diagnóstico preemptivo. O projeto garante alta performance utilizando sempre as tecnologias em suas últimas versões.
+Sistema corporativo de gerenciamento de backups, monitoramento e diagnóstico preemptivo. O projeto garante alta performance utilizando sempre as tecnologias em suas últimas versões (Python 3.11+/3.15, Go Core 1.22+, React 19 Modular Runtime e Universal CSS Stack).
 
 ## 🏗️ ARQUITETURA E STACK
 Duas frentes independentes integradas via WebSocket/REST:

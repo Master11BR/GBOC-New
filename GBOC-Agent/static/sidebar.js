@@ -1,6 +1,6 @@
 /*
 ==============================================================================
-GBOC System v14.8.3 Enterprise Edition
+GBOC System v15.0.0 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
@@ -14,20 +14,22 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 // 1. AUTO-INJEÇÃO SÍNCRONA DO LAYOUT MANAGER & MODAL FRAMEWORK
 // ============================================================================
 (function autoInjectLayoutManagerAndModal() {
-    if (!window.GBOCLayout && !document.getElementById('gboc-layout-manager-script')) {
+    if (!window.GBOCLayout && !document.getElementById('gboc-layout-manager-script') && !document.querySelector('script[src*="gboc-layout-manager.js"]')) {
         const s = document.createElement('script');
         s.id = 'gboc-layout-manager-script';
-        s.src = '/static/gboc-layout-manager.js';
+        s.src = '/static/gboc-layout-manager.js?v=15.0.0';
+        s.defer = true;
         if (document.head) {
             document.head.appendChild(s);
         } else {
             document.addEventListener('DOMContentLoaded', () => document.head.appendChild(s));
         }
     }
-    if (!window.GBOCModal && !document.getElementById('gboc-modal-script')) {
+    if (!window.GBOCModal && !document.getElementById('gboc-modal-script') && !document.querySelector('script[src*="gboc-modal.js"]')) {
         const m = document.createElement('script');
         m.id = 'gboc-modal-script';
-        m.src = '/static/gboc-modal.js';
+        m.src = '/static/gboc-modal.js?v=15.0.0';
+        m.defer = true;
         if (document.head) {
             document.head.appendChild(m);
         } else {
@@ -127,7 +129,7 @@ class UnifiedSidebar {
 
             // Atualização assíncrona em background para não bloquear o carregamento
             if (cachedHtml) {
-                this._loadSidebarHtml().catch(() => {});
+                this._loadSidebarHtml().catch(() => { });
             } else {
                 await this._loadSidebarHtml();
                 this._injectSidebar();
@@ -206,9 +208,9 @@ class UnifiedSidebar {
      */
     _injectSidebar() {
         const appDiv = document.querySelector(SIDEBAR_CONFIG.SELECTORS.APP) ||
-                       document.querySelector('.app-layout') ||
-                       document.querySelector('#sidebar-container') ||
-                       document.body;
+            document.querySelector('.app-layout') ||
+            document.querySelector('#sidebar-container') ||
+            document.body;
 
         if (!appDiv) {
             throw new Error(`Nenhum container válido para o sidebar foi encontrado.`);
@@ -237,7 +239,7 @@ class UnifiedSidebar {
         navLinks.forEach(link => link.classList.remove('active', 'in-focus'));
 
         const savedHref = (() => {
-            try { return sessionStorage.getItem('gboc_active_nav'); } catch(_) { return null; }
+            try { return sessionStorage.getItem('gboc_active_nav'); } catch (_) { return null; }
         })();
 
         let activeFound = false;
@@ -284,7 +286,7 @@ class UnifiedSidebar {
                 setTimeout(() => {
                     activeEl.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
                 }, 100);
-            } catch(e) {}
+            } catch (e) { }
         }
     }
 
@@ -353,7 +355,7 @@ class UnifiedSidebar {
                 if (href) {
                     try {
                         sessionStorage.setItem('gboc_active_nav', href);
-                    } catch (_) {}
+                    } catch (_) { }
                 }
 
                 const parentGroup = clickedLink.closest('.nav-group');
@@ -446,6 +448,7 @@ class UnifiedSidebar {
                         <a href="/failed-jobs.html" class="nav-link nav-sub" style="color:var(--danger)"><i class="fas fa-exclamation-triangle nav-icon"></i> <span>Jobs com Falha</span></a>
                         <a href="/logs.html" class="nav-link nav-sub"><i class="fas fa-file-alt nav-icon"></i> <span>Logs</span></a>
                         <a href="/diagnostic.html" class="nav-link nav-sub"><i class="fas fa-stethoscope nav-icon"></i> <span>Diagnóstico</span></a>
+                        <a href="/ai-knowledge.html" class="nav-link nav-sub"><i class="fas fa-brain nav-icon"></i> <span>IA: Conhecimento e MCP</span></a>
                         <a href="/reports.html" class="nav-link nav-sub"><i class="fas fa-chart-pie nav-icon"></i> <span>Relatórios</span></a>
                         <a href="javascript:void(0)" onclick="if(typeof toggleHardwareHUD==='function')toggleHardwareHUD()" class="nav-link nav-sub"><i class="fas fa-microchip nav-icon"></i> <span>Telemetria Hardware HUD</span></a>
                     </div>
@@ -468,9 +471,9 @@ class UnifiedSidebar {
         </aside>`;
 
         const appDiv = document.querySelector(SIDEBAR_CONFIG.SELECTORS.APP) ||
-                       document.querySelector('.app-layout') ||
-                       document.querySelector('#sidebar-container') ||
-                       document.body;
+            document.querySelector('.app-layout') ||
+            document.querySelector('#sidebar-container') ||
+            document.body;
         if (appDiv) {
             if (appDiv.id === 'sidebar-container') {
                 appDiv.innerHTML = fallbackHtml;
@@ -502,7 +505,7 @@ window.unifiedSidebar = new UnifiedSidebar();
 /**
  * Alterna entre tema claro e escuro
  */
-window.toggleTheme = function() {
+window.toggleTheme = function () {
     const current = document.documentElement.getAttribute('data-theme') || 'dark';
     const next = current === 'dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', next);
@@ -516,7 +519,7 @@ window.toggleTheme = function() {
  * Atualiza o visual do botão de tema
  * @param {string} theme - 'dark' ou 'light'
  */
-window.updateThemeButton = function(theme) {
+window.updateThemeButton = function (theme) {
     const icon = document.getElementById(SIDEBAR_CONFIG.SELECTORS.THEME_ICON);
     const label = document.getElementById(SIDEBAR_CONFIG.SELECTORS.THEME_LABEL);
     if (icon && label) {
@@ -529,12 +532,12 @@ window.updateThemeButton = function(theme) {
  * Exibe o usuário na interface do sidebar
  * @param {Object} u - Objeto contendo os dados do usuário
  */
-window._gbocShowSidebarUser = function(u) {
+window._gbocShowSidebarUser = function (u) {
     const el = document.getElementById(SIDEBAR_CONFIG.SELECTORS.USER_NAME);
     const info = document.getElementById(SIDEBAR_CONFIG.SELECTORS.USER_INFO);
     const btn = document.getElementById(SIDEBAR_CONFIG.SELECTORS.LOGOUT_BTN);
     const link = document.getElementById(SIDEBAR_CONFIG.SELECTORS.LOGOUT_LINK);
-    
+
     if (el) el.textContent = (u && (u.display_name || u.username)) || '';
     if (info) info.style.display = 'block';
     if (btn) btn.style.display = 'block';
@@ -544,10 +547,10 @@ window._gbocShowSidebarUser = function(u) {
 /**
  * Verifica autenticação e configura os botões e informações do usuário no sidebar
  */
-window.gbocSetupSidebarAuth = function() {
+window.gbocSetupSidebarAuth = function () {
     const token = localStorage.getItem(SIDEBAR_CONFIG.STORAGE.TOKEN);
     const user = localStorage.getItem(SIDEBAR_CONFIG.STORAGE.USER);
-    
+
     const btn = document.getElementById(SIDEBAR_CONFIG.SELECTORS.LOGOUT_BTN);
     const link = document.getElementById(SIDEBAR_CONFIG.SELECTORS.LOGOUT_LINK);
 
@@ -585,7 +588,7 @@ window.gbocSetupSidebarAuth = function() {
 /**
  * Executa o fluxo de logout do usuário
  */
-window.gbocLogout = async function() {
+window.gbocLogout = async function () {
     const confirmFn = window.gbocConfirm || window.confirm;
     const ok = window.gbocConfirm ? await window.gbocConfirm('Deseja realmente sair do sistema?', {
         title: 'Encerrar Sessão',
@@ -600,7 +603,7 @@ window.gbocLogout = async function() {
     } catch (e) {
         console.warn('⚠️ Falha ao invalidar sessão na API, procedendo com limpeza local.', e);
     }
-    
+
     localStorage.removeItem(SIDEBAR_CONFIG.STORAGE.TOKEN);
     localStorage.removeItem(SIDEBAR_CONFIG.STORAGE.USER);
     localStorage.removeItem('gboc_server_token');
@@ -613,7 +616,7 @@ window.gbocLogout = async function() {
  * @param {string|Date} value - Valor da data
  * @returns {string} Data formatada ou o valor original se for inválido
  */
-window.gbocFormatDateTime = function(value) {
+window.gbocFormatDateTime = function (value) {
     if (!value) return '—';
     try {
         let s = String(value);
@@ -634,31 +637,9 @@ window.gbocFormatDateTime = function(value) {
 };
 
 /**
- * Função global para alternar o tema do sistema (Dark / Light)
- */
-window.toggleTheme = function() {
-    const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
-    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', newTheme);
-    localStorage.setItem(SIDEBAR_CONFIG.STORAGE.THEME, newTheme);
-    window.updateThemeButton(newTheme);
-};
-
-window.updateThemeButton = function(theme) {
-    const iconEl = document.getElementById(SIDEBAR_CONFIG.SELECTORS.THEME_ICON);
-    const labelEl = document.getElementById(SIDEBAR_CONFIG.SELECTORS.THEME_LABEL);
-    if (iconEl) {
-        iconEl.className = theme === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
-    }
-    if (labelEl) {
-        labelEl.innerText = theme === 'dark' ? 'Tema Escuro' : 'Tema Claro';
-    }
-};
-
-/**
  * Funções globais de navegação colapsável da Sidebar (Grupos de Menu)
  */
-window.initNavGroups = function() {
+window.initNavGroups = function () {
     const navGroups = document.querySelectorAll('.nav-group');
     const curPath = window.location.pathname.toLowerCase();
 
@@ -683,7 +664,6 @@ window.initNavGroups = function() {
             }
         });
 
-        const savedState = localStorage.getItem('gboc-nav-' + grpId);
         // Se a página ativa pertence a este grupo, SEMPRE o mantém aberto e destacado
         if (hasActiveChild) {
             items.classList.add('open');
@@ -698,7 +678,7 @@ window.initNavGroups = function() {
     });
 };
 
-window.toggleNavGroup = function(grpId) {
+window.toggleNavGroup = function (grpId) {
     const items = document.getElementById('items-' + grpId);
     const arrow = document.getElementById('arrow-' + grpId);
     if (!items) return;
@@ -708,67 +688,9 @@ window.toggleNavGroup = function(grpId) {
 };
 
 /**
- * Funções globais de autenticação no Sidebar
- */
-window.gbocSetupSidebarAuth = function() {
-    const token = localStorage.getItem('gboc_token');
-    const user = localStorage.getItem('gboc_user');
-    if(user){
-        try {
-            const u = JSON.parse(user);
-            _gbocShowSidebarUser(u);
-        } catch(e){}
-    } else if(token){
-        const btn = document.getElementById('logoutBtn');
-        if(btn) btn.style.display = 'block';
-    }
-    fetch('/api/auth/status').then(r => r.json()).then(data => {
-        if(data.authenticated && data.user){
-            _gbocShowSidebarUser(data.user);
-        } else if(data.auth_enabled){
-            const btn = document.getElementById('logoutBtn');
-            if(btn) btn.style.display = 'block';
-        }
-    }).catch(()=>{
-        if(token){
-            const btn = document.getElementById('logoutBtn');
-            if(btn) btn.style.display = 'block';
-        }
-    });
-};
-
-function _gbocShowSidebarUser(u){
-    const el = document.getElementById('sidebarUsername');
-    const info = document.getElementById('sidebarUserInfo');
-    const btn = document.getElementById('logoutBtn');
-    if(el) el.textContent = u.display_name || u.username || '';
-    if(info) info.style.display = 'block';
-    if(btn) btn.style.display = 'block';
-}
-
-window.gbocLogout = async function(){
-    const ok = window.gbocConfirm ? await window.gbocConfirm('Deseja realmente sair do sistema?', {
-        title: 'Encerrar Sessão',
-        icon: 'fas fa-right-from-bracket',
-        type: 'warning',
-        confirmText: 'Sair do Sistema'
-    }) : confirm('Deseja realmente sair?');
-
-    if(!ok) return;
-    try {
-        await fetch('/api/auth/logout', {method:'POST'});
-    } catch(e){}
-    localStorage.removeItem('gboc_token');
-    localStorage.removeItem('gboc_server_token');
-    localStorage.removeItem('gboc_user');
-    document.cookie = 'gboc_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-    window.location.href = '/login.html';
-};
-
-/**
  * Unifica o indicador de status de conexão do cabeçalho em todas as páginas do sistema
  */
-window.gbocSyncConnectionStatus = async function() {
+window.gbocSyncConnectionStatus = async function () {
     // Indicador único (gboc-layout-manager.js): mesma regra em todas as telas
     if (window.GBOCStatus) { return window.GBOCStatus.refresh(); }
     const dot = document.getElementById('wsDot');
@@ -778,9 +700,9 @@ window.gbocSyncConnectionStatus = async function() {
         const res = await fetch('/api/system/info');
         if (res.ok) {
             const info = await res.json();
-            const rawVer = info.raw_version || info.gboc_version || '14.8.3';
+            const rawVer = info.raw_version || info.gboc_version || '15.0.0';
             const cleanVer = String(rawVer).replace(/^v/i, '').split('-')[0];
-            const ver = cleanVer || '14.8.1';
+            const ver = cleanVer || '15.0.0';
 
             if (dot && label) {
                 dot.className = 'ws-dot on';
@@ -807,7 +729,7 @@ window.gbocSyncConnectionStatus = async function() {
         } else {
             throw new Error('API Inacessível');
         }
-    } catch(e) {
+    } catch (e) {
         if (dot && label) {
             dot.className = 'ws-dot off';
             dot.style.background = 'var(--danger)';
@@ -818,7 +740,7 @@ window.gbocSyncConnectionStatus = async function() {
 };
 
 // Inicialização automática quando DOM estiver pronto
-document.addEventListener('DOMContentLoaded', async function() {
+document.addEventListener('DOMContentLoaded', async function () {
     const savedTheme = localStorage.getItem(SIDEBAR_CONFIG.STORAGE.THEME) || 'dark';
     document.documentElement.setAttribute('data-theme', savedTheme);
     window.updateThemeButton(savedTheme);

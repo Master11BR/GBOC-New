@@ -1,5 +1,5 @@
 # ==============================================================================
-# GBOC Agent v14.8.3 Enterprise Edition
+# GBOC Agent v15.0.0 Enterprise Edition
 # Engine: Universal Auto-Verify Engine (SureRestore On-Completion)
 # ==============================================================================
 
@@ -76,7 +76,7 @@ class AutoVerifyEngine:
             elif engine_type in ("gboc_native", "native"):
                 details = self._verify_native(task, repo_id, sandbox_dir)
             else:
-                # Motor genérico / simulação segura de integridade de metadados
+                # Motor sem verificador específico implementado (retorna erro explícito)
                 details = self._verify_generic_manifest(task, repo_id, sandbox_dir)
 
             status = "passed" if details.get("success", False) else "failed"

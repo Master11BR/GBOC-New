@@ -51,11 +51,11 @@ class TestDatabaseCrossMigrator(unittest.TestCase):
     def tearDown(self):
         self.tmp_dir.cleanup()
 
-    def test_sqlite_to_sqlite_simulation(self):
-        """Testa cópia e resiliência de dados usando o móbulo migrador."""
+    def test_sqlite_to_sqlite_migration(self):
+        """Testa cópia e resiliência de dados usando o módulo migrador."""
         migrator = DatabaseCrossMigrator()
         
-        # Simular migração usando conexões SQLite
+        # Executar migração real entre conexões SQLite
         src_conn = sqlite3.connect(self.src_db)
         src_conn.row_factory = sqlite3.Row
         

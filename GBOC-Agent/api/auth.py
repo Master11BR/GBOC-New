@@ -306,6 +306,30 @@ def get_current_user(request: Request) -> Optional[Dict]:
 _AUTH_ENABLED_CACHE = {"ok": False, "ts": 0.0}
 
 
+def get_current_user_fast(request: Request) -> Tuple[Optional[bool], Optional[Dict]]:
+    """Fast-path em memória (zero I/O, zero threadpool) quando auth_enabled e token já estão em cache."""
+    import time as _t
+    if not (_AUTH_ENABLED_CACHE["ok"] and (_t.monotonic() - _AUTH_ENABLED_CACHE["ts"]) < 60.0):
+        return None, None
+    now_ts = _t.time()
+    for token in _token_candidates(request):
+        info = ACTIVE_TOKENS.get(token)
+        if not info:
+            continue
+        expires_at = info.get('expires_at')
+        if isinstance(expires_at, (int, float)):
+            if now_ts > expires_at:
+                ACTIVE_TOKENS.pop(token, None)
+                continue
+        elif isinstance(expires_at, datetime):
+            now_comp = datetime.now(timezone.utc) if expires_at.tzinfo else datetime.now()
+            if now_comp > expires_at:
+                ACTIVE_TOKENS.pop(token, None)
+                continue
+        return True, info
+    return True, None
+
+
 def is_auth_enabled() -> bool:
     # Chamado em TODA requisição pelo middleware: o "sim" fica em cache por 60 s (antes: 1 consulta por pedido).
     import time as _t

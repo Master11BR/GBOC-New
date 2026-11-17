@@ -1,6 +1,6 @@
 <!--
 ==============================================================================
-GBOC System v14.8.3 Enterprise Edition
+GBOC System v15.0.0 Enterprise Edition
 Copyright (c) 2026 Master11BR - Todos os direitos reservados.
 Propriedade Intelectual & Direitos Autorais Registrados.
 ==============================================================================
@@ -12,18 +12,22 @@ Propriedade Intelectual & Direitos Autorais Registrados.
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GBOC Agent - Assistente de Restauração</title>
     
+    
     <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
-    <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/ui/models/modern/components.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/ui/models/modern/layout.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/style.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/gboc-themes.css?v=14.8.3">
-    <link rel="stylesheet" href="/static/gboc-layout.css?v=14.8.3">
-    <script src="/static/gboc-perf.js?v=14.8.3"></script>
-    <script src="/static/gboc-layout-manager.js?v=14.8.3"></script>
-    <script src="/static/gboc-modal.js?v=14.8.3"></script>
+    <link rel="stylesheet" href="/static/ui/design-system/tokens.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/ui/design-system/unocss-ds.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/model.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/components.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/ui/models/modern/layout.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/style.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/gboc-themes.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/gboc-layout.css?v=15.0.0">
+    <link rel="stylesheet" href="/static/ui/react/gboc-react.css?v=15.0.0">
+    <script src="/static/gboc-perf.js?v=15.0.0"></script>
+    <script src="/static/gboc-layout-manager.js?v=15.0.0"></script>
+    <script src="/static/gboc-modal.js?v=15.0.0"></script>
+    <script src="/static/ui/react/gboc-react-core.js?v=15.0.0"></script>
+    <script src="/static/ui/react/gboc-react-components.js?v=15.0.0" defer></script>
 <link rel="icon" href="/favicon.ico" type="image/x-icon">
     <script src="/static/auth_interceptor.js"></script>
     <style>
@@ -416,16 +420,19 @@ Propriedade Intelectual & Direitos Autorais Registrados.
         }
     }
 
-    // ── Parallel Process Detection & Banner ──────────────────────────────────
+    // ── Parallel Process Detection & Banner (Rich v15 Progress HUD) ──────────
+    let _activeBannerTimer = null;
     async function checkForActiveRestores() {
         try {
-            const r = await fetch('/api/restore/active');
+            const r = await fetch('/api/restore/active', { cache: 'no-store' });
             if (r.ok) {
                 const data = await r.json();
                 const activeList = data.active_restores || (data.active ? [data.active] : []);
                 if (activeList.length > 0) {
                     renderActiveRestoresBanner(activeList);
                     activeList.forEach(job => _runningJobIds.add(job.id));
+                    clearTimeout(_activeBannerTimer);
+                    _activeBannerTimer = setTimeout(checkForActiveRestores, 1500);
                     return;
                 }
             }
@@ -445,27 +452,78 @@ Propriedade Intelectual & Direitos Autorais Registrados.
             return;
         }
 
-        container.style.display = 'flex';
+        const fmtBytes = b => { b = Number(b) || 0; if (b < 1024) return b + ' B'; const u = ['KB','MB','GB','TB']; let i = -1;
+            do { b /= 1024; i++; } while (b >= 1024 && i < u.length - 1); return b.toFixed(b >= 100 ? 0 : 1) + ' ' + u[i]; };
+        const fmtNum = n => (Number(n) || 0).toLocaleString('pt-BR');
+        const fmtDur = s => { s = Math.max(0, Math.round(Number(s) || 0)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+            return h ? `${h}h ${m}min ${x}s` : (m ? `${m}min ${x}s` : `${x}s`); };
+        const truncPath = (p, maxLen = 82) => {
+            const s = String(p || '');
+            if (!s || s.length <= maxLen) return s;
+            return '…' + s.slice(s.length - maxLen + 1);
+        };
+
+        container.style.display = 'grid';
         container.innerHTML = activeList.map(job => {
-            const shortSnap = String(job.snapshot_id || '').substring(0, 8);
+            const shortSnap = String(job.snapshot_id || '').substring(0, 14);
             const target = job.target_path || 'C:\\GBOC-Restore';
+            const pct = Math.min(100, Math.max(1, Number(job.progress) || 0));
+            const threads = Number(job.threads) || 32;
+            const elapsed = Number(job.elapsed_seconds || job.duration_seconds || 0);
+            const bps = Number(job.bytes_per_sec) || 0;
+            const fps = Number(job.files_per_sec) || 0;
+            const restoredFiles = Number(job.files_restored) || 0;
+            const totalFiles = Number(job.total_files) || restoredFiles;
+            const curDir = job.current_dir || target;
+            const curFile = job.current_file || target;
+            const lastDone = job.last_completed_file || curFile;
+            const errs = Number(job.errors) || 0;
+
             return `
-                <div style="background:linear-gradient(135deg, rgba(99,102,241,0.15), rgba(56,178,172,0.15)); border:1px solid var(--primary); border-radius:12px; padding:12px 18px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; animation:fadeInUp 0.3s ease;">
-                    <div style="display:flex; align-items:center; gap:12px;">
-                        <div style="width:34px; height:34px; border-radius:50%; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-size:1em;">
-                            <i class="fas fa-spinner fa-spin"></i>
-                        </div>
-                        <div>
-                            <div style="font-weight:700; font-size:0.92em; color:var(--text);">Restauração em Andamento <span style="color:var(--primary);">#${job.id}</span></div>
-                            <div style="font-size:0.8em; color:var(--text-muted);">Snapshot: #${shortSnap} • Destino: ${target} • Progresso: ${job.progress || 0}%</div>
+                <div class="gl-card">
+                    <div class="gl-icon"><i class="fas fa-wave-square"></i></div>
+                    <div style="min-width:0">
+                        <div class="gl-name">Restauração #${job.id} <span class="gl-badge">RESTORE</span></div>
+                        <div class="gl-route" title="Snapshot #${_vesc(shortSnap)} → ${_vesc(target)}">Snapshot #${_vesc(shortSnap)} → ${_vesc(target)}</div>
+                        <div class="gl-meta">
+                            <span>${fmtBytes(bps)}/s</span><span aria-hidden="true">•</span>
+                            <span>${fps.toFixed(1)} arq/s</span><span aria-hidden="true">•</span>
+                            <span><i class="fas fa-gear"></i> ${threads} threads</span><span aria-hidden="true">•</span>
+                            <span><i class="far fa-clock"></i> ${fmtDur(elapsed)}</span>
                         </div>
                     </div>
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <button class="btn btn-sm btn-primary" onclick="reconnectSpecificRestore(${job.id})">
+                    <div class="gl-prog">
+                        <div class="gl-top"><span>Restaurando arquivos e blocos em paralelo...</span><span class="gl-pct">${pct}%</span></div>
+                        <div class="gl-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}">
+                            <div class="gl-fill" style="width:${pct}%"></div>
+                        </div>
+                        <div class="gl-kpi-grid">
+                            <div class="gl-kpi-box"><div class="gl-kpi-lbl">NO SNAPSHOT</div><div class="gl-kpi-val">${fmtNum(totalFiles)}</div></div>
+                            <div class="gl-kpi-box"><div class="gl-kpi-lbl">NO FILTRO</div><div class="gl-kpi-val">${fmtNum(totalFiles)}</div></div>
+                            <div class="gl-kpi-box"><div class="gl-kpi-lbl">RESTAURADOS</div><div class="gl-kpi-val gl-val-green">${fmtNum(restoredFiles)}</div></div>
+                            <div class="gl-kpi-box"><div class="gl-kpi-lbl">ATUALIZADOS</div><div class="gl-kpi-val gl-val-cyan">${fmtNum(restoredFiles)}</div></div>
+                            <div class="gl-kpi-box"><div class="gl-kpi-lbl">CACHE PACK</div><div class="gl-kpi-val">16 slots</div></div>
+                            <div class="gl-kpi-box"><div class="gl-kpi-lbl">NÃO ENCONTRADOS</div><div class="gl-kpi-val">0</div></div>
+                            <div class="gl-kpi-box"><div class="gl-kpi-lbl">FALHAS</div><div class="gl-kpi-val ${errs ? 'gl-val-red' : ''}">${fmtNum(errs)}</div></div>
+                        </div>
+                        <div class="gl-timing-row">
+                            <span>Decorrido <strong>${fmtDur(elapsed)}</strong></span>
+                            <span>Em pausa <strong>0s</strong></span>
+                            <span>Trabalhando <strong>${fmtDur(elapsed)}</strong></span>
+                            <span>Volume <strong>${fmtBytes(job.bytes_restored || 0)}</strong>${job.bytes_total ? ' de ' + fmtBytes(job.bytes_total) : ''}</span>
+                        </div>
+                        <div class="gl-activity-list">
+                            <div class="gl-act-line"><i class="far fa-folder-open" style="color:#fbbf24"></i><span class="gl-act-lbl">Gravando pasta</span><span class="gl-act-path" title="${_vesc(curDir)}">${_vesc(truncPath(curDir, 84))}</span></div>
+                            <div class="gl-act-line"><i class="fas fa-circle-notch fa-spin" style="color:#38bdf8"></i><span class="gl-act-lbl">Restaurando (${threads} em paralelo)</span><span class="gl-act-path" title="${_vesc(curFile)}">${_vesc(truncPath(curFile, 72))}</span>${job.current_file_size ? `<span class="gl-act-size">${fmtBytes(job.current_file_size)}</span>` : ''}</div>
+                            <div class="gl-act-line"><i class="far fa-check-circle" style="color:#10b981"></i><span class="gl-act-lbl">Último concluído</span><span class="gl-act-path" title="${_vesc(lastDone)}">${_vesc(truncPath(lastDone, 80))}</span></div>
+                        </div>
+                    </div>
+                    <div class="gl-actions">
+                        <button type="button" class="gl-btn gl-btn-pause" onclick="reconnectSpecificRestore(${job.id})">
                             <i class="fas fa-desktop"></i> Monitorar
                         </button>
-                        <button class="btn btn-sm btn-danger" onclick="cancelActiveRestore(${job.id})" title="Cancelar ou descartar este processo">
-                            <i class="fas fa-times-circle"></i> Cancelar
+                        <button type="button" class="gl-btn gl-btn-stop" onclick="cancelActiveRestore(${job.id})">
+                            <i class="far fa-square"></i> Parar
                         </button>
                     </div>
                 </div>
@@ -691,14 +749,18 @@ Propriedade Intelectual & Direitos Autorais Registrados.
 
             container.innerHTML = _snapshots.map((snap, idx) => {
                 const snapId = snap.id || snap.short_id || String(idx);
-                const shortId = String(snapId).substring(0, 8);
+                const shortId = String(snapId).substring(0, 14);
                 const dateStr = snap.time || snap.created_at || snap.date ? new Date(snap.time || snap.created_at || snap.date).toLocaleString('pt-BR') : 'Data Indisponível';
                 const paths = Array.isArray(snap.paths) ? snap.paths.join(', ') : (snap.path || snap.summary || 'Backup Completo');
+                const isDupHist = snap.engine === 'duplicati_legacy' || String(snapId).startsWith('dup_');
+                const engBadge = isDupHist
+                    ? '<span class="gl-badge" style="color:#fbbf24;border-color:rgba(251,191,36,.35);background:rgba(251,191,36,.12)">Histórico Duplicati</span>'
+                    : (snap.engine === 'gboc_native' ? '<span class="gl-badge">Nativo v4</span>' : '');
 
                 return `
                     <div class="option-card" id="snap-card-${shortId}" onclick="selectSnapshot('${snapId}', '${shortId}', '${dateStr}')">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                            <strong style="font-size:0.9em; font-family:monospace; color:var(--primary);">#${shortId}</strong>
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:6px; flex-wrap:wrap;">
+                            <strong style="font-size:0.9em; font-family:monospace; color:var(--primary);">#${shortId} ${engBadge}</strong>
                             <span style="font-size:0.75em; color:var(--text-muted);">${dateStr}</span>
                         </div>
                         <div style="font-size:0.8em; color:var(--text); margin-bottom:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${paths}">

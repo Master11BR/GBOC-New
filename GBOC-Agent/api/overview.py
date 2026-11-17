@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBOC Agent 14.8.3 - API OVERVIEW (STATUS DETALHADO)
+GBOC Agent 15.0.0 - API OVERVIEW (STATUS DETALHADO)
 Adiciona contagem de tarefas em execução vs paradas.
 """
 
@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/overview", tags=["overview"])
 
 _LOCAL_IP_CACHE = {"ip": "127.0.0.1", "ts": 0.0}
+_OVERVIEW_CACHE: Dict[str, Any] = {"data": None, "ts": 0.0}
 
 def _get_cached_local_ip() -> str:
     now = time.monotonic()
@@ -47,6 +48,9 @@ def _get_cached_local_ip() -> str:
 
 @router.get("/")
 def get_overview() -> Dict[str, Any]:
+    now_mono = time.monotonic()
+    if _OVERVIEW_CACHE["data"] is not None and (now_mono - _OVERVIEW_CACHE["ts"]) < 2.0:
+        return _OVERVIEW_CACHE["data"]
     request_start = time.perf_counter()
     try:
         # 1. Métricas de Sistema (sem intervalo bloqueante, consumindo amostrador de background)
@@ -113,10 +117,11 @@ def get_overview() -> Dict[str, Any]:
             server_link = {"state": "error", "connected": False, "detail": f"Falha ao consultar a ligação com o Servidor Central: {str(_sl_err)[:180]}"}
 
         elapsed_ms = round((time.perf_counter() - request_start) * 1000, 2)
-        logger.info(f"[PERF] GET /api/overview concluído em {elapsed_ms} ms")
+        logger.debug(f"[PERF] GET /api/overview concluído em {elapsed_ms} ms")
 
-        return {
+        payload = {
             "status": "online",
+            "gboc_version": "15.0.0",
             "timestamp": datetime.now().isoformat(),
             "health_score": _calculate_health(cpu_percent, memory.percent, disk.percent, backup_health_score),
             
@@ -148,9 +153,13 @@ def get_overview() -> Dict[str, Any]:
             "system_info": {
                 "platform": f"{platform.system()} {platform.release()}",
                 "version": platform.version(),
-                "uptime_seconds": uptime_seconds
+                "uptime_seconds": uptime_seconds,
+                "gboc_version": "15.0.0"
             }
         }
+        _OVERVIEW_CACHE["data"] = payload
+        _OVERVIEW_CACHE["ts"] = time.monotonic()
+        return payload
         
     except Exception as e:
         elapsed_ms = round((time.perf_counter() - request_start) * 1000, 2)
